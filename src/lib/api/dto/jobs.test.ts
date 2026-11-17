@@ -54,13 +54,15 @@ describe("a candidate's searches", () => {
     const searches = toJobSearches(JobSearchesDto.parse({
       running: { batch_id: "b1", kind: "search", run_id: "r1", state: "running", error_code: null, query: "Java Developer", place: "remote", country: "us", provider: "indeed", counts: null, user_id: "u1", started_at: "2026-11-11T14:00:00+00:00", finished_at: null },
       searches: [
-        { batch_id: "b0", kind: "search", state: "success", error_code: null, query: "Java Developer", counts: { found: 20, saved: 12, refreshed: 3, skipped_over_cap: 5, skipped_work_auth: 4, skipped_too_old: 6, skipped_not_remote: 1, skipped_adzuna: 2, skipped_level: 5, by_source: { linkedin: { saved: 7 }, indeed: { saved: 5 } } }, errors: { "freehire|remote": "timeout" }, started_at: "2026-11-11T13:00:00+00:00", finished_at: "2026-11-11T13:00:09+00:00" },
+        { batch_id: "b0", kind: "search", state: "success", error_code: null, query: "Java Developer", work_date: "2026-11-10", day: 2, batch: 3, counts: { found: 20, saved: 12, refreshed: 3, skipped_over_cap: 5, skipped_work_auth: 4, skipped_too_old: 6, skipped_not_remote: 1, skipped_adzuna: 2, skipped_level: 5, by_source: { linkedin: { saved: 7 }, indeed: { saved: 5 } } }, errors: { "freehire|remote": "timeout" }, started_at: "2026-11-11T13:00:00+00:00", finished_at: "2026-11-11T13:00:09+00:00" },
         { batch_id: "bx", kind: "search", state: "error", error_code: "timeout", query: "QA", counts: null, started_at: "2026-11-11T12:00:00+00:00", finished_at: "2026-11-11T12:00:30+00:00" },
         { batch_id: "bc", kind: "capture", state: "success", error_code: null, query: null, counts: null, started_at: "2026-11-11T11:00:00+00:00", finished_at: "2026-11-11T11:00:00+00:00" },
       ],
       usage: { jobs_saved_today: 47, jobs_cap: 100, attempts_today: 3, attempts_cap: 20, captures_today: 2, captures_cap: 20, resets_at: "2026-11-12T13:00:00+00:00" },
       role: "Java Developer",
       places: [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }, { value: "remote", label: "Remote (anywhere in the US)", kind: "remote" }],
+      workday: { start: "18:30", end: "04:00", timezone: "Asia/Kolkata", label: "6:30 PM – 4:00 AM", assigned_at: "2026-11-09T14:00:00+00:00",
+        day_one: "2026-11-09", today: "2026-11-10", today_day: 2, days_worked: [2] },
     }));
     expect(searches.running).toMatchObject({ id: "b1", kind: "SEARCH", state: "RUNNING", newCount: 0, finishedAt: null, place: "remote" });
     expect(searches.searches[0].place).toBeNull();                    // a search from before places (2026-11-14)
@@ -68,6 +70,10 @@ describe("a candidate's searches", () => {
     expect(searches.searches[0]).toMatchObject({ newBySource: { linkedin: 7, indeed: 5 }, failedSources: ["freehire"] });   // Q90, Q93
     expect(searches.searches[1]).toMatchObject({ leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0 });
     expect(searches.role).toBe("Java Developer");
+    // The candidate's Days (decided 2026-11-17, Q152–Q174): each search's Day and batch, and the Days with work.
+    expect(searches.searches[0]).toMatchObject({ workDate: "2026-11-10", day: 2, batch: 3 });
+    expect(searches.searches[1]).toMatchObject({ workDate: null, day: null, batch: null });
+    expect(searches.workday).toEqual({ start: "18:30", end: "04:00", timezone: "Asia/Kolkata", dayOne: "2026-11-09", today: "2026-11-10", todayDay: 2, daysWorked: [2] });
     expect(searches.places.map((p) => p.value)).toEqual(["Austin, TX", "remote"]);
     expect(searches.searches.map((s) => [s.kind, s.state, s.newCount, s.seenAgainCount, s.overLimitCount, s.errorCode])).toEqual([
       ["SEARCH", "SUCCESS", 12, 3, 5, null], ["SEARCH", "ERROR", 0, 0, 0, "timeout"], ["CAPTURE", "SUCCESS", 0, 0, 0, null],

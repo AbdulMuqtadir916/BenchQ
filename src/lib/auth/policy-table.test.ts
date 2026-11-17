@@ -39,6 +39,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
   ["notification.approve", "Y Y - - - -"],  // 07 Q54; only the routed approver acts
+  ["firm.editHours", "Y - - - - -"],        // 07 Q67: the firm's work hours, the one firm setting the OWNER edits
   ["team.view", "Y Y - - - Y"],
   // platform (07 §2.3)
   ["firm.create", "- - - - Y Y"],

@@ -46,7 +46,7 @@ from backend.auth.policy import can_manage_resume, can_search_jobs
 from backend.auth.scoping import scoped
 from backend.auth.sessions import Principal
 from backend.job_monitor import JobAlreadyRunningError, launch_background
-from backend.job_search import limits, pipeline, places, providers
+from backend.job_search import limits, pipeline, places, providers, workday
 from backend.job_search.country import search_country
 from backend.job_search.providers.base import ProviderError
 from backend.job_search.text import clean_json, safe_url, typed_text
@@ -106,8 +106,8 @@ def _too_many(detail: str) -> HTTPException:
     return HTTPException(status_code=429, detail=detail)
 
 
-def _resets(now) -> str:
-    return f"resets {limits.next_reset(now).astimezone(limits.IST):%I:%M %p} IST".replace("resets 0", "resets ")
+def _resets(db, firm_id, now) -> str:
+    return f"resets {limits.resets_at_text(db, firm_id, now)}"
 
 
 def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal) -> dict:
@@ -139,9 +139,9 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
     if limits.running_search(db, firm_id, candidate.id, now) is not None:
         raise HTTPException(status_code=409, detail="A search for this candidate is already running.")
     if limits.jobs_saved_today(db, firm_id, candidate.id, now) >= limits.JOBS_PER_CANDIDATE_PER_DAY:
-        raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(now)}.")
+        raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(db, firm_id, now)}.")
     if limits.attempts_today(db, firm_id, principal.user_id, now) >= limits.ATTEMPTS_PER_BDE_PER_DAY:
-        raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(now)}.")
+        raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(db, firm_id, now)}.")
     # One click asks every source the place's mode names (decided 2026-11-17, Q90, Q122): no source picker.
     provider_name = pipeline.ALL_SOURCES
     # The role's titles, searched together (decided 2026-11-16, Q69): "A | B" is two, "GenAI / LLM Engineer" two more.
@@ -199,11 +199,47 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
     return {"batch_id": str(batch_id), "run_id": str(run_id)}
 
 
-def _search_json(row: ScrapeJob, now=None) -> dict:
+def _numbered(db, firm_id, candidate, hours) -> dict:
+    """The current assignment's finished searches, oldest first: batch_id → {"day", "batch"} (decided 2026-11-17,
+    Q154, Q158, Q166, Q170): batches numbered on across Days, each search's Day from its work date and the
+    candidate's Day 1. Empty without a BDE (Q174). Every one of them, not just the history's page."""
+    if candidate.bde_id is None or candidate.bde_assigned_at is None or candidate.bde_day_one is None:
+        return {}
+    rows = scoped(db, ScrapeJob, firm_id).filter(
+        ScrapeJob.candidate_id == candidate.id, ScrapeJob.kind == "search", ScrapeJob.state.in_(("success", "empty")),
+        ScrapeJob.created_at >= candidate.bde_assigned_at,
+    ).order_by(ScrapeJob.created_at, ScrapeJob.id).with_entities(
+        ScrapeJob.batch_id, ScrapeJob.work_date, ScrapeJob.created_at, ScrapeJob.finished_at).all()
+    out = {}
+    for index, row in enumerate(rows, start=1):
+        on = row.work_date or workday.work_date(row.created_at, hours)
+        out[row.batch_id] = {"day": workday.day_number(on, candidate.bde_day_one), "batch": index,
+                             "window": (row.created_at, row.finished_at)}
+    return out
+
+
+def _workday_json(candidate, hours, numbered: dict, now) -> dict:
+    """The candidate's Days for the history (Q156, Q165, Q172): the firm's hours, the assignment, today's Day and
+    the Days with work; the empty ones between are worked out by the reader, never stored."""
+    today = workday.work_date(now, hours)
+    first = candidate.bde_day_one if candidate.bde_id is not None else None
+    return {"start": workday.clock_text(hours.start), "end": workday.clock_text(hours.end),
+            "timezone": hours.zone.key, "label": hours.label(),
+            "assigned_at": candidate.bde_assigned_at.isoformat() if first and candidate.bde_assigned_at else None,
+            "day_one": first.isoformat() if first else None, "today": today.isoformat(),
+            "today_day": workday.day_number(today, first) if first else None,
+            "days_worked": sorted({n["day"] for n in numbered.values()})}
+
+
+def _search_json(row: ScrapeJob, now=None, numbered: dict | None = None) -> dict:
     meta = row.meta or {}
     request = meta.get("request") or {}
     lost = limits.is_lost(row, now)            # shown as the error it becomes; a read writes nothing
+    number = (numbered or {}).get(row.batch_id) or {}
     return {"batch_id": str(row.batch_id), "kind": row.kind, "run_id": meta.get("run_id"),
+            # The work day it ran in, and its Day and batch number in the current assignment (None: before it, Q174).
+            "work_date": row.work_date.isoformat() if row.work_date else None,
+            "day": number.get("day"), "batch": number.get("batch"),
             "state": "error" if lost else row.state,
             "error_code": "internal" if lost else meta.get("error_code"), "query": request.get("query"),
             "place": request.get("place"), "country": request.get("country"),
@@ -223,8 +259,11 @@ def list_searches(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Princi
     if run is not None:
         query = query.filter(ScrapeJob.id != run.id)
     rows = query.order_by(ScrapeJob.created_at.desc()).limit(HISTORY).all()     # searches and captures
+    hours = workday.for_firm(db, firm_id)
+    numbered = _numbered(db, firm_id, candidate, hours)
     return {"running": _search_json(run, now) if run is not None else None,
-            "searches": [_search_json(r, now) for r in rows],
+            "searches": [_search_json(r, now, numbered) for r in rows],
+            "workday": _workday_json(candidate, hours, numbered, now),
             "usage": limits.usage(db, firm_id, candidate.id, candidate.bde_id, now),
             # What a search asks for (decided 2026-11-14): the target role, and the places the BDE picks from.
             "role": places.search_role(candidate),
@@ -246,7 +285,7 @@ def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, 
 
     def under_the_cap():
         if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
-            raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(now)}.")
+            raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(db, firm_id, now)}.")
     posting, created = pipeline.capture(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                         source=body.source, job=body.model_dump(exclude={"source"}),
                                         admit=under_the_cap)
@@ -488,6 +527,7 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
                    remote: Literal["REMOTE", "HYBRID", "ONSITE"] | None = None,
                    q: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None,
                    exclude_applied: bool = False, batch: str | None = None,
+                   day: int | None = Query(None, ge=1, le=100_000),
                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     """The owner and a viewer see the firm's, a manager their BDEs' candidates', a BDE their own (`_visible`, 07
     Q47); `candidate_id` narrows to one of those (another is 404). One item per `job_id`: a job found for two
@@ -515,15 +555,21 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
     light = postings.with_entities(JobPosting.id, JobPosting.job_id, JobPosting.source, JobPosting.match_score,
                                    JobPosting.discovered_at, JobPosting.last_seen_at,
                                    JobPosting.content.op("-")(literal("description"))).all()
-    window = None
-    if batch is not None:
+    windows = None
+    if batch is not None or day is not None:
         if one is None:
-            raise HTTPException(status_code=422, detail="A batch is one candidate's: name the candidate.")
+            raise HTTPException(status_code=422, detail="A batch or a Day is one candidate's: name the candidate.")
+    if batch is not None:
         found = scoped(db, ScrapeJob, firm_id).filter(ScrapeJob.candidate_id == one, ScrapeJob.kind == "search",
                                                       ScrapeJob.batch_id == _id_or_404(batch)).first()
         if found is None:
             raise HTTPException(status_code=404, detail="Not found.")
-        window = (found.created_at, found.finished_at or utcnow())
+        windows = [(found.created_at, found.finished_at or utcnow())]
+    elif day is not None:
+        # Every batch of that Day in the current assignment (Q166); a Day without one lists nothing.
+        owner = scoped(db, Candidate, firm_id).filter(Candidate.id == one).first()
+        numbered = _numbered(db, firm_id, owner, workday.for_firm(db, firm_id)) if owner is not None else {}
+        windows = [(n["window"][0], n["window"][1] or utcnow()) for n in numbered.values() if n["day"] == day]
     applied = set()
     if one is not None and exclude_applied:
         applied = {row[0] for row in scoped(db, Application, firm_id).filter(
@@ -545,7 +591,8 @@ def list_firm_jobs(firm_id: uuid.UUID, candidate_id: str | None = None,
             continue
         if not _is_recent(fields.posted_at, max(row.discovered_at for row in rows), today):
             continue
-        if window is not None and not any(window[0] <= row.discovered_at <= window[1] for row in rows):
+        if windows is not None and not any(start <= row.discovered_at <= end for start, end in windows
+                                           for row in rows):
             continue
         if remote is not None and remote_mode(fields) != remote:
             continue

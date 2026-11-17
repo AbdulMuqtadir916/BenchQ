@@ -34,6 +34,7 @@ from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.candidates import profile
 from backend.candidates.serialize import candidate_json
+from backend.job_search import workday
 from backend.match import store as match_store
 from backend.models.candidates import (EMPLOYMENT_TYPES, REMOTE_MODES, WORK_AUTHS, WORKING_STATUSES, Candidate,
                                        ResumeParse)
@@ -301,6 +302,8 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: 
         preferred_industries=[i.strip() for i in body.preferred_industries if i.strip()],
         deal_breakers=[d.strip() for d in body.deal_breakers if d.strip()],
     )
+    # A BDE from the start: their Day 1 starts now (decided 2026-11-17, Q155, Q164).
+    workday.assign(candidate, candidate.bde_id, now, workday.of(firm))
     db.add(candidate)
     db.flush()
     parse.candidate_id, parse.expires_at = candidate.id, None
@@ -403,7 +406,10 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
     if new_bde_id is not None and candidate.bde_id is None and candidate.status in WORKING_STATUSES:
         _check_limit(db, firm)                 # a queue candidate getting a BDE starts to count (Q45)
     previous = _firm_user(db, firm_id, candidate.bde_id) or _firm_user(db, firm_id, candidate.manager_id)
-    candidate.manager_id, candidate.bde_id = manager.id, new_bde_id
+    candidate.manager_id = manager.id
+    if candidate.bde_id != new_bde_id:
+        # A new BDE starts again at Day 1; no BDE has no Days (decided 2026-11-17, Q154, Q155, Q174).
+        workday.assign(candidate, new_bde_id, utcnow(), workday.of(firm))
     ledger.record(db, actor=db.get(User, principal.user_id), action="ASSIGN", entity_type="candidate",
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
                   summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note))

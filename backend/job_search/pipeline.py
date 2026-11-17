@@ -29,7 +29,7 @@ from datetime import date
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.job_monitor import mark_run_failed
-from backend.job_search import limits, places
+from backend.job_search import limits, places, workday
 from backend.match import score as match, store as match_store
 from backend.job_search.providers import READERS, REGISTRY, REMOTE, JobFields, ProviderError, SearchResult
 from backend.job_search.providers.base import ERROR_MESSAGES
@@ -69,11 +69,12 @@ def _same_role(query: str) -> str:
 def _continue_from(db, firm_id, candidate_id, query: str, country: str, provider: str,
                    place: str | None) -> tuple[str | None, bool]:
     """Where a search of this role continues today (decided 2026-11-10, Q11 (A)): after the last finished search of
-    the same role, place (2026-11-14), country and provider since 6:30 PM IST. (None, False) to start from the top; (None, True) when the
+    the same role, place (2026-11-14), country and provider since the firm's work day started. (None, False) to start from the top; (None, True) when the
     source had nothing more. A failed search doesn't move it, so a retry asks for the same page."""
     rows = scoped(db, ScrapeJob, firm_id).filter(
         ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
-        ScrapeJob.state.in_(("success", "empty")), ScrapeJob.created_at >= limits.day_start(),
+        ScrapeJob.state.in_(("success", "empty")),
+        ScrapeJob.created_at >= limits.day_start(hours=workday.for_firm(db, firm_id)),
     ).order_by(ScrapeJob.created_at.desc()).all()
     for row in rows:
         request = (row.meta or {}).get("request") or {}
@@ -103,7 +104,8 @@ def open_batch(db, *, firm_id, candidate_id, user_id, query, country, provider, 
         from backend.job_search import fanout
         rows = scoped(db, ScrapeJob, firm_id).filter(
             ScrapeJob.candidate_id == candidate_id, ScrapeJob.kind == "search",
-            ScrapeJob.state.in_(("success", "empty")), ScrapeJob.created_at >= limits.day_start(),
+            ScrapeJob.state.in_(("success", "empty")),
+            ScrapeJob.created_at >= limits.day_start(hours=workday.for_firm(db, firm_id)),
         ).order_by(ScrapeJob.created_at.desc()).all()
         request = {**_request(query, country, provider, place, None, False, titles),
                    "legs": fanout.continue_legs(rows, query, country, fanout.plan(place))}

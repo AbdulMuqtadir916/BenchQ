@@ -79,14 +79,14 @@ export function useCaptureJob() {
   });
 }
 
-/** The longest a timer may wait (setTimeout's limit is ~24.8 days; an hour is plenty for the 6:30 PM reset). */
+/** The longest a timer may wait (setTimeout's limit is ~24.8 days; an hour is plenty for the work day's reset). */
 const MAX_WAIT_MS = 60 * 60 * 1000;
 
 /**
  * A candidate's searches and today's usage, as query options (exported for its tests). Read every 3 s while one runs,
  * and while a search this tab started hasn't been read back finished: a fast search can end before the first read
  * sees it running (bot review on #135). When a search ends, the job lists and the ledger are read again. Idle, it is
- * read again just after the day resets (6:30 PM IST), so a limit reached today lifts without a reload; a tab in the
+ * read again just after the firm's work day resets (its start, `resetsAt`), so a limit reached today lifts without a reload; a tab in the
  * background then misses that timer, so coming back to it reads again once the reset has passed (Abdul on #135).
  */
 export function jobSearchesQuery(queryClient: QueryClient, firmId: string, candidateId: string) {

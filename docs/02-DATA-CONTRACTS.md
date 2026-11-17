@@ -262,6 +262,9 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default('Asia/Kolkata'),
   clientTimezone: z.string().default('America/New_York'),
+  // The firm's work hours, "HH:MM" in primaryTimezone; required, no default (07 Q67, migration 0031)
+  workStart: WorkClockSchema,
+  workEnd: WorkClockSchema,
   applicationExpiryDays: z.number().int().default(30),
 });
 
@@ -745,10 +748,18 @@ export const AiUsageSchema = z.object({
 | S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
 | S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
-### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59)
+### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59); work hours back 2026-11-17 (07 Q67)
 
 > **Withdrawn, never built.** The product owner dropped the shift window and the follow-up cadence on 2026-11-08: no
 > columns, no endpoint, and `settings/firm` shows neither. Kept below only as a record of what was proposed.
+>
+> **Work hours, 2026-11-17 (07 Q67, Zuhair; pending Abdul):** `firms.work_start`, `firms.work_end` (`Firm.workStart`,
+> `workEnd`, "HH:MM" in `primaryTimezone`; migration 0031). **Required, no default**: the Super Admin enters them when
+> creating the firm (`POST /api/admin/firms {work_start, work_end}`); every firm that existed got 18:30–04:00. The end
+> may be past midnight; start ≠ end (400 "The work hours can't start and end at the same time."). The **OWNER** changes
+> them on `settings/firm` (`PATCH /api/firms/{firm}/work-hours`, `firm.editHours`; one `UPDATE` ledger entry, entity
+> `firm`, with the hours before). A **work day** runs from one start to the next (searches run at any time); the daily
+> job-search limits reset at the start; a candidate's **Days** count from it (§6.w "Days"). Nothing else reads them.
 
 Two additions to `FirmSchema` (§3.1). Both are set when a firm is created (to the defaults below) and
 edited by the OWNER on `settings/firm`; a support view reads them.
@@ -1502,6 +1513,18 @@ failing source doesn't fail the click (`errors`), all failing does. `counts.by_s
 freehire.me's `work_mode`) and is the list's work mode. `GET /firms/{f}/job-postings` adds `batch` (one of the
 candidate's searches: the jobs it first found, saved while it ran) and answers `source_counts` (the list by source
 before `source` narrows it); LinkedIn's jobs come first in `match` and `newest`.
+
+**A candidate's Days (2026-11-17, Q152–Q174; migration 0031).** The firm's work hours (§3.3) make a **work day**: from
+one start to the next (`job_search/workday.py`). `candidates.bde_assigned_at` and `bde_day_one` (not in the frontend
+`Candidate`) are written when the BDE changes (create with a BDE, `…/assign`): Day 1 is the assignment's work day when
+it fell inside the hours, else the next one, and work between the assignment and that start is Day 1 too; a new BDE
+starts again; no BDE clears both. `scrape_jobs.work_date` is stamped when a row is written (a model hook), so changing
+the hours never moves past work. `GET …/job-searches` adds, per search, `work_date`, `day` and `batch` (the current
+assignment's finished searches numbered on across Days; null before it, without a BDE, for a capture or one not
+finished) and `workday` (`start`, `end`, `timezone`, `label`, `assigned_at`, `day_one`, `today`, `today_day`,
+`days_worked`); the empty Days are worked out from these, never stored. `GET /firms/{f}/job-postings` adds `day` (with
+`candidate_id`; every batch of that Day; 422 without a candidate). The daily limits' day and "resets …" text follow the
+firm's start and time zone.
 
 **The extra search titles (2026-11-17, Q131–Q144; migration 0030).** `Candidate.searchTitles: string[]` (backend
 `search_titles`, on the active base's version 1, `resumes.search_titles`, read like the résumé's city): after a candidate

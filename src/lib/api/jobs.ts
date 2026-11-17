@@ -29,6 +29,8 @@ export interface JobListParams {
   excludeApplied?: boolean;
   /** One of the candidate's searches (its id): the jobs it first found (decided 2026-11-17, Q109). */
   batch?: string;
+  /** One of the candidate's Days (decided 2026-11-17, Q166): every batch of that Day in the current assignment. */
+  day?: number;
   offset?: number;
 }
 
@@ -58,7 +60,7 @@ const live = {
       candidate_id: params?.candidateId ? toBackendId(params.candidateId) : undefined,
       sort: params?.sort, min_score: params?.minScore || undefined, source: params?.source, remote: params?.remote,
       q: params?.q?.trim() || undefined, exclude_applied: params?.excludeApplied || undefined, offset: params?.offset || undefined,
-      batch: params?.batch || undefined,
+      batch: params?.batch || undefined, day: params?.day || undefined,
     };
     const { items, total, next_offset, source_counts } = await http.get(`${firmPath(firmId)}/job-postings`, FirmJobListDto, { query });
     return { jobs: items.map((item) => toFirmJob(item, firmId)), total: total ?? items.length, nextOffset: next_offset ?? null,

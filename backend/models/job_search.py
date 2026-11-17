@@ -28,8 +28,8 @@ Tenancy: `(firm_id, candidate_id)` references `candidates (firm_id, id)` on both
 firm other than its candidate's; and `job_postings (firm_id, candidate_id, batch_id)` references the same three on
 `scrape_jobs`, so a posting can't name another candidate's or another firm's batch.
 """
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKeyConstraint, Index, SmallInteger, String, Text, \
-    UniqueConstraint, event, text
+from sqlalchemy import CheckConstraint, Column, Date, DateTime, ForeignKeyConstraint, Index, SmallInteger, String, \
+    Text, UniqueConstraint, event, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from backend.models.db import Base, sanitize_text, utcnow
@@ -61,6 +61,9 @@ class ScrapeJob(Base):
     meta = Column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     created_at = _created_at()                                        # when the search started
     finished_at = Column(DateTime(timezone=True), nullable=True)      # set exactly when it isn't running (0022)
+    # The firm's work day the row started in (migration 0031, Q170): stamped when it is written, so a later change
+    # of work hours or time zone never moves it to another Day.
+    work_date = Column(Date, nullable=True)
 
     __table_args__ = (
         ForeignKeyConstraint(["firm_id", "candidate_id"], ["candidates.firm_id", "candidates.id"],
@@ -75,6 +78,21 @@ class ScrapeJob(Base):
         Index("ix_scrape_jobs_user_created", "user_id", "created_at"),
         Index("ix_scrape_jobs_candidate_created", "candidate_id", "created_at"),
     )
+
+
+def _stamp_work_date(mapper, connection, target) -> None:
+    """Every new row gets the firm's work day it starts in (Q170), whichever code writes it."""
+    if target.work_date is not None:
+        return
+    from zoneinfo import ZoneInfo
+    from backend.job_search import workday
+    found = connection.execute(text("SELECT work_start, work_end, primary_timezone FROM firms WHERE id = :id"),
+                               {"id": target.firm_id}).first()
+    hours = workday.Hours(found[0], found[1], ZoneInfo(found[2])) if found is not None else workday.DEFAULT
+    target.work_date = workday.work_date(target.created_at or utcnow(), hours)
+
+
+event.listen(ScrapeJob, "before_insert", _stamp_work_date)
 
 
 class JobPosting(Base):

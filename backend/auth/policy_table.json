@@ -18,6 +18,7 @@
     "email.retry": "Y Y Y - - -",
     "firm.create": "- - - - Y Y",
     "firm.edit": "- - - - Y Y",
+    "firm.editHours": "Y - - - - -",
     "firm.suspend": "- - - - Y Y",
     "firm.viewWorkspace": "- - - - Y Y",
     "invite.resend": "- - - - Y Y",

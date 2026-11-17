@@ -342,7 +342,7 @@ def test_signing_in_as_someone_else_in_the_same_browser_ends_the_view(anonymous_
 def test_accepting_an_invite_in_the_same_browser_ends_the_view(anonymous_client, api_client, world, test_db):
     invite = api_client.post("/api/admin/firms", json={
         "name": "Northwind Staffing", "slug": "northwind", "plan_id": str(test_db.get(Firm, world["acme"]).plan_id),
-        "owner_name": "Nora", "owner_email": "nora@northwind.test"}).json()
+        "work_start": "18:30", "work_end": "04:00", "owner_name": "Nora", "owner_email": "nora@northwind.test"}).json()
     view_id = _start(anonymous_client, world).json()["principal"]["support"]["id"]
     resp = anonymous_client.post(f"/api/invites/{invite['invite_token']}/accept",
                                  json={"name": "Nora North", "password": "a-strong-pass"}, headers=world["admin"])

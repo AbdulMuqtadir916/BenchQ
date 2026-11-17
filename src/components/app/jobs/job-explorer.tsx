@@ -22,6 +22,7 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
 import { matchFor } from "@/lib/derive";
 import { useJobPages, useJobSearches } from "@/lib/hooks/use-jobs";
+import { NEWEST, dayOptions, readPick } from "@/lib/derive/job-days";
 import type { JobSort, JobSourceFilter } from "@/lib/api/jobs";
 import { ErrorState } from "@/components/app/error-state";
 import { formatRelative } from "@/lib/format/timezone";
@@ -116,8 +117,8 @@ export function JobExplorer({
   const deferredQuery = useDeferredValue(query);
   // Every source, each with its count (decided 2026-11-17, Q109: one click asks every source; replaces Q53's Indeed).
   const [portal, setPortal] = useState("ALL");
-  // A candidate's jobs open at their newest batch (one Find jobs click, Q109); "All batches" shows every job.
-  const [batchChoice, setBatchChoice] = useState("NEWEST");
+  // A candidate's jobs open at their newest batch (one Find jobs click, Q109), grouped by Day (2026-11-17, Q166).
+  const [batchChoice, setBatchChoice] = useState(NEWEST);
   const [remote, setRemote] = useState("ALL");
   // Every job a candidate has, best Match first (decided 2026-11-14, Q36): no score floor to start with.
   const [scoreFloor, setScoreFloor] = useState("0");
@@ -153,20 +154,15 @@ export function JobExplorer({
     return pending ?? savedApplications.has(jobId);
   };
 
-  // The candidate's batches: their finished searches, oldest first, numbered (Q109).
+  // The candidate's batches by Day (decided 2026-11-17, Q152–Q174, `dayOptions`): the backend numbers them; the
+  // empty Days show to the OWNER and MANAGER only (Q167, `team.view`).
   const searchesQuery = useJobSearches(context?.id ?? "", Boolean(context));
-  const batches = useMemo(() => (searchesQuery.data?.searches ?? [])
-    .filter((search) => search.kind === "SEARCH" && (search.state === "SUCCESS" || search.state === "EMPTY"))
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt)), [searchesQuery.data]);
-  const batchOptions: SelectOption[] = useMemo(() => {
-    const numbered = batches.map((search, index) => {
-      const isNewest = index === batches.length - 1;
-      return { value: isNewest ? "NEWEST" : search.id, label: isNewest ? `Batch ${index + 1} · newest` : `Batch ${index + 1}` };
-    });
-    return [...numbered.reverse(), { value: "ALL", label: "All batches" }];
-  }, [batches]);
-  const newestBatch = batches.length ? batches[batches.length - 1].id : undefined;
-  const batch = !context || batchChoice === "ALL" ? undefined : batchChoice === "NEWEST" ? newestBatch : batchChoice;
+  const showEmptyDays = useCan("team.view");
+  const days = useMemo(() => (searchesQuery.data
+    ? dayOptions(searchesQuery.data.searches, searchesQuery.data.workday, { showEmptyDays })
+    : { options: [], newestBatchId: undefined }), [searchesQuery.data, showEmptyDays]);
+  const hasBatches = days.newestBatchId !== undefined;
+  const pick = context ? readPick(batchChoice, days.newestBatchId) : {};
 
   // Every job, 100 at a time, sorted and filtered by the backend over the whole list (decided 2026-11-14, Q28, Q29,
   // Q47): the filters are the request, so "Load more" brings the next part of the same list and the total is real.
@@ -178,7 +174,8 @@ export function JobExplorer({
     remote: remote === "ALL" ? undefined : (remote as "REMOTE" | "HYBRID" | "ONSITE"),
     q: deferredQuery.trim() || undefined,
     excludeApplied: Boolean(context),
-    batch,
+    batch: "batch" in pick ? pick.batch : undefined,
+    day: "day" in pick ? pick.day : undefined,
   });
   // Each source's count in this list before the source filter (the source tabs, Q109).
   const sourceCounts = pages.data?.pages[0]?.sourceCounts;
@@ -282,7 +279,7 @@ export function JobExplorer({
             </label>
             {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={sourceOptions} onValueChange={setPortal} aria-label="Job source" />}
             {!lockedCandidate ? <Select value={portal} options={sourceOptions} onValueChange={setPortal} aria-label="Job source" /> : null}
-            {context && batches.length ? <Select value={batchChoice} options={batchOptions} onValueChange={setBatchChoice} aria-label="Batch" /> : null}
+            {context && hasBatches ? <Select value={batchChoice} options={days.options} onValueChange={setBatchChoice} aria-label="Day and batch" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
             <Select value={scoreFloor} options={SCORE_OPTIONS} onValueChange={setScoreFloor} aria-label="Minimum match score" disabled={!context} />
           </div>

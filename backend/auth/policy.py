@@ -16,7 +16,7 @@ from backend.auth.sessions import Principal
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search",
                 "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
-                "candidate.assign", "notification.approve")
+                "candidate.assign", "notification.approve", "firm.editHours")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
                     "invite.revoke", "platformTeam.manage", "platform.notification.approve")
 ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
@@ -45,6 +45,7 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
     "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
+    "firm.editHours": _OWNER_ONLY,                # 07 Q67: the firm's work hours, the one firm setting the OWNER edits
     "team.view": _OWNER_AND_MANAGER,
 }
 

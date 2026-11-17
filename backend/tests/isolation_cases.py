@@ -100,6 +100,8 @@ CASES: dict[str, Case] = {
     # The hierarchy (onboarding 06 PR 2): a BDE's manager, the firm's BDE capacity.
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": Case(body=lambda i: {"manager_id": str(i["manager"])},
                                                                  body_ids=True),
+    # The firm's work hours (07 Q67): the OWNER's, in their own firm only.
+    "PATCH /api/firms/{firm_id}/work-hours": Case(body=lambda i: {"work_start": "19:00", "work_end": "04:00"}),
 
     # ── Candidates (onboarding 06): the firm is in the path ──────────────────
     "POST /api/firms/{firm_id}/candidates/parse-resume": Case(upload=True),

@@ -5,12 +5,13 @@ import { blockedReason, placeLabel, searchOutcome, searchRole, usageLine } from 
 const search = (over: Partial<JobSearch> = {}): JobSearch => ({
   id: "b1", kind: "SEARCH", state: "SUCCESS", query: "Java Developer", place: "Austin, TX", newCount: 12, seenAgainCount: 3, overLimitCount: 0,
   leftOutWorkAuthCount: 0, leftOutOldCount: 0, leftOutNotRemoteCount: 0, leftOutAdzunaCount: 0, leftOutLevelCount: 0, newBySource: {}, failedSources: [],
-  errorCode: null, startedAt: "2026-11-11T14:00:00.000Z", finishedAt: "2026-11-11T14:00:09.000Z", ...over,
+  errorCode: null, startedAt: "2026-11-11T14:00:00.000Z", finishedAt: "2026-11-11T14:00:09.000Z", workDate: "2026-11-11", day: 1, batch: 1, ...over,
 });
 const searches = (over: Partial<JobSearches["usage"]> = {}, places: JobSearches["places"] = [{ value: "Austin, TX", label: "Austin, TX", kind: "home" }]): JobSearches => ({
   running: null, searches: [],
   usage: { jobsToday: 47, jobsCap: 100, searchesToday: 3, searchesCap: 20, capturesToday: 2, capturesCap: 20, resetsAt: "2026-11-12T13:00:00.000Z", ...over },
-  role: "Backend Engineer", places
+  role: "Backend Engineer", places,
+  workday: { start: "18:30", end: "04:00", timezone: "Asia/Kolkata", dayOne: "2026-11-11", today: "2026-11-11", todayDay: 1, daysWorked: [1] },
 });
 const candidate = { targetRoles: ["Backend Engineer"], country: "US" };
 

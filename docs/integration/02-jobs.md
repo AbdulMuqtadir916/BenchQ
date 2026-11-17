@@ -99,7 +99,11 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - **200 new jobs a day per candidate.** Fast sources show first; LinkedIn's share is kept for it; a small room goes to
   LinkedIn first. Extra jobs that don't fit are dropped, and that source starts from the same place next click.
 - **Same job on two sources: saved once.** One source failing doesn't fail the click.
-- **Batches:** each click is a batch; the Jobs list opens at the newest, with All batches, and each source's count.
+- **Batches:** each click is a batch; the Jobs list opens at the newest, with All days, and each source's count.
+- **Days (2026-11-17, Q152–Q174):** the firm's required work hours (`firms.work_start`/`work_end`, migration 0031; the
+  OWNER changes them) make a work day, from one start to the next. A candidate's Days count from their assignment to
+  their BDE; batches sit under their Day, numbered on; the OWNER and MANAGER also see the empty Days. Each search stamps
+  its work date, so changing the hours never moves past work. The daily limits reset at the firm's start.
   LinkedIn's jobs (no Match) come first in Top match and Newest. Each job's work mode is what its source says.
 - **Extra search titles:** an AI call suggests 2 for the target role when the candidate is added (on the active
   résumé; edited by hand on the details tab, up to 4); the search asks for them with the target role (5 at most) and

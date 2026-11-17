@@ -32,10 +32,31 @@ export const JobSearchSchema = z.object({
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),
+  /** The firm's work day it ran in, "YYYY-MM-DD" (decided 2026-11-17, Q161, Q170); stamped when it started. */
+  workDate: z.string().nullable(),
+  /** Its Day and batch number in the candidate's current assignment (Q158, Q166); null before it or without a BDE
+   * (Q168, Q174: "Earlier searches"), and for a capture or an unfinished search. */
+  day: z.number().int().positive().nullable(),
+  batch: z.number().int().positive().nullable(),
 });
 export type JobSearch = z.infer<typeof JobSearchSchema>;
 
-/** Today's numbers since 6:30 PM IST: the candidate's new jobs, their BDE's searches and captures (null: no BDE). */
+/** The candidate's Days (decided 2026-11-17, Q152–Q174): the firm's work hours, Day 1 and today's Day, and the Days
+ * with a search; the empty Days between are worked out from these, never stored (Q156). */
+export const JobSearchWorkdaySchema = z.object({
+  /** "HH:MM" in `timezone`. */
+  start: z.string(),
+  end: z.string(),
+  timezone: z.string(),
+  /** Day 1's work date and today's, "YYYY-MM-DD"; `dayOne` and `todayDay` are null without a BDE. */
+  dayOne: z.string().nullable(),
+  today: z.string(),
+  todayDay: z.number().int().positive().nullable(),
+  daysWorked: z.array(z.number().int().positive()),
+});
+export type JobSearchWorkday = z.infer<typeof JobSearchWorkdaySchema>;
+
+/** Today's numbers since the firm's work day started: the candidate's new jobs, their BDE's searches and captures (null: no BDE). */
 export const JobSearchUsageSchema = z.object({
   jobsToday: z.number().int(),
   jobsCap: z.number().int(),
@@ -65,5 +86,6 @@ export const JobSearchesSchema = z.object({
   role: z.string().nullable(),
   /** The places the BDE picks from, in order; empty when the candidate has none (no search then). */
   places: z.array(JobSearchPlaceSchema),
+  workday: JobSearchWorkdaySchema,
 });
 export type JobSearches = z.infer<typeof JobSearchesSchema>;

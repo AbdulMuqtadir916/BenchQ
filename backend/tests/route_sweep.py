@@ -66,7 +66,9 @@ JOB_URL = "https://jobs.example.test/posting/1"
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",
                 "country": "United States", "tiers": ["1"], "slug": "zorvath-firm", "template": "traditional",
                 # The Autofill save resets fixed questions by key, and refuses a key no question has: none reset.
-                "reset": []}
+                "reset": [],
+                # A firm's work hours are times, "HH:MM" (07 Q67); a planted string is refused before the route works.
+                "work_start": "19:00", "work_end": "04:00"}
 
 
 # ── Seed ──────────────────────────────────────────────────────────────────

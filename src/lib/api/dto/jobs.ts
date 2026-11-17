@@ -170,6 +170,15 @@ const SearchDto = z.object({
   errors: z.record(z.string(), z.string()).nullable().optional(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
+  work_date: z.string().nullable().optional(),
+  day: z.number().int().nullable().optional(),
+  batch: z.number().int().nullable().optional(),
+});
+
+const WorkdayDto = z.object({
+  start: z.string(), end: z.string(), timezone: z.string(), label: z.string(),
+  assigned_at: z.string().nullable(), day_one: z.string().nullable(), today: z.string(),
+  today_day: z.number().int().nullable(), days_worked: z.array(z.number().int()),
 });
 
 export const JobSearchesDto = z.object({
@@ -186,6 +195,7 @@ export const JobSearchesDto = z.object({
   }),
   role: z.string().nullable().optional(),
   places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "remote"]) })).optional(),
+  workday: WorkdayDto,
 });
 export type JobSearchesDto = z.infer<typeof JobSearchesDto>;
 
@@ -209,6 +219,9 @@ function toSearch(dto: z.infer<typeof SearchDto>): JobSearch {
     errorCode: dto.error_code,
     startedAt: toIso(dto.started_at),
     finishedAt: toIsoOrNull(dto.finished_at),
+    workDate: dto.work_date ?? null,
+    day: dto.day ?? null,
+    batch: dto.batch ?? null,
   };
 }
 
@@ -223,5 +236,9 @@ export function toJobSearches(dto: JobSearchesDto): JobSearches {
     },
     role: dto.role ?? null,
     places: dto.places ?? [],
+    workday: {
+      start: dto.workday.start, end: dto.workday.end, timezone: dto.workday.timezone, dayOne: dto.workday.day_one,
+      today: dto.workday.today, todayDay: dto.workday.today_day, daysWorked: dto.workday.days_worked,
+    },
   };
 }

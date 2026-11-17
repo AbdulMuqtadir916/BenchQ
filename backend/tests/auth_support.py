@@ -6,6 +6,7 @@ PLATFORM routes, the firm user's for the rest. A request that already carries `b
 so a test can still send its own cookie, or none (see `anonymous_client`).
 """
 from dataclasses import dataclass
+from datetime import time
 from functools import lru_cache
 import uuid
 
@@ -40,10 +41,12 @@ def make_plan(db, name="Test plan", seat_limit=10, candidate_limit=100):
     return plan
 
 
-def make_firm(db, plan, slug="acme", status="ACTIVE", name=None, id=None):
+def make_firm(db, plan, slug="acme", status="ACTIVE", name=None, id=None, work_start=time(18, 30),
+              work_end=time(4, 0)):
     from backend.models.tenancy import Firm
     firm = Firm(id=id, name=name or slug.title(), slug=slug, status=status, plan_id=plan.id,
-                seat_limit=plan.seat_limit, candidate_limit=plan.candidate_limit)
+                seat_limit=plan.seat_limit, candidate_limit=plan.candidate_limit, work_start=work_start,
+                work_end=work_end)
     db.add(firm)
     db.flush()
     return firm

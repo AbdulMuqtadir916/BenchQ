@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { slugProblem, suggestSlug } from "@/lib/derive/platform";
+import { workHoursProblem } from "@/lib/derive/work-hours";
 import { useCreateFirm, usePlans, usePlatformFirms } from "@/lib/hooks/use-platform";
 import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
@@ -27,12 +28,15 @@ interface Form {
   planId: string;
   primaryTimezone: string;
   clientTimezone: string;
+  workStart: string;
+  workEnd: string;
   contactPhone: string;
   ownerName: string;
   ownerEmail: string;
 }
 
-const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", contactPhone: "", ownerName: "", ownerEmail: "" };
+// The work hours start empty: they are required and have no default (07 Q67, decided 2026-11-17, Q152).
+const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", workStart: "", workEnd: "", contactPhone: "", ownerName: "", ownerEmail: "" };
 
 /**
  * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with the plan's limits copied, and
@@ -63,6 +67,7 @@ export function CreateFirm() {
     name: form.name.trim() ? null : "Enter the firm's name.",
     slug: slugProblem(form.slug, taken),
     planId: plan ? null : "Choose a plan.",
+    workHours: workHoursProblem(form.workStart, form.workEnd),
     ownerName: form.ownerName.trim() ? null : "Enter the owner's name.",
     ownerEmail: EMAIL.test(form.ownerEmail.trim()) ? null : "Enter a valid email address.",
   };
@@ -153,6 +158,14 @@ export function CreateFirm() {
                 <select id="firm-client-tz" value={form.clientTimezone} onChange={(event) => set("clientTimezone", event.target.value)} className="bq-input w-full">
                   {TIMEZONES.map((zone) => <option key={zone.value} value={zone.value}>{zone.label}</option>)}
                 </select>
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="firm-work-start" label="Work hours start" error={shown("workHours")} hint="In the primary timezone. A work day runs from one start to the next.">
+                <Input {...fieldAria("firm-work-start", shown("workHours"), true)} type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
+              </Field>
+              <Field id="firm-work-end" label="Work hours end" hint="May be past midnight, e.g. 4:00 AM.">
+                <Input {...fieldAria("firm-work-end", null, true)} aria-invalid={shown("workHours") ? true : undefined} type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
               </Field>
             </div>
             <Field id="firm-phone" label="Contact phone (optional)">

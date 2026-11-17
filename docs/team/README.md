@@ -123,4 +123,5 @@ it. Everyone else reads it.
 | 0028 | Zuhair | The Match score: `match_score`, `match_note`, `match_basis` on `job_postings` and `resumes` (a 0–100 check each) and `ix_job_postings_candidate_match`. Additive; the backend scores what has no score when it starts. Follows 0027 (Arbaz's) | `feat/job-search-indeed-and-candidate-details` |
 | 0029 | Zuhair | LinkedIn's pace for the whole backend: `linkedin_slots` (4 rows, filled here) and `linkedin_waiting` (who waits: opens before searches, firms in turn). Additive. Follows 0028 | `feat/job-search-indeed-and-candidate-details` |
 | 0030 | Zuhair | `resumes.search_titles` (JSONB, null): the job search's extra titles on the active base's v1. Additive. Follows 0029 | `feat/job-search-indeed-and-candidate-details` |
-| 0031+ | — | Claim the next number here in your PR | — |
+| 0031 | Zuhair (firms and candidates columns: Abdul approves) | `firms.work_start`, `work_end` (required; existing firms 18:30–04:00), `candidates.bde_assigned_at`, `bde_day_one`, `scrape_jobs.work_date` (filled from the rows). Follows 0030 | `feat/job-search-indeed-and-candidate-details` |
+| 0032+ | — | Claim the next number here in your PR | — |

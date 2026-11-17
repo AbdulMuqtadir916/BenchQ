@@ -413,8 +413,13 @@ result line also counts "N left out: level".
 **Since 2026-11-17 (Q90–Q124):** no source picker: the place dropdown lists places only, as before ("Austin, TX",
 each preferred location, "Remote (anywhere in the US)"); a city is searched on-site or hybrid by the candidate's work
 settings, never shown; one click asks every source that mode names; the result line
-says "LinkedIn 58 · Indeed 30 · freehire.me 12 new" and any source that didn't answer. The Jobs list has a **Batch**
-picker (newest first, "All batches") and the source filter shows each source's count; it opens at All sources.
+says "LinkedIn 58 · Indeed 30 · freehire.me 12 new" and any source that didn't answer. The Jobs list has a **Day and
+batch** picker (2026-11-17, Q152–Q174): the candidate's Days, newest first ("Day 3 · Nov 17–18", counted from their
+assignment to their BDE in the firm's work days; picking a Day lists all its batches), each Day's batches under it
+("Batch 4 · 7:42 PM", numbered on across Days), "Earlier searches" (before this assignment, by date and time), then
+"All days"; it opens at the newest batch. The OWNER and MANAGER also see the empty Days, folded ("Days 2–39 · no
+searches"), never pickable; a BDE sees only Days with work. The source filter shows each source's count; it opens at
+All sources.
 LinkedIn jobs show LinkedIn's own page in the pane (the extension), and tailoring one asks for its posting.
 
 #### Resumes
@@ -718,7 +723,7 @@ the knowledge that it exists.
 | Route | Role | Content |
 |---|---|---|
 | `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
-| `/settings/firm` | OWNER | Read-only: the firm's name and timezones (a Super Admin changes them), and a Plan and usage card: BDE seats and candidates against the plan's limits (07 Q59, Q63). There is no BDE capacity |
+| `/settings/firm` | OWNER | Read-only: the firm's name and timezones (a Super Admin changes them), and a Plan and usage card: BDE seats and candidates against the plan's limits (07 Q59, Q63). There is no BDE capacity. One exception: a **Work hours** card the OWNER changes (Change → start and end times, Save; Esc cancels; 07 Q67) |
 | `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |
@@ -882,6 +887,7 @@ plus "Clear filters".
 | Plan | required, active plans only. Shows the limits that will be copied onto the firm (A3) |
 | Primary timezone | default `Asia/Kolkata` |
 | Client timezone | default `America/New_York` |
+| Work hours start, end | required, no default (07 Q67): "HH:MM" in the primary timezone; the end may be past midnight; not the same. A work day runs from one start to the next |
 | Contact phone | optional |
 | Owner name | required |
 | Owner email | required, valid email |
