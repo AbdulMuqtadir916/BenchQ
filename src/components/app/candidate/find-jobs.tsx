@@ -25,11 +25,11 @@ export function searchRole(candidate: Pick<Candidate, "targetRoles">): string | 
   return candidate.targetRoles.map((role) => role.trim().replace(/\s+/g, " ")).find(Boolean) ?? null;
 }
 
-/** How a search's place reads: "Austin, TX", "Hybrid · Austin, TX", "Remote", or nothing for a search from before
- * places. */
+/** How a search's place reads: "Austin, TX" or "Remote", never its mode (a hybrid search's "hybrid:Austin, TX" too), or
+ * nothing for a search from before places. */
 export function placeLabel(place: string | null): string | null {
   if (place === "remote") return "Remote";
-  return place?.startsWith("hybrid:") ? `Hybrid · ${place.slice("hybrid:".length)}` : place;
+  return place?.startsWith("hybrid:") ? place.slice("hybrid:".length) : place;
 }
 
 /** The sources' names as the result line says them (backend source names). */

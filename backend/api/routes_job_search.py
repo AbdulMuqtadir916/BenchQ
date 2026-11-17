@@ -148,12 +148,14 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
     # Plus the extra titles on the candidate's résumé (2026-11-17, Q131–Q144): 5 at most, the target role's first.
     from backend.job_search import search_titles
     titles = search_titles.for_search(places.search_titles(candidate), candidate.search_titles)
+    # The city's mode from the candidate's work settings (Zuhair 2026-11-17: the picker lists places only).
+    searched = places.searched_place(candidate, chosen["value"])
     batch = pipeline.open_batch(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
-                                query=query, country=country, provider=provider_name, place=chosen["value"],
+                                query=query, country=country, provider=provider_name, place=searched,
                                 titles=titles)
     task = {"firm_id": firm_id, "candidate_id": candidate.id, "user_id": principal.user_id,
             "batch_id": batch.batch_id, "query": query, "country": country, "provider_name": provider_name,
-            "place": chosen["value"], "titles": titles}
+            "place": searched, "titles": titles}
     # Committed before the search is launched, so a launched search always has its row (Abdul's review, P2); the task
     # also checks it is still `running` before asking the source. A crash between the two leaves the row `running`,
     # and it becomes an `internal` error after 15 minutes, like a restart.

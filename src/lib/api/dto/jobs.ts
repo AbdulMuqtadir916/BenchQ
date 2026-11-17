@@ -185,7 +185,7 @@ export const JobSearchesDto = z.object({
     resets_at: z.string(),
   }),
   role: z.string().nullable().optional(),
-  places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "hybrid", "remote"]) })).optional(),
+  places: z.array(z.object({ value: z.string(), label: z.string(), kind: z.enum(["home", "preferred", "remote"]) })).optional(),
 });
 export type JobSearchesDto = z.infer<typeof JobSearchesDto>;
 

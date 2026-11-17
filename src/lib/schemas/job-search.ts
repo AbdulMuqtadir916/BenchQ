@@ -52,7 +52,7 @@ export type JobSearchUsage = z.infer<typeof JobSearchUsageSchema>;
 export const JobSearchPlaceSchema = z.object({
   value: z.string(),
   label: z.string(),
-  kind: z.enum(["home", "preferred", "hybrid", "remote"]),
+  kind: z.enum(["home", "preferred", "remote"]),
 });
 export type JobSearchPlace = z.infer<typeof JobSearchPlaceSchema>;
 

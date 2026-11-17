@@ -63,7 +63,7 @@ describe("one click, several sources (decided 2026-11-17, Q90, Q93, Q122)", () =
       .toBe("Indeed 4 new · LinkedIn didn't answer");
   });
 
-  it("names a hybrid place", () => {
-    expect(placeLabel("hybrid:Austin, TX")).toBe("Hybrid · Austin, TX");
+  it("names a hybrid search's place without its mode", () => {
+    expect(placeLabel("hybrid:Austin, TX")).toBe("Austin, TX");
   });
 });

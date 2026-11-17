@@ -121,7 +121,7 @@ def test_the_candidates_bde_starts_a_search_in_the_background(anonymous_client, 
     call = launched[0]
     assert call["job_type"] == "job_search" and call["meta"] is None      # the run names nothing of the firm's
     assert call["kwargs"]["query"] == "Java Developer" and call["kwargs"]["country"] == "us"
-    assert call["kwargs"]["place"] == "Austin, TX"                         # the first place: the picker's default
+    assert call["kwargs"]["place"] == "hybrid:Austin, TX"   # the first place; no work settings: hybrid (Q122)
     # One click asks every source its place's mode names (decided 2026-11-17, Q90): no source picker.
     assert call["kwargs"]["provider_name"] == "all" and call["kwargs"]["user_id"] == world["people"]["adnan"].id
     batch_id = uuid.UUID(r.json()["batch_id"])
@@ -177,14 +177,14 @@ def test_the_bde_picks_one_of_the_candidates_places(anonymous_client, world, fak
                 preferred_locations=["Austin, TX", "Remote"], work_settings=["HYBRID"]).json()
     body = anonymous_client.get(_url(world, c, "job-searches"), headers=world["as"]["adnan"]).json()
     assert body["role"] == "Java Developer"
-    # A hybrid candidate: each city on-site and hybrid (decided 2026-11-17, Q122), then remote.
+    # Places only, each once (Zuhair 2026-11-17); a hybrid candidate's city is searched hybrid (Q122).
     assert [(p["value"], p["kind"]) for p in body["places"]] == [
-        ("Plano, TX", "home"), ("hybrid:Plano, TX", "hybrid"), ("Austin, TX", "preferred"),
-        ("hybrid:Austin, TX", "hybrid"), ("remote", "remote")]
-    assert body["places"][4]["label"] == "Remote (anywhere in the US)"
+        ("Plano, TX", "home"), ("Austin, TX", "preferred"), ("remote", "remote")]
+    assert body["places"][1]["label"] == "Austin, TX"
+    assert body["places"][2]["label"] == "Remote (anywhere in the US)"
     assert _post(anonymous_client, world, c, place="austin, tx").status_code == 202
     assert _post(anonymous_client, world, c, place="remote").status_code == 409      # one already runs
-    assert launched[0]["kwargs"]["place"] == "Austin, TX"
+    assert launched[0]["kwargs"]["place"] == "hybrid:Austin, TX"
 
 
 @pytest.mark.parametrize("place", ["Seattle, WA", "x" * 201, ""])
@@ -489,7 +489,7 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
     assert _post(anonymous_client, world, adnans).status_code == 202
     body = anonymous_client.get(_url(world, adnans, "job-searches"), headers=world["as"]["fatima"]).json()
     assert body["running"]["query"] == "Java Developer" and body["running"]["state"] == "running"
-    assert body["running"]["place"] == "Austin, TX"
+    assert body["running"]["place"] == "hybrid:Austin, TX"            # the frontend reads it "Austin, TX"
     assert body["running"]["finished_at"] is None and body["searches"][0]["finished_at"]
     assert [(s["query"], s["state"], s["error_code"]) for s in body["searches"]] == [
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]

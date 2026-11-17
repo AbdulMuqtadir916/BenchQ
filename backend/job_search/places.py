@@ -10,10 +10,13 @@
 A search sends one place, by its `value`: "City, ST" text, or `REMOTE`. The route accepts only one of the candidate's
 own places, never free text.
 
-The modes (decided 2026-11-17, Q122–Q124): a place's value says how one click searches:
-- "City, ST": **On-site** in that city (LinkedIn, Indeed and freehire.me, all in the city);
+The modes (decided 2026-11-17, Q122–Q124): how one click searches a place. The picker lists places only, each once
+(Zuhair 2026-11-17: no "On-site ·" / "Hybrid ·" choices, as before); a city's mode comes from the candidate's work
+settings, set in onboarding and on the details tab (`searched_place`), and the stored place says it:
+- "City, ST": **On-site** in that city (LinkedIn, Indeed and freehire.me, all in the city), when the candidate's work
+  settings don't include hybrid;
 - `HYBRID_PREFIX` + "City, ST": **Hybrid**, the city (LinkedIn, Indeed) plus remote jobs anywhere in the country
-  (Indeed, freehire.me); listed when the candidate's work settings include hybrid;
+  (Indeed, freehire.me), when they include hybrid or say nothing;
 - `REMOTE`: **Remote**, anywhere in the country (Indeed, freehire.me; LinkedIn's public search can't ask for remote).
 """
 import re
@@ -55,13 +58,9 @@ def places(candidate, country: str | None) -> list[dict]:
             out.append({"value": value, "label": label, "kind": kind})
 
     settings = set(candidate.work_settings or [])
-    # Hybrid: when the candidate takes it, or says nothing about how they work (Q122).
-    wants_hybrid = "HYBRID" in settings or not settings
 
     def add_city(value: str, kind: str) -> None:
-        add(value, f"On-site · {value}", kind)
-        if wants_hybrid:
-            add(f"{HYBRID_PREFIX}{value}", f"Hybrid · {value} + remote", "hybrid")
+        add(value, value, kind)
 
     city, state = _line(candidate.city), _line(candidate.state)
     if city and state:
@@ -83,12 +82,23 @@ def pick(candidate, country: str | None, value: str) -> dict | None:
     return next((place for place in places(candidate, country) if place["value"].lower() == wanted), None)
 
 
+def wants_hybrid(candidate) -> bool:
+    """The candidate takes hybrid work, or says nothing about how they work (Q122)."""
+    settings = set(candidate.work_settings or [])
+    return "HYBRID" in settings or not settings
+
+
+def searched_place(candidate, value: str) -> str:
+    """The place a click stores and searches: a city with its mode from the work settings (hybrid → `HYBRID_PREFIX`
+    + the city), `REMOTE` as it is."""
+    return f"{HYBRID_PREFIX}{value}" if value != REMOTE and wants_hybrid(candidate) else value
+
+
 def label(place: str | None) -> str:
-    """How a stored place reads in the history and the Activity entry."""
+    """How a stored place reads in the history and the Activity entry: the place only, never its mode."""
     if place == REMOTE:
         return "Remote"
-    mode, city = mode_of(place)
-    return f"Hybrid · {city}" if mode == "hybrid" else (place or "the whole country")
+    return mode_of(place)[1] or "the whole country"
 
 
 def mode_of(place: str | None) -> tuple[str, str | None]:

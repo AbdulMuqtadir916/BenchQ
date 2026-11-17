@@ -1487,9 +1487,11 @@ ledger entry.
 
 **One click, several sources (2026-11-17, Q90–Q93, Q109, Q113, Q121–Q124, Q145–Q146; replaces the source picker of
 Q53).** `POST …/job-searches {place?}` asks every source the place's mode names (`job_search/fanout.py`); the batch's
-`request.provider` is `"all"`. A place's value says its mode: "City, ST" = on-site (LinkedIn 100, Indeed 100,
-freehire.me 40, all in the city); "hybrid:City, ST" = the city (LinkedIn 100, Indeed 50) plus remote in the country
-(Indeed 50, freehire.me 40), offered when the work settings include hybrid; `remote` = Indeed 100 and freehire.me 40,
+`request.provider` is `"all"`. `GET …/job-searches` `places` lists places only (`kind` home, preferred or remote; the
+label is the place, no mode). The stored place says the mode, the city's taken from the candidate's work settings
+(`places.searched_place`): "City, ST" = on-site (LinkedIn 100, Indeed 100, freehire.me 40, all in the city), when they
+don't include hybrid; "hybrid:City, ST" = the city (LinkedIn 100, Indeed 50) plus remote in the country (Indeed 50,
+freehire.me 40), when they include hybrid or are empty; it reads "City, ST"; `remote` = Indeed 100 and freehire.me 40,
 remote (LinkedIn's public search can't ask for remote). Indeed's two searches run one after the other; the fast sources
 save as they answer within today's room less LinkedIn's share; a small room goes to LinkedIn, then Indeed, then
 freehire.me; room left goes to the jobs over a source's share. The daily limit is **200** new jobs per candidate. The
