@@ -37,35 +37,31 @@ const SOURCE_NAMES: Record<string, string> = { linkedin: "LinkedIn", indeed: "In
 
 /** "12 new · 3 seen again · 5 over today's 100 · 4 left out: work authorization", "No new jobs for Java Developer in
  * Austin, TX", or why it failed. */
-export function searchOutcome(search: JobSearch, jobsCap: number): string {
+/**
+ * What the BDE needs to know about the last search: only what they can act on (Zuhair 2026-11-17: the per-source
+ * counts, "seen again", "over today's 200" and the left-out counts cluttered the header and are no longer shown). A
+ * failed search says why; a source that didn't answer is named. Otherwise nothing: the usage line says the rest.
+ */
+export function searchOutcome(search: JobSearch): string | null {
   if (search.state === "ERROR") return FAILED[search.errorCode ?? "internal"];
-  if (search.state === "EMPTY") {
-    const where = placeLabel(search.place);
-    return `No new jobs for ${search.query ?? "this role"}${where ? ` in ${where}` : ""} right now.`;
-  }
-  // A click that asked several sources (decided 2026-11-17, Q90): "LinkedIn 58 · Indeed 30 · freehire.me 12 new".
-  const bySource = Object.entries(search.newBySource);
-  const parts = [bySource.length ? `${bySource.map(([name, count]) => `${SOURCE_NAMES[name] ?? name} ${count}`).join(" · ")} new` : `${search.newCount} new`];
-  if (search.seenAgainCount) parts.push(`${search.seenAgainCount} seen again`);
-  if (search.overLimitCount) parts.push(`${search.overLimitCount} over today's ${jobsCap}`);
-  if (search.leftOutWorkAuthCount) parts.push(`${search.leftOutWorkAuthCount} left out: work authorization`);
-  if (search.leftOutOldCount) parts.push(`${search.leftOutOldCount} left out: posted over 14 days ago`);
-  if (search.leftOutNotRemoteCount) parts.push(`${search.leftOutNotRemoteCount} left out: not remote`);
-  if (search.leftOutLevelCount) parts.push(`${search.leftOutLevelCount} left out: level`);
-  if (search.leftOutAdzunaCount) parts.push(`${search.leftOutAdzunaCount} left out: Adzuna preview`);
-  for (const name of search.failedSources) parts.push(`${SOURCE_NAMES[name] ?? name} didn't answer`);
-  return parts.join(" · ");
+  if (search.failedSources.length) return `${search.failedSources.map((name) => SOURCE_NAMES[name] ?? name).join(", ")} didn't answer: try again`;
+  return null;
 }
 
-const resetTime = (iso: string) => `${formatIst(iso, "h:mm a")} IST`;
+/** When the firm's work day resets, in its own time zone: "6:30 PM IST" (decided 2026-11-17, Q157). */
+export function resetTime(iso: string, timeZone = "Asia/Kolkata"): string {
+  if (timeZone === "Asia/Kolkata") return `${formatIst(iso, "h:mm a")} IST`;
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" }).format(new Date(iso));
+}
 
-/** "47/100 jobs · 3/20 searches · 2/20 captures · resets 6:30 PM IST": every number the backend's count. */
-export function usageLine({ usage }: JobSearches): string {
+/** "47/200 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST": every number the backend's count, for
+ * the firm's current work day. "Added manually" is a job the BDE added through Add job or the extension (a capture). */
+export function usageLine({ usage, workday }: JobSearches): string {
   return [
     `${usage.jobsToday}/${usage.jobsCap} jobs`,
     usage.searchesToday === null ? null : `${usage.searchesToday}/${usage.searchesCap} searches`,
-    usage.capturesToday === null ? null : `${usage.capturesToday}/${usage.capturesCap} captures`,
-    `resets ${resetTime(usage.resetsAt)}`,
+    usage.capturesToday === null ? null : `${usage.capturesToday}/${usage.capturesCap} added manually`,
+    `resets ${resetTime(usage.resetsAt, workday.timezone)}`,
   ].filter(Boolean).join(" · ");
 }
 
@@ -77,10 +73,10 @@ export function blockedReason(candidate: Pick<Candidate, "targetRoles" | "countr
   if (searches && searches.places.length === 0) return "Add a city and state on the résumé, or a preferred location";
   const usage = searches?.usage;
   if (usage && usage.searchesToday !== null && usage.searchesToday >= usage.searchesCap) {
-    return `${usage.searchesToday}/${usage.searchesCap} searches today · resets ${resetTime(usage.resetsAt)}`;
+    return `${usage.searchesToday}/${usage.searchesCap} searches today · resets ${resetTime(usage.resetsAt, searches?.workday.timezone)}`;
   }
   // The backend refuses a search once the candidate has today's new jobs (429): say so before the press.
-  if (usage && usage.jobsToday >= usage.jobsCap) return `${usage.jobsToday}/${usage.jobsCap} new jobs today · resets ${resetTime(usage.resetsAt)}`;
+  if (usage && usage.jobsToday >= usage.jobsCap) return `${usage.jobsToday}/${usage.jobsCap} new jobs today · resets ${resetTime(usage.resetsAt, searches?.workday.timezone)}`;
   return null;
 }
 
@@ -152,8 +148,8 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
           <span className="text-[var(--color-danger-fg)]">{refusal}</span>
         ) : isSearching ? (
           `Searching ${running?.query ?? role}${placeLabel(running?.place ?? search.place) ? ` in ${placeLabel(running?.place ?? search.place)}` : ""}…`
-        ) : last && searches ? (
-          searchOutcome(last, searches.usage.jobsCap)
+        ) : last ? (
+          searchOutcome(last)
         ) : null}
         {searches && !blocked ? <span className="block">{usageLine(searches)}</span> : null}
       </p>

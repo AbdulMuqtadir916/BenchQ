@@ -328,8 +328,9 @@ target rate, availability and relocation. The owning BDE shows to managers and o
 looking at their own candidate doesn't need it. Actions: `Find jobs` (runs the matching
 sequence inside the Jobs tab — never navigates away) and `Build resume`. Since job search PR 3 (docs/02 §6.z) `Find
 jobs` is the candidate's BDE's only and really searches, for the candidate's main role (else the first target role):
-under it, the last search's outcome ("12 new · 3 seen again") and today's usage ("47/100 jobs · 3/20 searches ·
-2/20 captures · resets 6:30 PM IST"); disabled with the reason when there is no role, no résumé country, or the
+under it, the work day's usage only ("47/200 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST", the
+reset in the firm's time zone; since 2026-11-17 no per-source, seen-again, over-limit or left-out counts), plus a note
+only when the last search failed or a source didn't answer ("LinkedIn didn't answer: try again"); disabled with the reason when there is no role, no résumé country, or the
 day's searches are used. Below it, the derived
 stat strip (applications, active, interviews, offers, response rate, days on bench); **every stat
 is a button** that opens the tab behind it.
@@ -412,8 +413,8 @@ its posting arrives on the first open (a loading bar, then the text); "Open on L
 result line also counts "N left out: level".
 **Since 2026-11-17 (Q90–Q124):** no source picker: the place dropdown lists places only, as before ("Austin, TX",
 each preferred location, "Remote (anywhere in the US)"); a city is searched on-site or hybrid by the candidate's work
-settings, never shown; one click asks every source that mode names; the result line
-says "LinkedIn 58 · Indeed 30 · freehire.me 12 new" and any source that didn't answer. The Jobs list has a **Day and
+settings, never shown; one click asks every source that mode names; the header names only a source that didn't
+answer (each source's count shows on the Jobs list's source filter). The Jobs list has a **Day and
 batch** picker (2026-11-17, Q152–Q174): the candidate's Days, newest first ("Day 3 · Nov 17–18", counted from their
 assignment to their BDE in the firm's work days; picking a Day lists all its batches), each Day's batches under it
 ("Batch 4 · 7:42 PM", numbered on across Days), "Earlier searches" (before this assignment, by date and time), then
