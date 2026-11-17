@@ -30,7 +30,8 @@ import logging
 import re
 import time
 
-from backend.job_search.providers.base import REMOTE, JobFields, ProviderError, SearchResult, quoted_or
+from backend.job_search.providers.base import (REMOTE, JobFields, ProviderError, SearchResult, load_jobspy,
+                                               quoted_or)
 from backend.job_search.text import clean_str, html_to_text, safe_url
 
 logger = logging.getLogger("benchq.job_search")
@@ -63,6 +64,7 @@ def _strings(value) -> tuple[str, ...]:
 def _pages_class():
     """jobspy's Indeed scraper with one page at a time in place of its own loop. Built on first use: importing jobspy
     loads pandas and every board's scraper, which the app doesn't need until a search runs."""
+    load_jobspy()
     from jobspy.indeed import Indeed as JobspyIndeed
     from jobspy.indeed.constant import api_headers, job_search_query
 
@@ -146,10 +148,17 @@ def _content(post, job: dict) -> dict:
     return content
 
 
+def _jobspy_model():
+    """jobspy's search input types."""
+    load_jobspy()
+    from jobspy.model import Country, DescriptionFormat, ScraperInput, Site
+    return Country, DescriptionFormat, ScraperInput, Site
+
+
 def _search(query: str, country: str, limit: int, cursor: str | None, place: str | None,
             posted_within_days: int | None, deadline: float) -> SearchResult:
     """The search, page by page, in a worker thread (jobspy is synchronous)."""
-    from jobspy.model import Country, DescriptionFormat, ScraperInput, Site
+    Country, DescriptionFormat, ScraperInput, Site = _jobspy_model()
 
     started = time.monotonic()
     scraper = _pages_class()()

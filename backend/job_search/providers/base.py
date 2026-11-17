@@ -18,6 +18,7 @@ through its own provider's `read()`, picked by `job_postings.source`. Nothing ou
 `quoted_or(titles)`: several titles as one search's words, each in quotes, joined by OR (decided 2026-11-16, Q69; live
 on Indeed: 15 of 20 jobs with a wanted title, against 7 unquoted).
 """
+import threading
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -96,3 +97,15 @@ class Provider(Protocol):
                      level=None, firm_id=None) -> SearchResult: ...
 
     def read(self, content: dict) -> JobFields: ...
+
+
+_JOBSPY_LOCK = threading.Lock()
+
+
+def load_jobspy() -> None:
+    """Load python-jobspy once, whole, under a lock (found 2026-11-17). Its package imports every board's scraper, and
+    two threads loading it at once fail ("partially initialized module", KeyError 'jobspy'): the first click after a
+    start asks LinkedIn and Indeed together, so both city searches failed. Every source's first use comes through
+    here, and the app calls it at startup. Cheap once loaded."""
+    with _JOBSPY_LOCK:
+        import jobspy  # noqa: F401

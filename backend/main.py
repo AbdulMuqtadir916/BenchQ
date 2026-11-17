@@ -64,6 +64,9 @@ async def lifespan(app: FastAPI):
     from backend.auth.password_reset import require_reset_base_url
     require_reset_base_url()
     run_seeds()
+    # The job search's scraping library, loaded once before any search can run: two sources loading it at once fail.
+    from backend.job_search.providers.base import load_jobspy
+    load_jobspy()
 
     # Clean up stale job runs from previous process
     cleanup_stale_runs()

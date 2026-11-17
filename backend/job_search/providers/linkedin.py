@@ -28,7 +28,8 @@ import logging
 import re
 import time
 
-from backend.job_search.providers.base import REMOTE, JobFields, ProviderError, SearchResult, quoted_or
+from backend.job_search.providers.base import (REMOTE, JobFields, ProviderError, SearchResult, load_jobspy,
+                                               quoted_or)
 from backend.job_search.text import clean_str, html_to_text, safe_url
 
 logger = logging.getLogger("benchq.job_search")
@@ -70,6 +71,7 @@ def keywords(query: str, titles=(), level: str | None = None) -> str:
 def _jobspy():
     """jobspy's LinkedIn scraper (for its card reader and headers), built on first use: importing jobspy loads pandas
     and every board's scraper."""
+    load_jobspy()
     from jobspy.linkedin import LinkedIn as JobspyLinkedIn
     from jobspy.linkedin.constant import headers
     return JobspyLinkedIn, headers
