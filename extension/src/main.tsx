@@ -55,6 +55,16 @@ const TOPBAR =
   "sticky top-0 z-2 -mx-3 flex min-h-[var(--topbar-height)] items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2";
 const CANDIDATE_SELECT = `h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] bg-[image:var(--gradient-neutral)] pr-[var(--control-sm)] pl-2.5 text-sm text-[var(--color-text)] shadow-[var(--shadow-control)] transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-text-3)] enabled:hover:bg-[image:var(--gradient-neutral-hover)] focus-visible:border-[var(--color-focus-ring)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)] disabled:bg-none disabled:text-[var(--color-text-3)] disabled:shadow-none [&_option]:bg-[var(--color-surface)] [&_option]:text-[var(--color-text)]`;
 const CANDIDATE_LOCK = "candidate-lock";
+/** The panel opened as a tab of its own: the background answers only Chrome's side panel, so say how to get there. */
+const PANEL_IN_A_TAB = "BenchQ runs in Chrome's side panel. Go to the job's tab and click the BenchQ icon in the toolbar.";
+
+async function isInATab(): Promise<boolean> {
+  try {
+    return Boolean(await chrome.tabs.getCurrent?.());
+  } catch {
+    return false;
+  }
+}
 const TOOLTIP = `invisible absolute inset-x-0 top-full z-10 mt-1 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 py-1 text-caption text-[var(--color-text-2)] opacity-0 shadow-[var(--shadow-sm)] transition-[opacity,visibility] ${MOTION} group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100`;
 const NOTICE = `mt-3 p-3 ${CARD}`;
 const NOTICE_TITLE = "mb-1 text-h3";
@@ -292,7 +302,7 @@ function App() {
       type: "open-job",
       connection: details,
     }).catch(() => null);
-    if (!reply?.ok) setError("Could not open this job. Try again.");
+    if (!reply?.ok) setError(await isInATab() ? PANEL_IN_A_TAB : "Could not open this job. Try again.");
   };
   const apply = async (job: Application, form: AppliedForm, resumeId: string | null) => {
     setBusy(job.id);
@@ -329,7 +339,7 @@ function App() {
     const details = session && connectionFor(job, session.principal.user_id);
     if (!details || !activeBrowserTab) return;
     const reply = await sendToBackground({ type: "connect-tab", connection: details, tabId: activeBrowserTab.id }).catch(() => null);
-    if (!reply?.ok) setError("Could not use this tab. Try Open job.");
+    if (!reply?.ok) setError(await isInATab() ? PANEL_IN_A_TAB : "Could not use this tab. Try Open job.");
   };
   const openJobLink = (job: Application) => {
     if (isConnectable(job)) {
@@ -362,14 +372,15 @@ function App() {
     );
   };
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null;
-  // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then the tab connects.
+  // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then this tab connects, as
+  // the BDE is already on the form (Q10), with no tab of its own.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
     <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         loadJobs(selectedCandidate.id).catch(() => undefined);
-        void openJob(application);
+        void connectThisTab(application);
       }} />
   ) : null;
   const jobsArea = (

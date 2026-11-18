@@ -1,7 +1,12 @@
+import { base64Of } from "../api";
 import { normalize } from "./text";
 import type { ResumeFile, ReviewRow, ScannedField } from "./types";
 
 export type DocumentKind = "resume" | "cover-letter";
+
+export const PDF_MIME = "application/pdf";
+export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const EXTENSIONS: Record<string, string> = { [PDF_MIME]: ".pdf", [DOCX_MIME]: ".docx", "application/msword": ".doc" };
 
 const RESUME = /\b(resume|cv|curriculum vitae)\b/;
 const COVER_LETTER = /\bcover ?letter\b/;
@@ -28,6 +33,40 @@ export function withResumeFile(rows: ReviewRow[], file: ResumeFile | null): Revi
   return rows.map((row) => (row === upload
     ? { ...row, status: "ready" as const, reason: undefined, proposed: file.name, write: { type: "file" as const, ...file } }
     : row));
+}
+
+/** What the Resume section's file picker offers (Q5). */
+export const OWN_FILE_TYPES = ".pdf,.doc,.docx";
+/** BenchQ's own limit on a résumé upload (resume_parses' 10 MB check). */
+const MAX_OWN_FILE_BYTES = 10 * 1024 * 1024;
+const MIME_OF: Record<string, string> = { pdf: PDF_MIME, doc: "application/msword", docx: DOCX_MIME };
+
+/** A file the BDE picked from their computer for the form's résumé upload (Q5), read into the panel's memory: its type
+ * from its extension, its bytes in base64. The reason instead, as the panel says it, when it isn't a PDF or Word file
+ * or is over 10 MB. */
+export async function readOwnFile(file: File): Promise<ResumeFile | string> {
+  const extension = /\.(pdf|docx?)$/i.exec(file.name)?.[1]?.toLowerCase();
+  if (!extension) return "Pick a PDF or Word file.";
+  if (file.size > MAX_OWN_FILE_BYTES) return "That file is over 10 MB. Pick a smaller one.";
+  return { name: file.name, mimeType: MIME_OF[extension]!, data: base64Of(new Uint8Array(await file.arrayBuffer())), source: "picked" };
+}
+
+/** Whether an upload's `accept` list takes a file of this type: by its type, its extension or a wildcard. An empty list
+ * takes anything. */
+export function accepts(accept: string | undefined, mimeType: string): boolean {
+  const kinds = (accept ?? "").toLowerCase().split(",").map((kind) => kind.trim()).filter(Boolean);
+  if (kinds.length === 0) return true;
+  return kinds.some((kind) => kind === mimeType || kind === EXTENSIONS[mimeType] || kind === "*/*"
+    || kind === `${mimeType.split("/")[0]}/*`);
+}
+
+/** The kind of file the form's résumé upload (the first, as `withResumeFile` takes) needs when it won't take
+ * `mimeType`: "pdf" or "docx" when its `accept` list names that one, else null (Q3: PDF unless it takes only Word). */
+export function formatFor(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string): "pdf" | "docx" | null {
+  const upload = fields.find((field) => field.kind === "file" && documentOf(field) === "resume");
+  if (!upload || accepts(upload.accept, mimeType)) return null;
+  if (accepts(upload.accept, PDF_MIME)) return "pdf";
+  return accepts(upload.accept, DOCX_MIME) ? "docx" : null;
 }
 
 /** The name the picked résumé's file goes on a form by, without its extension: "<Candidate> - <Title>" (07 Q52), with

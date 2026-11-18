@@ -1744,14 +1744,21 @@ export const ResumeSaveResultSchema = z.object({ opened: OpenedResumeSchema, not
 - Change `src/lib/schemas/` to match this only in the PR that builds it (versioning PR 2 for `country`, PR 7 for
   the rest).
 
-### 8.2 A résumé version's file — PROPOSED 2026-11-09 (07 Q49; Zuhair's area, for his sign-off), BUILT (PR 121)
+### 8.2 A résumé version's file — PROPOSED 2026-11-09 (07 Q49), BUILT (PR 121); a file for every version BUILT 2026-11-18 (`feat/resume-files-coverage-ux`)
 
-`GET /api/firms/{firm}/candidates/{cid}/resumes/{rid}/file` answers the PDF or Word file an uploaded base was read
-from, as uploaded (`resume_parses.content`, its `mime_type`, `Content-Disposition: attachment` with the uploaded file's
-name, `Cache-Control: no-store`). Only an uploaded base's version 1 has one: that version is the file as read. Any later
-version, a tailored one or a promoted base's answers 404 ("This version has no uploaded file."), as does a version out
-of the principal's scope. The read follows the version's own access (§8.1). The extension attaches it to a form's
-résumé upload (07 Q50–Q52); a file for every version (rendered by the backend) is asked of Zuhair (Q25).
+`GET /api/firms/{firm}/candidates/{cid}/resumes/{rid}/file[?format=pdf|docx]` answers a version as a file, for the
+extension to attach to a form's résumé upload (07 Q50–Q52):
+
+- An uploaded base's version 1 is the file it was read from, as uploaded (`resume_parses.content`, its `mime_type`,
+  `Content-Disposition: attachment` with the uploaded file's name), unless `format` asks for the other kind.
+- Any other version (a later one, a tailored one, a promoted base's), or the other kind, is made from the version's own
+  text when asked (`backend/candidates/resume_file.py`): one plain, single-column page, a PDF (the backend's headless
+  Chromium, as cover letters) or Word with `?format=docx`, named `Name - Title.pdf`. No AI: only the version's words,
+  in `resume_text`'s order (§4.8 of resume-versioning.md); work authorization and languages stay out, as on the
+  studio's paper. LinkedIn and GitHub follow the firm's tracer links setting, as a cover letter's do.
+- `X-Resume-File` says which: `uploaded` or `generated`. Every answer is `Cache-Control: no-store`. 503 ("This résumé's
+  file couldn't be made. Try again.") when it can't be made, 422 for another `format`, 404 for a version out of the
+  principal's scope. The read follows the version's own access (§8.1).
 
 ### 8.3 Tailoring a résumé — APPROVED 2026-11-12 (Zuhair, tailoring part 3 Q7), BUILT (tailoring part 3)
 

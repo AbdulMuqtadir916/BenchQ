@@ -4,7 +4,7 @@ import { isUsState } from "./options";
 import { canonical, normalize } from "./text";
 import type { BankEntry, ScannedField } from "./types";
 
-/** Answers the bank holds inside other answers: the city in "Dallas, TX", the first name in a two-part full name, the
+/** Answers the bank holds inside other answers: the city in "Dallas, TX", the first, middle or last name in a full name, the
  * full name from its parts, the ZIP code at the end of an address, a start date from a notice period. */
 
 type Derived = { answer: string; source?: BankEntry };
@@ -130,13 +130,24 @@ export function inTheUs(location: string): boolean {
   return region === "us" || isUsState(region);
 }
 
+/** The dialling code of a country a saved location ends with, for a number saved without its own (Q8): "Hyderabad,
+ * Telangana, India" is +91. Canada shares +1 with the US, so it's named, as the US is. */
+const DIAL_CODES: Record<string, string> = {
+  india: "+91", canada: "Canada +1", "united kingdom": "+44", uk: "+44", australia: "+61", singapore: "+65",
+  "united arab emirates": "+971", uae: "+971", germany: "+49", ireland: "+353", mexico: "+52", philippines: "+63",
+};
+
 function phoneCountry(saved: Saved): Derived | null {
   const phone = saved("phone");
   const location = saved("city-state");
   const { dial } = splitPhone(phone?.answer ?? "");
   if (dial && dial !== "1") return { answer: `+${dial}`, source: phone! };
   if (dial) return { answer: "United States +1", source: phone! };
-  return location && inTheUs(location.answer) ? { answer: "United States +1", source: location } : null;
+  if (!location) return null;
+  if (inTheUs(location.answer)) return { answer: "United States +1", source: location };
+  const parts = withoutNotes(location.answer).split(",").map((part) => normalize(withoutPostal(part)));
+  const code = parts.length > 1 ? DIAL_CODES[parts.at(-1)!] : undefined;
+  return code ? { answer: code, source: location } : null;
 }
 
 /** "Do you have at least 5 years of experience?" Experience in a line of work is the BDE's to judge, so it never gets here. */
@@ -147,16 +158,53 @@ function minimumExperience(label: string, saved: Saved): Derived | null {
   return { answer: held >= minimumYears(label)! ? "Yes" : "No", source: years };
 }
 
-/** A first or last name from a saved full name: "Meera Krishnan", or "Krishnan, Meera" with the last name first. A
- * longer name could split more than one way, so it's left. */
-function namePart(type: "first-name" | "last-name", saved: Saved): Derived | null {
+/** A name's suffix, which goes with the last name: "King Jr.". Not "V": a name can end with an initial ("Ravi Kumar V"). */
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv)\.?$/i;
+
+/** Where `part`'s words sit, in order, inside `words` (any case), else -1. */
+function indexOfWords(words: string[], part: string[]): number {
+  const [all, wanted] = [words.map((word) => word.toLowerCase()), part.map((word) => word.toLowerCase())];
+  for (let at = 0; at + wanted.length <= all.length; at += 1) {
+    if (wanted.every((word, index) => all[at + index] === word)) return at;
+  }
+  return -1;
+}
+
+/** A saved full name in the parts a form's First, Middle and Last name boxes take: "Meera Krishnan", "Krishnan, Meera"
+ * with the last name first, or a longer name (Q6): its first word and its last, the words between being the middle
+ * name, unless a saved middle name says where the first name ends and the last begins ("Mohammed Arbazuddin Qureshi"
+ * with "Arbazuddin" saved). Nothing from one word, or from "Krishnan, Meera Devi", which could split more than one way. */
+function nameParts(saved: Saved): { first: string; middle: string; last: string; source: BankEntry } | null {
   const full = saved("full-name");
   if (!full) return null;
   const answer = full.answer.trim();
-  const [last, first, ...rest] = answer.split(",").map((part) => part.trim());
-  const names = answer.includes(",") ? (rest.length === 0 ? [first ?? "", last ?? ""] : []) : answer.split(/\s+/);
-  if (names.length !== 2 || names.some((name) => !name || /\s/.test(name))) return null;
-  return { answer: names[type === "first-name" ? 0 : 1]!, source: full };
+  if (answer.includes(",")) {
+    const [last, first, ...rest] = answer.split(",").map((part) => part.trim());
+    if (rest.length > 0 || !first || !last || /\s/.test(first) || /\s/.test(last)) return null;
+    return { first, middle: "", last, source: full };
+  }
+  const words = answer.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+  const middle = saved("middle-name")?.answer.trim().split(/\s+/).filter(Boolean) ?? [];
+  const at = middle.length > 0 ? indexOfWords(words, middle) : -1;
+  if (at > 0 && at + middle.length < words.length) {
+    return { first: words.slice(0, at).join(" "), middle: words.slice(at, at + middle.length).join(" "),
+      last: words.slice(at + middle.length).join(" "), source: full };
+  }
+  const tail = words.length > 2 && NAME_SUFFIX.test(words.at(-1)!) ? 2 : 1;
+  return { first: words[0]!, middle: words.slice(1, -tail).join(" "), last: words.slice(-tail).join(" "), source: full };
+}
+
+/** A first or last name from a saved full name (`nameParts`). */
+function namePart(type: "first-name" | "last-name", saved: Saved): Derived | null {
+  const parts = nameParts(saved);
+  return parts ? { answer: type === "first-name" ? parts.first : parts.last, source: parts.source } : null;
+}
+
+/** The middle name inside a saved full name of three words or more, when none is saved on its own (Q6). */
+function middleName(saved: Saved): Derived | null {
+  const parts = nameParts(saved);
+  return parts?.middle ? { answer: parts.middle, source: parts.source } : null;
 }
 
 /** The whole name from its saved parts, when no whole name is saved: "Tarun" and "Bose" make "Tarun Bose". */
@@ -192,6 +240,7 @@ export function derivedAnswer(type: EngineFieldType, { label, kind }: Asked, sav
   switch (type) {
     case "first-name":
     case "last-name": return namePart(type, saved);
+    case "middle-name": return middleName(saved);
     case "full-name": return fullName(saved);
     // A city lookup lists every Springfield: the state is what picks one.
     case "address-city": return place && location ? fromLocation(kind === "combobox" ? placeWithoutPostal(location.answer) : place.city) : null;

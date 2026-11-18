@@ -6,7 +6,7 @@ import { getResumeAnswers, getResumeFile, saveResumeAnswers } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import { confirmationKey } from "./job-check";
 import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
-import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
+import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, ResumeFile, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn(), saveResumeAnswers: vi.fn() }));
@@ -51,9 +51,9 @@ const report = (state: ReturnType<typeof useAutofill>) => { hook = state; };
 /** A résumé id that stands for "the panel is still loading the résumés". */
 const LOADING = "loading";
 
-function Harness({ value, resumeId = "res-1", isHeld = false }: { value: Connection; resumeId?: string | null; isHeld?: boolean }) {
+function Harness({ value, resumeId = "res-1", isHeld = false, pickedFile = null }: { value: Connection; resumeId?: string | null; isHeld?: boolean; pickedFile?: ResumeFile | null }) {
   const state = useAutofill({
-    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", onSessionExpired, onAccessLost, isHeld,
+    connection: value, firmId: "firm-1", resumeId: resumeId === LOADING ? undefined : resumeId, fileName: "Priya Shah - Java Developer", pickedFile, onSessionExpired, onAccessLost, isHeld,
   });
   useEffect(() => report(state));
   return null;
@@ -98,6 +98,51 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount(); });
   vi.clearAllMocks();
+});
+
+describe("the résumé's file for the form (docs/02 §8.2)", () => {
+  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const upload = (id = "r", accept = "") => ({ ...field(id, "Resume/CV", "file"), accept });
+  const uploadRow = () => hook.rows!.find(({ field: { id } }) => id === "r");
+
+  it("asks for Word when the form's résumé upload takes only Word (Q3)", async () => {
+    vi.mocked(getResumeFile).mockImplementation(async (_firm, _candidate, _resume, format) => (format === "docx"
+      ? { mimeType: DOCX, data: "d29yZA==", source: "generated" } : { mimeType: "application/pdf", data: "JVBERi0=", source: "generated" }));
+    vi.mocked(scanTab).mockResolvedValue(page([upload("r", ".doc,.docx"), field("a", "Email")], onSite));
+    await mount();
+    expect(getResumeFile).toHaveBeenLastCalledWith("firm-1", "cand-1", "res-1", "docx");
+    expect(uploadRow()).toMatchObject({ status: "ready", proposed: "Priya Shah - Java Developer.docx" });
+    expect(hook.attachmentSource).toBe("generated");
+    // Both kinds are kept: another look makes neither again.
+    vi.mocked(getResumeFile).mockClear();
+    await run(() => hook.rescan());
+    expect(getResumeFile).not.toHaveBeenCalled();
+    expect(uploadRow()).toMatchObject({ status: "ready", proposed: "Priya Shah - Java Developer.docx" });
+  });
+
+  it("keeps the PDF when the upload takes it", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue({ mimeType: "application/pdf", data: "JVBERi0=", source: "uploaded" });
+    vi.mocked(scanTab).mockResolvedValue(page([upload("r", ".pdf,.docx"), field("a", "Email")], onSite));
+    await mount();
+    expect(getResumeFile).toHaveBeenCalledTimes(1);
+    expect(getResumeFile).toHaveBeenCalledWith("firm-1", "cand-1", "res-1");
+    expect(uploadRow()).toMatchObject({ status: "ready", proposed: "Priya Shah - Java Developer.pdf" });
+    expect(hook.attachmentSource).toBe("uploaded");
+  });
+
+  it("says when the file couldn't be made, and takes the BDE's own file in its place (Q5)", async () => {
+    vi.mocked(getResumeFile).mockRejectedValue(Object.assign(new Error("This résumé's file couldn't be made. Try again."), { status: 503 }));
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    await mount();
+    expect(hook.fileProblem).toBe(true);
+    expect(uploadRow()?.status).toBe("blocked");
+    const own: ResumeFile = { name: "mine.docx", mimeType: DOCX, data: "d29yZA==", source: "picked" };
+    await act(async () => { root.render(<Harness value={connection} pickedFile={own} />); });
+    await wait(5);
+    expect(hook.fileProblem).toBe(false);
+    expect(uploadRow()).toMatchObject({ status: "ready", proposed: "Priya Shah - Java Developer.docx" });
+    expect(hook.attachmentSource).toBe("picked");
+  });
 });
 
 describe("going to a field", () => {
@@ -436,6 +481,28 @@ describe("the refill loop", () => {
     await run(() => hook.rescan());
     expect(statuses()![0]).toEqual(["a", "same"]);
     expect(hook.fillCount).toBe(0);
+  });
+
+  it("fills a field again once its saved answer changed, while it holds what BenchQ wrote (Q7)", async () => {
+    await mount();
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Phoenix")]));
+    await run(() => hook.autofill());
+    expect(statuses()).toEqual([["a", "same"], ["b", "same"]]);
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Email", "priya@example.test"), custom("City", "Tempe"), custom("Do you need sponsorship?", "Yes")]);
+    await run(() => hook.rescan());
+    expect(statuses()).toEqual([["a", "same"], ["b", "ready"]]);
+    expect(hook.fillCount).toBe(1);
+  });
+
+  it("leaves a changed answer's field alone once the BDE changed it", async () => {
+    await mount();
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Phoenix")]));
+    await run(() => hook.autofill());
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Mesa")]));
+    await run(() => hook.rescan());
+    vi.mocked(getResumeAnswers).mockResolvedValue([custom("Email", "priya@example.test"), custom("City", "Tempe"), custom("Do you need sponsorship?", "Yes")]);
+    await run(() => hook.rescan());
+    expect(statuses()![1]).toEqual(["b", "same"]);
   });
 
   it("offers it again if the BDE empties it", async () => {

@@ -37,6 +37,8 @@ export type ScannedField = {
   options: FieldOption[];
   maxLength: number | null;
   inAccountForm: boolean;
+  /** An upload's `accept` list as the page wrote it (`.pdf,.docx`); empty takes any file. Uploads only. */
+  accept?: string;
   /** The same control keeps this id across scans of one page load, so what the panel remembers about it stays with it
    * when fields come or go above it. */
   stableId?: string;
@@ -69,7 +71,11 @@ export type FieldWrite =
   | { type: "file" } & ResumeFile;
 
 /** A résumé's file as the panel holds it: its name on the form, its type and its bytes in base64. */
-export type ResumeFile = { name: string; mimeType: string; data: string };
+export type ResumeFile = { name: string; mimeType: string; data: string; source?: ResumeFileSource };
+
+/** Where the file came from: the résumé's upload as it was uploaded, made by BenchQ from the version's text (docs/02
+ * §8.2), or picked by the BDE from their computer in the panel. */
+export type ResumeFileSource = "uploaded" | "generated" | "picked";
 
 export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string };
 export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "no-match"; current: string; reason?: string };

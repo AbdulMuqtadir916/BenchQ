@@ -37,6 +37,14 @@ const row = (label: string, required: boolean, current = ""): ReviewRow => ({
   key: label, status: "manual", field: { label, required, current } as TabField,
 });
 
+/** The form's résumé upload, with the file Autofill attaches (withResumeFile). */
+const upload = (): ReviewRow => ({
+  key: "cv", status: "ready", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } as TabField,
+  proposed: "Priya - Java Developer.pdf", write: { type: "file", name: "Priya - Java Developer.pdf", mimeType: "application/pdf", data: "" },
+});
+/** The same upload with no file to attach. */
+const emptyUpload = (): ReviewRow => ({ ...upload(), status: "blocked", proposed: undefined, write: undefined });
+
 const base = { id: "res-2", label: "Base 1 · Java Developer · v2", meta: "Base 1 · v2", isTailored: false, isActive: true, title: "Java Developer", baseId: "base-1" };
 const tailored = { id: "res-9", label: "Tailored for this job · from Base 1 · v1", meta: "From Base 1 · v1", isTailored: true, isActive: false, title: "Java Developer", baseId: "base-1" };
 const pick = vi.fn();
@@ -58,6 +66,7 @@ let element: ReactElement<{ connection: Connection }>;
 type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
+  attachmentSource?: "uploaded" | "generated" | "picked" | null; fileProblem?: boolean; rescan?: () => void;
   step?: string | null; error?: string;
   needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
@@ -124,10 +133,10 @@ describe("Autofill", () => {
     expect(inBody()[0]!.disabled).toBe(true);
   });
 
-  it("makes way for Autofill complete once a run leaves nothing to fill", () => {
+  it("makes way for a summary of the run once it leaves nothing to fill", () => {
     show({ fillCount: 0, outcome: { filled: 3, handedBack: 0, stopped: false } });
     expect(inBody()).toEqual([]);
-    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Autofill complete");
+    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Filled 3");
     expect(host.querySelector("[data-slot='autofill-done']")?.className).toContain("text-caption");
   });
 
@@ -427,10 +436,77 @@ describe("the résumé the answers come from", () => {
   });
 
   it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {
-    const upload = { key: "cv", status: "ready", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "" } } as unknown as ReviewRow;
-    show({ fillCount: 1, rows: [upload], attachment: "Priya - Java Developer.pdf", answeredFrom: base.id });
+    show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", answeredFrom: base.id });
     expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe("Autofill attaches: Priya - Java Developer.pdf");
     expect(host.querySelector("[data-slot='autofill-ready']")!.textContent).toBe("Ready to fill 1 field, the resume file first.");
+  });
+
+  it("doesn't promise the file first when the form's upload won't get it", () => {
+    const kept = { ...upload(), status: "kept", field: { ...upload().field, current: "old.pdf" } } as ReviewRow;
+    show({ fillCount: 1, rows: [kept, row("Email", true)], attachment: "Priya - Java Developer.pdf", answeredFrom: base.id });
+    expect(host.querySelector("[data-slot='autofill-ready']")!.textContent).toBe("Ready to fill 1 field.");
+  });
+
+  it("says where the file comes from: made from the picked version, or as uploaded (docs/02 §8.2)", () => {
+    show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "generated", answeredFrom: base.id });
+    expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Made from Base 1 · v2");
+    update({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "uploaded", answeredFrom: base.id }, oneResume);
+    expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Uploaded file");
+  });
+
+  it("takes a PDF or Word file from the computer in place of the résumé's own (Q5)", async () => {
+    show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "generated", answeredFrom: base.id });
+    const input = host.querySelector<HTMLInputElement>("[data-slot='own-file-input']")!;
+    expect(input.accept).toBe(".pdf,.doc,.docx");
+    expect(named("Use a different file")).toBeTruthy();
+    const choose = async (file: File) => {
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      await act(async () => {
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    };
+    await choose(new File(["x"], "photo.png"));
+    expect(host.querySelector("[data-slot='own-file-error']")!.textContent).toBe("Pick a PDF or Word file.");
+    await choose(new File(["%PDF-1.4"], "mine.pdf"));
+    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile).toEqual({ name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0xLjQ=", source: "picked" });
+    expect(host.querySelector("[data-slot='own-file-error']")).toBeNull();
+  });
+
+  it("names the BDE's own file and offers to take it off again", () => {
+    show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "picked", answeredFrom: base.id });
+    expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
+    expect(named("Remove")).toBeTruthy();
+    expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
+  });
+
+  it("says when the file couldn't be made, with Try again and a file from the computer", async () => {
+    const rescan = vi.fn();
+    show({ fillCount: 1, rows: [emptyUpload()], fileProblem: true, rescan, answeredFrom: base.id });
+    expect(host.querySelector("[data-slot='resume-file-problem']")!.textContent).toBe("The resume file couldn't be made. Try again, or use a file from your computer.");
+    expect(named("Use a file")).toBeTruthy();
+    await click("Try again");
+    expect(rescan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the summary a run leaves", () => {
+  it("names the résumé it attached", () => {
+    show({ fillCount: 0, rows: [row("Email", true, "a@example.test")], outcome: { filled: 2, handedBack: 0, stopped: false }, attachedFile: "Priya - Java Developer.pdf" });
+    expect(host.querySelector("[data-slot='autofill-done-file']")!.textContent).toBe("Resume attached: Priya - Java Developer.pdf");
+    expect(host.querySelector("[data-slot='autofill-done-no-file']")).toBeNull();
+  });
+
+  it("warns when the résumé isn't on the form after the run, with the way to its field", () => {
+    show({ fillCount: 0, rows: [emptyUpload(), row("Email", true, "a@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } });
+    expect(host.querySelector("[data-slot='autofill-done']")!.textContent).toBe("Filled 1");
+    expect(host.querySelector("[data-slot='autofill-done-no-file']")!.textContent).toContain("The resume isn't on the form yet. Attach it by hand.");
+  });
+
+  it("counts what still needs the BDE and what the form already held", () => {
+    const kept = { ...row("City", false, "Austin"), status: "kept" } as ReviewRow;
+    show({ fillCount: 0, rows: [row("Phone", true), kept], outcome: { filled: 4, handedBack: 0, stopped: false } });
+    expect(host.querySelector("[data-slot='autofill-done']")!.textContent).toBe("Filled 4 · 1 needs you · 1 kept as it was");
   });
 });
 
@@ -484,12 +560,12 @@ describe("the note a run leaves", () => {
   const title = () => host.querySelector("[data-slot='autofill-result-title']")?.textContent;
   const detail = () => host.querySelector("[data-slot='autofill-result-detail']")?.textContent;
 
-  it("is gone from a run that ended as it should: only Autofill complete shows, in green", () => {
+  it("is gone from a run that ended as it should: only the summary shows, in green", () => {
     const rows = [row("Email", true, "a@example.test"), row("Phone", true), row("Website", false)];
     show({ fillCount: 0, rows, outcome: { filled: 15, handedBack: 1, stopped: false } });
     expect(note()).toBeNull();
     expect(host.textContent).not.toContain("Still empty");
-    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Autofill complete");
+    expect(host.querySelector("[data-slot='autofill-done']")?.textContent).toBe("Filled 15 · 2 need you");
     expect(host.querySelector("[data-slot='autofill-done']")?.className).toContain("--color-success-fg");
   });
 

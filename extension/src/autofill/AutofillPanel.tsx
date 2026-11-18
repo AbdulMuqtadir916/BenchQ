@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resumeStudioUrl, type Application } from "../api";
-import { ALERT, BELOW_TOP_BAR, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
+import { ALERT, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
 import { isOtherJobOnSite } from "./AddJobCard";
+import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
-import { documentOf, resumeFileName } from "./documents";
+import { documentOf, readOwnFile, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
 import FormProgress from "./FormProgress";
 import { CHECK, SPARKLES_ICON, SPINNER_ICON } from "./icons";
@@ -15,7 +16,7 @@ import OutcomeNote from "./OutcomeNote";
 import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
 import RunList from "./RunList";
-import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./types";
+import type { AppliedForm, Connection, ResumeFile, ReviewRow, ShortcutMessage } from "./types";
 import { SiteAccessNotice } from "./SiteAccessNotice";
 import { useAutofill, type Outcome } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus } from "./use-resumes";
@@ -87,7 +88,21 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const canReview = applicationStatus === "ready" && !["loading", "unavailable", "missing"].includes(resumes.status);
   const resumeId = canReview ? picked?.id ?? null : undefined;
   const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
-  const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost, isHeld: movedAway });
+  // A file the BDE picked from their computer for this candidate (Q5): in the panel's memory only, never saved or sent
+  // to BenchQ. It goes on the form in place of the résumé's own until they remove it.
+  const [ownFile, setOwnFile] = useState<{ candidateId: string; file: ResumeFile } | null>(null);
+  const [ownFileError, setOwnFileError] = useState<string | null>(null);
+  const pickedFile = ownFile?.candidateId === connection.candidateId ? ownFile.file : null;
+  const takeOwnFile = async (chosen: File) => {
+    const read = await readOwnFile(chosen).catch(() => "That file couldn't be read. Pick it again.");
+    setOwnFileError(typeof read === "string" ? read : null);
+    if (typeof read !== "string") setOwnFile({ candidateId: connection.candidateId, file: read });
+  };
+  const removeOwnFile = () => {
+    setOwnFile(null);
+    setOwnFileError(null);
+  };
+  const state = useAutofill({ connection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
   // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so
@@ -238,9 +253,9 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
         {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
       </button>}
       {isOpen && hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
-        Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
+        Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id && rows?.some((row) => row.status === "ready" && row.write?.type === "file") ? ", the resume file first" : ""}.
       </p>}
-      {isOpen && isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
+      {isOpen && isComplete && <AutofillDone filled={outcome?.filled ?? 0} rows={currentRows ?? []} attached={state.attachedFile} canSave onGoTo={goTo} />}
       {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
       {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
 
@@ -265,8 +280,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {isOpen && state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {isOpen && hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
-        picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} attached={state.attachedFile}
-        onChangeResume={hasOtherResumes ? changeResume : undefined} />}
+        picked={picked ? { label: picked.label, meta: picked.meta, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null,
+          source: answeredFrom === picked.id ? state.attachmentSource : null } : null} attached={state.attachedFile}
+        onChangeResume={hasOtherResumes ? changeResume : undefined} fileProblem={state.fileProblem} onRetryFile={() => void state.rescan()}
+        ownFileError={ownFileError} onOwnFile={(chosen) => void takeOwnFile(chosen)} onRemoveOwnFile={removeOwnFile} />}
       {isOpen && !filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} onSave={state.saveAnswer} />}

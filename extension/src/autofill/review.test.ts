@@ -71,9 +71,36 @@ describe("answers the bank holds inside another", () => {
     expect(review(field("Last name"), bank).proposed).toBe("Krishnan");
   });
 
-  it("won't guess how a longer name splits", () => {
-    expect(review(field("First name"), [entry("Full name", "Sai Kiran Reddy")]).status).toBe("manual");
+  it("splits a longer name at its first and last words, the words between being the middle name (Q6)", () => {
+    const bank = [entry("Full name", "Sai Kiran Reddy")];
+    expect(review(field("First name"), bank).proposed).toBe("Sai");
+    expect(review(field("Last name"), bank).proposed).toBe("Reddy");
+    expect(review(field("Middle name"), bank).proposed).toBe("Kiran");
+  });
+
+  it("splits around a saved middle name, and a saved first name still wins (Q6)", () => {
+    const bank = [entry("Full name", "Mohammed Arbazuddin Khan Qureshi"), entry("Middle name", "arbazuddin")];
+    expect(review(field("First name"), bank).proposed).toBe("Mohammed");
+    expect(review(field("Last name"), bank).proposed).toBe("Khan Qureshi");
     expect(review(field("First name"), [entry("Full name", "Sai Kiran Reddy"), entry("First name", "Sai Kiran")]).proposed).toBe("Sai Kiran");
+  });
+
+  it("keeps a suffix with the last name, and an initial at the end as the last name", () => {
+    expect(review(field("Last name"), [entry("Full name", "Martin Luther King Jr.")]).proposed).toBe("King Jr.");
+    expect(review(field("Middle name"), [entry("Full name", "Martin Luther King Jr.")]).proposed).toBe("Luther");
+    expect(review(field("Last name"), [entry("Full name", "Ravi Kumar V")]).proposed).toBe("V");
+  });
+
+  it("won't split one word, or a last name first with more than one first name", () => {
+    expect(review(field("First name"), [entry("Full name", "Madonna")]).status).toBe("manual");
+    expect(review(field("First name"), [entry("Full name", "Reddy, Sai Kiran")]).status).toBe("manual");
+  });
+
+  it("takes a phone's country code from the location's country when the number has none (Q8)", () => {
+    const indian = [entry("Phone", "9876543210"), entry("Current location", "Hyderabad, Telangana, India")];
+    expect(review(field("Phone country code"), indian).proposed).toBe("+91");
+    expect(review(field("Phone country code"), [entry("Phone", "+44 20 7946 0958"), entry("Current location", "Hyderabad, India")]).proposed).toBe("+44");
+    expect(review(field("Phone country code"), [entry("Phone", "4165550100"), entry("Current location", "Toronto, Canada")]).proposed).toBe("Canada +1");
   });
 
   it("takes the city, state and country from a location", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resumeFileName, withResumeFile } from "./documents";
+import { accepts, DOCX_MIME, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
 import type { FieldKind, ReviewRow, TabField } from "./types";
 
 const field = (id: string, label: string, kind: FieldKind = "file"): TabField => ({
@@ -28,5 +28,37 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     expect(resumeFileName("Priya Shah", "Java Developer")).toBe("Priya Shah - Java Developer");
     expect(resumeFileName("Priya Shah", null)).toBe("Priya Shah - Resume");
     expect(resumeFileName(" Priya  Shah ", "C/C++: Dev?")).toBe("Priya Shah - C C++ Dev");
+  });
+});
+
+describe("the kind of file an upload takes (Q3)", () => {
+  it("reads an accept list by type, extension or wildcard; an empty one takes anything", () => {
+    expect(accepts("", PDF_MIME)).toBe(true);
+    expect(accepts(".pdf, .docx", PDF_MIME)).toBe(true);
+    expect(accepts(".doc,.docx", PDF_MIME)).toBe(false);
+    expect(accepts("application/*", DOCX_MIME)).toBe(true);
+    expect(accepts(DOCX_MIME, DOCX_MIME)).toBe(true);
+  });
+
+  it("asks for the other kind only when the résumé upload won't take the file", () => {
+    expect(formatFor([{ ...field("r", "Resume/CV"), accept: ".doc,.docx" }], PDF_MIME)).toBe("docx");
+    expect(formatFor([{ ...field("r", "Resume"), accept: ".pdf" }], DOCX_MIME)).toBe("pdf");
+    expect(formatFor([{ ...field("r", "Resume"), accept: ".pdf,.docx" }], PDF_MIME)).toBeNull();
+    expect(formatFor([{ ...field("c", "Cover letter"), accept: ".docx" }], PDF_MIME)).toBeNull();
+    expect(formatFor([{ ...field("r", "Resume"), accept: "image/*" }], PDF_MIME)).toBeNull();
+  });
+});
+
+describe("a file from the BDE's computer (Q5)", () => {
+  it("is read into memory with its type, as the BDE's own", async () => {
+    expect(await readOwnFile(new File(["%PDF-1.4"], "mine.PDF"))).toEqual({ name: "mine.PDF", mimeType: PDF_MIME, data: "JVBERi0xLjQ=", source: "picked" });
+    expect(await readOwnFile(new File(["x"], "cv.docx"))).toMatchObject({ mimeType: DOCX_MIME, source: "picked" });
+  });
+
+  it("is refused when it isn't a PDF or Word file, or is over 10 MB", async () => {
+    expect(await readOwnFile(new File(["x"], "photo.png"))).toBe("Pick a PDF or Word file.");
+    const big = new File(["x"], "big.pdf");
+    Object.defineProperty(big, "size", { value: 10 * 1024 * 1024 + 1 });
+    expect(await readOwnFile(big)).toBe("That file is over 10 MB. Pick a smaller one.");
   });
 });

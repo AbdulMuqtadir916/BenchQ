@@ -1,4 +1,4 @@
-import type { AppliedForm, PageJob } from "./autofill/types";
+import type { AppliedForm, PageJob, ResumeFileSource } from "./autofill/types";
 
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
 
@@ -73,7 +73,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** Bytes as base64, in slices: a whole file at once would overflow the call stack. */
-function base64Of(bytes: Uint8Array): string {
+export function base64Of(bytes: Uint8Array): string {
   let binary = "";
   for (let start = 0; start < bytes.length; start += 0x8000) binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
   return btoa(binary);
@@ -120,13 +120,16 @@ export async function getResumeAnswers(firmId: string, candidateId: string, resu
   return Array.isArray(version?.autofill) ? version.autofill : null;
 }
 
-/** A résumé version's file as it was uploaded, its type and its bytes in base64, held in memory while a tab is reviewed
- * (docs/02 §8.2). Only an uploaded base's first version has one: null for any other. */
-export async function getResumeFile(firmId: string, candidateId: string, resumeId: string): Promise<{ mimeType: string; data: string } | null> {
+/** A résumé version's file, its type and its bytes in base64, held in memory while a tab is reviewed (docs/02 §8.2): an
+ * uploaded base's first version as it was uploaded (`source` "uploaded"), any other made by BenchQ from the version's
+ * text ("generated"). `format` asks for a PDF or Word file, for an upload that takes only one. Null when it's not found. */
+export async function getResumeFile(firmId: string, candidateId: string, resumeId: string, format?: "pdf" | "docx"): Promise<{ mimeType: string; data: string; source?: ResumeFileSource } | null> {
   try {
-    const response = await send(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/file`);
+    const query = format ? `?format=${format}` : "";
+    const response = await send(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/file${query}`);
     const mimeType = (response.headers.get("Content-Type") ?? "").split(";")[0]!.trim();
-    return { mimeType, data: base64Of(new Uint8Array(await response.arrayBuffer())) };
+    const source = response.headers.get("X-Resume-File");
+    return { mimeType, data: base64Of(new Uint8Array(await response.arrayBuffer())), ...(source === "uploaded" || source === "generated" ? { source } : {}) };
   } catch (error) {
     if ((error as { status?: number }).status === 404) return null;
     throw error;

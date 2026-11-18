@@ -19,22 +19,24 @@ candidate's BDE, or the OWNER and a MANAGER while it has none); upload, delete a
 reads only (backend/auth/access.py).
 """
 import asyncio
+import logging
 import uuid
 from datetime import date
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
+from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_change_resume, can_manage_resume, require
 from backend.auth.sessions import Principal
 from backend.candidates import autofill as autofill_answers
-from backend.candidates import versions
+from backend.candidates import resume_file, versions
 from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.models.candidates import ResumeParse, file_sha256
@@ -42,6 +44,7 @@ from backend.models.db import get_db
 from backend.models.tenancy import User
 
 router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}/resumes", tags=["candidate résumés"])
+logger = logging.getLogger(__name__)
 
 Short = Field(default="", max_length=300)
 
@@ -213,19 +216,60 @@ def save_resume_autofill(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id:
     return {"autofill": autofill_answers.merged(candidate, row, today, editor=True), "changed": changed}
 
 
-@router.get("/{resume_id}/file", summary="The file an uploaded résumé was read from")
-def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
-                    principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
-    """An uploaded base's version 1 as its PDF or Word file, as uploaded: the extension attaches it to a form (docs/02
-    §8.2). Any other version has no file of its own and answers 404, so the BDE attaches that one by hand."""
+def _file_response(content: bytes, mime_type: str, file_name: str, source: str) -> Response:
+    """`X-Resume-File` says where the file came from: `uploaded` (the file as uploaded) or `generated` (made from the
+    version's text), so the extension can say which one goes on the form."""
+    return Response(content=content, media_type=mime_type, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file_name, safe='')}",
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Resume-File": source})
+
+
+def _contact_links(db: DbSession, row) -> dict:
+    """Where the version's LinkedIn and GitHub addresses point in its file: tracer links when the firm uses them, as a
+    cover letter's do (`tracer_links_enabled`, off by default), else the addresses as written."""
+    items = [{"text": label, "url": value.strip()} for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub"))
+             if (value := getattr(row, key) or "").strip()]
+    if not items:
+        return {}
+    keys = {"LinkedIn": "linkedin", "GitHub": "github"}
+    traced = _rewrite_urls_with_tracers({"header": {"contact_items": items}}, str(row.id), db)
+    return {keys[item["text"]]: item["url"] for item in traced.get("header", {}).get("contact_items", [])
+            if item.get("text") in keys and item.get("url")}
+
+
+async def _printed(page_html: str, page_format) -> bytes:
+    """The page printed to PDF by the warm headless Chromium cover letters use (render_shared)."""
+    page = await (await _get_browser()).new_page()
+    try:
+        await page.set_content(page_html, wait_until="load")
+        return await page.pdf(**resume_file.pdf_options(page_format))
+    finally:
+        await page.close()
+
+
+@router.get("/{resume_id}/file", summary="A résumé version as a file")
+async def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                          kind: Annotated[str | None, Query(alias="format", pattern="^(pdf|docx)$")] = None,
+                          principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """A version as a file the extension attaches to a form (docs/02 §8.2). An uploaded base's version 1 is its file as
+    uploaded, unless `format` asks for the other kind; any other version's file is made from its own text when asked:
+    a plain, single-column PDF, or Word with `?format=docx`."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
-    kept = versions.uploaded_file(db, candidate, versions.candidate_version(db, candidate, resume_id))
-    if kept is None:
-        raise HTTPException(status_code=404, detail="This version has no uploaded file.")
-    return Response(content=kept.content, media_type=kept.mime_type, headers={
-        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(kept.file_name, safe='')}",
-        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+    row = versions.candidate_version(db, candidate, resume_id)
+    wanted = DOCX_MIME if kind == "docx" else PDF_MIME
+    kept = versions.uploaded_file(db, candidate, row)
+    if kept is not None and (kind is None or kept.mime_type == wanted):
+        return _file_response(kept.content, kept.mime_type, kept.file_name, "uploaded")
+    links = _contact_links(db, row)
+    extension = "docx" if wanted == DOCX_MIME else "pdf"
+    try:
+        content = (resume_file.docx(row, links) if wanted == DOCX_MIME
+                   else await _printed(resume_file.html(row, links), row.page_format))
+    except Exception as e:  # noqa: BLE001  (Chromium's and python-docx's errors have no common base)
+        logger.warning("Résumé file for version %s couldn't be made: %s", row.id, type(e).__name__)
+        raise HTTPException(status_code=503, detail="This résumé's file couldn't be made. Try again.") from None
+    return _file_response(content, wanted, resume_file.file_name(row, extension), "generated")
 
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")
