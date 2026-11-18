@@ -60,6 +60,13 @@ export function accepts(accept: string | undefined, mimeType: string): boolean {
     || kind === `${mimeType.split("/")[0]}/*`);
 }
 
+/** Whether the form's résumé upload (the first, as `withResumeFile` takes) takes a file of this type; a form without
+ * one takes any. A file it won't take stays off the form, for the BDE to attach. */
+export function fitsUpload(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string): boolean {
+  const upload = fields.find((field) => field.kind === "file" && documentOf(field) === "resume");
+  return !upload || accepts(upload.accept, mimeType);
+}
+
 /** The kind of file the form's résumé upload (the first, as `withResumeFile` takes) needs when it won't take
  * `mimeType`: "pdf" or "docx" when its `accept` list names that one, else null (Q3: PDF unless it takes only Word). */
 export function formatFor(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string): "pdf" | "docx" | null {

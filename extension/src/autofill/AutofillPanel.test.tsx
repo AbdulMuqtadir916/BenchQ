@@ -473,6 +473,14 @@ describe("the résumé the answers come from", () => {
     expect(host.querySelector("[data-slot='own-file-error']")).toBeNull();
   });
 
+  it("still offers to stop using the BDE's own file once it's on the form", () => {
+    const attached = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    show({ fillCount: 0, rows: [attached], attachment: "Priya - Java Developer.pdf", attachmentSource: "picked", answeredFrom: base.id });
+    expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
+    expect(named("Remove")).toBeTruthy();
+    expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
+  });
+
   it("names the BDE's own file and offers to take it off again", () => {
     show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "picked", answeredFrom: base.id });
     expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
@@ -501,6 +509,12 @@ describe("the summary a run leaves", () => {
     show({ fillCount: 0, rows: [emptyUpload(), row("Email", true, "a@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } });
     expect(host.querySelector("[data-slot='autofill-done']")!.textContent).toBe("Filled 1");
     expect(host.querySelector("[data-slot='autofill-done-no-file']")!.textContent).toContain("The resume isn't on the form yet. Attach it by hand.");
+  });
+
+  it("believes the form, not the earlier write: an upload the site cleared is still missing", () => {
+    show({ fillCount: 0, rows: [emptyUpload(), row("Email", true, "a@example.test")], outcome: { filled: 2, handedBack: 1, stopped: false }, attachedFile: "Priya - Java Developer.pdf" });
+    expect(host.querySelector("[data-slot='autofill-done-file']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-done-no-file']")).not.toBeNull();
   });
 
   it("counts what still needs the BDE and what the form already held", () => {

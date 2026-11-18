@@ -130,6 +130,28 @@ describe("the résumé's file for the form (docs/02 §8.2)", () => {
     expect(hook.attachmentSource).toBe("uploaded");
   });
 
+  it("asks for Word on a Word-only upload even when the PDF couldn't be made", async () => {
+    vi.mocked(getResumeFile).mockImplementation(async (_firm, _candidate, _resume, format) => {
+      if (format === "docx") return { mimeType: DOCX, data: "d29yZA==", source: "generated" };
+      throw Object.assign(new Error("This résumé's file couldn't be made. Try again."), { status: 503 });
+    });
+    vi.mocked(scanTab).mockResolvedValue(page([upload("r", ".docx"), field("a", "Email")], onSite));
+    await mount();
+    expect(getResumeFile).toHaveBeenLastCalledWith("firm-1", "cand-1", "res-1", "docx");
+    expect(uploadRow()).toMatchObject({ status: "ready", proposed: "Priya Shah - Java Developer.docx" });
+    expect(hook.fileProblem).toBe(false);
+  });
+
+  it("keeps a file the upload won't take off the form: the BDE's own PDF on a Word-only upload", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([upload("r", ".docx"), field("a", "Email")], onSite));
+    const own: ResumeFile = { name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0=", source: "picked" };
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} pickedFile={own} />); });
+    await wait(5);
+    expect(uploadRow()?.status).toBe("blocked");
+    expect(hook.attachment).toBeNull();
+  });
+
   it("says when the file couldn't be made, and takes the BDE's own file in its place (Q5)", async () => {
     vi.mocked(getResumeFile).mockRejectedValue(Object.assign(new Error("This résumé's file couldn't be made. Try again."), { status: 503 }));
     vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));

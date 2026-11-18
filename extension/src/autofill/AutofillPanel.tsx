@@ -93,12 +93,17 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const [ownFile, setOwnFile] = useState<{ candidateId: string; file: ResumeFile } | null>(null);
   const [ownFileError, setOwnFileError] = useState<string | null>(null);
   const pickedFile = ownFile?.candidateId === connection.candidateId ? ownFile.file : null;
+  // Each pick, and Remove, starts a new one: a read still running for an earlier pick is dropped, so the last one wins.
+  const ownFilePick = useRef(0);
   const takeOwnFile = async (chosen: File) => {
+    const pick = ++ownFilePick.current;
     const read = await readOwnFile(chosen).catch(() => "That file couldn't be read. Pick it again.");
+    if (pick !== ownFilePick.current) return;
     setOwnFileError(typeof read === "string" ? read : null);
     if (typeof read !== "string") setOwnFile({ candidateId: connection.candidateId, file: read });
   };
   const removeOwnFile = () => {
+    ownFilePick.current += 1;
     setOwnFile(null);
     setOwnFileError(null);
   };

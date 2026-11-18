@@ -464,3 +464,25 @@ def stub_outside(monkeypatch):
     for name, module in list(sys.modules.items()):
         if name.startswith("backend.") and module is not None and hasattr(module, "async_playwright"):
             monkeypatch.setattr(module, "async_playwright", no_browser)
+
+    # A résumé version's file (docs/02 §8.2) is printed from a page BenchQ builds itself, with nothing fetched: a
+    # stand-in prints it, so the route's own work runs and is checked.
+    class _Page:
+        async def set_content(self, *args, **kwargs):
+            return None
+
+        async def pdf(self, *args, **kwargs):
+            return b"%PDF-1.4 route sweep"
+
+        async def close(self):
+            return None
+
+    class _Browser:
+        async def new_page(self, *args, **kwargs):
+            return _Page()
+
+    async def printing_browser():
+        return _Browser()
+
+    from backend.api import routes_candidate_resumes
+    monkeypatch.setattr(routes_candidate_resumes, "_get_browser", printing_browser)

@@ -95,6 +95,9 @@ function App() {
   const appliedJobs = jobs.filter((job) => job.status === "applied");
   const visibleJobs = activeTab === "saved" ? savedJobs : appliedJobs;
   const { tab: activeBrowserTab, connection } = useTabConnection(session?.principal.user_id ?? null);
+  // The tab the BDE is on now, for an add that finishes after they moved on (Q10).
+  const latestTab = useRef(activeBrowserTab);
+  useEffect(() => { latestTab.current = activeBrowserTab; }, [activeBrowserTab]);
   const tabCandidateId = connection?.candidateId ?? null;
   const linkedJob =
     jobs.find((job) => job.id === connection?.applicationId && job.candidate_id === connection?.candidateId) ?? null;
@@ -380,7 +383,11 @@ function App() {
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         loadJobs(selectedCandidate.id).catch(() => undefined);
-        void connectThisTab(application);
+        // This tab, while it still shows the page the job was added from; if it moved on meanwhile, the job opens in
+        // a tab of its own, so no other page is connected to it.
+        const now = latestTab.current;
+        const isSamePage = Boolean(now && activeBrowserTab && now.id === activeBrowserTab.id && now.url === activeBrowserTab.url);
+        void (isSamePage ? connectThisTab(application) : openJob(application));
       }} />
   ) : null;
   const jobsArea = (

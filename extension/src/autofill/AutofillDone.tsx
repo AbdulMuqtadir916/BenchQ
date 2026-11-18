@@ -25,13 +25,16 @@ export default function AutofillDone({ filled, rows, attached, canSave, onGoTo }
   const rest = rows.filter(({ field }) => !documentOf(field));
   const needs = needsYou(rest, canSave).length;
   const kept = rest.filter((row) => row.status === "kept").length;
+  // What the form's résumé upload holds now, as the page reads it: a file a site took and then cleared isn't attached.
+  // The name BenchQ attached stands in only when the site swapped the upload for a chip of its own.
   const upload = rows.find(({ field }) => field.kind === "file" && documentOf(field) === "resume");
-  const isResumeMissing = upload !== undefined && !attached && !filledValue(upload);
+  const onForm = upload ? filledValue(upload) : attached;
+  const isResumeMissing = upload !== undefined && !onForm;
   const summary = [`Filled ${filled}`, needs ? `${needs} need${needs === 1 ? "s" : ""} you` : "",
     kept ? `${kept} kept as ${kept === 1 ? "it was" : "they were"}` : ""].filter(Boolean).join(" · ");
   return <div className="grid gap-1.5">
     <p data-slot="autofill-done" className={DONE} role="status">{CHECK}{summary}</p>
-    {attached && <p data-slot="autofill-done-file" className={`wrap-anywhere ${MUTED_TEXT}`}>Resume attached: {attached}</p>}
+    {onForm && <p data-slot="autofill-done-file" className={`wrap-anywhere ${MUTED_TEXT}`}>Resume attached: {onForm}</p>}
     {isResumeMissing && <div data-slot="autofill-done-no-file" className={WARNING} role="alert">
       <p className="mb-1.5">The resume isn&apos;t on the form yet. Attach it by hand.</p>
       <button type="button" className={button("secondary", "compact")} onClick={() => onGoTo(upload)}>Go to field</button>

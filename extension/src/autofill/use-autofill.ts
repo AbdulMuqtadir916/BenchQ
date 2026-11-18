@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
-import { DOCX_MIME, formatFor, withResumeFile } from "./documents";
+import { DOCX_MIME, fitsUpload, formatFor, PDF_MIME, withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
 import { checkJob, confirmationKey, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
@@ -390,12 +390,15 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     isScanRunning.current = true;
     setScanning(true);
     const reused = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
-    const [answers, loaded] = reused ? [reused, reused.file] : await Promise.all([loadAnswers(), loadFile()]);
+    // A next page of the form keeps the answers; its file is looked at again (kept by version, so nothing is fetched).
+    const [answers, loaded] = reused ? [reused, await loadFile()] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
-    // An upload that takes only the other kind (Word only, or PDF only) gets the résumé as that kind (Q3). Never the
-    // BDE's own pick: that one goes as it is.
-    const wanted = !reused && page && loaded && loaded.source !== "picked" ? formatFor(page.fields, loaded.mimeType) : null;
-    const file = wanted ? (await loadFile(wanted)) ?? loaded : loaded;
+    // An upload that takes only the other kind (Word only, or PDF only) gets the résumé as that kind (Q3), on any page
+    // of the form and even when the default one couldn't be made. Never the BDE's own pick: that one goes as it is. A
+    // file the upload won't take stays off the form: it's the BDE's to attach.
+    const wanted = page && loaded?.source !== "picked" ? formatFor(page.fields, loaded?.mimeType ?? PDF_MIME) : null;
+    const offered = wanted ? await loadFile(wanted) : loaded;
+    const file = offered && fitsUpload(page?.fields ?? [], offered.mimeType) ? offered : null;
     if (answers && page && isCurrent()) {
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.

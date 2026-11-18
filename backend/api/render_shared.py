@@ -46,8 +46,20 @@ async def _get_browser():
     if _pw_browser and _pw_browser.is_connected():
         return _pw_browser
     from playwright.async_api import async_playwright
-    _pw_instance = await async_playwright().start()
-    _pw_browser = await _pw_instance.chromium.launch(headless=True, args=['--font-render-hinting=none'])
+    if _pw_instance is not None:          # a browser that went away: its driver goes too, not just the handle
+        try:
+            await _pw_instance.stop()
+        except Exception:  # noqa: BLE001  (already gone)
+            pass
+        _pw_instance = None
+    instance = await async_playwright().start()
+    try:
+        browser = await instance.chromium.launch(headless=True, args=['--font-render-hinting=none'])
+    except Exception:
+        # Chromium didn't start: stop the driver now, or every retry leaves another one running.
+        await instance.stop()
+        raise
+    _pw_instance, _pw_browser = instance, browser
     logger.info("Warm Playwright browser started for PDF generation")
     return _pw_browser
 

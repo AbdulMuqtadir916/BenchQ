@@ -26,11 +26,12 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
-from backend.api.render_shared import _get_browser, _rewrite_urls_with_tracers
+from backend.api.render_shared import _get_browser
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_change_resume, can_manage_resume, require
@@ -224,17 +225,11 @@ def _file_response(content: bytes, mime_type: str, file_name: str, source: str) 
         "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Resume-File": source})
 
 
-def _contact_links(db: DbSession, row) -> dict:
-    """Where the version's LinkedIn and GitHub addresses point in its file: tracer links when the firm uses them, as a
-    cover letter's do (`tracer_links_enabled`, off by default), else the addresses as written."""
-    items = [{"text": label, "url": value.strip()} for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub"))
-             if (value := getattr(row, key) or "").strip()]
-    if not items:
-        return {}
-    keys = {"LinkedIn": "linkedin", "GitHub": "github"}
-    traced = _rewrite_urls_with_tracers({"header": {"contact_items": items}}, str(row.id), db)
-    return {keys[item["text"]]: item["url"] for item in traced.get("header", {}).get("contact_items", [])
-            if item.get("text") in keys and item.get("url")}
+def _not_made(version_id, error: Exception):
+    """A file that couldn't be made: logged by its version's id and the error's kind only, and a 503 the extension can
+    try again on."""
+    logger.warning("Résumé file for version %s couldn't be made: %s", version_id, type(error).__name__)
+    raise HTTPException(status_code=503, detail="This résumé's file couldn't be made. Try again.") from None
 
 
 async def _printed(page_html: str, page_format) -> bytes:
@@ -247,13 +242,11 @@ async def _printed(page_html: str, page_format) -> bytes:
         await page.close()
 
 
-@router.get("/{resume_id}/file", summary="A résumé version as a file")
-async def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
-                          kind: Annotated[str | None, Query(alias="format", pattern="^(pdf|docx)$")] = None,
-                          principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
-    """A version as a file the extension attaches to a form (docs/02 §8.2). An uploaded base's version 1 is its file as
-    uploaded, unless `format` asks for the other kind; any other version's file is made from its own text when asked:
-    a plain, single-column PDF, or Word with `?format=docx`."""
+def _file_or_page(firm_id, candidate_id, resume_id, kind, principal, db: DbSession):
+    """The route's synchronous part, run in a worker thread so the event loop never waits on the database: the checks,
+    the version, then its file (as uploaded, or Word made here) or the page to print with what goes with it. Reads only,
+    so nothing is written from a GET; the transaction ends before Chromium is waited on, so a slow print holds no
+    database connection. Links stay as the version writes them (no tracer rows from a read)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id)
     row = versions.candidate_version(db, candidate, resume_id)
@@ -261,15 +254,33 @@ async def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id
     kept = versions.uploaded_file(db, candidate, row)
     if kept is not None and (kind is None or kept.mime_type == wanted):
         return _file_response(kept.content, kept.mime_type, kept.file_name, "uploaded")
-    links = _contact_links(db, row)
-    extension = "docx" if wanted == DOCX_MIME else "pdf"
+    if wanted == DOCX_MIME:
+        try:
+            content = resume_file.docx(row)
+        except Exception as e:  # noqa: BLE001  (python-docx's errors have no common base)
+            _not_made(row.id, e)
+        return _file_response(content, DOCX_MIME, resume_file.file_name(row, "docx"), "generated")
+    page = (resume_file.html(row), row.page_format, resume_file.file_name(row, "pdf"), row.id)
+    db.rollback()   # ends the read's transaction: its connection goes back to the pool before the print
+    return page
+
+
+@router.get("/{resume_id}/file", summary="A résumé version as a file")
+async def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+                          kind: Annotated[str | None, Query(alias="format", pattern="^(pdf|docx)$")] = None,
+                          principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
+    """A version as a file the extension attaches to a form (docs/02 §8.2). An uploaded base's version 1 is its file as
+    uploaded, unless `format` asks for the other kind; any other version's file is made from its own text when asked:
+    a plain, single-column PDF, or Word with `?format=docx`."""
+    ready = await run_in_threadpool(_file_or_page, firm_id, candidate_id, resume_id, kind, principal, db)
+    if isinstance(ready, Response):
+        return ready
+    page_html, page_format, file_name, version_id = ready
     try:
-        content = (resume_file.docx(row, links) if wanted == DOCX_MIME
-                   else await _printed(resume_file.html(row, links), row.page_format))
-    except Exception as e:  # noqa: BLE001  (Chromium's and python-docx's errors have no common base)
-        logger.warning("Résumé file for version %s couldn't be made: %s", row.id, type(e).__name__)
-        raise HTTPException(status_code=503, detail="This résumé's file couldn't be made. Try again.") from None
-    return _file_response(content, wanted, resume_file.file_name(row, extension), "generated")
+        content = await _printed(page_html, page_format)
+    except Exception as e:  # noqa: BLE001  (Chromium's errors have no common base)
+        _not_made(version_id, e)
+    return _file_response(content, PDF_MIME, file_name, "generated")
 
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")

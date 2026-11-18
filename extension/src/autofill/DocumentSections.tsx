@@ -126,14 +126,23 @@ const SOURCE_TAG: Record<ResumeFileSource, string> = {
 type ResumeFileProps = Pick<DocumentSectionsProps, "fileProblem" | "onRetryFile" | "ownFileError" | "onOwnFile" | "onRemoveOwnFile"> & {
   picked: NonNullable<DocumentSectionsProps["picked"]>;
   isFilling: boolean;
+  /** A file is on the form already: only the BDE's own file says so, with Remove to stop using it. */
+  isOnForm?: boolean;
 };
 
 /** What the Resume section says about the picked résumé's file, before one is on the form: the file Autofill attaches and
  * where it came from (made from the version, as uploaded, or the BDE's own), with a way to use a file from their
  * computer instead (Q5); that it couldn't be made, with Try again; or, without a file, that it's the BDE's to attach. */
-function ResumeFile({ picked, isFilling, fileProblem = false, onRetryFile, ownFileError = null, onOwnFile, onRemoveOwnFile }: ResumeFileProps) {
+function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, onRetryFile, ownFileError = null, onOwnFile, onRemoveOwnFile }: ResumeFileProps) {
   const input = useRef<HTMLInputElement>(null);
   const isOwn = picked.source === "picked";
+  if (isOnForm) {
+    return isOwn && onRemoveOwnFile ? <div data-slot="resume-file" className="flex flex-wrap items-center gap-2">
+      <span data-slot="resume-file-source" className={SOURCE_TAG.picked}>Your file</span>
+      <button type="button" data-slot="own-file-remove" className={button("secondary", "compact")} disabled={isFilling}
+        title="Stop using your file for this candidate's forms" onClick={onRemoveOwnFile}>Remove</button>
+    </div> : null;
+  }
   const choose = onOwnFile && <>
     <input ref={input} type="file" accept={OWN_FILE_TYPES} hidden data-slot="own-file-input"
       onChange={(event) => {
@@ -185,8 +194,9 @@ export default function DocumentSections({ rows, details, resumesUrl, isFilling,
   const actions = { isFilling, onGoTo };
   const resumes = of("resume");
   const hasFile = resumes.some((row) => Boolean(filledValue(row))) || (resumes.length === 0 && Boolean(attached));
-  const fileLine = picked && !hasFile ? <ResumeFile picked={picked} isFilling={isFilling} fileProblem={fileProblem} onRetryFile={onRetryFile}
-    ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} /> : null;
+  // Once a file is on the form, the line stays only for the BDE's own file, so they can stop using it.
+  const fileLine = picked && (!hasFile || picked.source === "picked") ? <ResumeFile picked={picked} isOnForm={hasFile} isFilling={isFilling}
+    fileProblem={fileProblem} onRetryFile={onRetryFile} ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} /> : null;
   return <div data-slot="documents" className="grid gap-2">
     <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={resumes} held={picked ? null : resumeHeld(details)} extra={fileLine}
       link={picked ? null : resumesUrl} attached={attached} onChange={onChangeResume} {...actions} />

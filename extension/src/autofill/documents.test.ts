@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accepts, DOCX_MIME, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
+import { accepts, DOCX_MIME, fitsUpload, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
 import type { FieldKind, ReviewRow, TabField } from "./types";
 
 const field = (id: string, label: string, kind: FieldKind = "file"): TabField => ({
@@ -46,6 +46,13 @@ describe("the kind of file an upload takes (Q3)", () => {
     expect(formatFor([{ ...field("r", "Resume"), accept: ".pdf,.docx" }], PDF_MIME)).toBeNull();
     expect(formatFor([{ ...field("c", "Cover letter"), accept: ".docx" }], PDF_MIME)).toBeNull();
     expect(formatFor([{ ...field("r", "Resume"), accept: "image/*" }], PDF_MIME)).toBeNull();
+  });
+
+  it("keeps a file the résumé upload won't take off the form; a form without one takes any", () => {
+    expect(fitsUpload([{ ...field("r", "Resume/CV"), accept: ".docx" }], PDF_MIME)).toBe(false);
+    expect(fitsUpload([{ ...field("r", "Resume/CV"), accept: "image/*" }], DOCX_MIME)).toBe(false);
+    expect(fitsUpload([{ ...field("r", "Resume/CV"), accept: ".pdf,.docx" }], PDF_MIME)).toBe(true);
+    expect(fitsUpload([field("c", "Cover letter")], PDF_MIME)).toBe(true);
   });
 });
 
