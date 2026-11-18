@@ -20,9 +20,13 @@ def parser(monkeypatch):
         calls.append(firm_id)
         return clean_reply({**PARSE, "header": {**PARSE["header"], "title": "Staff Java Engineer"}})
 
-    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "résumé text")
+    # The file's text holds the test candidate's name and email (Ravi Teja, ravi@example.com): the 07 Q69 check passes.
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: RESUME_TEXT)
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)
     return calls
+
+
+RESUME_TEXT = "RAVI TEJA\nSenior Java Developer · ravi@example.com · Dallas, TX\n"
 
 
 def _url(world, candidate, tail=""):
@@ -549,3 +553,31 @@ def test_save_normalizes_bare_profile_links(anonymous_client, test_db, world):
     saved = _v(anonymous_client, world, candidate, version=2, who="adnan")
     assert saved["linkedin"] == "https://linkedin.com/in/qa-test"
     assert saved["github"] == "https://github.com/qa-test"
+
+
+@pytest.mark.parametrize("text,message", [
+    ("Ravi Teja · Java Developer · Dallas", "The résumé should contain the candidate's email."),
+    ("Java Developer · Dallas", "The résumé should contain the candidate's name and email."),
+    ("Ravi Teja · ravi.other@example.com", "This résumé isn't for this candidate. Please upload this candidate's résumé."),
+    ("Someone Else · someone@example.com", "This résumé isn't for this candidate. Please upload this candidate's résumé."),
+    ("R. Teja · ravi@example.com", "The résumé should contain the candidate's name."),
+])
+def test_a_later_upload_must_hold_the_candidates_name_and_email(anonymous_client, test_db, world, parser,
+                                                                 monkeypatch, text, message):
+    """07 Q69 (2026-11-18): checked on the file's text before the parser runs; a mismatch never says which part."""
+    from backend.api import routes_candidate_resumes
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")         # Ravi Teja, Ravi@Example.com
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: text)
+    r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
+    assert (r.status_code, r.json()["detail"]) == (400, message)
+    assert parser == []                                                    # the AI never read it
+    assert len(_listing(anonymous_client, world, c)["bases"]) == 1          # nothing kept
+
+
+@pytest.mark.parametrize("text", ["RAVI  TEJA\nravi@example.com", "Teja, Ravi — Ravi@Example.com",
+                                  "Ravi Kumar Teja · mailto:ravi@example.com."])
+def test_case_order_and_middle_names_dont_matter(anonymous_client, test_db, world, parser, monkeypatch, text):
+    from backend.api import routes_candidate_resumes
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: text)
+    assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201

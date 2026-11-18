@@ -418,5 +418,7 @@ def offline(monkeypatch):
     monkeypatch.setattr(routes_inbox, "revoke_token", lambda *args, **kwargs: True)
 
     from backend.api import routes_candidate_resumes
-    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "isolation résumé text")
+    # Both firms' candidates' names and the résumé's email, so a firm's own upload passes the 07 Q69 check.
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text",
+                        lambda kind, content: f"ACME candidate · {CANARY} candidate · priya@example.test")
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)

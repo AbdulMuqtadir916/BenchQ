@@ -19,6 +19,7 @@ candidate's BDE, or the OWNER and a MANAGER while it has none); upload, delete a
 reads only (backend/auth/access.py).
 """
 import asyncio
+import logging
 import uuid
 from datetime import date
 from typing import Annotated, Any
@@ -35,12 +36,15 @@ from backend.auth.policy import can_change_resume, can_manage_resume, require
 from backend.match import store as match_store
 from backend.auth.sessions import Principal
 from backend.candidates import autofill as autofill_answers
+from backend.candidates import identity_check
 from backend.candidates import versions
 from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.models.candidates import ResumeParse, file_sha256
 from backend.models.db import get_db
 from backend.models.tenancy import User
+
+logger = logging.getLogger("jobnavigator.resume_upload")
 
 router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}/resumes", tags=["candidate résumés"])
 
@@ -261,16 +265,21 @@ async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, background:
                         db: DbSession = Depends(get_db)):
     """PDF or DOCX, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
     with the base it is; if that base was deleted, it comes back instead (its v1, `restored` true, no parser run).
-    Otherwise the parser reads it and one transaction keeps the file and writes a new active base with its v1.
+    Otherwise the file's text must hold the candidate's name and email (07 Q69; refused with 400 before the parser
+    runs), then the parser reads it and one transaction keeps the file and writes a new active base with its v1.
     Nothing is saved if the parse fails (§4.6). The database work runs off the event loop
     (`asyncio.to_thread`): waiting for the candidate lock would otherwise hold up every request on the worker."""
-    await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
+    identity = await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
     content = await file.read(MAX_BYTES + 1)
     kind = file_kind(file.filename or "", content)
     sha256 = file_sha256(content)
     parse = None
     if await asyncio.to_thread(_is_new_file, db, firm_id, principal, candidate_id, sha256):
         text = await asyncio.to_thread(extract_text, kind, content)
+        code, refusal = identity_check.check(text, *identity)
+        if refusal is not None:
+            logger.info("resume upload refused candidate=%s check=%s", candidate_id, code)   # ids and a code only
+            raise HTTPException(status_code=400, detail=refusal)
         parse = await read_resume(text, kind, db, firm_id=firm_id)
     kept = await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
                                    content, sha256, parse)
@@ -278,11 +287,15 @@ async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, background:
     return kept
 
 
-def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> None:
+def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> tuple[str, str]:
+    """The candidate's name and email, which the file must hold (07 Q69), once the principal may upload."""
     _member_of(firm_id, principal)
-    if not can_manage_resume(principal, _candidate(db, firm_id, principal, candidate_id)):
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    if not can_manage_resume(principal, candidate):
         raise _forbidden()                   # refused before the file is parsed or kept (its bytes have arrived)
+    identity = (candidate.full_name or "", candidate.email or "")
     db.commit()
+    return identity
 
 
 def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID,
