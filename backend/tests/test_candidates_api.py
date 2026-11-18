@@ -354,9 +354,10 @@ def test_once_a_bde_is_assigned_only_that_bde_edits_the_details(anonymous_client
 
 
 def test_the_details_are_every_onboarding_answer_not_on_the_resume(anonymous_client, world):
-    """Q18: role, target role, years; work authorization; engagement, rates, availability; preferences; notes."""
+    """Q18: role, years; work authorization; engagement, rates, availability; preferences; notes. The target role is
+    fixed (07 Q68): it keeps what onboarding saved."""
     c = _create(anonymous_client, world, bde="adnan").json()
-    r = _patch(anonymous_client, world, c, "adnan", primary_role=" Senior Java Developer ", target_roles=["Data Engineer"],
+    r = _patch(anonymous_client, world, c, "adnan", primary_role=" Senior Java Developer ",
                years_experience=10, work_settings=["REMOTE", "REMOTE", "HYBRID"],
                preferred_locations=[" Dallas, TX ", "", "Dallas, TX", "Remote"], willing_to_relocate=True,
                preferred_industries=["Banking", " "], deal_breakers=["No travel"], contact_notes="  Calls after 6.  ",
@@ -364,7 +365,7 @@ def test_the_details_are_every_onboarding_answer_not_on_the_resume(anonymous_cli
     assert r.status_code == 200, r.text
     got = r.json()
     assert (got["primary_role"], got["target_roles"], got["years_experience"]) == ("Senior Java Developer",
-                                                                                  ["Data Engineer"], 10)
+                                                                                  c["target_roles"], 10)
     assert (got["work_settings"], got["preferred_locations"]) == (["REMOTE", "HYBRID"], ["Dallas, TX", "Remote"])
     assert (got["preferred_industries"], got["deal_breakers"], got["contact_notes"]) == (["Banking"], ["No travel"],
                                                                                          "Calls after 6.")
@@ -372,13 +373,11 @@ def test_the_details_are_every_onboarding_answer_not_on_the_resume(anonymous_cli
     assert _patch(anonymous_client, world, c, "adnan", contact_notes=None).json()["contact_notes"] is None
 
 
-@pytest.mark.parametrize("changes,status", [({"target_roles": ["Data Engineer", "Java Developer"]}, 422),
-                                            ({"target_roles": []}, 422), ({"target_roles": ["  "]}, 422),
-                                            ({"employment_types": []}, 422), ({"primary_role": "  "}, 422),
+@pytest.mark.parametrize("changes,status", [({"employment_types": []}, 422), ({"primary_role": "  "}, 422),
                                             ({"primary_role": None}, 400), ({"years_experience": None}, 400),
                                             ({"preferred_locations": None}, 400), ({"work_settings": None}, 400)])
 def test_an_edit_follows_onboardings_rules(anonymous_client, world, changes, status):
-    """Q20: one target role, at least one engagement type, nothing required emptied."""
+    """Q20: at least one engagement type, nothing required emptied."""
     c = _create(anonymous_client, world, bde="adnan").json()
     assert _patch(anonymous_client, world, c, "adnan", **changes).status_code == status
 
@@ -393,20 +392,23 @@ def test_an_edit_keeps_a_place_for_the_job_search(anonymous_client, world):
     assert (r.status_code, r.json()["preferred_locations"]) == (200, [])
 
 
-def test_the_ledger_names_what_changed_and_keeps_the_old_target_roles(anonymous_client, world, test_db):
-    """Q24: a candidate from before (several target roles) saved with one; the entry's note keeps the old list."""
-    from backend.models.candidates import Candidate
+def test_the_ledger_names_what_changed(anonymous_client, world, test_db):
+    """One UPDATE entry naming the fields that changed; nothing changed, no entry."""
     from backend.models.tenancy import LedgerEntry
     c = _create(anonymous_client, world, bde="adnan", rate_target=80).json()
-    row = test_db.get(Candidate, c["id"])
-    row.target_roles = ["Java Developer", "Backend Engineer"]
-    test_db.commit()
-    r = _patch(anonymous_client, world, c, "adnan", target_roles=["Java Developer"], rate_target=80, notice_period_days=7)
-    assert r.json()["target_roles"] == ["Java Developer"]
+    r = _patch(anonymous_client, world, c, "adnan", rate_target=80, notice_period_days=7)
+    assert r.status_code == 200, r.text
     entry = (test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "UPDATE")
              .one())
-    assert entry.summary == "Updated target roles, notice period days"                  # the rate didn't change
-    assert entry.note == "Target roles before: Java Developer, Backend Engineer"
-    # Nothing changed: no entry.
+    assert entry.summary == "Updated notice period days"                                # the rate didn't change
     _patch(anonymous_client, world, c, "adnan", rate_target=80)
     assert test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "UPDATE").count() == 1
+
+
+@pytest.mark.parametrize("fixed", [{"target_roles": ["Data Engineer"]}, {"search_titles": ["AI Engineer"]},
+                                   {"full_name": "Someone Else"}, {"email": "someone@example.com"}])
+def test_the_name_email_target_role_and_search_titles_are_fixed(anonymous_client, world, fixed):
+    """07 Q68 (2026-11-18): fixed once the candidate is added, for everyone: an edit that sends one is refused."""
+    c = _create(anonymous_client, world, bde="adnan").json()
+    assert _patch(anonymous_client, world, c, "adnan", **fixed).status_code == 422
+    assert _patch(anonymous_client, world, c, "adnan", **fixed, contact_notes="x").status_code == 422   # nothing kept

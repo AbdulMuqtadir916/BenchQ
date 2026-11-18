@@ -1530,9 +1530,10 @@ firm's start and time zone.
 `search_titles`, on the active base's version 1, `resumes.search_titles`, read like the résumé's city): after a candidate
 is added, one AI call (`job_search/search_titles.py`: the parser's OpenRouter key, `search_titles_llm_model`,
 `search_titles_prompt` with `{target_role}`, `search_titles_response_format`; thinking off) suggests 2 related titles
-for the target role, guarded (no seniority words, never a generic title, none the candidate has). Only the
-"Additional candidate details" tab shows them; the BDE edits them there (`PATCH …/candidates/{id} {search_titles}`, up
-to 4, kept as typed). A new active base takes them over. A search asks for the target role's titles and these (5 at
+for the target role, guarded (no seniority words, never a generic title, none the candidate has). **Since 2026-11-18
+(07 Q68) nobody edits them**, like the target role: the "Additional candidate details" tab shows them read-only to the
+OWNER and a MANAGER (`candidate.viewSearchTitles`), and the API leaves `search_titles` out for anyone else (the BDE).
+A new active base takes them over. A search asks for the target role's titles and these (5 at
 most); the Match counts them as wanted titles. None: the target role alone. The same filters at save; the daily limits are shared by both sources. A key
 (`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
 the licence is settled before production.
@@ -2189,11 +2190,13 @@ an `ApplicationEvent` — the same write the kanban makes.
 ### 9.z Candidate submission facts and details
 
 `UpdateCandidate` (`src/lib/schemas/candidate.ts`) — **since 2026-11-14 (07 Q66)** a partial of every onboarding answer
-that isn't on the résumé: `primaryRole`, `targetRoles` (exactly one), `yearsExperience`, `workAuth`,
+that isn't on the résumé: `primaryRole`, `yearsExperience`, `workAuth`,
 `needsSponsorship`, `needsTransfer`, `workAuthExpiry`, `employmentTypes` (at least one), `rateTarget`, `rateMin`,
 `availableFrom`, `noticePeriodDays`, `workSettings`, `preferredLocations`, `willingToRelocate`, `preferredIndustries`,
 `dealBreakers`, `contactNotes`, sent to `PATCH /api/firms/{firm}/candidates/{id}` by the "Additional candidate
-details" tab. Only the fields sent change; a required one sent as null is a 400, and list items are trimmed, blanks
+details" tab. **Not** the name, email, target role or extra search titles: fixed once the candidate is added (07 Q68,
+2026-11-18); the backend refuses a request that sends one (422, extra fields), and a résumé save that sends another
+name or email (400). Only the fields sent change; a required one sent as null is a 400, and list items are trimmed, blanks
 dropped, repeats removed. After the edit the candidate must still have a place for the job search (the résumé's city
 and state, or a preferred location; else 400). Who: `canEditProfile` (the résumé rule). A changed `workAuth` is sent
 with `needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in

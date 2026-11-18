@@ -3,8 +3,9 @@
 When a candidate is added, one small AI call takes their target role(s) and suggests 2 related titles employers often
 post for the same specialty (live 2026-11-17: "Business Analyst, Business Systems Analyst" for a Senior Business
 Analyst; "Machine Learning Engineer, AI Engineer" for a GenAI / LLM Engineer: good fits Match scores 70+ roughly
-doubled). They are stored on the candidate's active base's version 1 (`resumes.search_titles`), shown and edited by
-hand only on the "Additional candidate details" tab (up to 4; no AI call there), and taken over by a new active base.
+doubled). They are stored on the candidate's active base's version 1 (`resumes.search_titles`) and taken over by a new
+active base. Nobody edits them: like the target role, they are fixed once the candidate is added (07 Q68, 2026-11-18);
+the "Additional candidate details" tab shows them read-only to the owner and manager, and not to the BDE.
 
 The search asks for the target role's own titles and these, 5 at most (`for_search`); the Match counts them as wanted
 titles. None made (an older candidate, or a failed call): the target role alone (Q135).
@@ -24,7 +25,6 @@ logger = logging.getLogger("benchq.job_search")
 
 MODEL_ROW, PROMPT_ROW, FORMAT_ROW = "search_titles_llm_model", "search_titles_prompt", "search_titles_response_format"
 KEY_ROW = "resume_parse_llm_api_key"
-MOST_KEPT = 4                   # on the résumé (the BDE may add up to 4)
 MOST_SEARCHED = 5               # in one search, the target role's titles first (freehire.me takes 5 alternatives)
 AI_TITLES = 2
 ROLE = "{target_role}"
@@ -60,16 +60,6 @@ def keep(suggested, target_titles) -> list[str]:
                 {o.lower() for o in out}:
             out.append(title)
     return out[:AI_TITLES]
-
-
-def clean_typed(titles) -> list[str]:
-    """What the BDE typed (the details tab): kept as typed, blanks and repeats out, at most 4."""
-    out: list[str] = []
-    for title in titles or ():
-        title = _SPACES.sub(" ", str(title)).strip()[:100]
-        if title and title.lower() not in {o.lower() for o in out}:
-            out.append(title)
-    return out[:MOST_KEPT]
 
 
 def for_search(target_titles, extra) -> list[str]:

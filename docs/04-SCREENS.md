@@ -365,9 +365,11 @@ and notice, employment types, relocation, the target role — read-only since 20
 #### Additional candidate details
 Decided 2026-11-14 (07 Q66). What onboarding asked that isn't on the résumé, in the new-candidate flow's own fields:
 **Role** ("Marketed as", years), then the flow's step 3 (work authorization and its expiry, engagement types, target
-rate and floor, available from, notice) and step 4 (the target role, one box; work setting; preferred locations;
-relocation; industries; deal breakers; notes for the BDE). The same rules as onboarding: one target role, and a place
-for the job search (the résumé's city and state, or a preferred location; the hint says which the search will use).
+rate and floor, available from, notice) and step 4 (the target role, **read-only**; work setting; preferred locations;
+relocation; industries; deal breakers; notes for the BDE). The target role and the extra search titles are fixed once
+the candidate is added (07 Q68, 2026-11-18); the titles show, read-only, in a *Job search* card to the OWNER and a
+MANAGER only, never to the BDE. The same rules as onboarding: a place for the job search (the résumé's city and state,
+or a preferred location; the hint says which the search will use).
 *Save details* and *Discard changes* sit in a bar at the bottom, enabled once something changed. Edited by the
 candidate's BDE once one is assigned, before that by the OWNER and the candidate's MANAGER (the résumé rule); everyone
 else sees the same details read-only, with a line saying who edits them.
@@ -568,7 +570,8 @@ first, so nothing overlaps. Labels fold into their icons as the window narrows (
   Certifications. Two Column keeps contact and skills in its side column; the rest follow the order in the main one.
 - **Builder mode** — collapsible section forms on the left (Header, then the sections in that order), live page on the right: every field of the parser's strict format
   but languages (kept, never shown). The header has the name, title, email, phone, city, state, country, LinkedIn
-  and GitHub; work authorization is shown read-only (the profile's fact). A job has its printed dates and its start,
+  and GitHub; the name, email and work authorization are shown read-only (the profile's; the name and email are fixed
+  once the candidate is added, 07 Q68, so the page shows them but never edits them either). A job has its printed dates and its start,
   end and "current role"; projects and jobs have bullets. Rows reorder and remove in place. Enter in a bullet starts
   the next one.
 - **Save** — explicit (no autosave; `⌘S`). It makes the résumé's next version and the studio moves to it; if another

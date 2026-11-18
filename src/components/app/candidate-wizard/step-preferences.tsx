@@ -21,7 +21,11 @@ const WORK_SETTINGS: { value: RemoteMode; label: string }[] = [
  * a preferred location, or the city and state from step 2 (decided 2026-11-14). Every other field is optional. Work
  * setting, preferred locations and the notes are provisional fields (07 Q50).
  */
-export function StepPreferences({ wizard, errors, homeFrom = "basic" }: { wizard: WizardForm; errors: Errors; /** Where the city and state are entered: the flow's step 2, or the résumé (the details tab). */ homeFrom?: HomeFrom }) {
+export function StepPreferences({ wizard, errors, homeFrom = "basic", isTargetRoleFixed = false }: {
+  wizard: WizardForm; errors: Errors;
+  /** Where the city and state are entered: the flow's step 2, or the résumé (the details tab). */ homeFrom?: HomeFrom;
+  /** The details tab: the target role is fixed once the candidate is added (07 Q68), shown, not edited. */ isTargetRoleFixed?: boolean;
+}) {
   const { values, set } = wizard;
   const marketedAs = values.primaryRole.trim();
   const hasHome = values.city.trim() !== "" && values.state.trim() !== "";
@@ -36,6 +40,13 @@ export function StepPreferences({ wizard, errors, homeFrom = "basic" }: { wizard
         </div>
       </div>
 
+      {isTargetRoleFixed ? (
+        <div>
+          <p className="text-label text-[var(--color-text-2)]">Target role</p>
+          <p className="mt-1.5 break-words rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">{values.targetRole || "—"}</p>
+          <p className="mt-1 text-caption text-[var(--color-text-3)]">Set when the candidate was added; it can&apos;t be changed.</p>
+        </div>
+      ) : (
       <WizardField id="cw-target-role" label="Target role" required error={errors.targetRole} hint="The job search looks for this title.">
         <Input {...fieldAria("cw-target-role", errors.targetRole, true)} value={values.targetRole} onChange={(event) => set("targetRole", event.target.value)} maxLength={200} placeholder="Senior Java Developer…" />
         {marketedAs && values.targetRole.trim() === "" ? (
@@ -44,6 +55,7 @@ export function StepPreferences({ wizard, errors, homeFrom = "basic" }: { wizard
           </button>
         ) : null}
       </WizardField>
+      )}
 
       <fieldset className="space-y-1.5">
         <legend className="text-label text-[var(--color-text-2)]">Work setting</legend>

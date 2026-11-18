@@ -47,8 +47,11 @@ export type TeamAction =
   | "notification.approve"
   | "firm.editHours";
 
-/** Not an action: whether the person sees the team (members, owner, assignments) on firm pages (Q15). */
-export type FirmVisibility = "team.view";
+/**
+ * Not actions: what the person sees. The team (members, owner, assignments) on firm pages (Q15); a candidate's extra
+ * search titles, read-only, for the OWNER and a MANAGER and never the BDE (07 Q68, 2026-11-18).
+ */
+export type FirmVisibility = "team.view" | "candidate.viewSearchTitles";
 
 /** The platform tier (07 §2.3): PLATFORM_ADMIN only. */
 export type PlatformAction =
@@ -67,7 +70,7 @@ export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
 export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "notification.approve", "firm.editHours"];
 export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
-export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
+export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", "candidate.viewSearchTitles", ...PLATFORM_ACTIONS];
 
 const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];
 const OWNER_ONLY: readonly FirmRole[] = ["OWNER"];
@@ -99,6 +102,8 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   /** 07 Q67 (2026-11-17): the firm's work hours, on settings/firm. */
   "firm.editHours": OWNER_ONLY,
   "team.view": OWNER_AND_MANAGER,
+  /** 07 Q68 (2026-11-18): the extra search titles, read-only; the BDE doesn't see them. */
+  "candidate.viewSearchTitles": OWNER_AND_MANAGER,
 };
 
 const isPlatformAction = (action: Action): action is PlatformAction => (PLATFORM_ACTIONS as readonly string[]).includes(action);

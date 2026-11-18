@@ -132,7 +132,7 @@ CASES: dict[str, Case] = {
     # The upload's own v1 ("resume"): only an uploaded base's first version has a file (07 Q49).
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
-                                       body=lambda i: {"full_name": "Edited", "email": "edited@example.test", "summary": "An edited summary"}),
+                                       body=lambda i: {"full_name": i["candidate_name"], "email": "priya@example.test", "summary": "An edited summary"}),   # the name and email are fixed (07 Q68)
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": Case(path={"resume_id": "version"}, as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": Case(upload=True, as_bde=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/removal": Case(path={"resume_id": "version"}),

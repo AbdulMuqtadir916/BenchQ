@@ -8,6 +8,7 @@ and another firm is the same 404 as a missing one (principle 4).
 - POST /candidates: create, with its manager and optional BDE (Q41), skills and summary UNVERIFIED (Q49).
 - PATCH /candidates/{id}: the candidate's details, every onboarding answer that isn't on the résumé (the "Additional
   candidate details" tab, decided 2026-11-14), by the résumé rule: the BDE once assigned, else the OWNER and MANAGER.
+  The target role and the extra search titles are not among them: fixed once the candidate is added (07 Q68).
 - POST /candidates/{id}/assign: move it to another manager and/or BDE (Q43).
 Assigning a BDE to a candidate that had none is blocked at the plan's candidate limit (Q45). Every assignment change
 is one ASSIGN ledger entry, with the handoff note.
@@ -19,7 +20,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
@@ -100,10 +101,12 @@ class CreateCandidateBody(BaseModel):
 
 class UpdateCandidateBody(BaseModel):
     """The frontend's UpdateCandidateSchema: the candidate's details, every onboarding answer that isn't on the résumé
-    (decided 2026-11-14, Q18). Only the fields sent change. The same rules as onboarding (Q20): one target role, at
-    least one engagement type, and a place for the job search afterwards."""
+    (decided 2026-11-14, Q18). Only the fields sent change. The same rules as onboarding (Q20): at least one engagement
+    type, and a place for the job search afterwards. The name, email, target role and extra search titles are fixed
+    once the candidate is added (07 Q68, 2026-11-18): a request that sends one is refused (422, extra fields)."""
+    model_config = ConfigDict(extra="forbid")
+
     primary_role: Required200 | None = None
-    target_roles: list[Required200] | None = Field(default=None, min_length=1, max_length=1)
     years_experience: float | None = Field(default=None, ge=0, le=60)
     work_auth: WorkAuth | None = None
     work_auth_expiry: datetime | None = None
@@ -121,17 +124,12 @@ class UpdateCandidateBody(BaseModel):
     preferred_industries: list[str] | None = Field(default=None, max_length=50)
     deal_breakers: list[str] | None = Field(default=None, max_length=50)
     contact_notes: str | None = Field(default=None, max_length=2000)
-    # The extra titles the job search asks for (decided 2026-11-17, Q143, Q144): typed by the BDE on the details tab,
-    # kept as typed; stored on the active base's v1 (`resumes.search_titles`), not on `candidates`.
-    search_titles: list[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] | None = Field(
-        default=None, max_length=4)
 
 
 # The candidate's fields the Match score reads (backend/match/score.py `who`): an edit to one scores their jobs again.
-_SCORED = {"primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
-           "employment_types", "search_titles"}
+_SCORED = {"primary_role", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer", "employment_types"}
 # The fields an edit can't empty (null): the rest (expiry, rates, availability, notice, notes) can be cleared.
-_NOT_NULL = ("primary_role", "target_roles", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
+_NOT_NULL = ("primary_role", "years_experience", "work_auth", "needs_sponsorship", "needs_transfer",
              "employment_types", "work_settings", "preferred_locations", "willing_to_relocate", "preferred_industries",
              "deal_breakers")
 
@@ -246,14 +244,14 @@ def list_candidates(firm_id: uuid.UUID, principal: Principal = Depends(current_p
     _member_of(firm_id, principal)
     rows = _visible(db, firm_id, principal).order_by(Candidate.created_at.desc()).all()
     profile.prime(db, firm_id, rows)            # the résumé's fields for the whole list in one query (07 Q57)
-    return [candidate_json(c) for c in rows]
+    return [candidate_json(c, principal) for c in rows]
 
 
 @router.get("/{candidate_id}", summary="One candidate, if in the principal's scope")
 def get_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, principal: Principal = Depends(current_principal),
                   db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
-    return candidate_json(_candidate(db, firm_id, principal, candidate_id))
+    return candidate_json(_candidate(db, firm_id, principal, candidate_id), principal)
 
 
 @router.post("", status_code=201, summary="Add a candidate with its manager and optional BDE")
@@ -325,13 +323,13 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: 
     # The job search's 2 extra titles for the target role, after the answer (decided 2026-11-17, Q131).
     from backend.job_search import search_titles
     background.add_task(search_titles.generate, firm_id, candidate.id)
-    return candidate_json(candidate)
+    return candidate_json(candidate, principal)
 
 
 def _edited(changes: dict) -> dict:
     """The sent values as stored: text trimmed, blank list items dropped, each list without repeats."""
     out = dict(changes)
-    for field in ("work_settings", "employment_types", "target_roles"):
+    for field in ("work_settings", "employment_types"):
         if out.get(field) is not None:
             out[field] = list(dict.fromkeys(out[field]))
     for field in ("preferred_locations", "preferred_industries", "deal_breakers"):
@@ -346,14 +344,13 @@ def _edited(changes: dict) -> dict:
 def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCandidateBody, background: BackgroundTasks,
                      principal: Principal = Depends(require("candidate.editProfile")), db: DbSession = Depends(get_db)):
     """Decided 2026-11-14 (Q17, reversing 07 Q56): the résumé rule (Q55): the candidate's BDE once one is assigned;
-    before that the OWNER and the candidate's MANAGER. One UPDATE ledger entry naming the fields that changed; a changed
-    target role keeps the old list in the entry's note (Q24)."""
+    before that the OWNER and the candidate's MANAGER. One UPDATE ledger entry naming the fields that changed. The
+    target role and the extra search titles can't be sent (07 Q68)."""
     _member_of(firm_id, principal)
     candidate = _candidate(db, firm_id, principal, candidate_id, lock=True)
     if not can_edit_profile(principal, candidate):
         raise HTTPException(status_code=403, detail="This candidate's BDE edits their details; you can view them.")
     changes = _edited(body.model_dump(exclude_unset=True))
-    typed_titles = changes.pop("search_titles", None) if "search_titles" in changes else ...
     for field, value in changes.items():
         if value is None and field in _NOT_NULL:
             raise _bad(f"{field} can't be empty.")
@@ -363,32 +360,21 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
         if missing:
             raise _bad(f"A new work_auth needs {' and '.join(missing)} in the same request.")
     changed = [field for field, value in changes.items() if getattr(candidate, field) != value]
-    if typed_titles is not ...:
-        from backend.job_search import search_titles
-        titles = search_titles.clean_typed(typed_titles or [])
-        if titles != list(candidate.search_titles or []):
-            if not search_titles.store(db, candidate, titles):
-                raise HTTPException(status_code=409, detail="The candidate has no active résumé to keep the titles on.")
-            changed.append("search_titles")
-    roles_before = list(candidate.target_roles or [])
     for field in changed:
-        if field != "search_titles":
-            setattr(candidate, field, changes[field])
+        setattr(candidate, field, changes[field])
     if candidate.rate_min is not None and candidate.rate_target is not None and candidate.rate_min > candidate.rate_target:
         raise _bad("The floor can't be above the target rate.")
     # The job search needs a place (Q20): the résumé's city and state together, or a preferred location.
     if changed and not ((candidate.city and candidate.state) or candidate.preferred_locations):
         raise _bad(PLACE_NEEDED_ON_EDIT)
     if changed:
-        note = (f"Target roles before: {', '.join(roles_before)}"
-                if "target_roles" in changed and roles_before else None)
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}", note=note)
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}")
         db.commit()
         if set(changed) & _SCORED:
             match_store.rescore_later(background, firm_id, candidate_id)   # what the Match reads (Q35)
-    return candidate_json(candidate)
+    return candidate_json(candidate, principal)
 
 
 @router.post("/{candidate_id}/assign", summary="Move a candidate to another manager and/or BDE")
@@ -402,7 +388,7 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
     manager, bde = _target(db, firm_id, principal, candidate.manager_id, body.manager_id, body.bde_id)
     new_bde_id = bde.id if bde else None
     if (candidate.manager_id, candidate.bde_id) == (manager.id, new_bde_id):
-        return candidate_json(candidate)
+        return candidate_json(candidate, principal)
     if new_bde_id is not None and candidate.bde_id is None and candidate.status in WORKING_STATUSES:
         _check_limit(db, firm)                 # a queue candidate getting a BDE starts to count (Q45)
     previous = _firm_user(db, firm_id, candidate.bde_id) or _firm_user(db, firm_id, candidate.manager_id)
@@ -414,4 +400,4 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
                   summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note))
     db.commit()
-    return candidate_json(candidate)
+    return candidate_json(candidate, principal)

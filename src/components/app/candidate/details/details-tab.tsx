@@ -15,8 +15,7 @@ import { StepPreferences } from "@/components/app/candidate-wizard/step-preferen
 import { StepWorkRate } from "@/components/app/candidate-wizard/step-work-rate";
 import type { Errors, WizardValues } from "@/components/app/candidate-wizard/model";
 import type { WizardForm } from "@/components/app/candidate-wizard/use-wizard";
-import { MOST_SEARCH_TITLES, detailsValues, isChanged, toUpdate, validateDetails } from "./model";
-import { TagInput } from "@/components/app/candidate-wizard/tag-input";
+import { detailsValues, isChanged, toUpdate, validateDetails } from "./model";
 
 const NOTHING_DRAFTED: ReadonlySet<never> = new Set();
 const SETTING_LABEL = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" } as const;
@@ -24,14 +23,18 @@ const SETTING_LABEL = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" } 
 /**
  * "Additional candidate details" (decided 2026-11-14, Q15–Q20): every onboarding answer that isn't on the résumé, in the
  * new-candidate flow's own fields. Edited by the candidate's BDE once one is assigned, and by the OWNER and a MANAGER
- * only before that (`canEditProfile`, the résumé rule); everyone else reads it.
+ * only before that (`canEditProfile`, the résumé rule); everyone else reads it. The target role and the extra search
+ * titles are fixed once the candidate is added (07 Q68): shown, never edited, and the titles only to the OWNER and a
+ * MANAGER (`candidate.viewSearchTitles`), never the BDE.
  */
-export function CandidateDetailsTab({ candidate, canEdit, onSaved }: { candidate: Candidate; canEdit: boolean; onSaved: () => void }) {
+export function CandidateDetailsTab({ candidate, canEdit, showSearchTitles, onSaved }: { candidate: Candidate; canEdit: boolean; showSearchTitles: boolean; onSaved: () => void }) {
   // A saved edit comes back as a newer candidate: the form starts again from it.
-  return canEdit ? <DetailsForm key={candidate.updatedAt} candidate={candidate} onSaved={onSaved} /> : <DetailsView candidate={candidate} />;
+  return canEdit
+    ? <DetailsForm key={candidate.updatedAt} candidate={candidate} showSearchTitles={showSearchTitles} onSaved={onSaved} />
+    : <DetailsView candidate={candidate} showSearchTitles={showSearchTitles} />;
 }
 
-function DetailsForm({ candidate, onSaved }: { candidate: Candidate; onSaved: () => void }) {
+function DetailsForm({ candidate, showSearchTitles, onSaved }: { candidate: Candidate; showSearchTitles: boolean; onSaved: () => void }) {
   const update = useUpdateCandidate(candidate.id);
   const [values, setValues] = useState<WizardValues>(() => detailsValues(candidate));
   const [errors, setErrors] = useState<Errors>({});
@@ -66,16 +69,15 @@ function DetailsForm({ candidate, onSaved }: { candidate: Candidate; onSaved: ()
         <StepWorkRate wizard={form} errors={errors} />
       </Card>
       <Card>
-        <StepPreferences wizard={form} errors={errors} homeFrom="resume" />
+        <StepPreferences wizard={form} errors={errors} homeFrom="resume" isTargetRoleFixed />
       </Card>
-      <Card>
-        <StepSection title="Job search" description="Extra titles the job search asks for besides the target role (5 titles in all). Made by AI when the candidate was added; change them freely.">
-          <WizardField id="cw-search-titles" label={`Extra search titles (up to ${MOST_SEARCH_TITLES})`} error={errors.searchTitles}>
-            <TagInput id="cw-search-titles" label="extra search titles" values={values.searchTitles}
-              onChange={(next) => set("searchTitles", next)} placeholder="Machine Learning Engineer…" />
-          </WizardField>
-        </StepSection>
-      </Card>
+      {showSearchTitles ? (
+        <Card>
+          <StepSection title="Job search" description="Extra titles the job search asks for besides the target role. Made by AI when the candidate was added; they can't be changed.">
+            {tags(candidate.searchTitles)}
+          </StepSection>
+        </Card>
+      ) : null}
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] py-3">
         {update.error ? <p role="alert" className="mr-auto text-sm text-[var(--color-danger-fg)]">{update.error.message}</p> : null}
         <Button type="button" variant="ghost" size="sm" disabled={!changed || update.isPending} onClick={() => { setValues(detailsValues(candidate)); setErrors({}); update.reset(); }}>Discard changes</Button>
@@ -101,7 +103,7 @@ const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-
 const tags = (items: string[]) => (items.length ? <span className="flex flex-wrap gap-1.5">{items.map((item) => <Tag key={item}>{item}</Tag>)}</span> : "—");
 
 /** For whoever can't edit them: the same details, read-only, and who edits them. */
-function DetailsView({ candidate }: { candidate: Candidate }) {
+function DetailsView({ candidate, showSearchTitles }: { candidate: Candidate; showSearchTitles: boolean }) {
   return (
     <Card>
       <p className="mb-2 text-caption text-[var(--color-text-3)]">
@@ -121,7 +123,7 @@ function DetailsView({ candidate }: { candidate: Candidate }) {
         <Row label="Willing to relocate">{candidate.willingToRelocate ? "Yes" : "No"}</Row>
         <Row label="Preferred industries">{tags(candidate.preferredIndustries)}</Row>
         <Row label="Deal breakers">{tags(candidate.dealBreakers)}</Row>
-        <Row label="Extra search titles">{tags(candidate.searchTitles)}</Row>
+        {showSearchTitles ? <Row label="Extra search titles">{tags(candidate.searchTitles)}</Row> : null}
         <Row label="Notes for the BDE"><span className="whitespace-pre-line">{candidate.contactNotes ?? "—"}</span></Row>
       </dl>
     </Card>

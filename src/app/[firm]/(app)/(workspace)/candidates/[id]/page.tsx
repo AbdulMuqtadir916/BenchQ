@@ -219,7 +219,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
             />
           ) : null}
           {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
-          {tab === "details" ? <CandidateDetailsTab candidate={candidate} canEdit={canEditDetails} onSaved={() => { setToast("Details saved"); setTab("overview"); }} /> : null}
+          {tab === "details" ? <CandidateDetailsTab candidate={candidate} canEdit={canEditDetails} showSearchTitles={can(principal, "candidate.viewSearchTitles")} onSaved={() => { setToast("Details saved"); setTab("overview"); }} /> : null}
           {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>

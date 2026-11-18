@@ -56,7 +56,9 @@ merge): the existing job screens on the backend through a mapper, two firm-level
 Indeed through python-jobspy replaces freehire.me; a search asks for the candidate's target role (one) in one of their
 places (city and state, a preferred location, or Remote); it leaves out jobs over 14 days old, non-remote ones on a
 Remote search and ones whose text rules out the candidate's work authorization. Onboarding takes one target role and
-needs a place; the candidate's details have their own tab (07 Q66). The **Match** ([ats-score.md](./ats-score.md),
+needs a place; the candidate's details have their own tab (07 Q66). Since 2026-11-18 (07 Q68) the name, email,
+target role and extra search titles are fixed once the candidate is added: every résumé write takes the candidate's
+name and email (`versions.fixed_identity`), and only the OWNER and a MANAGER see the extra titles. The **Match** ([ats-score.md](./ats-score.md),
 migration 0028) replaces the title-only placeholder everywhere, and the job list shows every job, 100 at a time,
 sorted and filtered by the backend. The old pool's freehire scraper is removed.
 The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its

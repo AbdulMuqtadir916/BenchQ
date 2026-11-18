@@ -146,13 +146,12 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
 /** `UpdateCandidate` → UpdateCandidateBody: only the fields being changed (the backend reads unset as "leave it"). */
 export function toBackendUpdateCandidate(patch: UpdateCandidate) {
   const names: Record<keyof UpdateCandidate, string> = {
-    primaryRole: "primary_role", targetRoles: "target_roles", yearsExperience: "years_experience",
+    primaryRole: "primary_role", yearsExperience: "years_experience",
     workAuth: "work_auth", needsSponsorship: "needs_sponsorship", needsTransfer: "needs_transfer",
     workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
     availableFrom: "available_from", noticePeriodDays: "notice_period_days", willingToRelocate: "willing_to_relocate",
     employmentTypes: "employment_types", workSettings: "work_settings", preferredLocations: "preferred_locations",
     preferredIndustries: "preferred_industries", dealBreakers: "deal_breakers", contactNotes: "contact_notes",
-    searchTitles: "search_titles",
   };
   return Object.fromEntries((Object.keys(patch) as (keyof UpdateCandidate)[]).map((key) => [names[key], patch[key]]));
 }

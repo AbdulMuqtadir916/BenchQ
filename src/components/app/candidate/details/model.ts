@@ -5,6 +5,8 @@ import type { Candidate, UpdateCandidate } from "@/lib/schemas/candidate";
 /**
  * The "Additional candidate details" tab's form (decided 2026-11-14, Q15–Q20, Q24): every onboarding answer that isn't
  * on the résumé, held as the new-candidate flow holds it (text fields as strings) so the flow's steps 3 and 4 edit it.
+ * The target role and the extra search titles are fixed once the candidate is added (07 Q68): carried for display,
+ * never sent.
  * The résumé's city and state come along read-only: with a preferred location they are the job search's places. Pure,
  * so it is tested without rendering.
  */
@@ -45,16 +47,12 @@ export function detailsValues(candidate: Candidate): WizardValues {
   };
 }
 
-/** The job search's extra titles a candidate may keep (decided 2026-11-17, Q144). */
-export const MOST_SEARCH_TITLES = 4;
-
 /** The form's problems, by field: onboarding's own rules (Q20) for these fields, the place named as the résumé's. */
 export function validateDetails(values: WizardValues): Errors {
   const basic = validateStep("basic", values);
   const errors: Errors = { ...validateStep("work", values), ...validateStep("preferences", values, { homeFrom: "resume" }) };
   if (basic.primaryRole) errors.primaryRole = basic.primaryRole;
   if (basic.yearsExperience) errors.yearsExperience = basic.yearsExperience;
-  if (values.searchTitles.length > MOST_SEARCH_TITLES) errors.searchTitles = `At most ${MOST_SEARCH_TITLES} titles.`;
   return errors;
 }
 
@@ -63,7 +61,6 @@ export function toUpdate(candidate: Candidate, values: WizardValues): UpdateCand
   const workAuth = values.workAuth ?? candidate.workAuth;
   return {
     primaryRole: values.primaryRole.trim(),
-    targetRoles: [values.targetRole.trim()],
     yearsExperience: asNumber(values.yearsExperience) ?? 0,
     // A changed status carries the sponsorship and transfer it implies, as in the flow; the same one sends nothing.
     ...workAuthChange(candidate.workAuth, workAuth),
@@ -78,7 +75,6 @@ export function toUpdate(candidate: Candidate, values: WizardValues): UpdateCand
     willingToRelocate: values.willingToRelocate,
     preferredIndustries: values.preferredIndustries,
     dealBreakers: values.dealBreakers,
-    searchTitles: values.searchTitles,
     contactNotes: values.contactNotes.trim() === "" ? null : values.contactNotes.trim(),
   };
 }

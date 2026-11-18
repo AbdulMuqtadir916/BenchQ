@@ -21,10 +21,11 @@ describe("the details tab's form (decided 2026-11-14, Q18–Q20, Q24)", () => {
     expect(validateDetails(values)).toEqual({});
   });
 
-  it("an untouched form sends what is stored, with only the first target role (Q24)", () => {
+  it("an untouched form sends what is stored, never the target role (fixed, 07 Q68)", () => {
     const update = toUpdate(candidate, detailsValues(candidate));
     expect(UpdateCandidateSchema.parse(update)).toEqual(update);
-    expect(update).toMatchObject({ targetRoles: ["Java Developer"], workAuthExpiry: "2027-03-01T00:00:00.000Z", rateTarget: 85, contactNotes: null });
+    expect(update).not.toHaveProperty("targetRoles");
+    expect(update).toMatchObject({ workAuthExpiry: "2027-03-01T00:00:00.000Z", rateTarget: 85, contactNotes: null });
     expect(update).not.toHaveProperty("workAuth");                         // the same status sends nothing
     expect(isChanged(candidate, detailsValues(candidate))).toBe(false);
   });
@@ -48,11 +49,12 @@ describe("the details tab's form (decided 2026-11-14, Q18–Q20, Q24)", () => {
   });
 });
 
-describe("the job search's extra titles on the details tab (decided 2026-11-17, Q143, Q144)", () => {
-  it("are edited by hand and sent as they are, at most 4", () => {
-    const values = { ...detailsValues(candidate), searchTitles: ["AI Engineer", "ML Engineer"] };
-    expect(isChanged(candidate, values)).toBe(true);
-    expect(toUpdate(candidate, values).searchTitles).toEqual(["AI Engineer", "ML Engineer"]);
-    expect(validateDetails({ ...values, searchTitles: ["A", "B", "C", "D", "E"] }).searchTitles).toBe("At most 4 titles.");
+describe("the fixed details (07 Q68, 2026-11-18)", () => {
+  it("never sends the target role or the extra search titles, whatever the form holds", () => {
+    const values = { ...detailsValues(candidate), targetRole: "Data Engineer", searchTitles: ["AI Engineer"] };
+    const update = toUpdate(candidate, values);
+    expect(update).not.toHaveProperty("targetRoles");
+    expect(update).not.toHaveProperty("searchTitles");
+    expect(UpdateCandidateSchema.parse(update)).toEqual(update);
   });
 });

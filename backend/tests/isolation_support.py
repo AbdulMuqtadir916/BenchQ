@@ -264,6 +264,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
             "version": v2.id, "base": second.id, "posting": posting.id, "tailoring": tailoring.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,
+            # Not an id: the candidate's name, which a résumé save must send unchanged (07 Q68).
+            "candidate_name": candidate.full_name,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
             "manager": manager.id, "bde_user": bde.id, "candidate": candidate.id}

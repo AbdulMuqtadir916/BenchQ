@@ -369,7 +369,8 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
             base = versions.base_for_tailoring(db, actor, candidate, source)
         except HTTPException:
             raise _Stop(HIDDEN)               # the base made from this version was hidden meanwhile
-        content = versions._with_ids(versions.content_of(source), tailored.content)
+        content = {**versions._with_ids(versions.content_of(source), tailored.content),
+                   **versions.fixed_identity(candidate)}     # the candidate's name and email (07 Q68)
         group = scoped(db, Resume, firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "TAILORED",
                                                    Resume.job_id == posting.id)
         latest = group.with_entities(func.max(Resume.version)).scalar() or 0

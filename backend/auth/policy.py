@@ -19,7 +19,10 @@ TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.d
                 "candidate.assign", "notification.approve", "firm.editHours")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
                     "invite.revoke", "platformTeam.manage", "platform.notification.approve")
-ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
+# Not actions: what a person sees. The team (07 Q15), and a candidate's extra search titles (07 Q68): the OWNER and
+# MANAGER only, never the BDE.
+VISIBILITY = ("team.view", "candidate.viewSearchTitles")
+ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + VISIBILITY + PLATFORM_ACTIONS
 
 _ALL_ACTING = ("OWNER", "MANAGER", "BDE")
 _OWNER_ONLY = ("OWNER",)
@@ -47,6 +50,7 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
     "firm.editHours": _OWNER_ONLY,                # 07 Q67: the firm's work hours, the one firm setting the OWNER edits
     "team.view": _OWNER_AND_MANAGER,
+    "candidate.viewSearchTitles": _OWNER_AND_MANAGER,   # 07 Q68 (2026-11-18): read-only, and not the BDE
 }
 
 

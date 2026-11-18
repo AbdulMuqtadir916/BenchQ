@@ -49,20 +49,20 @@ def test_adding_a_candidate_makes_two_titles_on_their_active_resume(anonymous_cl
     c = _create(anonymous_client, world, bde="adnan").json()
     assert ai["asked"] == [["Java Developer"]]                            # the target role, never the résumé
     assert _v1(test_db, c).search_titles == ["Java Software Engineer", "Backend Java Engineer"]
-    body = anonymous_client.get(f"/api/firms/{world['firm'].id}/candidates/{c['id']}", headers=world["as"]["adnan"])
-    assert body.json()["search_titles"] == ["Java Software Engineer", "Backend Java Engineer"]
+    url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
+    # 07 Q68: the OWNER and a MANAGER see them; the BDE doesn't (the key is left out).
+    assert anonymous_client.get(url, headers=world["as"]["owner"]).json()["search_titles"] == \
+        ["Java Software Engineer", "Backend Java Engineer"]
+    assert "search_titles" not in anonymous_client.get(url, headers=world["as"]["adnan"]).json()
 
 
-def test_the_bde_edits_them_on_the_details_tab_as_typed(anonymous_client, world, ai, test_db):
+def test_nobody_edits_them(anonymous_client, world, ai, test_db):
+    """07 Q68 (2026-11-18): fixed once the candidate is added, like the target role."""
     c = _create(anonymous_client, world, bde="adnan").json()
     r = anonymous_client.patch(f"/api/firms/{world['firm'].id}/candidates/{c['id']}",
-                               json={"search_titles": ["Software Engineer", " Spring  Developer ", "Spring Developer"]},
-                               headers=world["as"]["adnan"])
-    assert r.status_code == 200 and r.json()["search_titles"] == ["Software Engineer", "Spring Developer"]
-    assert _v1(test_db, c).search_titles == ["Software Engineer", "Spring Developer"]
-    too_many = anonymous_client.patch(f"/api/firms/{world['firm'].id}/candidates/{c['id']}",
-                                      json={"search_titles": ["A", "B", "C", "D", "E"]}, headers=world["as"]["adnan"])
-    assert too_many.status_code == 422
+                               json={"search_titles": ["Software Engineer"]}, headers=world["as"]["adnan"])
+    assert r.status_code == 422
+    assert _v1(test_db, c).search_titles == ["Java Software Engineer", "Backend Java Engineer"]
 
 
 def test_a_search_asks_for_them_and_the_match_counts_them(anonymous_client, world, ai, launched, test_db):

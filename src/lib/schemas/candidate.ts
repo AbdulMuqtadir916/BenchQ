@@ -96,7 +96,6 @@ export type CandidateStats = z.infer<typeof CandidateStatsSchema>;
 /** The submission facts the owner or the candidate's manager edits from the candidate Overview (07 Q56). A new `workAuth` comes with the sponsorship and transfer it implies. */
 export const UpdateCandidateSchema = CandidateSchema.pick({
   primaryRole: true,
-  targetRoles: true,
   yearsExperience: true,
   workAuth: true,
   needsSponsorship: true,
@@ -113,7 +112,6 @@ export const UpdateCandidateSchema = CandidateSchema.pick({
   preferredIndustries: true,
   dealBreakers: true,
   contactNotes: true,
-  searchTitles: true,
 }).partial();
 export type UpdateCandidate = z.infer<typeof UpdateCandidateSchema>;
 

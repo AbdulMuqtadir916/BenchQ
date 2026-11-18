@@ -54,6 +54,19 @@ def content_of(row: Resume) -> dict:
             **{k: copy.deepcopy(getattr(row, k) or []) for k in SECTIONS}}
 
 
+def fixed_identity(candidate) -> dict:
+    """The candidate's name and email, which every version carries (07 Q68, 2026-11-18): fixed once the candidate is
+    added, so a save, an upload, a base made from another version and a tailoring all take them from the candidate,
+    never from what was sent, parsed or copied."""
+    return {"full_name": candidate.full_name, "email": candidate.email}
+
+
+def _same_identity(candidate, submitted: dict) -> bool:
+    """Whether a save sends the candidate's own name and email (spacing around them and the email's case aside)."""
+    name, email = (submitted.get("full_name") or "").strip(), (submitted.get("email") or "").strip().lower()
+    return name == (candidate.full_name or "").strip() and email == (candidate.email or "").strip().lower()
+
+
 def _items(content: dict):
     """Every item with an id, bullets included: (id, its fields without the id). A job's or project's fields hold its
     bullets' text, since its claim covers them: a changed, added or removed bullet changes the job too (§4.5). The
@@ -349,8 +362,10 @@ def save_autofill(db, actor: User, candidate, row: Resume, change: dict, *, only
 
 def save_version(db, actor: User, candidate, source: Resume, submitted: dict) -> Saved:
     """The next version of `source`'s résumé with `submitted` as its content (§4.3)."""
+    if not _same_identity(candidate, submitted):
+        raise _bad("The candidate's name and email can't be changed.")
     before = content_of(source)
-    content = _with_ids(before, submitted)
+    content = {**_with_ids(before, submitted), **fixed_identity(candidate)}
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
@@ -386,6 +401,7 @@ def base_for_tailoring(db, actor: User, candidate, row: Resume) -> BaseResume:
 
 
 def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> BaseResume:
+    identity = fixed_identity(candidate)        # read before a switch of active base empties the profile (07 Q68)
     numbers = base_numbers(db, candidate)
     if row.category == "BASE" and row.version == 1:
         target = candidate_base(db, candidate, row.base_resume_id)
@@ -413,7 +429,8 @@ def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> Ba
         _activate(db, candidate, base)
     copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                     job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)),
+                    **{**content_of(row), **identity})
     db.add(copied)
     db.flush()
     if activate:
