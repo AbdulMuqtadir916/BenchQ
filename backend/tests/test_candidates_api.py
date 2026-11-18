@@ -412,3 +412,18 @@ def test_the_name_email_target_role_and_search_titles_are_fixed(anonymous_client
     c = _create(anonymous_client, world, bde="adnan").json()
     assert _patch(anonymous_client, world, c, "adnan", **fixed).status_code == 422
     assert _patch(anonymous_client, world, c, "adnan", **fixed, contact_notes="x").status_code == 422   # nothing kept
+
+
+def test_a_bde_holds_at_most_three_candidates(anonymous_client, world, test_db):
+    """07 Q70 (2026-11-18): every candidate assigned to the BDE counts, a placed one too, until it is moved."""
+    from backend.models.candidates import Candidate
+    held = [_create(anonymous_client, world, bde="adnan").json() for _ in range(3)]
+    test_db.get(Candidate, held[0]["id"]).status = "PLACED"                        # still holds a slot
+    test_db.commit()
+    r = _create(anonymous_client, world, bde="adnan")
+    assert (r.status_code, r.json()["detail"]) == (409, "This BDE has 3 candidates.")
+    queued = _create(anonymous_client, world).json()                                # the manager's queue: fine
+    r = _assign(anonymous_client, world, "owner", queued, "fatima", bde="adnan")
+    assert (r.status_code, r.json()["detail"]) == (409, "This BDE has 3 candidates.")
+    assert _assign(anonymous_client, world, "owner", held[1], "fatima", bde="sneha").status_code == 200   # moved away
+    assert _assign(anonymous_client, world, "owner", queued, "fatima", bde="adnan").status_code == 200    # the slot's free

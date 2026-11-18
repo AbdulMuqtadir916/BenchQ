@@ -10,8 +10,8 @@ and another firm is the same 404 as a missing one (principle 4).
   candidate details" tab, decided 2026-11-14), by the résumé rule: the BDE once assigned, else the OWNER and MANAGER.
   The target role and the extra search titles are not among them: fixed once the candidate is added (07 Q68).
 - POST /candidates/{id}/assign: move it to another manager and/or BDE (Q43).
-Assigning a BDE to a candidate that had none is blocked at the plan's candidate limit (Q45). Every assignment change
-is one ASSIGN ledger entry, with the handoff note.
+Assigning a BDE to a candidate that had none is blocked at the plan's candidate limit (Q45), and a BDE holds at most
+`BDE_CANDIDATE_LIMIT` candidates (07 Q70). Every assignment change is one ASSIGN ledger entry, with the handoff note.
 """
 import asyncio
 import re
@@ -45,6 +45,10 @@ from backend.models.tenancy import Firm, User
 router = APIRouter(prefix="/firms/{firm_id}/candidates", tags=["candidates"])
 
 PARSE_LIFETIME = timedelta(minutes=60)
+# 07 Q70 (2026-11-18): a BDE holds at most 3 candidates at a time, every status counted (a placed one too) until it is
+# moved. The frontend's BDE_CANDIDATE_LIMIT (src/lib/derive/assignment.ts) says the same.
+BDE_CANDIDATE_LIMIT = 3
+BDE_FULL = f"This BDE has {BDE_CANDIDATE_LIMIT} candidates."
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PLACE_NEEDED = "Add a preferred location, or the candidate's city and state: the job search needs a place."
 PLACE_NEEDED_ON_EDIT = "Add a preferred location, or the city and state on the candidate's résumé: the job search needs a place."
@@ -193,6 +197,14 @@ def _check_limit(db: DbSession, firm: Firm) -> None:
         raise HTTPException(status_code=409, detail=assign_block_reason(used, firm.candidate_limit))
 
 
+def _check_bde_limit(db: DbSession, firm_id: uuid.UUID, bde_id: uuid.UUID) -> None:
+    """07 Q70: the BDE already holds `BDE_CANDIDATE_LIMIT` candidates (any status): 409. The caller holds the firm lock,
+    so two assignments to the same BDE at once can't both pass. A BDE already above it keeps them."""
+    held = scoped(db, Candidate, firm_id, func.count(Candidate.id)).filter(Candidate.bde_id == bde_id).scalar()
+    if held >= BDE_CANDIDATE_LIMIT:
+        raise HTTPException(status_code=409, detail=BDE_FULL)
+
+
 def _target(db: DbSession, firm_id: uuid.UUID, principal: Principal, current_manager_id: uuid.UUID | None,
             manager_id: uuid.UUID, bde_id: uuid.UUID | None) -> tuple[User, User | None]:
     manager = _firm_user(db, firm_id, manager_id)
@@ -273,6 +285,7 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: 
     manager, bde = _target(db, firm_id, principal, None, body.manager_id, body.bde_id)
     if bde is not None:
         _check_limit(db, firm)
+        _check_bde_limit(db, firm_id, bde.id)
     # 07 Q58 (Abdul, 2026-11-06): a candidate is onboarded only with their résumé.
     if body.resume_parse_id is None:
         raise _bad("Upload the candidate's résumé first: a candidate can't be added without one.")
@@ -391,6 +404,8 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
         return candidate_json(candidate, principal)
     if new_bde_id is not None and candidate.bde_id is None and candidate.status in WORKING_STATUSES:
         _check_limit(db, firm)                 # a queue candidate getting a BDE starts to count (Q45)
+    if new_bde_id is not None and candidate.bde_id != new_bde_id:
+        _check_bde_limit(db, firm_id, new_bde_id)   # 07 Q70: the BDE it goes to
     previous = _firm_user(db, firm_id, candidate.bde_id) or _firm_user(db, firm_id, candidate.manager_id)
     candidate.manager_id = manager.id
     if candidate.bde_id != new_bde_id:
