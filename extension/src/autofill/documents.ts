@@ -6,7 +6,6 @@ export type DocumentKind = "resume" | "cover-letter";
 
 export const PDF_MIME = "application/pdf";
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-const EXTENSIONS: Record<string, string> = { [PDF_MIME]: ".pdf", [DOCX_MIME]: ".docx", "application/msword": ".doc" };
 
 const RESUME = /\b(resume|cv|curriculum vitae)\b/;
 const COVER_LETTER = /\bcover ?letter\b/;
@@ -35,6 +34,9 @@ export function withResumeFile(rows: ReviewRow[], file: ResumeFile | null): Revi
     : row));
 }
 
+/** Which file this is, apart from its name on the form: the BDE's own file and BenchQ's can share a name (#148). */
+export const fileKey = (file: { id?: string; name: string; data?: string }) => file.id ?? `${file.name}:${file.data?.length ?? 0}`;
+
 /** What the Resume section's file picker offers (Q5). */
 export const OWN_FILE_TYPES = ".pdf,.doc,.docx";
 /** BenchQ's own limit on a résumé upload (resume_parses' 10 MB check). */
@@ -48,29 +50,42 @@ export async function readOwnFile(file: File): Promise<ResumeFile | string> {
   const extension = /\.(pdf|docx?)$/i.exec(file.name)?.[1]?.toLowerCase();
   if (!extension) return "Pick a PDF or Word file.";
   if (file.size > MAX_OWN_FILE_BYTES) return "That file is over 10 MB. Pick a smaller one.";
-  return { name: file.name, mimeType: MIME_OF[extension]!, data: base64Of(new Uint8Array(await file.arrayBuffer())), source: "picked" };
+  const data = base64Of(new Uint8Array(await file.arrayBuffer()));
+  return { name: file.name, mimeType: MIME_OF[extension]!, data, source: "picked", id: `own:${file.name}:${file.size}:${file.lastModified}` };
 }
 
-/** Whether an upload's `accept` list takes a file of this type: by its type, its extension or a wildcard. An empty list
- * takes anything. */
-export function accepts(accept: string | undefined, mimeType: string): boolean {
+/** Whether an upload's `accept` list takes a file: by its type, its extension (from the type, else its name) or a
+ * wildcard. An empty list takes anything. page/accepts.ts holds the page's copy, kept the same by a test. */
+const EXTENSIONS: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/msword": ".doc",
+};
+
+export function accepts(accept: string | undefined, mimeType: string, name = ""): boolean {
   const kinds = (accept ?? "").toLowerCase().split(",").map((kind) => kind.trim()).filter(Boolean);
   if (kinds.length === 0) return true;
-  return kinds.some((kind) => kind === mimeType || kind === EXTENSIONS[mimeType] || kind === "*/*"
+  const extension = EXTENSIONS[mimeType] ?? /\.[a-z0-9]+$/i.exec(name)?.[0]?.toLowerCase() ?? "";
+  return kinds.some((kind) => kind === mimeType || (extension !== "" && kind === extension) || kind === "*/*"
     || kind === `${mimeType.split("/")[0]}/*`);
 }
 
 /** Whether the form's résumé upload (the first, as `withResumeFile` takes) takes a file of this type; a form without
  * one takes any. A file it won't take stays off the form, for the BDE to attach. */
-export function fitsUpload(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string): boolean {
-  const upload = fields.find((field) => field.kind === "file" && documentOf(field) === "resume");
-  return !upload || accepts(upload.accept, mimeType);
+export function fitsUpload(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string, name = ""): boolean {
+  const upload = resumeUploadOf(fields);
+  return !upload || accepts(upload.accept, mimeType, name);
+}
+
+/** The form's résumé upload: the first one, as `withResumeFile` takes it. */
+export function resumeUploadOf<T extends Pick<ScannedField, "kind" | "label" | "hints">>(fields: T[]): T | undefined {
+  return fields.find((field) => field.kind === "file" && documentOf(field) === "resume");
 }
 
 /** The kind of file the form's résumé upload (the first, as `withResumeFile` takes) needs when it won't take
  * `mimeType`: "pdf" or "docx" when its `accept` list names that one, else null (Q3: PDF unless it takes only Word). */
 export function formatFor(fields: Pick<ScannedField, "kind" | "label" | "hints" | "accept">[], mimeType: string): "pdf" | "docx" | null {
-  const upload = fields.find((field) => field.kind === "file" && documentOf(field) === "resume");
+  const upload = resumeUploadOf(fields);
   if (!upload || accepts(upload.accept, mimeType)) return null;
   if (accepts(upload.accept, PDF_MIME)) return "pdf";
   return accepts(upload.accept, DOCX_MIME) ? "docx" : null;

@@ -67,9 +67,10 @@ type State = {
   fillCount?: number; filling?: boolean; undoable?: number; rows?: ReviewRow[] | null; outcome?: { filled: number; handedBack: number; stopped: boolean } | null;
   answeredFrom?: string | null; needsConfirmation?: boolean; scanning?: boolean; attachment?: string | null; attachedFile?: string | null;
   attachmentSource?: "uploaded" | "generated" | "picked" | null; fileProblem?: boolean; rescan?: () => void;
+  attachedShown?: boolean; refusedAccept?: string | null;
   step?: string | null; error?: string;
   needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
-  reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null } | null;
+  reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null; fileId?: string | null } | null;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null; tabUrl?: string | null } = {}, resumes: Resumes = oneResume) {
@@ -407,8 +408,15 @@ describe("the résumé the answers come from", () => {
     expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")!.textContent).toBe(`Attach by hand: ${base.label}`);
   });
 
+  it("doesn't say a file is attached once the upload is gone and no chip names it (#148)", () => {
+    show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf", attachedShown: false });
+    const resume = host.querySelector("[data-document='resume']")!;
+    expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("No field found");
+    expect(resume.querySelector("[data-slot='document-attached']")).toBeNull();
+  });
+
   it("shows the file Autofill attached when the site swapped its upload for a chip (07 Q53)", () => {
-    show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf" });
+    show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf", attachedShown: true });
     const resume = host.querySelector("[data-document='resume']")!;
     expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("Attached");
     expect(resume.querySelector("[data-slot='document-attached'] [data-slot='document-value']")!.textContent).toBe("Priya - Java Developer.pdf");
@@ -468,24 +476,54 @@ describe("the résumé the answers come from", () => {
     };
     await choose(new File(["x"], "photo.png"));
     expect(host.querySelector("[data-slot='own-file-error']")!.textContent).toBe("Pick a PDF or Word file.");
-    await choose(new File(["%PDF-1.4"], "mine.pdf"));
-    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile).toEqual({ name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0xLjQ=", source: "picked" });
+    await choose(new File(["%PDF-1.4"], "mine.pdf", { lastModified: 1 }));
+    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile)
+      .toEqual({ name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0xLjQ=", source: "picked", id: "own:mine.pdf:8:1" });
     expect(host.querySelector("[data-slot='own-file-error']")).toBeNull();
   });
 
-  it("still offers to stop using the BDE's own file once it's on the form", () => {
-    const attached = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
-    show({ fillCount: 0, rows: [attached], attachment: "Priya - Java Developer.pdf", attachmentSource: "picked", answeredFrom: base.id });
+  /** The BDE picks `file` with the Resume section's picker; the hooks then say `state`, with the review for that file. */
+  async function pickOwn(state: State, file = new File(["%PDF-1.4"], "mine.pdf", { lastModified: 1 })) {
+    const input = host.querySelector<HTMLInputElement>("[data-slot='own-file-input']")!;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const reviewedFor = { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: `own:${file.name}:${file.size}:1` };
+    update({ ...state, reviewedFor }, oneResume);
+  }
+  const generated = { fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "generated" as const, answeredFrom: base.id };
+
+  it("names the BDE's own file and offers to take it off again", async () => {
+    show(generated);
+    await pickOwn({ ...generated, attachmentSource: "picked" });
     expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
-    expect(named("Remove")).toBeTruthy();
     expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
+    await click("Remove");
+    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile).toBeNull();
   });
 
-  it("names the BDE's own file and offers to take it off again", () => {
-    show({ fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "picked", answeredFrom: base.id });
+  it("still offers to stop using the BDE's own file once it's on the form, and where the site swapped the upload for a chip", async () => {
+    show(generated);
+    const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    await pickOwn({ ...generated, fillCount: 0, rows: [attachedRow], attachmentSource: "picked" });
     expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
     expect(named("Remove")).toBeTruthy();
-    expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
+    const reviewedFor = { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: "own:mine.pdf:8:1" };
+    update({ ...generated, fillCount: 0, rows: [row("Email", true, "a@example.test")], attachmentSource: "picked", attachedFile: "Priya - Java Developer.pdf",
+      attachedShown: true, reviewedFor }, oneResume);
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-status']")!.textContent).toBe("Attached");
+    expect(named("Remove")).toBeTruthy();
+  });
+
+  it("says when the form's upload won't take the file, and keeps the BDE's controls", async () => {
+    show(generated);
+    await pickOwn({ ...generated, rows: [emptyUpload()], attachment: null, attachmentSource: null, refusedAccept: ".docx" });
+    expect(host.querySelector("[data-slot='resume-file-refused']")!.textContent)
+      .toBe("Your file, mine.pdf, isn't a kind this form's upload takes (.docx). Use another file, or attach one by hand.");
+    expect(named("Use a different file")).toBeTruthy();
+    expect(named("Remove")).toBeTruthy();
   });
 
   it("says when the file couldn't be made, with Try again and a file from the computer", async () => {
@@ -499,8 +537,9 @@ describe("the résumé the answers come from", () => {
 });
 
 describe("the summary a run leaves", () => {
-  it("names the résumé it attached", () => {
-    show({ fillCount: 0, rows: [row("Email", true, "a@example.test")], outcome: { filled: 2, handedBack: 0, stopped: false }, attachedFile: "Priya - Java Developer.pdf" });
+  it("names the résumé it attached, where the site shows it as a chip", () => {
+    show({ fillCount: 0, rows: [row("Email", true, "a@example.test")], outcome: { filled: 2, handedBack: 0, stopped: false }, attachedFile: "Priya - Java Developer.pdf",
+      attachedShown: true });
     expect(host.querySelector("[data-slot='autofill-done-file']")!.textContent).toBe("Resume attached: Priya - Java Developer.pdf");
     expect(host.querySelector("[data-slot='autofill-done-no-file']")).toBeNull();
   });
@@ -509,6 +548,12 @@ describe("the summary a run leaves", () => {
     show({ fillCount: 0, rows: [emptyUpload(), row("Email", true, "a@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } });
     expect(host.querySelector("[data-slot='autofill-done']")!.textContent).toBe("Filled 1");
     expect(host.querySelector("[data-slot='autofill-done-no-file']")!.textContent).toContain("The resume isn't on the form yet. Attach it by hand.");
+  });
+
+  it("warns when the site took the upload away and no chip names the file (#148)", () => {
+    show({ fillCount: 0, rows: [row("Email", true, "a@example.test")], outcome: { filled: 2, handedBack: 0, stopped: false }, attachedFile: "Priya - Java Developer.pdf" });
+    expect(host.querySelector("[data-slot='autofill-done-file']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-done-no-file']")!.textContent).toBe("The resume isn't on the form yet. Attach it by hand.");
   });
 
   it("believes the form, not the earlier write: an upload the site cleared is still missing", () => {

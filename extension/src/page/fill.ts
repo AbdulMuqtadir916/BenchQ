@@ -1,3 +1,4 @@
+import { accepts } from "./accepts";
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
 import { fireEvents, pause, setText } from "./events";
@@ -56,6 +57,9 @@ function setFiles(input: HTMLInputElement, files: File[]) {
 
 const fileOf = ({ name, mimeType, data }: FieldWrite & { type: "file" }) =>
   new File([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], name, { type: mimeType });
+
+/** Why a file wasn't written: the upload no longer takes its kind. */
+const UPLOAD_REFUSES_KIND = "This upload doesn't take this kind of file.";
 
 /** A control that takes a file off an upload, by its words or its label: "Remove", "Delete", an ×. */
 const REMOVE_CONTROL = /\b(remove|delete|clear|discard)\b|^[×✕✖x]$/i;
@@ -263,6 +267,10 @@ export function createFiller(registry: () => Registry | null) {
       if (!entry) return STALE;
       const present = readCurrent(entry);
       if (present !== current) return { status: "changed", current: present };
+      // The page can change what an upload takes after the scan: a file it won't take now isn't written.
+      if (write.type === "file" && !accepts((entry.controls[0] as HTMLInputElement).accept, write.mimeType, write.name)) {
+        return { status: "failed", current: present, reason: UPLOAD_REFUSES_KIND };
+      }
       const before = snapshot(entry);
       apply(entry, write);
       await pause(SETTLE_MS);
@@ -345,6 +353,11 @@ export function createFiller(registry: () => Registry | null) {
      * names it (07 Q51): a page such as Greenhouse shows a taken file as a chip and ignores a new one put under it. Only
      * a file this frame attached is removed, and only its own chip, beside the upload it went to: a file of the same
      * name the BDE attached elsewhere, here or in another frame, stays. True once its control was clicked. */
+    /** Whether the page shows a chip naming `name`: a file the site took and shows in place of its upload (07 Q53). */
+    showsFile(name: string): boolean {
+      return chipsNamed(name).length > 0;
+    },
+
     async removeFile(name: string): Promise<boolean> {
       const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
         .map(({ entry }) => entry.controls[0] as HTMLInputElement);

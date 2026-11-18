@@ -260,7 +260,10 @@ def _file_or_page(firm_id, candidate_id, resume_id, kind, principal, db: DbSessi
         except Exception as e:  # noqa: BLE001  (python-docx's errors have no common base)
             _not_made(row.id, e)
         return _file_response(content, DOCX_MIME, resume_file.file_name(row, "docx"), "generated")
-    page = (resume_file.html(row), row.page_format, resume_file.file_name(row, "pdf"), row.id)
+    try:
+        page = (resume_file.html(row), row.page_format, resume_file.file_name(row, "pdf"), row.id)
+    except Exception as e:  # noqa: BLE001  (a layout error of any kind)
+        _not_made(row.id, e)
     db.rollback()   # ends the read's transaction: its connection goes back to the pool before the print
     return page
 

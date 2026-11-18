@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { accepts, DOCX_MIME, fitsUpload, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
+import { accepts, DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
+import { accepts as pageAccepts } from "../page/accepts";
 import type { FieldKind, ReviewRow, TabField } from "./types";
 
 const field = (id: string, label: string, kind: FieldKind = "file"): TabField => ({
@@ -38,6 +39,19 @@ describe("the kind of file an upload takes (Q3)", () => {
     expect(accepts(".doc,.docx", PDF_MIME)).toBe(false);
     expect(accepts("application/*", DOCX_MIME)).toBe(true);
     expect(accepts(DOCX_MIME, DOCX_MIME)).toBe(true);
+    expect(accepts(".docx", "application/octet-stream", "cv.DOCX")).toBe(true);
+    expect(accepts(".docx", "application/octet-stream", "cv")).toBe(false);
+  });
+
+  it("is the same rule the page uses right before writing a file (page.js keeps its own copy)", () => {
+    const lists = ["", ".pdf", ".docx", ".doc,.docx", "application/pdf", "application/*", "*/*", "image/*", " .PDF , .Docx "];
+    const files: [string, string][] = [[PDF_MIME, "a.pdf"], [DOCX_MIME, "a.docx"], ["application/msword", "a.doc"], ["application/octet-stream", "a.docx"], ["text/plain", "a.txt"]];
+    for (const list of lists) for (const [type, name] of files) expect(pageAccepts(list, type, name)).toBe(accepts(list, type, name));
+  });
+
+  it("tells files apart by more than the name they go on the form by (#148)", () => {
+    expect(fileKey({ name: "cv.pdf", id: "own:cv.pdf:3:1" })).toBe("own:cv.pdf:3:1");
+    expect(fileKey({ name: "cv.pdf", data: "abcd" })).toBe("cv.pdf:4");
   });
 
   it("asks for the other kind only when the résumé upload won't take the file", () => {
@@ -58,7 +72,8 @@ describe("the kind of file an upload takes (Q3)", () => {
 
 describe("a file from the BDE's computer (Q5)", () => {
   it("is read into memory with its type, as the BDE's own", async () => {
-    expect(await readOwnFile(new File(["%PDF-1.4"], "mine.PDF"))).toEqual({ name: "mine.PDF", mimeType: PDF_MIME, data: "JVBERi0xLjQ=", source: "picked" });
+    expect(await readOwnFile(new File(["%PDF-1.4"], "mine.PDF", { lastModified: 1 })))
+      .toEqual({ name: "mine.PDF", mimeType: PDF_MIME, data: "JVBERi0xLjQ=", source: "picked", id: "own:mine.PDF:8:1" });
     expect(await readOwnFile(new File(["x"], "cv.docx"))).toMatchObject({ mimeType: DOCX_MIME, source: "picked" });
   });
 

@@ -5,14 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getResumeAnswers, getResumeFile, saveResumeAnswers } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import { confirmationKey } from "./job-check";
-import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
+import { fileShownOnPage, fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, ResumeFile, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn(), saveResumeAnswers: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(), focusField: vi.fn(),
-  undoFills: vi.fn(), undoCount: vi.fn(), takeBackField: vi.fn(), removeFileOnPage: vi.fn(),
+  undoFills: vi.fn(), undoCount: vi.fn(), takeBackField: vi.fn(), removeFileOnPage: vi.fn(), fileShownOnPage: vi.fn(),
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -93,6 +93,7 @@ beforeEach(() => {
   vi.mocked(undoCount).mockResolvedValue(0);
   vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: false });
   vi.mocked(removeFileOnPage).mockResolvedValue(false);
+  vi.mocked(fileShownOnPage).mockResolvedValue(false);
 });
 
 afterEach(async () => {
@@ -150,6 +151,7 @@ describe("the résumé's file for the form (docs/02 §8.2)", () => {
     await wait(5);
     expect(uploadRow()?.status).toBe("blocked");
     expect(hook.attachment).toBeNull();
+    expect(hook.refusedAccept).toBe(".docx");
   });
 
   it("says when the file couldn't be made, and takes the BDE's own file in its place (Q5)", async () => {
@@ -1132,7 +1134,7 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     await act(async () => { await running; });
     const requests = vi.mocked(fillField).mock.calls.map(([, , request]) => request);
     expect(requests).toEqual([
-      { scanId: 1, fieldId: "r", current: "", write: { type: "file", name: NAME, ...pdf } },
+      { scanId: 1, fieldId: "r", current: "", write: { type: "file", name: NAME, ...pdf, id: "benchq:res-1:" } },
       { scanId: 1, fieldId: "a", current: "site@parsed.test", write: { type: "text", value: "priya@example.test" } },
     ]);
     const answered = vi.mocked(fillField).mock.invocationCallOrder[1]!;
@@ -1181,6 +1183,49 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     expect(vi.mocked(fillField).mock.calls.map(([, , request]) => request.write.type)).toEqual(["file", "text"]);
     expect(hook.outcome).toEqual({ filled: 1, handedBack: 1, stopped: false });
     expect(hook.rows!.find(({ field: { id } }) => id === "r")).toMatchObject({ status: "manual", reason: "The page changed this upload, so change the file there." });
+  });
+
+  /** BenchQ attaches its own file; the site then shows `after` (the upload as the page now has it, or none). */
+  async function attachBenchQFile(after: TabField[] = [upload(NAME), field("a", "Email", "text", "priya@example.test")]) {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email", "text", "priya@example.test")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
+      if (write.type === "file") vi.mocked(scanTab).mockResolvedValue(page(after, onSite));
+      return { status: "filled", current: write.type === "file" ? NAME : "" };
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500 * 24);
+    await act(async () => { await running; });
+  }
+
+  it("puts the BDE's own file on in place of BenchQ's, though both go by one name (#148)", async () => {
+    await attachBenchQFile();
+    expect(statuses()![0]).toEqual(["r", "same"]);
+    const own: ResumeFile = { name: "mine.pdf", mimeType: "application/pdf", data: "b3du", source: "picked", id: "own:mine.pdf:3:1" };
+    await act(async () => { root.render(<Harness value={connection} pickedFile={own} />); });
+    await advance(1);
+    expect(hook.rows!.find(({ field: { id } }) => id === "r")).toMatchObject({ status: "ready", proposed: NAME });
+    expect(hook.reviewedFor?.fileId).toBe("own:mine.pdf:3:1");
+  });
+
+  it("forgets a file the site cleared once it seemed to take it (#148)", async () => {
+    vi.mocked(rejectedFields).mockImplementation(async (_tab, _frame, _scan, ids) => ids.filter((id) => id === "r"));
+    await attachBenchQFile([upload(), field("a", "Email", "text", "priya@example.test")]);
+    expect(hook.attachedFile).toBeNull();
+  });
+
+  it("takes the file as on the form, once the site swapped its upload out, only while a chip names it (#148)", async () => {
+    await attachBenchQFile([field("a", "Email", "text", "priya@example.test")]);
+    expect(hook.attachedFile).toBe(NAME);
+    expect(hook.attachedShown).toBe(false);
+    vi.mocked(fileShownOnPage).mockResolvedValue(true);
+    await act(async () => { const looking = hook.rescan(); await vi.advanceTimersByTimeAsync(10); await looking; });
+    expect(fileShownOnPage).toHaveBeenLastCalledWith(7, NAME);
+    expect(hook.attachedShown).toBe(true);
   });
 
   it("leaves a file that was on the form before BenchQ looked", async () => {
@@ -1276,7 +1321,7 @@ describe("picking another résumé (07 Q24)", () => {
     const next = { ...connection, applicationId: "app-2", job: { ...connection.job, source: "indeed" } };
     await act(async () => { root.render(<Harness value={next} resumeId="res-1" />); });
     await wait(5);
-    expect(hook.reviewedFor).toEqual({ applicationId: "app-2", candidateId: "cand-1", resumeId: "res-1" });
+    expect(hook.reviewedFor).toEqual({ applicationId: "app-2", candidateId: "cand-1", resumeId: "res-1", fileId: null });
     expect(hook.rows![0]).toMatchObject({ status: "ready", proposed: "Indeed" });
     expect(hook.fillCount).toBe(1);
   });

@@ -71,7 +71,8 @@ export type FieldWrite =
   | { type: "file" } & ResumeFile;
 
 /** A résumé's file as the panel holds it: its name on the form, its type and its bytes in base64. */
-export type ResumeFile = { name: string; mimeType: string; data: string; source?: ResumeFileSource };
+/** `id`: which file this is, apart from its name on the form: the BDE's own file and BenchQ's can share a name. */
+export type ResumeFile = { name: string; mimeType: string; data: string; source?: ResumeFileSource; id?: string };
 
 /** Where the file came from: the résumé's upload as it was uploaded, made by BenchQ from the version's text (docs/02
  * §8.2), or picked by the BDE from their computer in the panel. */
@@ -120,6 +121,7 @@ export type PageApi = {
   flagged(scanId: number, fieldIds: string[]): Promise<string[]>;
   focusField(target: FieldTarget): boolean;
   takeBack(target: FieldTarget): Promise<boolean>;
+  showsFile(name: string): boolean;
   removeFile(name: string): Promise<boolean>;
   undo(): Promise<UndoResult>;
   undoCount(): number;

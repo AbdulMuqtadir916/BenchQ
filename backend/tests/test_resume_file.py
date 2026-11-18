@@ -119,6 +119,19 @@ def test_a_file_that_cant_be_made_says_so(anonymous_client, test_db, world, monk
     assert (r.status_code, r.json()["detail"]) == (503, "This résumé's file couldn't be made. Try again.")
 
 
+def test_a_page_that_cant_be_built_says_so_too(anonymous_client, test_db, world, printer, monkeypatch):
+    def broken(*args, **kwargs):
+        raise ValueError("a layout error")
+
+    monkeypatch.setattr(resume_file, "html", broken)
+    c = _candidate(anonymous_client, test_db, world)
+    v1 = _v(anonymous_client, world, c)
+    assert _save(anonymous_client, world, c, v1, summary="An edited summary.").status_code == 201
+    r = _file(anonymous_client, world, c, _v(anonymous_client, world, c, version=2)["id"])
+    assert (r.status_code, r.json()["detail"]) == (503, "This résumé's file couldn't be made. Try again.")
+    assert printer["pages"] == []
+
+
 def test_out_of_scope_and_unknown_versions_are_not_found(anonymous_client, test_db, world):
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c)

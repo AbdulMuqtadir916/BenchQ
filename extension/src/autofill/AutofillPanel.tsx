@@ -5,7 +5,7 @@ import { sendToBackground } from "./connection-store";
 import { isOtherJobOnSite } from "./AddJobCard";
 import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
-import { documentOf, readOwnFile, resumeFileName } from "./documents";
+import { documentOf, fileKey, readOwnFile, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
 import FormProgress from "./FormProgress";
 import { CHECK, SPARKLES_ICON, SPINNER_ICON } from "./icons";
@@ -125,8 +125,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const isSelectionSyncing = pendingFill !== null && !(error && !scanning) && !state.needsAccess;
   // A run is busy from its first step (taking the old file off) to its last fill.
   const isWorking = filling || Boolean(step) || isSelectionSyncing;
+  // A review is this application's, this résumé's and this file's: one for an earlier pick from the computer isn't (#148).
   const reviewMatches = canReview && reviewedFor?.applicationId === connection.applicationId
-    && reviewedFor.candidateId === connection.candidateId && reviewedFor.resumeId === resumeId;
+    && reviewedFor.candidateId === connection.candidateId && reviewedFor.resumeId === resumeId
+    && (reviewedFor.fileId ?? null) === (pickedFile ? fileKey(pickedFile) : null);
   const currentRows = reviewMatches ? rows : null;
   const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
   const pickResume = (id: string) => {
@@ -260,7 +262,8 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {isOpen && hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
         Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id && rows?.some((row) => row.status === "ready" && row.write?.type === "file") ? ", the resume file first" : ""}.
       </p>}
-      {isOpen && isComplete && <AutofillDone filled={outcome?.filled ?? 0} rows={currentRows ?? []} attached={state.attachedFile} canSave onGoTo={goTo} />}
+      {isOpen && isComplete && <AutofillDone filled={outcome?.filled ?? 0} rows={currentRows ?? []} attached={state.attachedFile}
+        attachedShown={state.attachedShown} canSave onGoTo={goTo} />}
       {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
       {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
 
@@ -286,9 +289,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
 
       {isOpen && hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
         picked={picked ? { label: picked.label, meta: picked.meta, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null,
-          source: answeredFrom === picked.id ? state.attachmentSource : null } : null} attached={state.attachedFile}
+          source: answeredFrom === picked.id ? state.attachmentSource : null } : null} attached={state.attachedShown ? state.attachedFile : null}
         onChangeResume={hasOtherResumes ? changeResume : undefined} fileProblem={state.fileProblem} onRetryFile={() => void state.rescan()}
-        ownFileError={ownFileError} onOwnFile={(chosen) => void takeOwnFile(chosen)} onRemoveOwnFile={removeOwnFile} />}
+        ownFileError={ownFileError} onOwnFile={(chosen) => void takeOwnFile(chosen)} onRemoveOwnFile={removeOwnFile}
+        ownFile={pickedFile ? { name: pickedFile.name } : null} refusedAccept={state.refusedAccept ?? null} />}
       {isOpen && !filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} onSave={state.saveAnswer} />}

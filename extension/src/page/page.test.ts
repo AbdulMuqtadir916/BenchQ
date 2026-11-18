@@ -299,6 +299,12 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
 
   afterEach(() => { vi.unstubAllGlobals(); });
 
+  it("says whether a chip names a file (#148)", async () => {
+    const filler = await attached(UPLOAD);
+    expect(filler.showsFile(NAME)).toBe(true);
+    expect(filler.showsFile("Priya - Data Engineer.pdf")).toBe(false);
+  });
+
   it("clicks the remove control beside the chip of the file it attached", async () => {
     const filler = await attached(UPLOAD);
     const mine = clicksOn("#mine");
@@ -385,6 +391,15 @@ describe("attaching the résumé's file (07 Q49–Q51)", () => {
   const write = { type: "file" as const, name: "Priya Shah - Java Developer.pdf", mimeType: "application/pdf", data: btoa("%PDF-1.7") };
 
   afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("writes no file the upload no longer takes: the page can change that after the scan (#148)", async () => {
+    const { filler, rescan, input, held } = upload();
+    const { scanId, fields } = rescan();
+    input.accept = ".docx";
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    expect(result).toEqual({ status: "failed", current: "", reason: "This upload doesn't take this kind of file." });
+    expect(held()).toEqual([]);
+  });
 
   it("puts the file on the upload, tells the page, and undo takes it off again", async () => {
     const { filler, rescan, input, held } = upload();

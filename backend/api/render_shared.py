@@ -7,6 +7,7 @@ the old `/api/resumes` router (JobNavigator's), which résumé versioning PR 6 r
 - Tracer links: contact URLs swapped for tracking links on export.
 - `_resolve_tailoring_jd`: the job description to write from, fetched once if the job has none.
 """
+import asyncio
 import functools as _functools
 import logging
 import re
@@ -39,9 +40,20 @@ def reset_tailoring_semaphore():
 # Warm Playwright browser singleton for fast PDF generation (~3-13ms warm vs ~500ms cold)
 _pw_instance = None
 _pw_browser = None
+# One start, or restart, at a time: requests that waited for it use the browser it started instead of launching their
+# own. Printing happens outside it, so a healthy browser serves every request at once.
+_pw_starting = asyncio.Lock()
 
 async def _get_browser():
     """Get or create a warm Playwright browser instance."""
+    if _pw_browser and _pw_browser.is_connected():
+        return _pw_browser
+    async with _pw_starting:
+        return await _start_browser()
+
+
+async def _start_browser():
+    """The browser, started (or restarted) under `_pw_starting`; already up when a request before this one started it."""
     global _pw_instance, _pw_browser
     if _pw_browser and _pw_browser.is_connected():
         return _pw_browser

@@ -29,6 +29,10 @@ type DocumentSectionsProps = {
   ownFileError?: string | null;
   onOwnFile?: (file: File) => void;
   onRemoveOwnFile?: () => void;
+  /** The BDE's own file while they use one, whether or not this form's upload takes it. */
+  ownFile?: { name: string } | null;
+  /** The kinds the form's résumé upload takes, when the file offered isn't one of them. */
+  refusedAccept?: string | null;
 };
 
 type Actions = Pick<DocumentSectionsProps, "isFilling" | "onGoTo"> & { onChange?: () => void };
@@ -109,7 +113,7 @@ function DocumentSection({ kind, title, icon, rows, held, link, attached = null,
     </div>
     {rows.map((row) => <DocumentField key={row.key} row={row} isFilling={isFilling} onGoTo={onGoTo} onChange={onChange} />)}
     {rows.length === 0 && attached && <AttachedFile name={attached} isFilling={isFilling} onChange={onChange} />}
-    {rows.length > 0 && (extra ?? (held && <p data-slot="document-held" className={MUTED_TEXT}>{held}</p>))}
+    {(rows.length > 0 || attached) && (extra ?? (rows.length > 0 && held && <p data-slot="document-held" className={MUTED_TEXT}>{held}</p>))}
     {rows.length > 0 && link && <a className={`justify-self-start ${button("secondary", "compact")}`} href={link} target="_blank" rel="noreferrer">
       Open in BenchQ{EXTERNAL_ICON}
     </a>}
@@ -123,27 +127,23 @@ const SOURCE_TAG: Record<ResumeFileSource, string> = {
   picked: `${TAG} bg-[var(--color-teal-bg)] text-[var(--color-teal-fg)]`,
 };
 
-type ResumeFileProps = Pick<DocumentSectionsProps, "fileProblem" | "onRetryFile" | "ownFileError" | "onOwnFile" | "onRemoveOwnFile"> & {
+type ResumeFileProps = Pick<DocumentSectionsProps, "fileProblem" | "onRetryFile" | "ownFileError" | "onOwnFile" | "onRemoveOwnFile" | "ownFile" | "refusedAccept"> & {
   picked: NonNullable<DocumentSectionsProps["picked"]>;
   isFilling: boolean;
   /** A file is on the form already: only the BDE's own file says so, with Remove to stop using it. */
   isOnForm?: boolean;
 };
 
-/** What the Resume section says about the picked résumé's file, before one is on the form: the file Autofill attaches and
- * where it came from (made from the version, as uploaded, or the BDE's own), with a way to use a file from their
- * computer instead (Q5); that it couldn't be made, with Try again; or, without a file, that it's the BDE's to attach. */
-function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, onRetryFile, ownFileError = null, onOwnFile, onRemoveOwnFile }: ResumeFileProps) {
+/** What the Resume section says about the picked résumé's file: the file Autofill attaches and where it came from (made
+ * from the version, as uploaded, or the BDE's own), with a way to use a file from their computer instead (Q5); that it
+ * couldn't be made, with Try again; that the form's upload doesn't take its kind; or that it's the BDE's to attach. The
+ * BDE's own file keeps Remove in every case, on the form or not, taken or not, so they can always stop using it. */
+function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, onRetryFile, ownFileError = null, onOwnFile, onRemoveOwnFile,
+  ownFile = null, refusedAccept = null }: ResumeFileProps) {
   const input = useRef<HTMLInputElement>(null);
-  const isOwn = picked.source === "picked";
-  if (isOnForm) {
-    return isOwn && onRemoveOwnFile ? <div data-slot="resume-file" className="flex flex-wrap items-center gap-2">
-      <span data-slot="resume-file-source" className={SOURCE_TAG.picked}>Your file</span>
-      <button type="button" data-slot="own-file-remove" className={button("secondary", "compact")} disabled={isFilling}
-        title="Stop using your file for this candidate's forms" onClick={onRemoveOwnFile}>Remove</button>
-    </div> : null;
-  }
-  const choose = onOwnFile && <>
+  const remove = ownFile && onRemoveOwnFile && <button type="button" data-slot="own-file-remove" className={button("secondary", "compact")}
+    disabled={isFilling} title="Stop using your file for this candidate's forms" onClick={onRemoveOwnFile}>Remove</button>;
+  const choose = (label: string) => onOwnFile && <>
     <input ref={input} type="file" accept={OWN_FILE_TYPES} hidden data-slot="own-file-input"
       onChange={(event) => {
         const chosen = event.currentTarget.files?.[0];
@@ -151,36 +151,50 @@ function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, 
         if (chosen) onOwnFile(chosen);
       }} />
     <button type="button" data-slot="own-file-pick" className={button("secondary", "compact")} disabled={isFilling} onClick={() => input.current?.click()}>
-      {UPLOAD_ICON}{fileProblem && !isOwn ? "Use a file" : "Use a different file"}
+      {UPLOAD_ICON}{label}
     </button>
   </>;
-  const refused = ownFileError && <p data-slot="own-file-error" className="text-caption text-[var(--color-danger-fg)]" role="alert">{ownFileError}</p>;
-  if (fileProblem && !isOwn) {
+  const error = ownFileError && <p data-slot="own-file-error" className="text-caption text-[var(--color-danger-fg)]" role="alert">{ownFileError}</p>;
+  const ownTag = ownFile && <span data-slot="resume-file-source" className={SOURCE_TAG.picked}>Your file</span>;
+  if (isOnForm) {
+    return ownFile ? <div data-slot="resume-file" className="flex flex-wrap items-center gap-2">{ownTag}{remove}</div> : null;
+  }
+  if (refusedAccept !== null) {
+    const what = ownFile ? `Your file, ${ownFile.name}, isn't` : "The resume's file isn't";
+    return <div data-slot="resume-file" className="grid gap-1.5">
+      <p data-slot="resume-file-refused" className={WARNING} role="status">
+        {what} a kind this form&apos;s upload takes{refusedAccept ? ` (${refusedAccept})` : ""}. Use another file, or attach one by hand.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">{ownTag}{choose(ownFile ? "Use a different file" : "Use a file")}{remove}</div>
+      {error}
+    </div>;
+  }
+  if (fileProblem && !ownFile) {
     return <div data-slot="resume-file" className="grid gap-1.5">
       <p data-slot="resume-file-problem" className={WARNING} role="status">The resume file couldn&apos;t be made. Try again, or use a file from your computer.</p>
       <div className={FITTED_BUTTONS}>
         {onRetryFile && <button type="button" className={button("secondary", "compact")} disabled={isFilling} onClick={onRetryFile}>Try again</button>}
-        {choose}
+        {choose("Use a file")}
       </div>
-      {refused}
+      {error}
     </div>;
   }
   if (!picked.file) {
     return <div data-slot="resume-file" className="grid gap-1.5">
       <p data-slot="document-held" className={MUTED_TEXT}>Attach by hand: {picked.label}</p>
-      {refused}
+      {ownFile && <div className="flex flex-wrap items-center gap-2">{ownTag}{remove}</div>}
+      {error}
     </div>;
   }
-  const tag = picked.source === "generated" ? `Made from ${picked.meta || picked.label}` : picked.source === "uploaded" ? "Uploaded file" : "Your file";
+  const tag = ownFile ? null : picked.source === "generated" ? `Made from ${picked.meta || picked.label}` : picked.source === "uploaded" ? "Uploaded file" : null;
   return <div data-slot="resume-file" className="grid gap-1.5">
     <p data-slot="document-held" className={`wrap-anywhere ${MUTED_TEXT}`}>Autofill attaches: <span className="text-[var(--color-text)]">{picked.file}</span></p>
     <div className="flex flex-wrap items-center gap-2">
-      {picked.source && <span data-slot="resume-file-source" className={SOURCE_TAG[picked.source]}>{tag}</span>}
-      {isOwn
-        ? onRemoveOwnFile && <button type="button" data-slot="own-file-remove" className={button("secondary", "compact")} disabled={isFilling} onClick={onRemoveOwnFile}>Remove</button>
-        : choose}
+      {ownTag}
+      {tag && picked.source && <span data-slot="resume-file-source" className={SOURCE_TAG[picked.source]}>{tag}</span>}
+      {ownFile ? remove : choose("Use a different file")}
     </div>
-    {refused}
+    {error}
   </div>;
 }
 
@@ -189,14 +203,15 @@ function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, 
  * when BenchQ has it, and otherwise says which résumé to attach; once a file is on the form, its card says so instead.
  * A cover letter is always the BDE's. */
 export default function DocumentSections({ rows, details, resumesUrl, isFilling, onGoTo, picked = null, attached = null, onChangeResume,
-  fileProblem, onRetryFile, ownFileError, onOwnFile, onRemoveOwnFile }: DocumentSectionsProps) {
+  fileProblem, onRetryFile, ownFileError, onOwnFile, onRemoveOwnFile, ownFile = null, refusedAccept = null }: DocumentSectionsProps) {
   const of = (kind: DocumentKind) => rows.filter(({ field }) => documentOf(field) === kind);
   const actions = { isFilling, onGoTo };
   const resumes = of("resume");
   const hasFile = resumes.some((row) => Boolean(filledValue(row))) || (resumes.length === 0 && Boolean(attached));
   // Once a file is on the form, the line stays only for the BDE's own file, so they can stop using it.
-  const fileLine = picked && (!hasFile || picked.source === "picked") ? <ResumeFile picked={picked} isOnForm={hasFile} isFilling={isFilling}
-    fileProblem={fileProblem} onRetryFile={onRetryFile} ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} /> : null;
+  const fileLine = picked && (!hasFile || ownFile) ? <ResumeFile picked={picked} isOnForm={hasFile} isFilling={isFilling} fileProblem={fileProblem}
+    onRetryFile={onRetryFile} ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} ownFile={ownFile}
+    refusedAccept={refusedAccept} /> : null;
   return <div data-slot="documents" className="grid gap-2">
     <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={resumes} held={picked ? null : resumeHeld(details)} extra={fileLine}
       link={picked ? null : resumesUrl} attached={attached} onChange={onChangeResume} {...actions} />

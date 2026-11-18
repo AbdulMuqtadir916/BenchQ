@@ -1756,9 +1756,12 @@ extension to attach to a form's résumé upload (07 Q50–Q52):
   Chromium, as cover letters) or Word with `?format=docx`, named `Name - Title.pdf`. No AI: only the version's words,
   in `resume_text`'s order (§4.8 of resume-versioning.md); work authorization and languages stay out, as on the
   studio's paper. Links stay as the version writes them: the read writes nothing (no tracer rows from a GET).
-- `X-Resume-File` says which: `uploaded` or `generated`. Every answer is `Cache-Control: no-store`. 503 ("This résumé's
-  file couldn't be made. Try again.") when it can't be made, 422 for another `format`, 404 for a version out of the
-  principal's scope. The read follows the version's own access (§8.1).
+- Every file it answers with carries `Cache-Control: no-store` and `X-Resume-File`, which says where it came from:
+  `uploaded` or `generated`. Its other answers are the usual errors: 503 ("This résumé's file couldn't be made. Try
+  again.") when it can't be made, 422 for another `format`, 404 for a version out of the principal's scope.
+- The read follows the version's own access (§8.1), with one exception: a support view is refused, uploaded or generated
+  alike (403, "A support view is read-only."; `SUPPORT_VIEW_REFUSED` in `backend/auth/access.py`), since a view never
+  exports a résumé (07 §4). That 403 is a refusal of the view, unlike the 404 for a version it can't see.
 
 ### 8.3 Tailoring a résumé — APPROVED 2026-11-12 (Zuhair, tailoring part 3 Q7), BUILT (tailoring part 3)
 
