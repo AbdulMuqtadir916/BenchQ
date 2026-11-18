@@ -56,7 +56,7 @@ def fake(monkeypatch, test_db):
     monkeypatch.setitem(providers.REGISTRY, "fake", provider)
     # A click asks the sources its place's mode names (fanout.py): in tests, only this fake one, never the network.
     from backend.job_search import fanout
-    monkeypatch.setattr(fanout, "plan", lambda place: [fanout.Leg("fake", place, 100, place == providers.REMOTE)])
+    monkeypatch.setattr(fanout, "plan", lambda place: [fanout.Leg("fake", place, 100, 100, place == providers.REMOTE)])
     test_db.merge(Setting(key=providers.SETTING_KEY, value="fake"))
     test_db.commit()
     return provider
@@ -495,7 +495,7 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]
     usage = body["usage"]
     assert (usage["jobs_saved_today"], usage["jobs_cap"], usage["attempts_today"], usage["attempts_cap"]) == (
-        1, 200, 3, 20)                                                    # 200 new jobs a day since Q145
+        1, 30, 3, 20)                                                     # 30 new jobs a day since 07 Q71
     assert usage["resets_at"]
 
 

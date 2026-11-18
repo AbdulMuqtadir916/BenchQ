@@ -24,7 +24,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   company data (H-1B filings, client vs vendor) is a later feature.
 - **Only the candidate's BDE searches or captures** (`canSearchJobs`, `job.search`). Owners, managers and viewers
   read; a support view reads only.
-- **Daily limits** (since 6:30 PM IST): 100 new jobs per candidate, 20 searches and 20 captures per BDE. The same role
+- **Daily limits** (since the firm's work-day start): 30 new jobs per candidate (07 Q71), 20 searches and 20 captures per BDE. The same role
   searched again continues where the last search stopped.
 - **The whole posting:** Indeed and freehire.me's agent search (since 2026-11-16) send whole postings. Jobs saved by
   freehire.me's old search keep the ~1,000 characters it sent. freehire.me only has a preview of Adzuna's listings
@@ -93,11 +93,13 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 ## Decisions (2026-11-17): one click, every source, by mode (Q90–Q93, Q109, Q113, Q121–Q124, Q145–Q146)
 
 - **No source picker.** The picker lists places only (the candidate's city, preferred locations, Remote); a city's mode
-  comes from the candidate's work settings: On-site (city: LinkedIn 100, Indeed 100, freehire.me 40) when they don't
-  include hybrid, Hybrid (city: LinkedIn 100, Indeed 50; remote: Indeed 50, freehire.me 40) when they do or are empty;
-  Remote (Indeed 100, freehire.me 40).
-- **200 new jobs a day per candidate.** Fast sources show first; LinkedIn's share is kept for it; a small room goes to
-  LinkedIn first. Extra jobs that don't fit are dropped, and that source starts from the same place next click.
+  comes from the candidate's work settings. **Since 2026-11-18 (07 Q71)**, asked → kept: On-site (city: LinkedIn
+  25 → 20, Indeed 13 → 10) when they don't include hybrid; Hybrid (city: LinkedIn 25 → 20, Indeed 10 → 5; remote:
+  Indeed 10 → 5) when they do or are empty; Remote (Indeed 33 → 30). freehire.me (20) is asked only if the day isn't
+  full after them, and fills the rest.
+- **30 new jobs a day per candidate** (200 until 2026-11-18). Indeed shows first; LinkedIn's 20 is kept for it; a short
+  LinkedIn share takes Indeed's extras, then freehire.me. Extra jobs that don't fit are dropped, and that source starts
+  from the same place next click.
 - **Same job on two sources: saved once.** One source failing doesn't fail the click.
 - **Batches:** each click is a batch; the Jobs list opens at the newest, with All days, and each source's count.
 - **Days (2026-11-17, Q152–Q174):** the firm's required work hours (`firms.work_start`/`work_end`, migration 0031; the

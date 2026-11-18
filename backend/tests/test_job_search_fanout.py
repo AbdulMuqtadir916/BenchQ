@@ -1,5 +1,5 @@
-"""One click, several sources (backend/job_search/fanout.py; decided 2026-11-17, Q90–Q93, Q122–Q124, Q145–Q146): which
-sources each mode asks and with what share, LinkedIn's share held while the fast sources save, the same job from two
+"""One click, several sources (backend/job_search/fanout.py; decided 2026-11-17, Q90–Q93, Q145–Q146; the split since
+2026-11-18, 07 Q71): which sources each mode asks and with what share, LinkedIn's share held while the fast sources save, the same job from two
 sources saved once, a leg whose jobs didn't fit read again next time, a failing leg not failing the click. Fake
 sources only: no network; every job is made up."""
 import asyncio
@@ -60,38 +60,62 @@ def _saved(test_db, candidate):
     return out
 
 
-def test_each_mode_asks_its_sources_with_their_shares():
-    remote = [(leg.provider, leg.place, leg.quota) for leg in fanout.plan(REMOTE)]
-    hybrid = [(leg.provider, leg.place, leg.quota) for leg in fanout.plan("hybrid:Austin, TX")]
-    onsite = [(leg.provider, leg.place, leg.quota) for leg in fanout.plan("Austin, TX")]
-    assert remote == [("indeed", REMOTE, 100), ("freehire", REMOTE, 40)]                     # LinkedIn sits out
-    assert hybrid == [("linkedin", "Austin, TX", 100), ("indeed", "Austin, TX", 50), ("indeed", REMOTE, 50),
-                      ("freehire", REMOTE, 40)]
-    assert onsite == [("linkedin", "Austin, TX", 100), ("indeed", "Austin, TX", 100), ("freehire", "Austin, TX", 40)]
+def test_each_mode_asks_its_sources_for_their_shares_of_30():
+    """07 Q71 (2026-11-18): (source, place, asked, kept, filler)."""
+    def legs(place):
+        return [(leg.provider, leg.place, leg.ask, leg.keep, leg.filler) for leg in fanout.plan(place)]
+    assert limits.JOBS_PER_CANDIDATE_PER_DAY == 30
+    assert legs(REMOTE) == [("indeed", REMOTE, 33, 30, False), ("freehire", REMOTE, 20, 20, True)]   # no LinkedIn
+    assert legs("hybrid:Austin, TX") == [("linkedin", "Austin, TX", 25, 20, False), ("indeed", "Austin, TX", 10, 5, False),
+                                         ("indeed", REMOTE, 10, 5, False), ("freehire", REMOTE, 20, 20, True)]
+    assert legs("Austin, TX") == [("linkedin", "Austin, TX", 25, 20, False), ("indeed", "Austin, TX", 13, 10, False),
+                                  ("freehire", "Austin, TX", 20, 20, True)]
 
 
-def test_a_hybrid_click_saves_every_sources_share_and_counts_them_by_source(world, adnans, sources, test_db):
-    sources["linkedin"].jobs = _jobs("Li", 60)
-    sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 70)]      # fit the remote half too
-    sources["freehire"].jobs = [{**job, "remote": True} for job in _jobs("Fh", 50)]
+def test_a_full_hybrid_click_is_linkedin_20_and_indeed_5_and_5_and_never_asks_freehire(world, adnans, sources, test_db):
+    sources["linkedin"].jobs = _jobs("Li", 25)
+    sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 10)]      # fit the remote half too
+    sources["freehire"].jobs = [{**job, "remote": True} for job in _jobs("Fh", 20)]
     summary, batch_id = _click(world, adnans, "hybrid:Austin, TX")
-    # Indeed's two searches one after the other: the city, then remote.
-    assert [ask["place"] for ask in sources["indeed"].asks] == ["Austin, TX", REMOTE]
-    # Indeed: 50 city + 20 more remote; freehire.me: its 40, then 10 more into the gap LinkedIn left (60 of 100, Q123).
-    assert _saved(test_db, adnans) == {"linkedin": 60, "indeed": 70, "freehire": 50}
+    # Indeed's two searches one after the other: the city, then remote; each asked for 10.
+    assert [(ask["place"], call[2]) for ask, call in zip(sources["indeed"].asks, sources["indeed"].calls)] == \
+        [("Austin, TX", 10), (REMOTE, 10)]
+    assert sources["linkedin"].calls[0][2] == 25
+    assert _saved(test_db, adnans) == {"linkedin": 20, "indeed": 10}
+    assert sources["freehire"].calls == []                                  # the day was full
     batch = _batch(test_db, batch_id)
-    assert batch.state == "success" and batch.meta["counts"]["by_source"]["freehire"]["saved"] == 50
-    assert summary.startswith("LinkedIn 60 · Indeed 70 · freehire.me 50 new")
+    assert batch.state == "success" and batch.meta["counts"]["by_source"]["linkedin"]["saved"] == 20
+    assert summary.startswith("LinkedIn 20 · Indeed 10 new")
 
 
-def test_a_small_room_goes_to_linkedin_first(world, adnans, sources, test_db, monkeypatch):
-    """Q146: 40 left today; the fast sources answer first, but LinkedIn's share is held for it."""
-    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 40)
-    sources["linkedin"].jobs = _jobs("Li", 30)
-    sources["indeed"].jobs = _jobs("In", 30)
-    sources["freehire"].jobs = _jobs("Fh", 30)
+def test_linkedins_short_share_takes_indeeds_extras_then_freehire_fills_the_rest(world, adnans, sources, test_db):
+    """07 Q71: LinkedIn brings 12 of its 20; Indeed's 3 beyond its 10 go first, then freehire.me is asked for 20."""
+    sources["linkedin"].jobs = _jobs("Li", 12)
+    sources["indeed"].jobs = _jobs("In", 13)
+    sources["freehire"].jobs = _jobs("Fh", 20)
     _click(world, adnans, "Austin, TX")
-    assert _saved(test_db, adnans) == {"linkedin": 30, "indeed": 10}       # LinkedIn's 30, then Indeed fills the rest
+    assert _saved(test_db, adnans) == {"linkedin": 12, "indeed": 13, "freehire": 5}
+    assert sources["freehire"].calls[0][2] == 20
+
+
+def test_linkedins_share_is_held_however_fast_indeed_answers(world, adnans, sources, test_db, monkeypatch):
+    """Q146: 15 left today, less than LinkedIn's 20: Indeed answers first but saves nothing until LinkedIn has."""
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 15)
+    sources["linkedin"].jobs = _jobs("Li", 25)
+    sources["indeed"].jobs = _jobs("In", 13)
+    sources["freehire"].jobs = _jobs("Fh", 20)
+    _click(world, adnans, "Austin, TX")
+    assert _saved(test_db, adnans) == {"linkedin": 15}
+    assert sources["freehire"].calls == []
+
+
+def test_remote_is_indeed_first_freehire_only_fills(world, adnans, sources, test_db):
+    """07 Q71: no race on Remote: Indeed keeps up to 30 and freehire.me is asked only for the rest."""
+    sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 33)]
+    sources["freehire"].jobs = [{**job, "remote": True} for job in _jobs("Fh", 20)]
+    _click(world, adnans, REMOTE)
+    assert _saved(test_db, adnans) == {"indeed": 30} and sources["freehire"].calls == []
+    assert sources["indeed"].calls[0][2] == 33
 
 
 def test_the_same_job_from_two_sources_is_saved_once(world, adnans, sources, test_db):
@@ -120,22 +144,28 @@ def test_a_failing_source_does_not_fail_the_click_and_all_failing_does(world, ad
     assert summary == "failed: timeout" and _batch(test_db, batch_id).state == "error"
 
 
-def test_a_source_whose_jobs_did_not_fit_is_read_again_next_time(world, adnans, sources, test_db, monkeypatch):
-    """Q92: 100 left today and Indeed brings 120 → 20 don't fit, so its place stays; freehire.me had none to keep, so
-    it moves on."""
-    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)
-    sources["linkedin"].jobs = []
-    sources["indeed"].jobs = _jobs("In", 120)
-    sources["indeed"].next_cursor = "indeed-page-2"
-    sources["freehire"].jobs = []
-    sources["freehire"].next_cursor = "40"
+def test_a_source_whose_jobs_did_not_fit_is_read_again_next_time(world, adnans, sources, test_db):
+    """Q92: LinkedIn brings 25 and Indeed 13 → the day's 30 is full, 8 don't fit, so both keep their place; freehire.me
+    wasn't asked."""
+    sources["linkedin"].jobs, sources["linkedin"].next_cursor = _jobs("Li", 25), "li-2"
+    sources["indeed"].jobs, sources["indeed"].next_cursor = _jobs("In", 13), "in-2"
     _, batch_id = _click(world, adnans, "Austin, TX")
     legs = _batch(test_db, batch_id).meta["request"]["legs"]
-    assert legs["indeed|Austin, TX"] == {"cursor": None, "exhausted": False}           # read again from the top
-    assert legs["freehire|Austin, TX"] == {"cursor": "40", "exhausted": False}
-    sources["indeed"].cursors.clear(); sources["freehire"].cursors.clear()
+    assert legs["linkedin|Austin, TX"] == legs["indeed|Austin, TX"] == {"cursor": None, "exhausted": False}
+    assert "freehire|Austin, TX" not in legs
+
+
+def test_a_filler_whose_jobs_all_fit_moves_on(world, adnans, sources, test_db):
+    """Q92 for freehire.me: asked because the day wasn't full, nothing it brought was left out, so it moves on."""
+    sources["linkedin"].jobs, sources["linkedin"].next_cursor = [], None
+    sources["indeed"].jobs, sources["indeed"].next_cursor = _jobs("In", 3), None
+    sources["freehire"].jobs, sources["freehire"].next_cursor = _jobs("Fh", 4), "40"
+    _, batch_id = _click(world, adnans, "Austin, TX")
+    assert _saved(test_db, adnans) == {"indeed": 3, "freehire": 4}
+    assert _batch(test_db, batch_id).meta["request"]["legs"]["freehire|Austin, TX"] == {"cursor": "40", "exhausted": False}
+    sources["freehire"].cursors.clear()
     _click(world, adnans, "Austin, TX")
-    assert sources["indeed"].cursors == [None] and sources["freehire"].cursors == ["40"]
+    assert sources["freehire"].cursors == ["40"]
 
 
 def test_remote_never_asks_linkedin(world, adnans, sources, test_db):

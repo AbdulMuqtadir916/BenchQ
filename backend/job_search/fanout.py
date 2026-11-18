@@ -1,24 +1,27 @@
-"""One "Find jobs" click, several sources (decided 2026-11-17, Q90–Q93, Q122–Q124, Q145–Q146).
+"""One "Find jobs" click, several sources (decided 2026-11-17, Q90–Q93, Q145–Q146; the split since 2026-11-18, 07 Q71).
 
 The BDE no longer picks a source. The place's mode (`places.mode_of`) says which sources one click asks, each a
-"leg" (a source and a place) with how many jobs it may bring, in priority order:
+"leg" (a source and a place) with how many jobs it **asks** for and how many it **keeps**, in priority order; the
+day's 30 (`limits.JOBS_PER_CANDIDATE_PER_DAY`) is shared out like this:
 
-    Remote          Indeed, Remote 100 · freehire.me, remote in the country 40
-    Hybrid (city)   LinkedIn, the city 100 · Indeed, the city 50 · Indeed, Remote 50 · freehire.me, remote 40
-    On-site (city)  LinkedIn, the city 100 · Indeed, the city 100 · freehire.me, the city 40
+    On-site (city)  LinkedIn, the city 25 → 20 · Indeed, the city 13 → 10              · then freehire.me, the city 20
+    Hybrid (city)   LinkedIn, the city 25 → 20 · Indeed, the city 10 → 5 · Indeed, Remote 10 → 5 · then freehire.me, remote 20
+    Remote          Indeed, Remote 33 → 30                                              · then freehire.me, remote 20
 
-LinkedIn sits out Remote: its public search can't ask for remote jobs (live 2026-11-17). All legs start together:
-Indeed's one after the other (two searches at once invite a block), the others beside them. A fast leg saves as soon as
-it answers, within today's room less LinkedIn's share, which is held for it (Q90); LinkedIn saves when it answers or
-after `linkedin.TIME_LIMIT_SECONDS`. A small room goes to the higher priority first (Q146). When everything has
-answered, room left over goes to the jobs the other legs brought beyond their share, in priority order (Q123).
+LinkedIn sits out Remote: its public search can't ask for remote jobs (live 2026-11-17). LinkedIn and Indeed start
+together: Indeed's legs one after the other (two searches at once invite a block), LinkedIn beside them. Indeed saves
+as soon as it answers, within today's room less LinkedIn's share, which is held for it (Q90, Q146); LinkedIn saves
+when it answers or after `linkedin.TIME_LIMIT_SECONDS`. Then room left over goes to the jobs they brought beyond what
+they keep, in priority order (Q123): LinkedIn's short share is filled by Indeed's extras first. Only if the day still
+isn't full is freehire.me asked (a **filler** leg), and it fills what's left. So a higher source always comes first,
+whichever answers first.
 
 - **Same job, two sources (Q91):** a job whose company and title the candidate already has from another source, or that
   an earlier leg of this click saved, isn't saved again (`skipped_duplicate_source`).
 - **Jobs that didn't fit (Q92):** a leg some of whose jobs weren't saved keeps its place, so the next click reads that
   page again; a leg whose jobs were all saved moves on. Jobs that didn't fit are dropped (Q145).
 - **A leg that fails (Q93)** doesn't fail the click; the search fails only when every leg failed.
-- **The daily limit** is `limits.JOBS_PER_CANDIDATE_PER_DAY` new jobs per candidate (200, Q145).
+- **The daily limit** is `limits.JOBS_PER_CANDIDATE_PER_DAY` new jobs per candidate (30 since 2026-11-18, 07 Q71).
 
 The batch keeps each leg's place (`request.legs`: cursor, exhausted), its counts by source (`counts.by_source`) and any
 leg's error code (`errors`). Logs carry ids, codes, counts and timings only.
@@ -45,8 +48,10 @@ LABELS = {"linkedin": "LinkedIn", "indeed": "Indeed", "freehire": "freehire.me"}
 class Leg:
     provider: str
     place: str | None
-    quota: int
+    ask: int                    # how many jobs the source is asked for
+    keep: int                   # how many it may save before the others have had their turn
     remote_only: bool = False
+    filler: bool = False        # asked only if the day still isn't full once the others have saved (07 Q71)
 
     @property
     def key(self) -> str:
@@ -54,14 +59,14 @@ class Leg:
 
 
 def plan(place: str | None) -> list[Leg]:
-    """The legs one click asks, in priority order (Q122–Q124)."""
+    """The legs one click asks, in priority order (07 Q71, 2026-11-18)."""
     mode, city = places.mode_of(place)
     if mode == "remote":
-        return [Leg("indeed", REMOTE, 100, True), Leg("freehire", REMOTE, 40, True)]
+        return [Leg("indeed", REMOTE, 33, 30, True), Leg("freehire", REMOTE, 20, 20, True, filler=True)]
     if mode == "hybrid":
-        return [Leg("linkedin", city, 100), Leg("indeed", city, 50), Leg("indeed", REMOTE, 50, True),
-                Leg("freehire", REMOTE, 40, True)]
-    return [Leg("linkedin", city, 100), Leg("indeed", city, 100), Leg("freehire", city, 40)]
+        return [Leg("linkedin", city, 25, 20), Leg("indeed", city, 10, 5), Leg("indeed", REMOTE, 10, 5, True),
+                Leg("freehire", REMOTE, 20, 20, True, filler=True)]
+    return [Leg("linkedin", city, 25, 20), Leg("indeed", city, 13, 10), Leg("freehire", city, 20, 20, filler=True)]
 
 
 def continue_legs(rows, query: str, country: str, legs: list[Leg]) -> dict:
@@ -185,10 +190,17 @@ def _save_leg(click: _Click, leg: Leg, result: SearchResult, reserve: int) -> No
         now = utcnow()
         room = max(0, limits.JOBS_PER_CANDIDATE_PER_DAY
                    - limits.jobs_saved_today(db, click.firm_id, click.candidate_id, now) - reserve)
-        left = _write(db, click, leg, picked, min(room, leg.quota), counts, now)
+        left = _write(db, click, leg, picked, min(room, leg.keep), counts, now)
         click.held[leg.key] = left
         counts["skipped_over_cap"] += len(left)
         db.commit()
+
+
+def _room_left(click: _Click) -> int:
+    """Today's new jobs the candidate still has room for."""
+    with SessionLocal() as db:
+        return max(0, limits.JOBS_PER_CANDIDATE_PER_DAY
+                   - limits.jobs_saved_today(db, click.firm_id, click.candidate_id, utcnow()))
 
 
 def _fill_leftover(click: _Click) -> None:
@@ -275,7 +287,7 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
             return SearchResult(jobs=[], metadata={"exhausted": True}), None
         try:
             return await REGISTRY[leg.provider].search(
-                query, country, leg.quota, state.get("cursor"), place=leg.place,
+                query, country, leg.ask, state.get("cursor"), place=leg.place,
                 posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years, level=level,
                 firm_id=firm_id), None
         except ProviderError as error:
@@ -284,8 +296,10 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
             logger.error("job search batch=%s leg=%s unexpected %s", batch_id, leg.provider, type(error).__name__)
             return None, "internal"
 
-    linkedin = [leg for leg in legs if leg.provider == "linkedin"]
-    reserve = {"jobs": sum(leg.quota for leg in linkedin)}
+    fillers = [leg for leg in legs if leg.filler]
+    click.legs = [leg for leg in legs if not leg.filler]       # a filler joins only if it is asked
+    linkedin = [leg for leg in click.legs if leg.provider == "linkedin"]
+    reserve = {"jobs": sum(leg.keep for leg in linkedin)}      # LinkedIn's share, held for it (Q90, Q146)
     linkedin_tasks = [(leg, asyncio.create_task(fetch(leg))) for leg in linkedin]
 
     async def save(leg: Leg, outcome) -> None:
@@ -297,11 +311,11 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
         await asyncio.to_thread(_save_leg, click, leg, result, reserve["jobs"])
 
     async def indeed_in_turn() -> None:
-        for leg in (leg for leg in legs if leg.provider == "indeed"):
+        for leg in (leg for leg in click.legs if leg.provider == "indeed"):
             await save(leg, await fetch(leg))
 
     async def the_others() -> None:
-        others = [leg for leg in legs if leg.provider not in ("indeed", "linkedin")]
+        others = [leg for leg in click.legs if leg.provider not in ("indeed", "linkedin")]
         outcomes = await asyncio.gather(*(fetch(leg) for leg in others))
         for leg, outcome in zip(others, outcomes):
             await save(leg, outcome)
@@ -311,6 +325,12 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
     for leg, task in linkedin_tasks:
         await save(leg, await task)
     await asyncio.to_thread(_fill_leftover, click)
+    # 07 Q71: freehire.me only when the day still isn't full, and it fills what's left.
+    for leg in fillers:
+        if click.gone or await asyncio.to_thread(_room_left, click) <= 0:
+            break
+        click.legs.append(leg)
+        await save(leg, await fetch(leg))
     summary = await asyncio.to_thread(_finish, click)
     logger.info("job search batch=%s candidate=%s legs=%d errors=%d ms=%d", batch_id, candidate_id, len(legs),
                 len(click.errors), (time.monotonic() - started) * 1000)

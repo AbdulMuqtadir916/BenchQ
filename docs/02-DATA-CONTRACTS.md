@@ -1500,12 +1500,14 @@ ledger entry.
 Q53).** `POST …/job-searches {place?}` asks every source the place's mode names (`job_search/fanout.py`); the batch's
 `request.provider` is `"all"`. `GET …/job-searches` `places` lists places only (`kind` home, preferred or remote; the
 label is the place, no mode). The stored place says the mode, the city's taken from the candidate's work settings
-(`places.searched_place`): "City, ST" = on-site (LinkedIn 100, Indeed 100, freehire.me 40, all in the city), when they
-don't include hybrid; "hybrid:City, ST" = the city (LinkedIn 100, Indeed 50) plus remote in the country (Indeed 50,
-freehire.me 40), when they include hybrid or are empty; it reads "City, ST"; `remote` = Indeed 100 and freehire.me 40,
-remote (LinkedIn's public search can't ask for remote). Indeed's two searches run one after the other; the fast sources
-save as they answer within today's room less LinkedIn's share; a small room goes to LinkedIn, then Indeed, then
-freehire.me; room left goes to the jobs over a source's share. The daily limit is **200** new jobs per candidate. The
+(`places.searched_place`), each source asked for some jobs and keeping some (**since 2026-11-18, 07 Q71**): "City, ST" =
+on-site (LinkedIn asked 25, keeps 20; Indeed asked 13, keeps 10; all in the city), when they don't include hybrid;
+"hybrid:City, ST" = the city (LinkedIn 25 → 20, Indeed 10 → 5) plus remote in the country (Indeed 10 → 5), when they
+include hybrid or are empty; it reads "City, ST"; `remote` = Indeed 33 → 30, remote (LinkedIn's public search can't ask
+for remote). LinkedIn and Indeed start together, Indeed's two searches one after the other; Indeed saves as it answers
+within today's room less LinkedIn's 20, held for it; room left then goes to the jobs over a source's share, LinkedIn's
+first, then Indeed's; only if the day still isn't full is **freehire.me** asked (20, the city on-site, remote
+otherwise) to fill the rest. The daily limit is **30** new jobs per candidate (200 from Q145 until 2026-11-18). The
 same job (company and title) from another source isn't saved again (`skipped_duplicate_source`); a source whose jobs
 didn't all fit is read again from the same place next click (`request.legs[provider|place]`: cursor, exhausted); one
 failing source doesn't fail the click (`errors`), all failing does. `counts.by_source` holds each source's counts;

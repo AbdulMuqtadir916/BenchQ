@@ -1,6 +1,6 @@
 """The job search's daily caps (decided 2026-11-10), counted from rows, never stored:
 
-- 100 **new** jobs per candidate per day: `job_postings` rows discovered since the day started, captures left out
+- 30 **new** jobs per candidate per day (07 Q71, 2026-11-18; was 100, then 200): `job_postings` rows discovered since the day started, captures left out
   by how they were first saved (`first_source` manual / extension). A job seen again only refreshes its row and
   doesn't count; a captured job a search later refreshes stays a capture (Abdul's comment on PR 2: counting the
   latest `source` let it take a search's place, 101).
@@ -27,10 +27,10 @@ from backend.job_search.providers.capture import CAPTURE_SOURCES
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
-JOBS_PER_CANDIDATE_PER_DAY = 200       # 100 until 2026-11-17 (Q145)
+JOBS_PER_CANDIDATE_PER_DAY = 30        # 07 Q71 (2026-11-18); 200 from 2026-11-17 (Q145), 100 before
 ATTEMPTS_PER_BDE_PER_DAY = 20
 CAPTURES_PER_BDE_PER_DAY = 20
-JOBS_PER_SEARCH = 100            # always asked for, even with less room left (Q28)
+JOBS_PER_SEARCH = 100            # a one-source search's ask (Q28); a click asks each source its leg's own (fanout.py)
 POSTED_WITHIN_DAYS = 14          # only jobs posted in the last 14 days (decided 2026-11-14, Q7)
 JOB_TYPE = "job_search"          # job_runs.job_type (the background launcher's own record of the task)
 IST = ZoneInfo("Asia/Kolkata")
