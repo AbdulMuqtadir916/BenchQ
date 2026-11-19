@@ -363,7 +363,7 @@ export function createFiller(registry: () => Registry | null) {
       const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
         .map(({ entry }) => entry.controls[0] as HTMLInputElement);
       if (uploads.length === 0) return false;
-      return ownChip(uploads, chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip)))) !== null;
+      return ownChip(uploads, chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip).split(name).join(" ")))) !== null;
     },
 
     async removeFile(name: string): Promise<boolean> {

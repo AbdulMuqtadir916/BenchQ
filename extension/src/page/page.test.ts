@@ -278,14 +278,14 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
   const UPLOAD = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>${NAME}</span><button id="mine" type="button" aria-label="Remove file">×</button></div></div>`;
 
   /** The page in `html`, once BenchQ attached its file to the upload `#r` the way the panel does. */
-  async function attached(html: string) {
+  async function attached(html: string, name = NAME) {
     vi.stubGlobal("DataTransfer", FakeTransfer);
     const { filler, rescan } = setup(html);
     let held: File[] = [];
     Object.defineProperty(element("#r"), "files", { configurable: true, get: () => held, set: (next: File[]) => { held = [...next]; } });
     const { scanId, fields } = rescan();
     const upload = fields.find(({ kind }) => kind === "file")!;
-    const write = { type: "file" as const, name: NAME, mimeType: "application/pdf", data: btoa("%PDF-1.7") };
+    const write = { type: "file" as const, name, mimeType: "application/pdf", data: btoa("%PDF-1.7") };
     expect((await filler.fill({ scanId, fieldId: upload.id, write, current: upload.current })).status).toBe("filled");
     return filler;
   }
@@ -309,6 +309,12 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
     const failed = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>Could not upload ${NAME}</span></div></div>`;
     const filler = await attached(failed);
     expect(filler.showsFile(NAME)).toBe(false);
+  });
+
+  it("still takes a chip whose file name holds such a word (#148)", async () => {
+    const errorName = "Error Analyst - Resume.pdf";
+    const filler = await attached(UPLOAD.replaceAll(NAME, errorName), errorName);
+    expect(filler.showsFile(errorName)).toBe(true);
   });
 
   it("clicks the remove control beside the chip of the file it attached", async () => {

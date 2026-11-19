@@ -165,12 +165,13 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   useEffect(() => {
     const wanted = pendingFill;
     // While the tab shows another job, the fill waits, queued: "Keep it connected" lets it run (PR #140's review).
-    if (!wanted || movedAway || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
+    // A file still being read keeps the fill queued: it runs once the read settles, with that file (#148).
+    if (!wanted || movedAway || isReadingOwnFile || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
     startedFill.current = wanted;
     // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
     const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0) ? autofill() : undefined;
     void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
-  }, [pendingFill, movedAway, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
+  }, [pendingFill, movedAway, isReadingOwnFile, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {

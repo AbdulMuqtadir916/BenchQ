@@ -415,6 +415,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     const file = offered && fitsUpload(page?.fields ?? [], offered.mimeType, offered.name) ? offered : null;
     // The kinds the upload takes when the file offered isn't one: the Resume section says so and keeps the BDE's controls.
     const refused = offered && !file && page ? resumeUploadOf(page.fields)?.accept ?? "" : null;
+    // The site swapped the upload out: does it still show the file BenchQ attached (07 Q53)? Without a chip naming it,
+    // the file isn't taken as on the form. Asked before this look counts as the current one, so a newer look started
+    // meanwhile wins and this one shows nothing (#148).
+    const lastAttached = [...memory.current.attached.values()].at(-1) ?? null;
+    const isShown = page !== null && lastAttached !== null && resumeUploadOf(page.fields) === undefined
+      && await fileShownOnPage(tabId, lastAttached).catch(() => false);
     if (answers && page && isCurrent()) {
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.
@@ -436,11 +442,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
         setBankEmpty(answers.entries.length === 0);
         setAnsweredFrom(resumeId);
         setReviewedFor({ applicationId, candidateId, resumeId, fileId: pickedFile ? fileKey(pickedFile) : null });
-        // The site swapped the upload out: does it still show the file BenchQ attached (07 Q53)? Without a chip naming
-        // it, the file isn't taken as on the form (#148).
-        const lastAttached = [...memory.current.attached.values()].at(-1) ?? null;
-        const isSwapped = lastAttached !== null && resumeUploadOf(page.fields) === undefined;
-        setAttachedShown(isSwapped && await fileShownOnPage(tabId, lastAttached).catch(() => false));
+        setAttachedShown(isShown);
         setUnreadableFrames(page.unreadableFrames);
         setUndoable(page.pending);
         setError("");
