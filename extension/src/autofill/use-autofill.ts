@@ -293,12 +293,6 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const [attachedShown, setAttachedShown] = useState(false);
   // A look skipped because a run was busy, to take once it ends.
   const missedLook = useRef(false);
-  /** Takes a look skipped while the panel was busy (another file picked meanwhile), now, with what's picked now. */
-  const drainMissedLook = useCallback(() => {
-    if (!missedLook.current || busy.current) return;
-    missedLook.current = false;
-    void currentScan.current();
-  }, []);
 
   /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job, and what came with
    * them. No résumé, no answers. A backend that sends no autofill for the version can't answer either. Only the scan
@@ -458,10 +452,16 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       isScanRunning.current = false;
       setScanning(false);
     }
-  }, [applicationId, candidateId, resumeId, loadAnswers, loadFile, readPage, review]);
+  }, [applicationId, candidateId, resumeId, pickedFile, tabId, loadAnswers, loadFile, readPage, review]);
   // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
   const currentScan = useRef(scan);
   useEffect(() => { currentScan.current = scan; }, [scan]);
+  /** Takes a look skipped while the panel was busy (another file picked meanwhile), now, with what's picked now. */
+  const drainMissedLook = useCallback(() => {
+    if (!missedLook.current || busy.current) return;
+    missedLook.current = false;
+    void currentScan.current();
+  }, []);
 
   // The hold lifted: the BDE kept the tab connected on the page it moved to, or the tab went back to the job. Nothing
   // went into this application's form while held, so a fresh look takes in the page the tab shows now; never the rows
