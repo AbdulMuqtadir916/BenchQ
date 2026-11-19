@@ -113,7 +113,7 @@ function DocumentSection({ kind, title, icon, rows, held, link, attached = null,
     </div>
     {rows.map((row) => <DocumentField key={row.key} row={row} isFilling={isFilling} onGoTo={onGoTo} onChange={onChange} />)}
     {rows.length === 0 && attached && <AttachedFile name={attached} isFilling={isFilling} onChange={onChange} />}
-    {(rows.length > 0 || attached) && (extra ?? (rows.length > 0 && held && <p data-slot="document-held" className={MUTED_TEXT}>{held}</p>))}
+    {extra ?? (rows.length > 0 && held && <p data-slot="document-held" className={MUTED_TEXT}>{held}</p>)}
     {rows.length > 0 && link && <a className={`justify-self-start ${button("secondary", "compact")}`} href={link} target="_blank" rel="noreferrer">
       Open in BenchQ{EXTERNAL_ICON}
     </a>}
@@ -208,8 +208,11 @@ export default function DocumentSections({ rows, details, resumesUrl, isFilling,
   const actions = { isFilling, onGoTo };
   const resumes = of("resume");
   const hasFile = resumes.some((row) => Boolean(filledValue(row))) || (resumes.length === 0 && Boolean(attached));
-  // Once a file is on the form, the line stays only for the BDE's own file, so they can stop using it.
-  const fileLine = picked && (!hasFile || ownFile) ? <ResumeFile picked={picked} isOnForm={hasFile} isFilling={isFilling} fileProblem={fileProblem}
+  // The line says what goes on the form's upload; once a file is on it, or the form has none (any more), it stays only
+  // for the BDE's own file, so they can always stop using it.
+  const hasUpload = resumes.length > 0;
+  const fileLine = picked && (hasUpload ? !hasFile || ownFile : ownFile) ? <ResumeFile picked={picked} isOnForm={hasFile || !hasUpload}
+    isFilling={isFilling} fileProblem={fileProblem}
     onRetryFile={onRetryFile} ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} ownFile={ownFile}
     refusedAccept={refusedAccept} /> : null;
   return <div data-slot="documents" className="grid gap-2">

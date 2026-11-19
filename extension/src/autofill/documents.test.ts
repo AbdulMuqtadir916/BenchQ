@@ -73,7 +73,11 @@ describe("the kind of file an upload takes (Q3)", () => {
 describe("a file from the BDE's computer (Q5)", () => {
   it("is read into memory with its type, as the BDE's own", async () => {
     expect(await readOwnFile(new File(["%PDF-1.4"], "mine.PDF", { lastModified: 1 })))
-      .toEqual({ name: "mine.PDF", mimeType: PDF_MIME, data: "JVBERi0xLjQ=", source: "picked", id: "own:mine.PDF:8:1" });
+      .toEqual({ name: "mine.PDF", mimeType: PDF_MIME, data: "JVBERi0xLjQ=", source: "picked", id: expect.stringMatching(/^own:[0-9a-f-]{36}$/) });
+    // Two picks are two files, even of one file: each pick has its own identity (#148).
+    const same = new File(["%PDF-1.4"], "mine.pdf", { lastModified: 1 });
+    const [first, second] = await Promise.all([readOwnFile(same), readOwnFile(same)]);
+    expect(typeof first === "object" && typeof second === "object" && first.id !== second.id).toBe(true);
     expect(await readOwnFile(new File(["x"], "cv.docx"))).toMatchObject({ mimeType: DOCX_MIME, source: "picked" });
   });
 

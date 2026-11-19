@@ -293,6 +293,12 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const [attachedShown, setAttachedShown] = useState(false);
   // A look skipped because a run was busy, to take once it ends.
   const missedLook = useRef(false);
+  /** Takes a look skipped while the panel was busy (another file picked meanwhile), now, with what's picked now. */
+  const drainMissedLook = useCallback(() => {
+    if (!missedLook.current || busy.current) return;
+    missedLook.current = false;
+    void currentScan.current();
+  }, []);
 
   /** The picked résumé's answers, with "How did you hear about us?" from where BenchQ found the job, and what came with
    * them. No résumé, no answers. A backend that sends no autofill for the version can't answer either. Only the scan
@@ -824,7 +830,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       if (!bank.current?.isRefused) await removeOldFiles(bank.current?.file ? fileKey(bank.current.file) : null);
       // Each step checks the hold again: the tab can move on to another job while one runs (PR #140's review).
       if (held.current) return;
-      const stale = (shownRows.current ?? []).filter((row) => row.isStale);
+      // A file the upload won't take replaces nothing, here too: the attached one isn't taken back (#148).
+      const stale = (shownRows.current ?? []).filter((row) => row.isStale && !(bank.current?.isRefused && row.field.kind === "file"));
       if (stale.length > 0) await takeBackStale(stale);
       if (held.current) return;
       setStep(null);
@@ -832,13 +839,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       await addEntries();
     } finally {
       setStep(null);
-      // A look skipped while the run was busy (another file picked meanwhile) happens now, with what's picked now.
-      if (missedLook.current && !busy.current) {
-        missedLook.current = false;
-        void currentScan.current();
-      }
+      drainMissedLook();
     }
-  }, [addEntries, fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
+  }, [addEntries, drainMissedLook, fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
 
   /** The page moved on: a new page or step of the form, or fields that came or went. A fresh look first. When most of
    * the fields are new, it's the form's next step rather than a question an answer brought out; once the BDE has run
@@ -877,8 +880,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   }, [followPage]);
 
   /** Writes the saved answers over values the form held before BenchQ looked, for the rows the BDE chose. */
-  const replace = useCallback((chosen: ReviewRow[]) =>
-    fillRows(chosen.filter((row): row is FillableRow => row.status === "kept" && Boolean(row.write)), 1), [fillRows]);
+  const replace = useCallback(async (chosen: ReviewRow[]) => {
+    await fillRows(chosen.filter((row): row is FillableRow => row.status === "kept" && Boolean(row.write)), 1);
+    drainMissedLook();
+  }, [drainMissedLook, fillRows]);
 
   /** Fills a field with one of the saved answers suggested for it, which the BDE picked (Q26). It counts as BenchQ's
    * fill, so Undo takes it back too. An answer that doesn't fit the field says why instead. */
@@ -886,10 +891,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     const picked = suggestedRow(row, entry);
     if (picked.status === "ready" && picked.write) {
       await fillRows([picked as FillableRow], 1);
+      drainMissedLook();
       return;
     }
     if (picked.status === "manual") showResult(row.key, (item) => ({ ...item, reason: picked.reason }));
-  }, [fillRows, showResult]);
+  }, [drainMissedLook, fillRows, showResult]);
 
   /** A dropdown's options, for a row Autofill found no clear option for, so the BDE can choose one in the panel. */
   const listOptions = useCallback(async ({ field }: ReviewRow): Promise<string[] | null> => {
@@ -913,7 +919,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     }
     busy.current = false;
     await scan(result.status === "filled" ? new Set([key]) : undefined);
-  }, [scan, tabId]);
+    drainMissedLook();
+  }, [drainMissedLook, scan, tabId]);
 
   /** Takes the BDE to a row's field on the form. If the page has moved on, a fresh review shows what's there now. */
   const goToField = useCallback(async ({ field }: ReviewRow) => {
@@ -938,14 +945,17 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     }
     memory.current.settled.clear();
     memory.current.filledFrom.clear();
+    memory.current.wrote.clear();
     memory.current.attached.clear();
+    memory.current.attachedId.clear();
     // The BDE took the fills back: the next pages wait for them to run Autofill again.
     memory.current.autoSteps = false;
     setIsFollowingSteps(false);
     setAttachedFile(null);
     busy.current = false;
     await scan(new Set());
-  }, [scan, tabId]);
+    drainMissedLook();
+  }, [drainMissedLook, scan, tabId]);
 
   /** Keeps an answer the BDE typed on the picked résumé, for next time (07 Q58): for all of the candidate's jobs, or the
    * picked résumé only. The answers load again, so the next form that asks it is filled. A résumé picked while it saved

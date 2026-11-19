@@ -305,6 +305,12 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
     expect(filler.showsFile("Priya - Data Engineer.pdf")).toBe(false);
   });
 
+  it("doesn't take an upload error that names the file for its chip (#148)", async () => {
+    const failed = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>Could not upload ${NAME}</span></div></div>`;
+    const filler = await attached(failed);
+    expect(filler.showsFile(NAME)).toBe(false);
+  });
+
   it("clicks the remove control beside the chip of the file it attached", async () => {
     const filler = await attached(UPLOAD);
     const mine = clicksOn("#mine");

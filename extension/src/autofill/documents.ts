@@ -51,7 +51,8 @@ export async function readOwnFile(file: File): Promise<ResumeFile | string> {
   if (!extension) return "Pick a PDF or Word file.";
   if (file.size > MAX_OWN_FILE_BYTES) return "That file is over 10 MB. Pick a smaller one.";
   const data = base64Of(new Uint8Array(await file.arrayBuffer()));
-  return { name: file.name, mimeType: MIME_OF[extension]!, data, source: "picked", id: `own:${file.name}:${file.size}:${file.lastModified}` };
+  // One identity per pick, kept for as long as the BDE uses that pick: two picks are two files, whatever they share.
+  return { name: file.name, mimeType: MIME_OF[extension]!, data, source: "picked", id: `own:${crypto.randomUUID()}` };
 }
 
 /** Whether an upload's `accept` list takes a file: by its type, its extension (from the type, else its name) or a

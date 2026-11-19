@@ -58,6 +58,9 @@ function setFiles(input: HTMLInputElement, files: File[]) {
 const fileOf = ({ name, mimeType, data }: FieldWrite & { type: "file" }) =>
   new File([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], name, { type: mimeType });
 
+/** A site's words for an upload that didn't go through, beside the file's name. */
+const UPLOAD_FAILED = /\b(could ?n[o']t|cannot|can't|failed|error|invalid|too (large|big)|not (supported|allowed)|unsupported|try again)\b/i;
+
 /** Why a file wasn't written: the upload no longer takes its kind. */
 const UPLOAD_REFUSES_KIND = "This upload doesn't take this kind of file.";
 
@@ -353,9 +356,14 @@ export function createFiller(registry: () => Registry | null) {
      * names it (07 Q51): a page such as Greenhouse shows a taken file as a chip and ignores a new one put under it. Only
      * a file this frame attached is removed, and only its own chip, beside the upload it went to: a file of the same
      * name the BDE attached elsewhere, here or in another frame, stays. True once its control was clicked. */
-    /** Whether the page shows a chip naming `name`: a file the site took and shows in place of its upload (07 Q53). */
+    /** Whether the page shows the chip of a file this frame attached as `name`: the site took it and shows it in place of
+     * its upload (07 Q53). Its chip, beside the upload it went to (as removeFile finds it), never a message that merely
+     * names it ("Could not upload …"). */
     showsFile(name: string): boolean {
-      return chipsNamed(name).length > 0;
+      const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
+        .map(({ entry }) => entry.controls[0] as HTMLInputElement);
+      if (uploads.length === 0) return false;
+      return ownChip(uploads, chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip)))) !== null;
     },
 
     async removeFile(name: string): Promise<boolean> {

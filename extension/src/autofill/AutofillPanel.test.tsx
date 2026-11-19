@@ -478,7 +478,10 @@ describe("the résumé the answers come from", () => {
     expect(host.querySelector("[data-slot='own-file-error']")!.textContent).toBe("Pick a PDF or Word file.");
     await choose(new File(["%PDF-1.4"], "mine.pdf", { lastModified: 1 }));
     expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile)
-      .toEqual({ name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0xLjQ=", source: "picked", id: "own:mine.pdf:8:1" });
+      .toEqual({ name: "mine.pdf", mimeType: "application/pdf", data: "JVBERi0xLjQ=", source: "picked", id: expect.stringMatching(/^own:/) });
+    // Nothing filled while the pick was being read (#148).
+    expect(vi.mocked(useAutofill).mock.calls.some(([options]) => options.isHeld === true)).toBe(true);
+    expect(vi.mocked(useAutofill).mock.lastCall![0].isHeld).toBe(false);
     expect(host.querySelector("[data-slot='own-file-error']")).toBeNull();
   });
 
@@ -490,9 +493,11 @@ describe("the résumé the answers come from", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    const reviewedFor = { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: `own:${file.name}:${file.size}:1` };
-    update({ ...state, reviewedFor }, oneResume);
+    update({ ...state, reviewedFor: reviewedForOwn() }, oneResume);
   }
+  /** The review for the file the BDE picked last, as the hook would report it. */
+  const reviewedForOwn = () => ({ applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id,
+    fileId: vi.mocked(useAutofill).mock.lastCall![0].pickedFile?.id ?? null });
   const generated = { fillCount: 1, rows: [upload()], attachment: "Priya - Java Developer.pdf", attachmentSource: "generated" as const, answeredFrom: base.id };
 
   it("names the BDE's own file and offers to take it off again", async () => {
@@ -510,11 +515,16 @@ describe("the résumé the answers come from", () => {
     await pickOwn({ ...generated, fillCount: 0, rows: [attachedRow], attachmentSource: "picked" });
     expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
     expect(named("Remove")).toBeTruthy();
-    const reviewedFor = { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: "own:mine.pdf:8:1" };
     update({ ...generated, fillCount: 0, rows: [row("Email", true, "a@example.test")], attachmentSource: "picked", attachedFile: "Priya - Java Developer.pdf",
-      attachedShown: true, reviewedFor }, oneResume);
+      attachedShown: true, reviewedFor: reviewedForOwn() }, oneResume);
     expect(host.querySelector("[data-document='resume'] [data-slot='document-status']")!.textContent).toBe("Attached");
     expect(named("Remove")).toBeTruthy();
+    // The upload gone with no chip either: Remove still shows, and nothing says a file goes on (#148).
+    update({ ...generated, fillCount: 0, rows: [row("Email", true, "a@example.test")], attachmentSource: "picked", attachedFile: null,
+      attachedShown: false, reviewedFor: reviewedForOwn() }, oneResume);
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-status']")!.textContent).toBe("No field found");
+    expect(named("Remove")).toBeTruthy();
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")).toBeNull();
   });
 
   it("says when the form's upload won't take the file, and keeps the BDE's controls", async () => {

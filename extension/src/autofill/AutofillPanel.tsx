@@ -95,19 +95,25 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const pickedFile = ownFile?.candidateId === connection.candidateId ? ownFile.file : null;
   // Each pick, and Remove, starts a new one: a read still running for an earlier pick is dropped, so the last one wins.
   const ownFilePick = useRef(0);
+  // A pick still being read: nothing fills meanwhile, from a click, a shortcut or a next page, so the file the BDE
+  // replaced can't go on the form (#148). The hold lifts once the read settles, and the form is looked at again.
+  const [isReadingOwnFile, setIsReadingOwnFile] = useState(false);
   const takeOwnFile = async (chosen: File) => {
     const pick = ++ownFilePick.current;
+    setIsReadingOwnFile(true);
     const read = await readOwnFile(chosen).catch(() => "That file couldn't be read. Pick it again.");
     if (pick !== ownFilePick.current) return;
     setOwnFileError(typeof read === "string" ? read : null);
     if (typeof read !== "string") setOwnFile({ candidateId: connection.candidateId, file: read });
+    setIsReadingOwnFile(false);
   };
   const removeOwnFile = () => {
     ownFilePick.current += 1;
+    setIsReadingOwnFile(false);
     setOwnFile(null);
     setOwnFileError(null);
   };
-  const state = useAutofill({ connection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway });
+  const state = useAutofill({ connection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway || isReadingOwnFile });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
   // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so
