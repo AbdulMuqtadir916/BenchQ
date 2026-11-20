@@ -1,4 +1,5 @@
 import type { FieldClues } from "../autofill/types";
+import { byId, hostOf } from "./shadow";
 
 /** Reading what a form calls its fields. Everything here only reads: nothing is cloned, marked or moved. */
 
@@ -57,7 +58,7 @@ export function cleanLabel(text: string): string {
 function labelledBy(element: Element): string {
   const ids = element.getAttribute("aria-labelledby")?.split(/\s+/).filter(Boolean) ?? [];
   return ids.map((id) => {
-    const target = element.ownerDocument.getElementById(id);
+    const target = byId(element, id);
     return target ? textOf(target) : "";
   }).join(" ");
 }
@@ -120,20 +121,38 @@ function uploadPurpose(input: Element): string {
   return "";
 }
 
+/** A component holding several fields (an address: street, city, ZIP), whose label names them all. */
+function holdsSeveralFields(element: Element): boolean {
+  const root = element.getRootNode();
+  return root instanceof ShadowRoot && root.querySelectorAll("input, select, textarea").length > 1;
+}
+
 export function rawLabel(element: HTMLElement): string {
   const own = collapse(ownLabel(element));
   // An upload's own label is often just its button: "Attach".
   const isVague = (element as HTMLInputElement).type === "file" && (!own || UPLOAD_BUTTON.test(own));
   return (isVague && uploadPurpose(element))
     || own
-    || nearbyText(element)
+    // A component holding several fields names them all: each field's own words come first there.
+    || (holdsSeveralFields(element) ? nearbyText(element) || hostLabel(element) : hostLabel(element) || nearbyText(element))
     || element.getAttribute("placeholder")
     || element.getAttribute("title")
     || "";
 }
 
+/** A field inside a component whose question sits on the component: the component's own label (its aria label, an
+ * element naming it with `for`, its `label` or `accessible-name`), else the text before it; then the component around
+ * that one. Empty for a field that isn't inside a component. */
+function hostLabel(element: Element): string {
+  const host = hostOf(element);
+  if (!host) return "";
+  const named = host.id ? (host.getRootNode() as ParentNode).querySelector(`[for="${host.id.replace(/["\\]/g, "\\$&")}"]`) : null;
+  return collapse(ownLabel(host)) || (named ? collapse(textOf(named)) : "")
+    || collapse(host.getAttribute("label") ?? host.getAttribute("accessible-name") ?? "") || nearbyText(host) || hostLabel(host);
+}
+
 /** The nearest heading or legend above a field: the section it sits in. */
-function sectionHeading(element: Element): string {
+export function sectionHeading(element: Element): string {
   let node: Element | null = element;
   for (let depth = 0; node && depth < MAX_HEADING_DEPTH && !node.matches("body"); depth += 1) {
     for (let previous = node.previousElementSibling; previous; previous = previous.previousElementSibling) {
@@ -185,7 +204,7 @@ export function ariaLabelOf(element: HTMLElement): string {
   const named = collapse(labelledBy(element)) || collapse(element.getAttribute("aria-label") ?? "");
   const own = collapse(element.textContent ?? "");
   const beside = element.nextElementSibling ? collapse(textOf(element.nextElementSibling)) : "";
-  return named || own || beside || nearbyText(element);
+  return named || own || beside || nearbyText(element) || hostLabel(element);
 }
 
 /** A radio or checkbox group's question: its legend or group label, else the text before the group. */
@@ -198,7 +217,7 @@ export function groupLabel(inputs: HTMLElement[]): string {
     const before = nearbyText(group);
     if (before) return before;
   }
-  return nearbyText(commonAncestor(inputs));
+  return nearbyText(commonAncestor(inputs)) || hostLabel(inputs[0]!);
 }
 
 /** The text right beside a box comes first: a label can wrap a question or a long description as well as the option. */

@@ -11,8 +11,8 @@ import { useStudio } from "./studio-store";
 
 const NOTICE_ICON = { info: Info, ai: Sparkles, danger: AlertTriangle } as const;
 
-/** Bottom bar: live counts and notices. */
-export function StatusBar({ doc }: { doc: ResumeDocument }) {
+/** Bottom bar: live counts and notices. The Autofill tab shows only the notices: its counts are on the tab. */
+export function StatusBar({ doc, showWords = true }: { doc: ResumeDocument; showWords?: boolean }) {
   const notice = useStudio((s) => s.notice);
   const reduce = useReducedMotion() ?? false;
 
@@ -21,9 +21,11 @@ export function StatusBar({ doc }: { doc: ResumeDocument }) {
 
   return (
     <footer className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5">
-      <span className="tabular hidden text-sm text-[var(--color-text-3)] md:inline">
-        {words} words
-      </span>
+      {showWords ? (
+        <span className="tabular hidden text-sm text-[var(--color-text-3)] md:inline">
+          {words} words
+        </span>
+      ) : null}
 
       <div className="ml-auto min-w-0" aria-live="polite">
         <AnimatePresence>

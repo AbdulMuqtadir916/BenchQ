@@ -114,7 +114,8 @@ class JobPosting(Base):
         # index for lookups by candidate_id alone (its leading column).
         UniqueConstraint("candidate_id", "job_id", name="uq_job_postings_candidate_job"),
         CheckConstraint("job_id ~ '^[0-9a-f]{64}$'", name="ck_job_postings_job_id_sha256"),
-        # The target of the candidate-safe keys pointing here: `resumes` (0023) and `applications` (Samad's PR).
+        # The target of the candidate-safe keys pointing here: `resumes` (0023) and `applications` (0027): each names
+        # its own candidate's posting.
         UniqueConstraint("firm_id", "candidate_id", "id", name="uq_job_postings_firm_candidate_id"),
         # The list screen (one candidate's jobs in a firm, or a firm's) and the batch key, by its leading columns.
         Index("ix_job_postings_firm_candidate_batch", "firm_id", "candidate_id", "batch_id"),

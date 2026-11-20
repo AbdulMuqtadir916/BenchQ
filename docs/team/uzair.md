@@ -58,6 +58,14 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
 **Deferred, with the reason:**
 
 - **A per-firm cap on the AI routes,** after Zuhair finishes tailoring and scoring. It is a safety cap, sized by the firm's BDE seats: a flat number per firm would block a large firm's normal tailoring. It covers parse-resume, `resumes/import-pdf`, tailor, analyze and score-check; the number is agreed with Zuhair. Today only parse-resume is live.
+  **From tailoring (2026-11-12, [tailoring.md](./tailoring.md) §7):** one tailoring is 5 model calls, about a minute.
+  The tailor has its own gate, `resume_tailor`, 40 per worker (`resume_tailor_max_concurrent`), and at most 5 running
+  per BDE; nothing yet stops one firm taking most of the gate. Your cap is that missing per-firm layer.
+- **More than one worker, for the tailor (2026-11-12):** each worker stamps the tailorings it holds every 30 s
+  (`backend/resume_tailor/runs.py`), so a run lost to a crash shows within 2 minutes on any number of workers. But
+  `job_monitor.cleanup_stale_runs()` at startup fails *every* running `job_runs` row: with several workers, one
+  restarting would fail the others' live runs. Before running more than one worker, it should fail only rows not
+  stamped recently (or its own).
 - **AI quotas per plan,** with billing (Abdul). The cap above is not a quota.
 - **AI work started in the background** (scoring after a scrape, the score a tailor chains): a request limit doesn't see it. It is covered once AI spend is recorded per firm (07-auth issue 8).
 - **The IP-count fix.** A successful sign-in resets the IP's count as well as the email's, so someone with their own account can keep resetting the per-IP lock. The fix is to reset only the email's count (`throttle.clear()`).
@@ -205,9 +213,8 @@ Python's `logging` sends every module's records up to one root logger. Each file
   logs Google's whole reply when listing messages fails, like `:36` above: log the status code and Google's `error`
   field.
 - **Zuhair:** two calls log up to 500 characters of the model's reply, which carries the candidate's name, phone and
-  résumé text: `backend/analyzer/cover_letter_generator.py:107` (cover letter) and
-  `backend/analyzer/legacy_tailoring.py:379` (tailoring, moved there from `routes_resumes.py`). Log the reply's length
-  and the parse error instead, as `backend/candidates/parse.py:220` does. (The PDF import and the persona import, which
+  résumé text: `backend/analyzer/cover_letter_generator.py:107` (cover letter) and, until tailoring part 2 deleted
+  it (2026-11-12), `backend/analyzer/legacy_tailoring.py:379`. Log the reply's length and the parse error instead, as `backend/candidates/parse.py:220` does. (The PDF import and the persona import, which
   logged a file name, were removed with `routes_resumes.py` and the persona import route, 2026-11-05.) The scrapers
   (`backend/scraper/orchestrator.py`, `sources/jobspy.py`, `freehire.py`, `jobright.py`,
   `levelsfyi.py`, `linkedin_personal.py`, and `backend/api/routes_searches.py:328`) log `search.name`, and JobSpy the

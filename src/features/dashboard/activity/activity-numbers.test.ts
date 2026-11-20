@@ -9,7 +9,7 @@ const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).to
 const window = windowOf("30d", NOW);
 
 const app = (over: Partial<Application>): Application => ({
-  id: "a", firmId: "f", candidateId: "c1", jobId: "j", resumeVersionId: null, submittedByUserId: "u", status: "APPLIED",
+  id: "a", firmId: "f", candidateId: "c1", jobId: "j", resumeVersionId: null, submittedByUserId: "u", status: "APPLIED", statusRevision: 0, pendingReviewCount: 0,
   companyNameAtApply: "Acme", jobTitleAtApply: "Engineer", appliedAt: daysAgo(2), firstResponseAt: null, interviewAt: null,
   offerAt: null, closedAt: null, expiresAt: null, coverLetterText: null, notes: null, events: [], createdAt: daysAgo(3), ...over,
 });
@@ -24,9 +24,19 @@ describe("the activity numbers", () => {
       app({ id: "1", firstResponseAt: daysAgo(1) }),
       app({ id: "2", appliedAt: daysAgo(45), interviewAt: daysAgo(5) }),       // an old application's interview this month
       app({ id: "3", status: "SAVED", appliedAt: null }),                          // saved, not submitted
-      app({ id: "4", status: "PLACED", appliedAt: daysAgo(80), closedAt: daysAgo(3) }),
+      app({ id: "4", status: "OFFER", appliedAt: daysAgo(80), offerAt: daysAgo(3) }),
     ], window);
-    expect(counts).toEqual({ applications: 1, responses: 1, interviews: 1, placements: 1 });
+    expect(counts).toEqual({ applications: 1, responses: 1, interviews: 1, offers: 1 });
+  });
+
+  it("dates interviews and offers from the history when the record has no stage dates (the live backend sends none)", () => {
+    const moved = (toStatus: Application["status"], days: number) => ({ toStatus, createdAt: daysAgo(days) }) as Application["events"][number];
+    const counts = countActivity([
+      app({ id: "1", appliedAt: daysAgo(20), status: "OFFER", events: [moved("INTERVIEW_SCHEDULED", 10), moved("OFFER", 4)] }),
+      app({ id: "2", appliedAt: daysAgo(20), status: "OFFER", events: [moved("OFFER", 2)] }),            // skipped the interview: it still counts (D1)
+      app({ id: "3", appliedAt: daysAgo(90), status: "OFFER", events: [moved("OFFER", 60)] }),           // offer before the period
+    ], window);
+    expect(counts).toMatchObject({ interviews: 2, offers: 2 });
   });
 
   it("gives each manager their team, their active BDEs and their queue", () => {
@@ -57,12 +67,12 @@ describe("the activity numbers", () => {
     const step = (toStatus: Application["status"]) => ({ toStatus }) as Application["events"][number];
     const [row] = bdeStageRows([person("bea", "BDE", "mira")], [candidate("c1", "mira", "bea"), candidate("c2", "mira", "zed")], [
       app({ id: "1", candidateId: "c1" }),
-      app({ id: "2", candidateId: "c1", status: "INTERVIEW", events: [step("SCREENING"), step("INTERVIEW")] }),
-      app({ id: "3", candidateId: "c1", status: "PLACED", events: [step("SCREENING"), step("INTERVIEW"), step("OFFER"), step("PLACED")] }),
+      app({ id: "2", candidateId: "c1", status: "INTERVIEW_SCHEDULED", events: [step("SHORTLISTED"), step("INTERVIEW_SCHEDULED")] }),
+      app({ id: "3", candidateId: "c1", status: "OFFER", events: [step("SHORTLISTED"), step("INTERVIEW_SCHEDULED"), step("OFFER")] }),
       app({ id: "4", candidateId: "c1", appliedAt: daysAgo(60), status: "PLACED", events: [step("PLACED")] }), // submitted before the period
       app({ id: "5", candidateId: "c2" }),                                                                     // another BDE's candidate
     ], window);
-    expect(row).toMatchObject({ applied: 3, shortlisted: 2, interview: 2, placed: 1 });
+    expect(row).toMatchObject({ applied: 3, shortlisted: 2, interview: 2, offer: 1 });
   });
 
   it("dates a candidate by the latest thing that happened, whenever it was", () => {

@@ -94,6 +94,8 @@ def _message_json(message: InboxMessage, *, hide_body: bool = False, include_bod
         "classification_category": classification.category if classification and not hide_body else None,
         "classification_confidence": classification.confidence if classification and not hide_body else None,
         "thread_id": None if hide_body else message.thread_id, "source_address": "" if hide_body else message.source_address,
+        # Revisions the review/retry commands must echo back (PR 4); not content.
+        "content_revision": message.content_revision, "classification_version": message.classification_version,
 
     }
 
@@ -156,6 +158,10 @@ def _load_inbox(db: Session, firm_id: uuid.UUID, candidate_id: uuid.UUID, limit:
     result.update(next_cursor=next_cursor)
     if total is not None:
         result['total_count'] = total
+        # Count only, never content: emails hidden as not about a job (encrypted, kept 30 days) — PR 4.
+        result['hidden_count'] = scoped(db, InboxMessage, firm_id).filter(
+            InboxMessage.candidate_id == candidate_id, InboxMessage.deleted_at.is_(None),
+            InboxMessage.hidden_at.isnot(None)).count()
     return result
 
 
@@ -603,6 +609,11 @@ def _command_seen(db, firm_id, candidate_id, message_id, principal, body, operat
     return False
 
 
+# The stages a BDE may confirm from an email review (PR 4, DEBUG D-10): every selectable stage except Saved.
+REVIEW_STATUSES = frozenset({'applied', 'screening_call', 'shortlisted', 'interview_schedule_request',
+                             'interview_scheduled', 'assessment', 'offer', 'move_on', 'incomplete_application'})
+
+
 class EmailReviewBody(BaseModel):
     model_config = ConfigDict(extra='forbid')
     review_id: uuid.UUID
@@ -619,23 +630,40 @@ class EmailReviewBody(BaseModel):
 @router.get('/firms/{firm_id}/candidates/{candidate_id}/email-reviews')
 def candidate_email_reviews(candidate_id: uuid.UUID, principal: Principal = Depends(current_principal),
                             db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
-                            limit: int = Query(default=100, ge=1, le=200), after: uuid.UUID | None = None):
+                            limit: int = Query(default=100, ge=1, le=200), after: str | None = None):
+    """Pending reviews, newest first, with the email's subject and sender so a card is readable on its own
+    (PR 4, DEBUG D-09). Cursor `after` = "<created_at ISO>|<review id>" of the last row of the previous page."""
+    from datetime import datetime
+    from sqlalchemy import and_, or_
     _candidate(db, firm_id, candidate_id, principal)
     query = scoped(db, ApplicationReview, firm_id).join(InboxMessage,
         ApplicationReview.inbox_message_id == InboxMessage.id).filter(
             ApplicationReview.candidate_id == candidate_id, ApplicationReview.state == 'PENDING',
             InboxMessage.candidate_id == candidate_id, InboxMessage.firm_id == firm_id,
             InboxMessage.deleted_at.is_(None), InboxMessage.hidden_at.is_(None))
+    total = query.count()
     if principal.support_view_id is not None:
-        return {'total_count': query.count(), 'reviews': []}
+        return {'total_count': total, 'reviews': []}
     if after:
-        query = query.filter(ApplicationReview.id > after)
-    rows = query.order_by(ApplicationReview.id).limit(limit + 1).all()
-    return {'reviews': [{'id': str(r.id), 'message_id': str(r.inbox_message_id),
+        try:
+            stamp, last_id = after.split('|', 1)
+            stamp, last_id = datetime.fromisoformat(stamp), uuid.UUID(last_id)
+        except ValueError:
+            raise HTTPException(400, 'Invalid review cursor.') from None
+        query = query.filter(or_(ApplicationReview.created_at < stamp,
+                                 and_(ApplicationReview.created_at == stamp, ApplicationReview.id < last_id)))
+    rows = (query.add_entity(InboxMessage)
+            .order_by(ApplicationReview.created_at.desc(), ApplicationReview.id.desc()).limit(limit + 1).all())
+    page = rows[:limit]
+    last = page[-1][0] if page else None
+    return {'total_count': total, 'reviews': [{'id': str(r.id), 'message_id': str(r.inbox_message_id),
             'application_id': str(r.application_id) if r.application_id else None,
             'revision': r.revision, 'application_revision': r.application_revision,
-            'reason': r.reason, 'classification_id': str(r.classification_id) if r.classification_id else None}
-            for r in rows[:limit]], 'next_cursor': str(rows[limit - 1].id) if len(rows) > limit else None}
+            'reason': r.reason, 'classification_id': str(r.classification_id) if r.classification_id else None,
+            'created_at': r.created_at.isoformat(), 'subject': m.subject or '', 'from_name': m.from_name or '',
+            'received_at': m.received_at.isoformat() if m.received_at else None}
+            for r, m in page],
+            'next_cursor': f'{last.created_at.isoformat()}|{last.id}' if len(rows) > limit and last else None}
 
 
 @router.patch('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review')
@@ -662,6 +690,19 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             raise HTTPException(409, 'Email changed. Reload before reviewing.')
         if review.state != 'PENDING' or review.revision != body.expected_review_revision:
             raise HTTPException(409, 'Review changed. Reload before reviewing.')
+        if body.action == 'DISMISS_NON_APPLICATION':
+            # Dismissing is about the email, never an application: no link, no application revision (D-08).
+            review.state = 'RESOLVED'
+            review.resolved_at = utcnow()
+            review.resolved_by_user_id = principal.user_id
+            review.note = body.note
+            review.revision += 1
+            _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
+                   summary='Dismissed candidate email as not about an application; no status change.')
+            db.commit()
+            return _load_inbox(db, firm_id, candidate_id, message_id=message.id)
+        if body.action == 'SET_STATUS' and body.status not in REVIEW_STATUSES:
+            raise HTTPException(400, 'A review can set any stage except Saved.')
         target_id = body.application_id or review.application_id
         if message.application_id and target_id != message.application_id:
             raise HTTPException(409, 'Email is already linked to another application.')
@@ -672,6 +713,13 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             raise HTTPException(409, 'Application changed. Reload before reviewing.')
         if body.action in {'LINK_ONLY', 'SET_STATUS', 'KEEP_CURRENT'} and app is None:
             raise HTTPException(400, 'Link a submitted application first.')
+        if body.action == 'SET_STATUS' and body.status == 'incomplete_application' and app.status != 'incomplete_application':
+            current = scoped(db, EmailClassification, firm_id).filter_by(
+                inbox_message_id=message.id, result_version=message.classification_version,
+                content_revision=message.content_revision).first()
+            if current is None or current.category != 'incomplete_application':
+                # DEBUG D-10: Incomplete only for an email classified Incomplete, or an application already Incomplete.
+                raise HTTPException(400, 'Incomplete is only for an email classified Incomplete or an application already Incomplete.')
         if review.application_id is None and app:
             duplicate = scoped(db, ApplicationReview, firm_id).filter_by(
                 application_id=app.id, inbox_message_id=message.id, state='PENDING').first()
@@ -685,11 +733,11 @@ def review_candidate_email(candidate_id: uuid.UUID, message_id: uuid.UUID, body:
             move(db, app, principal, status=status, expected_revision=body.expected_application_revision,
                  command_id=body.command_id, note=body.note, review=review)
         else:
-            if body.action == 'DISMISS_NON_APPLICATION':
-                review.state = 'RESOLVED'
-                review.resolved_at = utcnow()
-                review.resolved_by_user_id = principal.user_id
-                review.note = body.note
+            # Link only: the email is about this application and its status stays as it is. Resolved like Dismiss.
+            review.state = 'RESOLVED'
+            review.resolved_at = utcnow()
+            review.resolved_by_user_id = principal.user_id
+            review.note = body.note
             review.revision += 1
             _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
                    summary='Reviewed candidate email linkage/disposition; no automatic status change.')
@@ -718,6 +766,9 @@ def _queue_classification(db, firm_id, candidate_id, message_id, principal, body
         return
     if not enabled():
         raise HTTPException(409, 'Classification is disabled or not authorized for real mail.')
+    from backend.inbox import classification_worker, classifier_pause
+    if classifier_pause.active_pause(db, classification_worker.ai_config('email_classification', db=db)) is not None:
+        raise HTTPException(409, 'Classifier paused: credentials rejected.')
     row = readable(scoped(db, InboxMessage, firm_id).filter_by(
         id=message_id, candidate_id=candidate_id)).with_for_update().first()
     if not row:
@@ -738,6 +789,45 @@ def _queue_classification(db, firm_id, candidate_id, message_id, principal, body
            summary='Requested versioned email reclassification.' if rerun else 'Requested failed email classification retry.')
     db.commit()
     logger.info("Email %s queued for %s by user %s", row.id, 'reclassification' if rerun else 'retry', principal.user_id)
+
+
+@router.post('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open')
+def open_candidate_email_review(candidate_id: uuid.UUID, message_id: uuid.UUID,
+                                principal: Principal = Depends(current_principal), db: Session = Depends(get_db),
+                                firm_id=Depends(reader_firm_id)):
+    """A BDE opens a review for an email the classifier put aside as Other (shown as Irrelevant), so the usual review
+    panel (link, set a status, dismiss) works on it. Only emails a person chooses join the queue (2026-11-09)."""
+    if not can(principal, 'application.move'):
+        raise HTTPException(403, "You don't have permission to review this email.")
+    _candidate(db, firm_id, candidate_id, principal)
+    message = readable(scoped(db, InboxMessage, firm_id).filter_by(
+        id=message_id, candidate_id=candidate_id)).with_for_update().first()
+    if not message:
+        raise HTTPException(404, 'Email not found.')
+    pending = scoped(db, ApplicationReview, firm_id).filter_by(inbox_message_id=message.id, state='PENDING').first()
+    if pending:
+        return {'review_id': str(pending.id)}
+    record = scoped(db, EmailClassification, firm_id).filter_by(
+        inbox_message_id=message.id, result_version=message.classification_version,
+        content_revision=message.content_revision).first()
+    if message.classification_state != 'DONE' or record is None or record.outcome != 'OTHER':
+        raise HTTPException(409, 'Only an email marked Irrelevant can be opened for review.')
+    if scoped(db, ApplicationReview, firm_id).filter_by(
+            inbox_message_id=message.id, classification_version=record.result_version).first():
+        raise HTTPException(409, 'This email was already reviewed. Reclassify it to review it again.')
+    app = (scoped(db, Application, firm_id).filter_by(id=message.application_id, candidate_id=candidate_id).first()
+           if message.application_id else None)
+    review = ApplicationReview(firm_id=firm_id, candidate_id=candidate_id, inbox_message_id=message.id,
+                               application_id=app.id if app else None,
+                               application_revision=app.status_revision if app else None,
+                               classification_id=record.id, classification_version=record.result_version,
+                               reason='MANUAL_REVIEW')
+    db.add(review)
+    db.flush()
+    _audit(db, principal, firm_id=firm_id, candidate_id=candidate_id, entity_id=review.id,
+           summary='Opened an email marked Irrelevant for review')
+    db.commit()
+    return {'review_id': str(review.id)}
 
 
 @router.post('/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry')

@@ -13,13 +13,17 @@ import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
-import { NEXT_STATUS, STATUS_LABEL, STATUS_TONE, isClosed, stageRank } from "@/components/app/applications/status-meta";
+import { INCOMPLETE, NEXT_STATUS, PIPELINE, SELECTABLE, STATUS_LABEL, STATUS_TONE, isClosed, isLegacy, stageRank } from "@/components/app/applications/status-meta";
+import { Select } from "@/components/ui/select";
 import { ResumeSent } from "@/components/app/applications/resume-sent";
+import { AutomaticChangeNotice } from "@/components/app/applications/automatic-change";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { useHref } from "@/lib/routes/use-href";
 
-const STEPS: ApplicationStatus[] = ["APPLIED", "RESPONSE", "SCREENING", "INTERVIEW", "OFFER", "PLACED"];
+/** Progress from Applied to Offer; Saved is the queue before it. */
+const STEPS: ApplicationStatus[] = PIPELINE.slice(1);
+const MOVE_OPTIONS = [{ value: "", label: "Set status…" }, ...SELECTABLE.map((s) => ({ value: s, label: STATUS_LABEL[s] }))];
 
 interface DrawerProps {
   ws: CandidateWorkspace;
@@ -77,7 +81,8 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
   const emails = ws.messages.filter((m) => m.applicationId === app.id);
   const suggestion = ws.suggestions.find((s) => s.applicationId === app.id);
   const next = NEXT_STATUS[app.status];
-  const rank = stageRank(app.status);
+  // An incomplete application was submitted: its progress stops at Applied.
+  const rank = app.status === INCOMPLETE ? stageRank("APPLIED") : stageRank(app.status);
   const reachedAt = (s: ApplicationStatus) => app.events.find((e) => e.toStatus === s)?.createdAt;
   const closedAt = isClosed(app.status) ? app.events.at(-1)?.createdAt : undefined;
 
@@ -101,11 +106,13 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
           </div>
         ) : null}
 
+        <AutomaticChangeNotice application={app} canAct={canAct} onOpenEmail={actions.openMessage} />
+
         <section aria-label="Progress">
           <h3 className="mb-2 text-label text-[var(--color-text-3)]">Progress</h3>
           <ol className="relative space-y-3 pl-1">
             {STEPS.map((s, i) => {
-              const isDone = !isClosed(app.status) ? stageRank(s) < rank || (s === app.status && s === "PLACED") : !!reachedAt(s);
+              const isDone = !isClosed(app.status) && !isLegacy(app.status) ? stageRank(s) < rank || (app.status === INCOMPLETE && s === "APPLIED") : !!reachedAt(s);
               const isCurrent = s === app.status;
               const at = reachedAt(s);
               return (
@@ -121,10 +128,19 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
             })}
           </ol>
           {closedAt ? <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--color-danger-fg)]"><XCircle size={14} aria-hidden />{STATUS_LABEL[app.status]} {formatRelative(closedAt)}</p> : null}
-          {canAct && next ? (
+          {app.status === INCOMPLETE ? <p className="mt-3 text-sm text-[var(--color-warning-fg)]">Incomplete application: the employer asked for missing steps. Move it back to Applied once it is completed.</p> : null}
+          {isLegacy(app.status) && !isClosed(app.status) ? <p className="mt-3 text-sm text-[var(--color-text-3)]">This application has an older status ({STATUS_LABEL[app.status]}). Choose its current stage to bring it up to date.</p> : null}
+          {canAct && next && app.pendingReviewCount === 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {suggestion?.to === next ? null : <Button size="sm" variant="secondary" onClick={() => onMove(app.id, next)}>Move to {STATUS_LABEL[next]} <ArrowRight size={13} aria-hidden /></Button>}
-              {app.status !== "SAVED" ? <Button size="sm" variant="ghost" onClick={() => onMove(app.id, "REJECTED")}>Mark not selected</Button> : null}
+              {app.status !== "SAVED" ? <Button size="sm" variant="ghost" onClick={() => onMove(app.id, "MOVE_ON")}>Mark not selected</Button> : null}
+            </div>
+          ) : null}
+          {canAct && app.pendingReviewCount > 0 ? <p className="mt-3 text-sm text-[var(--color-violet-fg)]">An email about this application is waiting for review. Decide it in the Inbox first; the status cannot be changed until then.</p> : null}
+          {canAct && app.pendingReviewCount === 0 ? (
+            <div className="mt-3 max-w-xs">
+              <Select aria-label="Set status" value="" options={MOVE_OPTIONS.filter((o) => o.value !== app.status)}
+                onValueChange={(value) => { if (value) onMove(app.id, value as ApplicationStatus); }} />
             </div>
           ) : null}
         </section>
@@ -141,7 +157,7 @@ function DrawerBody({ app, ws, canAct, actions, onMove, closeRef, onClose }: { a
           ) : (
             <ul className="space-y-1.5">
               {emails.map((m) => {
-                const meta = mailSignalMeta(m.signal, m.classificationState);
+                const meta = mailSignalMeta(m.signal, m.classificationState, m.classificationCategory, m.classificationError);
                 return (
                   <li key={m.id}>
                     <button type="button" onClick={() => actions.openMessage(m.id)} className="flex w-full items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-left hover:bg-[var(--color-surface-2)]">

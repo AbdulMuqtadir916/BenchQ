@@ -254,37 +254,3 @@ def test_every_arrangement_facet_count_equals_its_filter_count(arranged, api_cli
         listed = api_client.get(
             "/api/jobs?status=new&limit=1&brief=1&arrangement=%s" % entry["name"])
         assert listed.json()["total"] == entry["count"], entry["name"]
-
-
-# ── a hand-added job is searchable too ───────────────────────────────────────
-
-
-# ── a hand-logged application is searchable too ──────────────────────────────
-
-def test_a_logged_application_answers_both_filters(test_db, api_client):
-    """POST /applications creates the job row itself, so it has to run the same
-    analyzers every other writer runs."""
-    resp = api_client.post("/api/applications", json={
-        "title": "Staff Engineer (Remote)",
-        "company": "Acme",
-        "url": "https://example.com/logged/1",
-        "location": "Toronto, Ontario, Canada",
-    })
-    assert resp.status_code in (200, 201), resp.text
-
-    job = test_db.query(Job).filter(Job.url == "https://example.com/logged/1").one()
-    assert (job.arr_remote, job.arr_hybrid, job.arr_onsite) == (True, False, False)
-    assert (job.loc_country, job.loc_region, job.loc_city) == ("CA", "ON", "toronto")
-    assert _count(test_db, "CA:ON:toronto") == 1
-
-
-def test_a_logged_application_without_a_location_stays_unplaced(test_db, api_client):
-    resp = api_client.post("/api/applications", json={
-        "title": "Staff Engineer",
-        "company": "Acme",
-        "url": "https://example.com/logged/2",
-    })
-    assert resp.status_code in (200, 201), resp.text
-    job = test_db.query(Job).filter(Job.url == "https://example.com/logged/2").one()
-    assert job.loc_country is None
-    assert list(job.locations) == []

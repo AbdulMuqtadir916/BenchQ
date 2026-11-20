@@ -88,6 +88,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": F,
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/autofill": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": F,
@@ -96,6 +97,12 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": F,
+    # Résumé tailoring (docs/team/tailoring.md): the candidate's BDE starts one; anyone who sees the candidate reads it.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings": F,
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": F,
+    # The signed-in user's own tailorings, for their panel (part 3); a support view gets an empty list.
+    "GET /api/firms/{firm_id}/tailorings": F,
     # Job search (job search PR 1): a search, the candidate's BDE (job.search + can_search_jobs); reads, in scope.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": F,
@@ -110,6 +117,7 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": F,
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/oauth": F,
@@ -122,6 +130,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": F,
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/inbox-content": F,
     "GET /api/applications": F,
+    "GET /api/applications/counts": F,
+    "POST /api/applications/{app_id}/status-events/{event_id}/undo": F,
     "GET /api/applications/{app_id}": F,
     "PATCH /api/applications/{app_id}/candidate-status": F,
     "PATCH /api/applications/{app_id}/review": F,
@@ -178,11 +188,11 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/firms": A,
     "POST /api/admin/firms": A,
     "GET /api/admin/firms/{firm_id}": A,
-    "PATCH /api/admin/firms/{firm_id}/seats": A,          # BDE count (07 Q64)
+    "PATCH /api/admin/firms/{firm_id}/seats": A,          # BDE count (07 Q65)
     "POST /api/admin/firms/{firm_id}/suspend": A,
     "POST /api/admin/firms/{firm_id}/reactivate": A,
     "PATCH /api/admin/plans/{plan_id}": A,
-    "GET /api/admin/billing-periods": A,                 # billing records: Super Admin only (07 Q65-Q66)
+    "GET /api/admin/billing-periods": A,                 # billing records: Super Admin only (07 Q66-Q67)
     "POST /api/admin/firms/{firm_id}/billing-periods": A,
     "PATCH /api/admin/billing-periods/{period_id}": A,
     "GET /api/admin/invites": A,

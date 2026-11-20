@@ -1,5 +1,5 @@
 import { connectionKey } from "./autofill/connection-store";
-import { hostOf } from "./autofill/job-check";
+import { hostOf, isConfirmedHost } from "./autofill/job-check";
 import type { Connection, NewConnection, PanelMessage, PanelReply, ShortcutCommand, ShortcutMessage } from "./autofill/types";
 
 /** The one writer of tab connections. It keeps them in session storage, because Chrome can stop this worker at any
@@ -47,6 +47,14 @@ async function handle(message: PanelMessage): Promise<PanelReply> {
   switch (message.type) {
     case "open-job":
       return { ok: true, tabId: await openJob(message.connection) };
+    case "connect-tab": {
+      // One tab per application: a tab connected to it before lets go.
+      const before = (await allConnections()).filter((item) => item.applicationId === message.connection.applicationId
+        && item.userId === message.connection.userId && item.tabId !== message.tabId);
+      await chrome.storage.session.remove(before.map(({ tabId }) => connectionKey(tabId)));
+      await saveConnection({ ...message.connection, tabId: message.tabId, confirmedHosts: [] });
+      return { ok: true, tabId: message.tabId };
+    }
     case "disconnect-tab":
       await removeConnection(message.tabId);
       return { ok: true };
@@ -116,6 +124,6 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, frameId, url, transitionT
   void readConnection(tabId).then((connection) => {
     if (!connection) return;
     const host = hostOf(url);
-    if (host !== hostOf(connection.job.url) && !connection.confirmedHosts.includes(host)) void removeConnection(tabId);
+    if (host !== hostOf(connection.job.url) && !isConfirmedHost(connection.confirmedHosts, host)) void removeConnection(tabId);
   });
 });

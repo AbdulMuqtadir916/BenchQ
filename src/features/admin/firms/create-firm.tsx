@@ -39,7 +39,7 @@ const EMPTY: Form = { name: "", slug: "", planId: "", seatLimit: "", candidateLi
 
 /**
  * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with a BDE count (the plan's by default; 10 candidates
- * per BDE follow, 07 Q64) and the plan's price copied, and
+ * per BDE follow, 07 Q65) and the plan's price copied, and
  * the OWNER's 7-day invite. Application expiry takes its default: the OWNER
  * changes them in settings/firm. Esc or Cancel goes back to the list, confirming if anything was typed.
  */

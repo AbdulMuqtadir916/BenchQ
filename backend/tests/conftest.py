@@ -32,6 +32,18 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
+def _email_switches_off(monkeypatch):
+    """Tests never inherit a developer's backend/.env (load_dotenv): every candidate-email switch starts OFF and a
+    test that needs one sets it explicitly (PR 4, T7.4)."""
+    from backend import config
+    for name in ("CANDIDATE_EMAIL_AUTO_STATUS_ENABLED", "CANDIDATE_EMAIL_AUTOMATION_APPROVED",
+                 "CANDIDATE_EMAIL_SETUP_RECOVERY_ENABLED", "CANDIDATE_EMAIL_HISTORICAL_ENABLED"):
+        monkeypatch.setattr(config, name, False, raising=False)
+    monkeypatch.setattr(config, "CANDIDATE_EMAIL_AUTOMATION_START_AT", "", raising=False)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _clean_auth_throttle():
     """The sign-in failure counter is process-global by design, so a test that posts wrong passwords
     would otherwise lock out the tests that follow it."""

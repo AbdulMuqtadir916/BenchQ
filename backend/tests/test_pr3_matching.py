@@ -4,13 +4,19 @@ import pytest
 from backend.inbox.application_matching import classification_text, matching_application_id
 from backend.inbox.google_oauth import encrypt_content
 from backend.models.db import Application, ApplicationStatusEvent, Company, utcnow
+from backend.tests.posting_support import posting_for
 from backend.tests.test_candidate_mailbox import mailbox_case, email
+
+
+def _rename(app, **fields):
+    """The application's job (its posting, which matching reads) under another title or company."""
+    app.posting.content = {**(app.posting.content or {}), **fields}
 
 
 @pytest.fixture
 def matching_case(test_db, mailbox_case):
     candidate, job, app, mailbox = mailbox_case
-    job.company='Alderbyte Systems'; job.title='Java Backend Engineer'
+    _rename(app, company='Alderbyte Systems', title='Java Backend Engineer')
     app.status='applied'; app.applied_at=utcnow()-timedelta(days=1)
     app.submitted_by_user_id=mailbox.connected_by_user_id
     row=email(test_db,mailbox)
@@ -98,8 +104,8 @@ def test_snippet_fallback_is_decrypted(test_db,matching_case):
 
 
 def test_no_fixture_specific_title_stripping(test_db,matching_case):
-    _,job,_,box,row=matching_case
-    job.title='[QA-01] Java Backend Engineer (Synthetic)'
+    _,_,app,box,row=matching_case
+    _rename(app, title='[QA-01] Java Backend Engineer (Synthetic)')
     test_db.commit()
     assert matching_application_id(test_db,box,row) is None
 
@@ -116,10 +122,9 @@ def test_signature_and_quoted_history_are_not_identity(test_db,matching_case,bod
 
 
 def test_multiple_complete_matches_stay_ambiguous(test_db,matching_case):
-    from backend.models.db import Job
-    candidate,job,app,box,row=matching_case
-    second=Job(external_id='pr3-ambiguous-posting',title=job.title,company=job.company,url='https://example.test/another-posting')
-    test_db.add(second);test_db.flush()
+    candidate,_,app,box,row=matching_case
+    second=posting_for(test_db,app.firm_id,candidate.id,title='Java Backend Engineer',company='Alderbyte Systems',
+                       url='https://example.test/another-posting')
     test_db.add(Application(firm_id=app.firm_id,candidate_id=candidate.id,job_id=second.id,
         status='applied',applied_at=app.applied_at,submitted_by_user_id=app.submitted_by_user_id))
     test_db.commit()
@@ -136,12 +141,9 @@ def test_html_quoted_history_does_not_supply_identity(test_db, matching_case):
 
 
 def test_ambiguous_thread_is_not_overridden_by_body(test_db, matching_case):
-    from backend.models.db import Job
     candidate, _, app, box, row = matching_case
-    job = Job(external_id='pr3-thread-other', title='Platform Engineer',
-              company='Another Company', url='https://example.test/thread-other')
-    test_db.add(job)
-    test_db.flush()
+    job = posting_for(test_db, app.firm_id, candidate.id, title='Platform Engineer', company='Another Company',
+                      url='https://example.test/thread-other')
     other = Application(firm_id=app.firm_id, candidate_id=candidate.id,
                         job_id=job.id, status='applied', applied_at=app.applied_at,
                         submitted_by_user_id=app.submitted_by_user_id)
@@ -162,8 +164,8 @@ def test_ambiguous_thread_is_not_overridden_by_body(test_db, matching_case):
 ])
 def test_complete_names_normalize_without_fuzzy_matching(
         test_db, matching_case, company, title, body):
-    _, job, app, box, row = matching_case
-    job.company, job.title = company, title
+    _, _, app, box, row = matching_case
+    _rename(app, company=company, title=title)
     row.body = encrypt_content(body)
     test_db.commit()
     assert matching_application_id(test_db, box, row) == app.id

@@ -2,6 +2,9 @@
 
 > **Claim states dropped (2026-11-05).** BenchQ no longer has Verified / Unverified / Contradicted states, an evidence record or an export gate. Where this document describes them, read it as history.
 
+> **Tailoring is designed in [docs/team/tailoring.md](../team/tailoring.md) (2026-11-12).** Its phases and routes
+> below are history.
+
 > **Partly superseded (2026-11-02).** Résumé storage, versions, bases and their routes are now
 > [docs/team/resume-versioning.md](../team/resume-versioning.md): PR 5 added the routes under
 > `/api/firms/{firm}/candidates/{candidate}/resumes`, and PR 6 removed the old `/api/resumes` routes this file names
@@ -15,7 +18,7 @@
 This is the product's centerpiece: AI drafts land `UNVERIFIED`, a human verifies, and the export
 gate blocks until every claim is clean. Do it in phases; each phase is its own PR.
 
-**Every LLM call reads its model and prompts through `ai_config("tailoring")` / `ai_config("scoring")`**
+**Every LLM call reads its model and prompts through `ai_config("resume_tailor")` / `ai_config("scoring")`**
 (`backend/ai/config.py`), never `settings` directly, so the Super Admin's AI presets plug in later without a
 rewrite ([08-ai-presets.md](./08-ai-presets.md)). Output formats stay in code.
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowUpFromLine, Briefcase, CircleCheck, ChevronRight, Eye, FileCheck2, FileUser, Trash2 } from "lucide-react";
+import { ArrowUpFromLine, Briefcase, CircleCheck, ChevronRight, Eye, FileCheck2, FileUser, ListChecks, Trash2 } from "lucide-react";
 import type { BaseResume } from "@/lib/schemas/resume";
 import { baseSummary, type TreeBase, type TreeTailored, type TreeVersion } from "@/lib/derive/resume-tree";
 import { baseName, roleOf, tailoredName, versionName } from "@/lib/derive/resume-name";
@@ -64,6 +64,10 @@ function VersionRow({ version, label, labels, extra }: { version: TreeVersion; l
       <Link href={toHref("resumes.studio", { id: version.id }, { mode: "view" })} aria-label={`View ${versionName(label, version.number)}`}
         className="bq-secondary inline-flex h-7 shrink-0 items-center gap-1 rounded-[var(--radius-md)] px-2 text-caption">
         <Eye size={12} aria-hidden />View
+      </Link>
+      <Link href={toHref("resumes.autofill", { id: version.id })} aria-label={`Autofill answers of ${versionName(label, version.number)}`}
+        className="bq-secondary inline-flex h-7 shrink-0 items-center gap-1 rounded-[var(--radius-md)] px-2 text-caption">
+        <ListChecks size={12} aria-hidden />Autofill
       </Link>
       {extra}
     </li>

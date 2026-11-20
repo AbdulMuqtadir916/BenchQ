@@ -95,6 +95,7 @@ describe("route registry", () => {
     expect(matchRoute(f("/candidates/cand_01"))?.id).toBe("candidates.detail");
     expect(matchRoute(f("/jobs/capture"))?.id).toBe("jobs.capture");
     expect(matchRoute(f("/resumes/new"))?.id).toBe("resumes.studio");
+    expect(matchRoute(f("/resumes/res_01/autofill"))?.id).toBe("resumes.autofill");
     expect(matchRoute(f("/settings/team?x=1"))?.id).toBe("settings.team");
     expect(matchRoute("/sign-in")?.id).toBe("sign-in");
     expect(matchRoute("/dev/design-system")?.id).toBe("design-system");
@@ -146,6 +147,7 @@ describe("hrefFor", () => {
     expect(hrefFor("settings.preferences", { firm: S })).toBe("/acme/settings/preferences");
     expect(hrefFor("candidates.detail", { firm: S, id: "cand_01" })).toBe("/acme/candidates/cand_01");
     expect(hrefFor("resumes.studio", { firm: S, id: "new" })).toBe("/acme/resumes/new");
+    expect(hrefFor("resumes.autofill", { firm: S, id: "res_01" })).toBe("/acme/resumes/res_01/autofill");
     expect(hrefFor("jobs.detail", { firm: S, id: "a/b" })).toBe("/acme/jobs/a%2Fb");
   });
 
@@ -192,8 +194,9 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
   ["applications.detail", "full", "team", "own", "read"],
   ["resumes", "full", "team", "assigned", "read"],
   ["resumes.studio", "full", "team", "assigned", "read"],
+  ["resumes.autofill", "full", "team", "assigned", "read"],
   ["outreach", "full", "team", "own", "read"],
-  ["focus", "full", "full", "full", "none"],
+  ["focus", "none", "none", "full", "none"], // BDE only (07 Q64)
   ["ledger", "full", "team", "own", "read"],
   ["settings", "full", "full", "full", "full"], // index: redirects to the first allowed section
   ["settings.firm", "full", "none", "none", "none"],
@@ -366,7 +369,7 @@ describe("isRouteActive (matches on route ids, not paths)", () => {
 const SUPPORT_TABLE: ReadonlyArray<readonly [RouteId, Access]> = [
   ["welcome", "none"], ["dashboard", "read"], ["candidates", "read"], ["candidates.new", "none"], ["candidates.detail", "read"],
   ["jobs", "read"], ["jobs.detail", "read"], ["jobs.capture", "none"], ["applications", "read"], ["applications.detail", "read"],
-  ["resumes", "read"], ["resumes.studio", "read"], ["outreach", "read"], ["focus", "none"],
+  ["resumes", "read"], ["resumes.studio", "read"], ["resumes.autofill", "read"], ["outreach", "read"], ["focus", "none"],
   ["managers", "read"], ["bdes", "none"], ["ledger", "read"], ["settings", "read"], ["settings.firm", "read"], ["settings.team", "read"],
   ["settings.templates", "read"], ["settings.preferences", "none"], ["notifications", "none"], ["notifications.requests", "none"],
 ];
@@ -461,9 +464,9 @@ describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
     for (const id of pages) expect(accessFor(routeById(id), inSupport), id).toBe("read");
   });
 
-  it("offers Focus mode only to firm users who can open it", () => {
+  it("offers Focus mode only to BDEs (07 Q64)", () => {
     for (const role of ROLES) {
-      expect(ids(asRole(role), "firm").includes("focus"), role).toBe(role !== "VIEWER");
+      expect(ids(asRole(role), "firm").includes("focus"), role).toBe(role === "BDE");
     }
     expect(ids(inSupport, "firm")).not.toContain("focus");
   });

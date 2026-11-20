@@ -1,5 +1,6 @@
 import { pause, typeSearch } from "./events";
 import { isVisible } from "./labels";
+import { byId } from "./shadow";
 
 /** Dropdowns built from <div>s, like Greenhouse's. Their options don't exist until the list opens, so this runs at fill
  * time, never during a scan, which only reads. */
@@ -31,7 +32,7 @@ function controlBox(control: HTMLElement): HTMLElement {
 /** The open list's options: the list the control names, else the menu rendered beside it. */
 function optionElements(control: HTMLElement): HTMLElement[] {
   const listId = control.getAttribute("aria-controls") ?? control.getAttribute("aria-owns");
-  const list = listId ? control.ownerDocument.getElementById(listId) : null;
+  const list = listId ? byId(control, listId) : null;
   const scope = list ?? controlBox(control).parentElement ?? control.ownerDocument;
   return Array.from(scope.querySelectorAll<HTMLElement>(OPTION)).filter(isVisible);
 }
@@ -93,7 +94,7 @@ export const pickOption = clickLike;
 /** Whether a dropdown keeps several choices: its list says so, or it shows its picks as chips. */
 export function isMultiple(control: HTMLElement): boolean {
   const listId = control.getAttribute("aria-controls") ?? control.getAttribute("aria-owns");
-  const list = listId ? control.ownerDocument.getElementById(listId) : null;
+  const list = listId ? byId(control, listId) : null;
   return list?.getAttribute("aria-multiselectable") === "true" || control.getAttribute("aria-multiselectable") === "true"
     || controlBox(control).querySelector("[class*='--is-multi'], [class*='multi-value'], [class*='multiValue']") !== null;
 }

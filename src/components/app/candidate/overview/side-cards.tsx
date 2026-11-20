@@ -36,7 +36,7 @@ export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspa
   );
 }
 
-export function TopMatches({ matches, onFindJobs, failed = false, onRetry }: { matches: Array<{ job: Job; score: number }>; onFindJobs?: () => void; /** The jobs didn't load: said, with Retry, not "no matches". */ failed?: boolean; onRetry?: () => void }) {
+export function TopMatches({ candidateId, matches, onFindJobs, failed = false, onRetry }: { /** Whose matches: the job page opens for them. */ candidateId: string; matches: Array<{ job: Job; score: number }>; onFindJobs?: () => void; /** The jobs didn't load: said, with Retry, not "no matches". */ failed?: boolean; onRetry?: () => void }) {
   const toHref = useHref();
   return (
     <Card className="p-0">
@@ -44,7 +44,7 @@ export function TopMatches({ matches, onFindJobs, failed = false, onRetry }: { m
       <ul className="divide-y divide-[var(--color-border)]">
         {matches.map(({ job, score }) => (
           <li key={job.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-            <Link href={toHref("jobs.detail", { id: job.id })} className="flex min-w-0 items-center gap-2.5 hover:underline">
+            <Link href={toHref("jobs.detail", { id: job.id }, { candidate: candidateId })} className="flex min-w-0 items-center gap-2.5 hover:underline">
               <PortalLogo portal="COMPANY" domain={job.company.domain} size={28} />
               <span className="min-w-0">
                 <span className="block truncate text-sm text-[var(--color-text)]">{job.title}</span>

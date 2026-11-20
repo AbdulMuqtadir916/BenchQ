@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { missingForSave } from "@/lib/resume-doc/save-check";
 import { useSaveResume } from "@/lib/hooks/use-resumes";
 import { useHref } from "@/lib/routes/use-href";
-import { useStudio, type StudioMode } from "./studio-store";
+import { useStudio, type StudioTab } from "./studio-store";
 
 const FIELD_WORDS = { fullName: "the full name", email: "the email" } as const;
 
 /**
  * Save (resume-versioning.md §4.3): the edit becomes the résumé's next version and the studio moves to it. A save of
  * v2 or later of a base asks "Use this as the base?". The header's name and email are required, as the backend says.
+ * `tab`: where the studio stays after the save, on the new version (the Autofill tab shows that version's answers).
  */
-export function useStudioSave(versionId: string, mode: StudioMode) {
+export function useStudioSave(versionId: string, tab: StudioTab) {
   const save = useSaveResume();
   const router = useRouter();
   const toHref = useHref();
@@ -34,11 +35,13 @@ export function useStudioSave(versionId: string, mode: StudioMode) {
         if (opened.resume.isMaster && saved && saved.versionNumber > 1) {
           setAskUseAsBase({ candidateId: opened.resume.candidateId, versionId: opened.versionId, number: saved.versionNumber });
         }
-        router.replace(toHref("resumes.studio", { id: opened.versionId }, mode === "view" ? { mode: "view" } : undefined));
+        router.replace(tab === "autofill"
+          ? toHref("resumes.autofill", { id: opened.versionId })
+          : toHref("resumes.studio", { id: opened.versionId }, tab === "view" ? { mode: "view" } : undefined));
       },
       onError: (error) => notify(error instanceof Error ? error.message : "The save didn't go through. Try again.", "danger"),
     });
-  }, [save, versionId, mode, router, toHref]);
+  }, [save, versionId, tab, router, toHref]);
 
   return { onSave, isSaving: save.isPending };
 }

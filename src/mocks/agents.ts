@@ -1,8 +1,6 @@
 import { mockResult, wait } from "./_shared";
-import { firmScoped, requireAction } from "./membership";
-import { AgentDraftSchema, TailorResumeInputSchema, type AgentDraft, type TailorResumeInput } from "@/lib/schemas/agent";
+import { requireAction } from "./membership";
 import { RewriteInputSchema, type RewriteInput, type RewriteResult, RewriteResultSchema } from "@/lib/schemas/resume-document";
-import { ResumeLineSchema, type ResumeLine } from "@/lib/schemas/resume";
 
 const STRONG_VERBS: Array<[RegExp, string]> = [
   [/^worked on\b/i, "Delivered"],
@@ -66,34 +64,6 @@ function rewriteText(input: RewriteInput): RewriteResult {
   return RewriteResultSchema.parse({ text: output === text ? improve(text) : output, note: notes[input.action] });
 }
 
-const stages = [
-  "Reading the candidate record",
-  "Extracting job requirements",
-  "Matching experience",
-  "Drafting tailored bullets",
-];
-
-function draftLines(resumeVersionId: string): ResumeLine[] {
-  return [
-    ResumeLineSchema.parse({
-      id: `agent_${resumeVersionId}_summary`,
-      resumeVersionId,
-      section: "summary",
-      entityId: null,
-      bulletIndex: null,
-      text: "Senior engineer focused on reliable delivery across cloud-native platforms.",
-    }),
-    ResumeLineSchema.parse({
-      id: `agent_${resumeVersionId}_experience`,
-      resumeVersionId,
-      section: "experience",
-      entityId: null,
-      bulletIndex: 0,
-      text: "Improved deployment reliability by standardising automated release workflows.",
-    }),
-  ];
-}
-
 export const agentsMock = {
   rewrite: async (rawInput: RewriteInput, signal?: AbortSignal): Promise<RewriteResult> => {
     // Not about one firm's records, but it is still editing a resume: read-only principals are refused.
@@ -102,21 +72,4 @@ export const agentsMock = {
     await wait(900, signal);
     return mockResult(rewriteText(input), signal);
   },
-
-  // Firm-scoped: a tailoring run belongs to a firm (Q21). `rewrite` works on text alone.
-  ...firmScoped("agents", {
-    tailorResume: async (firmId: string, rawInput: TailorResumeInput, signal?: AbortSignal): Promise<AgentDraft> => {
-      const input = TailorResumeInputSchema.parse(rawInput);
-      await wait(2_000, signal);
-      return mockResult(AgentDraftSchema.parse({
-        runId: `run_${input.resumeVersionId}_${input.jobId}`,
-        firmId,
-        resumeVersionId: input.resumeVersionId,
-        jobId: input.jobId,
-        stages,
-        lines: draftLines(input.resumeVersionId),
-        generatedAt: new Date().toISOString(),
-      }), signal);
-    },
-  }, { tailorResume: "resume.edit" }),
 };

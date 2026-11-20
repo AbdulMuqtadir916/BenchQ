@@ -93,6 +93,8 @@ export const ResumeSchema = z.object({
   /** A base's own versions (`category = 'BASE'`); false for a copy tailored to a job. */
   isMaster: z.boolean(),
   targetJobId: z.string().nullable(),
+  /** A tailored copy's job, as the listing names it (docs/02 §8.1): the screens never load jobs to name it. */
+  targetJob: z.object({ title: z.string(), company: z.string() }).nullable().default(null),
   templateId: z.string(),
   versions: z.array(ResumeVersionSchema),
   latestVersionId: z.string(),

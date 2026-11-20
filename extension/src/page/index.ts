@@ -1,5 +1,7 @@
 import type { PageApi } from "../autofill/types";
 import { createFiller } from "./fill";
+import { addEntry } from "./entries";
+import { readJob } from "./job";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
 /** Injected into a connected tab's frames, in the extension's isolated world: the page's own scripts can't see it.
@@ -22,6 +24,8 @@ if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
       return result.scan;
     },
     read: () => (registry ? readFields(document, registry) : null),
+    readJob: () => readJob(document),
+    addEntry: (kind) => addEntry(document, kind),
     ...createFiller(() => registry),
   };
 }

@@ -24,7 +24,7 @@ def firm_json(firm: Firm) -> dict:
 
 
 def admin_firm_json(firm: Firm) -> dict:
-    """`firm_json` plus the Super Admin's price per BDE (07 Q66). Only /api/admin routes use this; no firm-side
+    """`firm_json` plus the Super Admin's price per BDE (07 Q67). Only /api/admin routes use this; no firm-side
     response does (a test asserts it)."""
     return {**firm_json(firm), "price_cents_per_seat": firm.price_cents_per_seat}
 

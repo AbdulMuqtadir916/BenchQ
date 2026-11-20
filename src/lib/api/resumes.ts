@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { ResumeRemovalSchema, type ResumeRemoval, type ResumeShelf } from "@/lib/schemas/resume";
 import type { OpenedResume, ResumeDocument, ResumeSaveResult } from "@/lib/schemas/resume-document";
+import type { AutofillChange, AutofillSaveResult, ResumeAutofill } from "@/lib/schemas/resume-autofill";
 import { ResumeShelfDto, ResumeVersionDto, toOpenedResume, toResumeShelf } from "./dto/resumes";
+import { AutofillSavedDto, AutofillVersionDto, toAutofillChangeBody, toResumeAutofill, toVersionAutofill } from "./dto/resume-autofill";
 import { toBackendContent } from "./dto/resume-content";
 import { fromBackendId, toBackendId } from "./dto/demo-ids";
 import { http } from "./http";
@@ -107,6 +109,12 @@ const live = {
     const base = await http.post(`${candidatePath(firmId, candidateId)}/bases/${toBackendId(baseId)}/show`, z.object({ number: z.number().int() }));
     return { number: base.number };
   },
+  autofill: async (firmId: string, versionId: string): Promise<ResumeAutofill> =>
+    toVersionAutofill(versionId, await http.get(firmPath(firmId, versionId), AutofillVersionDto, { query: { autofill: true, editor: true } })),
+  saveAutofill: async (firmId: string, candidateId: string, versionId: string, change: AutofillChange): Promise<AutofillSaveResult> => {
+    const saved = await http.patch(`${candidatePath(firmId, candidateId)}/${toBackendId(versionId)}/autofill`, AutofillSavedDto, { body: toAutofillChangeBody(change) });
+    return { autofill: toResumeAutofill(versionId, candidateId, saved.autofill), changed: saved.changed };
+  },
 };
 
 const SavedDto = ResumeVersionDto.extend({ notice: z.string().nullable() });
@@ -144,4 +152,10 @@ export const resumesApi = {
   deleteVersion: (firmId: string, candidateId: string, versionId: string): Promise<ResumeRemoval> => live.deleteVersion(firmId, candidateId, versionId),
   /** Show a hidden base again; it isn't made active. */
   showBase: (firmId: string, candidateId: string, baseId: string): Promise<{ number: number }> => live.showBase(firmId, candidateId, baseId),
+
+  /** One version's autofill for the Autofill screen (docs/02 §8.4): every question, the unanswered ones too. */
+  autofill: (firmId: string, versionId: string): Promise<ResumeAutofill> => live.autofill(firmId, versionId),
+  /** Change a version's autofill in place (07 Q7); for the rest of its résumé that answers the same unless `onlyThis`. */
+  saveAutofill: (firmId: string, candidateId: string, versionId: string, change: AutofillChange): Promise<AutofillSaveResult> =>
+    live.saveAutofill(firmId, candidateId, versionId, change),
 };

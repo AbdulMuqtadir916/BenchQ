@@ -44,7 +44,8 @@ export default function OutreachPage() {
   const threads = useMemo(() => {
     let apps = applicationsQuery.data ?? [];
     apps = scopeApplications(principal, apps, candidatesQuery.data ?? []);
-    return apps.filter((a) => ["APPLIED", "RESPONSE", "SCREENING"].includes(a.status)).slice(0, 20);
+    // Early stages, where outreach helps (current values plus their legacy equivalents).
+    return apps.filter((a) => ["APPLIED", "SCREENING_CALL", "SHORTLISTED", "RESPONSE", "SCREENING"].includes(a.status)).slice(0, 20);
   }, [applicationsQuery.data, candidatesQuery.data, principal]);
 
   const [activeId, setActiveId] = useState<string | null>(null);

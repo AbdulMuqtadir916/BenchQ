@@ -3,6 +3,101 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
+
+Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Route registry and 07 (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `docs/07-ROUTES-AND-RBAC.md` (Q3, Q64, §2.2) | Focus mode is the BDE's only: OWNER and MANAGER `none` (Forbidden in place), out of their palette and shortcuts. | Decided by Zuhair 2026-11-12 (Q64, replaces Q3): its actions are the BDE's own work. | **Pending: Abdul** |
+| Firm layout (shared) | `src/app/[firm]/layout.tsx` | The tailoring panel mounted beside every firm page (inside `FirmGate`). | R2-Q2: the BDE's tailorings follow them across pages. | **Pending** |
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue's sparkle is the Tailor control (the picker beside it); it no longer links to the job page. | R2-Q5. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | T starts a real tailoring (the active base) and moves on; a refusal is said under the actions. | Q1, Q4. | **Pending** |
+| Mock tests (shared) | `src/mocks/agents.ts`, `membership.ts` (`FIRM_SCOPED_RESOURCES` without `agents`), `membership.test.ts`, `write-authorization.test.ts`; `src/components/dev/stage-one-showcase.tsx` | The agents mock's `tailorResume` and its rows deleted; `agents` keeps only `rewrite` (no firm). The dev showcase plays the staged panel without a call. | Q7: the theatre goes; tailoring is the backend's. | **Pending** |
+| Access table (Abdul) | `backend/auth/access.py` | `GET /api/firms/{firm_id}/tailorings` (FIRM; the caller's own runs, a support view gets none). | `test_access.py` refuses an unclassified route. | **Pending: Abdul** |
+| Isolation sweep (Uzair) | `backend/tests/isolation_cases.py` | The new route's case. | Every route stays classified and checked. | **Pending: Uzair** |
+| App wiring | `backend/main.py` | The tailoring `firm_router` included. | The new route. | Informational |
+
+## Résumé tailoring, part 3 step 1: only that candidate's jobs (`feat/resume-tailoring`, Zuhair)
+
+Zuhair's rule (2026-11-12): a screen about one candidate reads only that candidate's jobs ([tailoring.md](./tailoring.md)
+§8). Built 2026-11-12; these rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| BDE dashboard (candidate/dashboard owners) | `src/features/dashboard/bde-dashboard.tsx` | The queue reads its candidate's jobs only (it read the BDE's newest 300 to show 6); the jobs read waits for the candidate, and isn't counted while there is none. Its job links carry `?candidate=`. | A job shared by two of the BDE's candidates carried the other's posting id (tailoring answered 404); the newest 300 could leave this candidate's out. | **Pending** |
+| Dashboard tests (shared) | `src/features/dashboard/dashboard-errors.test.ts` | The render settles queries created by a later render (the queue's jobs wait for the candidates), skips disabled ones, and a new test checks the BDE dashboard reads jobs only for one candidate. | The same. | **Pending** |
+| Focus mode (shared) | `src/app/[firm]/focus/page.tsx` | The selected candidate's jobs only, read again on a switch; skeleton, error and "No jobs to work" states (it showed "Run complete" while loading). | The same, and the three states (CLAUDE.md). | **Pending** |
+
+## Résumé tailoring (`feat/resume-tailoring`, Zuhair; part 1, the package; part 2, the wiring)
+
+The tailor's backend package ([tailoring.md](./tailoring.md)). Built 2026-11-12; these rows were not asked about
+before the change, so each waits for its owner.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Settings (Abdul, F2c) | `backend/seed.py` (`DEFAULT_SETTINGS`, `ENUM_SETTING_VALUES`, `invalid_setting_values`), `backend/settings_scope.py` | 16 `resume_tailor_*` rows seeded (the tailor's model, nine prompts, four formats; the key empty), all AI presets; its provider limited to `openrouter`; the save check refuses a broken tailor prompt or format. The rows come from `backend/resume_tailor/settings.py`. | Decided 2026-11-12 (Q6, Q6b): the tailor keeps its prompts and formats in settings the way the résumé parser does. | **Pending: Abdul** |
+| AI presets (Abdul, 08) | `backend/ai/config.py` | A `resume_tailor` module in `AI_MODULES` (its prompts and formats). The old `tailoring` module stays until tailoring's part 2 deletes it with `legacy_tailoring.py`. | The same; the presets take the tailor's prompts later without a rewrite. | **Pending: Abdul** |
+| Shared AI helpers | `backend/analyzer/prompt_fence.py` | `without_fake_markers` added (the file is now JobNavigator's, unchanged); `fence` is untouched. New files beside it: `keyword_match.py`, `known_skills.py`, `job_requirements.py` (only `clean_job_text`), `data/skills_dictionary.json`. | The tailoring handoff takes fake fence markers out of a posting first, and its claim checks read the skills dictionary (Q5). Nothing else calls them yet. | Informational |
+| Background runs (Uzair) | `backend/job_monitor.py` | Part 2: `launch_background` takes an optional `firm_id` (stored on the run's `job_runs` row, which never had one); the tailor's own gate `resume_tailor` (`resume_tailor_max_concurrent`, 40); the old `tailor_resume` job type leaves the `tailoring` gate (cover letters keep it, at 2). | Decided 2026-11-12 (part 2 Q1, Q4c): the tailoring's row is its record, read by the firm; 2 at a time is too few for many firms. Your follow-up: `cleanup_stale_runs()` before more than one worker (uzair.md, Deferred). | **Pending: Uzair** |
+| Isolation and log sweeps (Uzair) | `backend/tests/isolation_cases.py`, `isolation_support.py`, `test_log_every_route.py` | Part 2: the three tailoring routes' cases; a finished tailoring row in each firm (`tailoring`); the offline fixture stubs the tailor's setup and launch; the old `cv_tailor_prompt` row no longer planted. The sweep lists `POST …/resumes/tailor` (OWNER: 403) and `GET …/tailorings/{run_id}` (no firm's run seeded) as not reached; their logging is tested in `test_resume_tailor_routes.py`. | Every route stays classified and checked. | **Pending: Uzair** |
+| LLM client and its tests (Uzair; AI timeouts handed to Zuhair) | `backend/analyzer/llm_client.py`, `backend/api/routes_llm.py`, `test_llm_client_propagation.py`, `test_llm_logged_pair_matches_dispatch.py`, `test_llm_reasoning_effort.py`, `test_log_lint.py`, `test_r4_contract_settings.py` | Part 2: `call_cv_tailor_llm` and the `cv_tailor_*` key slot deleted; the tests drop the `cv_tailor` feature (the effort test uses `cover_letter`); the log lint's allowance for `legacy_tailoring.py` goes with the file. | Decided 2026-11-12 (Q10, part 2 Q7): the old tailoring is deleted. | **Pending: Uzair** |
+| Access table (Abdul) | `backend/auth/access.py` | Part 2: three `FIRM` rows for the tailoring routes. | `test_access.py` refuses an unclassified route. | **Pending: Abdul** |
+| Settings and AI presets (Abdul) | `backend/seed.py`, `backend/settings_scope.py`, `backend/ai/config.py`, `test_ai_config.py` | Part 2: `resume_tailor_max_concurrent` (40, PLATFORM) seeded; the six old rows (`cv_tailor_llm_*`, `cv_tailor_prompt`, `persona_tailor_prompt`) no longer seeded or classified, and the old `tailoring` AI module gone (rows a database already holds stay); the empty-prompt test uses `cover_letter`. | The same. | **Pending: Abdul** |
+| App startup (shared) | `backend/main.py` | Part 2: the tailoring router registered before the résumé routes (`…/resumes/tailorings` is not a résumé id); the tailor's heartbeat started with the app. | Decided 2026-11-12 (part 2 Q10b). | Informational |
+
+## For Arbaz: merging #129 after #127
+
+#127 (PR 4) is expected to merge first. When you bring main into #129, these won't all show as git conflicts: they are
+lines #129's changes break at runtime. Each needs the change listed.
+
+| # | Where | What to do | Why |
+|---|---|---|---|
+| 1 | `backend/migrations/versions/` (your first migration) | Number yours **0026** and **0027**, and point the first one's `down_revision` at `'0025'` (#127's AUTO_APPLIED migration, after Abdul's 0024). The team README already lists 0026–0027 as yours. | Otherwise Alembic finds two heads after 0024 and the backend won't start. |
+| 2 | `backend/applications/tracking.py`, `apply_email_decision` (the automatic status change, ≈ l.254–258) | Remove the `FavoriteJob` lookup and delete (a Saved application is the favourite in #129); make the ledger's `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | `FavoriteJob` and `Application.job` no longer exist after #129. |
+| 3 | `backend/applications/tracking.py`, `undo_email_decision` (Undo of an automatic change, ≈ l.304–319) | Remove the "back to Saved restores the favourite" block (`if original.from_status == 'saved' and … FavoriteJob …`); make `entity_label=app.job.title or 'Application'` read `posting_job(app.posting).title or 'Application'`. | Same: the table and the relationship are gone. Tests that pin the restored favourite (from your `cff6830`/`689fbc0`) go with it. |
+| 4 | `src/lib/api/applications.ts`, `BackendUnsavedSchema` (≈ l.25) | `z.object({ favorite: z.literal(false) })` → `z.object({ favorite: z.boolean() })`. | #129's un-favourite answers `favorite: not untouched`, so `true` for a kept application; the current check rejects it and the heart shows "returned data the app doesn't understand". |
+| 5 | Check after merging | Heart on a job from a search saves it as Saved (#127's heart already sends the posting id); un-heart an untouched Saved job removes it; un-heart one with history keeps it, without an error. The backend suite's automatic-change and Undo tests pass. | Abdul's item 3 on #127 is fixed by #129's save route. |
+
+## Abdul's review on #127: the résumé sent with an application (`feat/inbox-masking-and-review`)
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad; the field is filled by Arbaz's extension flow) | `backend/api/routes_applications.py` (`_app_to_dict`), `backend/tests/test_candidate_application_status.py`, `docs/02-DATA-CONTRACTS.md` §9 | Every application response adds `resume_id`: the version already stored on the application, or `null`. Read-only; no schema change. | Abdul's review (P2): the "Résumé sent" panel said "Not submitted yet" for every live application, because the backend never sent the stored value and the mapper set it to `null`. |
+
+## Main merged into PR 4 a third time — #135's job screens (`feat/inbox-masking-and-review`)
+
+Main brought Zuhair's #135: the job screens read `job_postings`, and the candidates, résumés and jobs mocks are gone.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Job screens (Zuhair) | `src/components/app/jobs/job-explorer.tsx`, `source-preview.tsx` (an optional `onOpenSource`) | The heart keeps PR 4's save to Applications (`useToggleSavedJob`) instead of #135's mock Save/Hide marks; everything else is #135's. The preview's Open original also saves, like PR 4's Open source. | Abdul's decision 1 on #135: the heart puts the job in Applications, and that flow belongs to #127. **Until Arbaz's #129 moves the save route onto `job_postings`, the heart gets "Job not found".** |
+| Migrations (Samad's 0025) | `backend/migrations/versions/0025_email_outcome_auto_applied.py`, `backend/tests/test_migration_0025.py`, this README (was 0026; **0025** after Abdul's 0024 merged, Arbaz's #129 takes 0026–0027) | PR 4's `AUTO_APPLIED` migration is 0025 (was 0016, 0022, 0026), after Abdul's 0024; Arbaz's open #129 takes 0026–0027. | Main took 0022–0023. Whichever of #127 and #129 merges second points its first migration's `down_revision` at the other's last one. |
+| Mock tests (shared) | `src/mocks/{isolation,membership,write-authorization}.test.ts`, `src/lib/derive/application-counts.test.ts` | #135's rows (no candidates, résumés or jobs mock) plus PR 4's applications rows (Move On, save, unsave). | Both sides' changes. |
+| Applications on `job_postings` (Arbaz, #129) | `backend/applications/tracking.py` | **For you:** #127 adds two new `app.job.title` uses (the automatic change's ledger label ≈ l.258, Undo's ≈ l.314). #129 removes `app.job`; whoever merges second makes them `posting_job(app.posting).title`. Git may merge them without a conflict. | Otherwise automatic status updates and Undo fail when they write the ledger. |
+
+## Main merged into PR 4 again — #128's application counts on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Samad reviews. #128 (BUG-005) gave every screen one count of applications, written on the old stages, so on this
+branch Shortlisted or Interview scheduled wouldn't have counted as active and Move On not as closed.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Applications (Samad) | `src/lib/derive/application-counts.ts` (+ test) | Active = submitted and not closed (`isActive` in status-meta, every stage Applied to Offer); closed = Move On and the legacy closed values; a legacy Placed on its own; `OPEN_STATUSES` is gone. The candidate's Active rows keep Saved and Move On (the PR 4 board has a column for each), and the line above the board names every row shown ("N active · M closed · S saved"). Saved is still never counted as active. | The stage list in docs/02 §2.1; the PR 4 tab has no "All" view, so hiding Saved would have left saved jobs nowhere on the candidate page. |
+| Applications (Samad) | `src/components/app/candidate/applications/applications-tab.tsx` | The BDE review and Irrelevant tabs and the scroll fix kept; the rows and the count line use the shared rule above. | As above. |
+
+## Main merged into PR 4 — the Activity dashboard on the new stage list (`feat/inbox-masking-and-review`)
+
+Not agreed yet: Umamah reviews. Main brought PR 8 (#125), built on the old stages; this branch replaced them (docs/02
+§2.1). Without a change the dashboard would count every new application as never shortlisted, interviewed or placed.
+Details: [pr8-owner-dashboard.md](./pr-changes/pr8-owner-dashboard.md), "Merged with PR 4's stage list".
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Activity dashboard (Umamah) | `src/lib/derive/funnel.ts` (`reachedStatuses`), `src/lib/schemas/list-search.ts` (`REACHED_STAGES`, `APPLICATION_DATES`), `src/lib/derive/list-filters.ts` (`applicationDate`) | Reached = every pipeline stage up to the furthest (D1, D6); the seven new stages; no `placed` date; interview and offer dated from the history when the record has no date. | New applications never hold the old names, and the live backend sends no stage dates. |
+| Activity dashboard (Umamah) | `src/features/dashboard/activity/{activity-numbers,activity-insights,activity-firm-cards,activity-tables,activity-team-cards}.ts(x)`, `owner-activity-views.tsx`, `src/features/managers/managers-list.tsx`, and their tests | Placements → Offers everywhere; "Offer → placed" removed; days to an offer; applications per offer; the per-BDE chart is Shortlisted / Interview scheduled / Offer. | Offer is the last stage on the new list; Placed is legacy. |
+| Dashboards (Umamah) | `src/features/dashboard/owner-dashboard.tsx`, `manager-dashboard.tsx`, `dashboard-errors.test.ts` | Finance tab: Offers this quarter and Time to offer, dated by reaching Offer; the per-BDE table's column says Offers (it already counted offers, D6), and its Interviews count the same way as the Activity dashboard (`applicationDate`, a skipped stage counts) in `src/lib/derive/bde-performance.ts`. | As above; on live data the column read 1 where the Activity tile read 3. |
+| Applications (Samad) | `src/lib/api/dto/applications.ts` (+ test) | `firstResponseAt`, `interviewAt` and `offerAt` are read off `status_transitions` and `interviews` instead of always `null`: the first move out of Applied (not back to Saved; Move On counts), the earliest booked interview not cancelled else the first move to Interview scheduled, the first move to Offer or a legacy Placed. **Not agreed yet: Samad reviews.** | The rule in [docs/integration/03-applications.md](../integration/03-applications.md) (field table), updated for the new stages; on live data Responses, % heard back, response rate and the Finance tab's Interviews showed 0. The `last_email_received` fallback is left out: the new inbox doesn't fill that column. |
 ## Job screens on the backend (`integrate/jobs`, Zuhair; job search PR 3)
 
 Decided 2026-11-11 (grilling rounds 1–3). In progress; rows are added as the work lands. Opened as a PR only after
@@ -70,6 +165,14 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 | Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
 
+## The Autofill screen — phase 3 of résumé autofill (Arbaz; contract for Abdul's sign-off)
+
+Not agreed yet: docs/02 §8.4 is proposed for Abdul's sign-off; the `access.py` row was approved by Arbaz (2026-11-09).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates / résumés (Zuhair, Abdul) | `backend/candidates/autofill.py`, `backend/candidates/versions.py` (`save_autofill`, `_family`), `backend/api/routes_candidate_resumes.py`, `backend/api/routes_firm_resumes.py`, `backend/auth/access.py` (one `F` row), `isolation_cases.py`, `test_autofill.py`, `test_autofill_screen.py`, `docs/02-DATA-CONTRACTS.md` §8.1, §8.4 | `resumes.autofill.custom` is a list of `{question, also, answer}` (07 Q40–Q41; nothing wrote the map); the read marks an edit that stopped applying (`replaced`, Q15) and, with `&editor=true`, lists unanswered questions with each answer's `type` (Q34); `PATCH …/resumes/{rid}/autofill` saves edits, resets, added and removed questions in place, for the rest of the résumé unless `only_this` (Q7, Q14, Q30, Q44). | The Autofill screen (`/[firm]/resumes/[id]/autofill`), where a BDE sees and changes what the extension fills. |
+
 ## Job search tables (`feat/jobs-table`, Zuhair)
 
 `job_postings` and `scrape_jobs`, migration 0020 ([docs/02](../02-DATA-CONTRACTS.md) §6.y).
@@ -93,7 +196,7 @@ answer with its `key`, and each version stores only the entries the user typed (
 | Demo seed (Abdul) | `backend/scripts/seed_demo.py` | No `qa_bank` on the demo candidates; the unused camelCase helpers go. | The column is gone. |
 | Candidate DTO (shared) | `src/lib/api/dto/candidates.ts`, its sample and test | The backend sends no `qa_bank`; the mapper gives `qaBank: []`. `CandidateSchema.qaBank` stays. | The Documents tab's Screening answers panel reads it and shows its empty state until the Documents section is removed (planned, [abdul.md](./abdul.md) §3). Mock mode still shows the fixtures' answers. |
 | Autofill and the extension (Arbaz) | none | Nothing changed. **For you:** read the selected résumé's `GET …/resumes/{id}?autofill=true` instead of `persona.qa_bank`, and match each entry by its `key` before its wording. A hand-saved answer becomes one of the version's own entries (`resumes.autofill`); the route that writes them is planned ([persona-to-candidates.md](./persona-to-candidates.md) §5). | This PR builds the answers; switching the extension is your PR. |
-| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed. It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
+| Old tailoring (JobNavigator leftover) | `backend/analyzer/legacy_tailoring.py` | Not changed (deleted later by tailoring part 2). It isn't wired to anything and can't make versions (it reads columns 0013 dropped). | **For the tailoring module (Zuhair), done in its part 2 (2026-11-12):** a tailored v1 copies its source version's typed entries (`autofill.entries_of`), as a save and a promote do (docs/02 §8.1, Abdul's third review). Its fixed answers are built from its own text, and an edit applies only where that text still gives the answer it replaced. |
 
 ## Résumé screens live — no claim states, the tree (`integrate/resumes`, Zuhair)
 

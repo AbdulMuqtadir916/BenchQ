@@ -177,7 +177,7 @@ describe("the team and /admin on the live backend", () => {
     });
   });
 
-  it("sets a firm's BDE count and price (07 Q64) and suspends and reactivates it", async () => {
+  it("sets a firm's BDE count and price (07 Q65) and suspends and reactivates it", async () => {
     const adminFirm = (over: Record<string, unknown> = {}) => ({ ...firmDto(HTS, "hyderabad-tech-staffing"), price_cents_per_seat: 4000, ...over });
     routes.push(
       on("PATCH", `/api/admin/firms/${HTS}/seats`, 200, adminFirm({ seat_limit: 12, candidate_limit: 120 })),
@@ -192,7 +192,7 @@ describe("the team and /admin on the live backend", () => {
     expect((await platformApi.firms.reactivate("firm_hts")).status).toBe("ACTIVE");
   });
 
-  it("edits the base plan and reads, starts and marks billing periods (07 Q65)", async () => {
+  it("edits the base plan and reads, starts and marks billing periods (07 Q66)", async () => {
     const periodDto = (over: Record<string, unknown> = {}) => ({
       id: "11111111-1111-4111-8111-111111111111", firm_id: HTS, starts_on: "2026-11-12", ends_on: "2026-12-12", seat_limit: 10,
       candidate_limit: 100, jobs_per_candidate_per_day: 100, price_cents_per_seat: 3500, amount_cents: 35000, status: "UNPAID",

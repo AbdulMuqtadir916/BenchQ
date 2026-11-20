@@ -67,7 +67,7 @@ export function AttentionCard({ ws, actions, canAct }: { ws: CandidateWorkspace;
     }),
     ...ws.suggestions.map((s): Item => {
       const app = appById.get(s.applicationId);
-      const meta = mailSignalMeta(s.message.signal, s.message.classificationState);
+      const meta = mailSignalMeta(s.message.signal, s.message.classificationState, s.message.classificationCategory);
       return {
         key: `sg_${s.message.id}`,
         Icon: meta.Icon,

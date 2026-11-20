@@ -30,6 +30,9 @@ class Case:
     upload: bool = False
     # Only the candidate's BDE takes it (07 Q55): firm B's own call is made as its BDE, not its OWNER.
     as_bde: bool = False
+    # Refused even for the firm's own rows, with this status (a candidate's application is never deleted: 409). Firm
+    # B's own call gets it rather than getting through; still not the 404 firm A gets, so that one is isolation.
+    refused: int | None = None
     # Optional action preconditions, applied independently to each tenant before assertions.
     prepare: Callable | None = None
     # The old job pool's write routes, retired (job search PR 2, backend/job_search/retired.py): every caller gets the
@@ -49,6 +52,20 @@ def _classification_ready(state):
     return prepare
 
 
+def _irrelevant_ready(db, ids):
+    """The email is classified Other (shown as Irrelevant) and has no review, so a BDE may open one."""
+    from backend.models.candidates import InboxMessage
+    from backend.models.db import EmailClassification
+    message = db.get(InboxMessage, ids['inbox_message'])
+    message.classification_state = 'DONE'
+    message.classification_version = 1
+    db.add(EmailClassification(firm_id=message.firm_id, candidate_id=message.candidate_id, inbox_message_id=message.id,
+        result_version=1, content_revision=message.content_revision, category='other', confidence=0.95,
+        probabilities={'other': 0.95}, model='synthetic-test-only', provider='openrouter', prompt_version='synthetic',
+        category_version='synthetic', sender_auth_result='PASS', receive_time_verified=True, outcome='OTHER', reason='OTHER'))
+    db.commit()
+
+
 def _resume_country_us(db, ids):
     """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py)."""
     from backend.models.db import Resume
@@ -57,8 +74,8 @@ def _resume_country_us(db, ids):
 
 
 PARAM = {"firm_id": "firm", "invite_id": "invite", "job_id": "job", "app_id": "app", "interview_id": "interview",
-         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base",
-         "posting_id": "posting"}
+         "resume_id": "resume", "cl_id": "letter", "slug": "slug", "user_id": "bde_user", "candidate_id": "candidate", "message_id": "inbox_message", "attempt_id": "oauth_attempt", "base_id": "base", "event_id": "auto_event",
+         "posting_id": "posting", "run_id": "tailoring"}
 
 
 
@@ -99,6 +116,9 @@ CASES: dict[str, Case] = {
     # Résumé versions and bases (résumé versioning PR 5): under the candidate; writes are the candidate's BDE's.
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}": Case(path={"resume_id": "version"}),
+    # The Autofill screen's save (07 Q14): the candidate's BDE changes a version's answers in place.
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/autofill": Case(
+        path={"resume_id": "version"}, as_bde=True, body=lambda i: {"add": {"Why do you want to work here?": "Payments."}}),
     # The upload's own v1 ("resume"): only an uploaded base's first version has a file (07 Q49).
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
@@ -110,6 +130,13 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/removal": Case(),
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}": Case(as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/bases/{base_id}/show": Case(as_bde=True),
+    # Résumé tailoring: the BDE starts one on the candidate's posting; anyone who sees the candidate reads them.
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailor": Case(
+        as_bde=True, body=lambda i: {"job_posting_id": str(i["posting"])}, body_ids=True),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings": Case(),
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/tailorings/{run_id}": Case(),
+    # The signed-in user's own tailorings (their panel): another firm's URL is the same 404 as a missing one.
+    "GET /api/firms/{firm_id}/tailorings": Case(),
     # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
         as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),
@@ -152,6 +179,7 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review": Case(path={"message_id":"review_message"}, body=lambda i: {"review_id": str(i["review"]), "command_id": "22222222-2222-4222-8222-222222222222", "expected_review_revision": 0, "expected_content_revision": 0, "application_id": str(i["review_app"]), "expected_application_revision":0, "action": "SET_STATUS", "status":"assessment"}),
+    "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/review/open": Case(prepare=_irrelevant_ready),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/retry": Case(prepare=_classification_ready("ERROR"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/classification/reclassify": Case(prepare=_classification_ready("DONE"), body=lambda i: {"command_id": "22222222-2222-4222-8222-222222222222", "expected_content_revision": 0, "expected_result_version": 0}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}": Case(),
@@ -163,16 +191,21 @@ CASES: dict[str, Case] = {
     "DELETE /api/firms/{firm_id}/candidates/{candidate_id}/mailbox": Case(),
     "PATCH /api/firms/{firm_id}/candidates/{candidate_id}/inbox-messages/{message_id}/read": Case(),
     "GET /api/applications": Case(shows_rows=True),
+    "GET /api/applications/counts": Case(),
     "GET /api/applications/{app_id}": Case(),
     "PATCH /api/applications/{app_id}/review": Case(path={"app_id": "review_app"}, body=lambda i: {"review_id": str(i["review"]), "status": "assessment", "expected_revision": 0, "expected_review_revision": 0}),
-    "POST /api/applications": Case(body=lambda i: {"title": "Logged role", "company": "Logged Co", "url": _new("logged")}),
+    "POST /api/applications": Case(body=lambda i: {"candidate_id": str(i["candidate"]), "job": {
+        "source": "manual", "title": "Added role", "company": "Added Co", "description": "The added role's text.",
+        "url": _new("added")}}, body_ids=True, as_bde=True),
     "POST /api/applications/extract": Case(body=lambda i: {"url": _new("posting")}),
+    "POST /api/applications/{app_id}/status-events/{event_id}/undo": Case(path={"app_id": "auto_app", "event_id": "auto_event"}, body=lambda i: {"expected_revision": 1, "command_id": str(uuid.uuid4())}),
     "PATCH /api/applications/{app_id}/candidate-status": Case(body=lambda i: {"status": "saved", "expected_revision": 0}),
     "PATCH /api/applications/{app_id}": Case(body=lambda i: {"notes": "Edited"}),
-    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}),
+    "DELETE /api/applications/{app_id}": Case(path={"app_id": "legacy_app"}, refused=409),
     "POST /api/applications/bulk-update": Case(body=lambda i: {"ids": [str(i["app"])], "status": "interview_scheduled", "expected_revisions": {str(i["app"]): 0}},
                                                body_ids=True, bulk=True),
-    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True),
+    "POST /api/applications/bulk-delete": Case(body=lambda i: {"ids": [str(i["legacy_app"])]}, body_ids=True, bulk=True,
+                                               refused=409),
     "GET /api/applications/{app_id}/prep": Case(),
     "POST /api/applications/{app_id}/interviews": Case(body=lambda i: {"what": "Panel"}),
     "PATCH /api/applications/interviews/{interview_id}": Case(body=lambda i: {"what": "Panel two"}),

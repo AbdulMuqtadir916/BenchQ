@@ -3,6 +3,7 @@ import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
   isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
+import { hostOf, queryDeep } from "./shadow";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
 export type Entry = {
@@ -204,7 +205,17 @@ function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
  * that wraps a real input is that input's look, and the input stands for it. */
 function isAriaQuestion(element: HTMLElement): boolean {
   return isVisible(element) && element.getAttribute("aria-disabled") !== "true" && !element.querySelector("input, select, textarea")
-    && element.closest(FORM_AREA) !== null && element.closest(NOT_A_QUESTION) === null;
+    && closestThrough(element, FORM_AREA) !== null && closestThrough(element, NOT_A_QUESTION) === null;
+}
+
+/** `closest()` through the components an element sits in: a choice inside a component under a form is in that form,
+ * and one inside a component in a menu is in that menu. */
+function closestThrough(element: Element, selector: string): Element | null {
+  for (let at: Element | null = element; at; at = hostOf(at)) {
+    const found = at.closest(selector);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** The group a styled choice answers with: its radio group, the toggle buttons beside it, or the checkboxes in its
@@ -225,8 +236,22 @@ function collectSlots(doc: Document): Slot[] {
   const slots: Slot[] = [];
   const groups = new Map<string, HTMLInputElement[]>();
   const ariaGroups = new Map<Element, AriaGroup>();
-  const forms = Array.from(doc.forms);
-  for (const element of Array.from(doc.querySelectorAll<HTMLElement>(`input, textarea, select, ${ARIA_CHOICES}`))) {
+  // Each form by itself, one in a component too (doc.forms lists only the page's own).
+  const formIds = new Map<HTMLFormElement, number>();
+  const formOf = (form: HTMLFormElement | null) => {
+    if (!form) return -1;
+    if (!formIds.has(form)) formIds.set(form, formIds.size);
+    return formIds.get(form)!;
+  };
+  // Radios of one name in two components are two groups: a component's names are its own.
+  const trees = new Map<Node, number>();
+  const treeOf = (element: Element) => {
+    const tree = element.getRootNode();
+    if (tree === doc) return "";
+    if (!trees.has(tree)) trees.set(tree, trees.size);
+    return `${trees.get(tree)}/`;
+  };
+  for (const element of queryDeep<HTMLElement>(doc, `input, textarea, select, ${ARIA_CHOICES}`)) {
     if (isAriaChoice(element)) {
       if (!isAriaQuestion(element)) continue;
       const grouping = ariaGroupOf(element);
@@ -250,7 +275,7 @@ function collectSlots(doc: Document): Slot[] {
         if (!value || value === "on") slots.push(element);
         continue;
       }
-      const key = `${element.form ? forms.indexOf(element.form) : -1}:${element.type}:${element.name}`;
+      const key = `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
       const group = groups.get(key);
       if (group) group.push(element);
       else {
@@ -265,13 +290,19 @@ function collectSlots(doc: Document): Slot[] {
 
 /** Dropdowns built from <div>s or buttons, which `input, textarea, select` can't find. */
 function customControls(doc: Document): HTMLElement[] {
-  return Array.from(doc.querySelectorAll<HTMLElement>("[role='combobox'], [aria-haspopup='listbox']")).filter((element) =>
+  return queryDeep<HTMLElement>(doc, "[role='combobox'], [aria-haspopup='listbox']").filter((element) =>
     !element.matches("input, select, textarea") && !element.querySelector("input, select, textarea") && isVisible(element));
 }
 
 /** What a scan reads: the form's controls, then its dropdowns built from other elements. */
 function formControls(doc: Document) {
-  return CAPTCHA_FRAME.test(doc.URL) ? { slots: [], custom: [] } : { slots: collectSlots(doc), custom: customControls(doc) };
+  if (CAPTCHA_FRAME.test(doc.URL)) return { slots: [], custom: [] };
+  const slots = collectSlots(doc);
+  // A dropdown component whose own input the scan already has (inside its shadow root) is that input: one field. One
+  // whose input is hidden or left out stays the field.
+  const controls = slots.flat().flatMap((slot) => (slot instanceof Node ? [slot] : slot.aria));
+  const custom = customControls(doc).filter((host) => !host.shadowRoot || !controls.some((control) => host.shadowRoot!.contains(control)));
+  return { slots, custom };
 }
 
 function shapeOf(doc: Document): Shape {

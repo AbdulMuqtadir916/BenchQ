@@ -1,3 +1,4 @@
+import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
@@ -161,6 +162,104 @@ function suggestionsFor(field: TabField, label: string, type: EngineFieldType | 
 }
 
 /** The row a suggestion the BDE picked makes: ready to fill, or why the answer doesn't fit this field. */
+const recordText = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+/** Which value of a school or job record a field of a history block takes. */
+const FROM_RECORD: Partial<Record<string, [keyof HistoryRecords, (record: Record<string, unknown>) => string]>> = {
+  "education-school": ["education", (record) => recordText(record.school)],
+  "education-degree": ["education", (record) => recordText(record.degree)],
+  // The last year of a range ("2013 – 2017"), as the backend's graduation year reads it.
+  "graduation-year": ["education", (record) => recordText(record.graduation_date).match(/\b(?:19|20)\d{2}\b/g)?.at(-1) ?? ""],
+  "current-company": ["work", (record) => recordText(record.company)],
+  "current-title": ["work", (record) => recordText(record.title)],
+};
+
+const REPEATS_ON_FORM = "This question appears more than once on the form.";
+
+/** A row a school or job record may answer: one the review would fill, or held back only because its question repeats
+ * (as a repeated block's questions do). A row held back for any other reason keeps that decision. */
+const takesRecord = (row: ReviewRow) => row.status === "ready" || row.status === "same"
+  || (row.status === "manual" && (row.reason === REPEATS_ON_FORM || row.reason === REPEATED));
+
+const sameText = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+
+const OTHER_ENTRY = "This block's other answers are from another entry on the résumé.";
+
+/** A form that repeats a school or job block (or grew one with "Add another", #132) asks for the next school or job in
+ * each. The first block keeps the school or job it was given or already holds; the next blocks take the résumé's other
+ * records in order. A block past the résumé's last one is left to the BDE. The first block's answers stay on one record:
+ * one the review would fill from another record than the one its block picked is left to the BDE. */
+export function withHistory(rows: ReviewRow[], history: HistoryRecords): ReviewRow[] {
+  // Each kind's records in the order the blocks take them: the one the first block holds or was given, then the rest.
+  const anchors = new Map<keyof HistoryRecords, { type: string; value: string }>();
+  for (const row of rows) {
+    const type = typeOf(row.field);
+    const from = type ? FROM_RECORD[type] : undefined;
+    const value = row.proposed || row.field.current;
+    if (type && from && takesRecord(row) && value && !anchors.has(from[0])) anchors.set(from[0], { type, value });
+  }
+  // The record the first block's anchor picked, by kind: the block's other answers must be that record's too.
+  const picked = new Map<keyof HistoryRecords, { type: string; record: Record<string, unknown> }>();
+  const ordered = new Map<keyof HistoryRecords, Record<string, unknown>[]>();
+  const recordsOf = (kind: keyof HistoryRecords) => {
+    const known = ordered.get(kind);
+    if (known) return known;
+    const records = history[kind];
+    const anchor = anchors.get(kind);
+    const at = anchor ? records.findIndex((record) => sameText(FROM_RECORD[anchor.type]![1](record), anchor.value)) : -1;
+    if (anchor && at >= 0) picked.set(kind, { type: anchor.type, record: records[at]! });
+    const next = at > 0 ? [records[at]!, ...records.filter((_, n) => n !== at)] : records;
+    ordered.set(kind, next);
+    return next;
+  };
+  // Each field's place among its kind's records. A form that asks block by block (school, degree, school, degree) starts
+  // a block where a question it already asked comes again, so a block that lacks a field never shifts the next one's
+  // record. A form that asks question by question (every school, then every degree) counts each question.
+  const asked = rows.map((row) => {
+    const type = typeOf(row.field);
+    const from = type ? FROM_RECORD[type] : undefined;
+    return type && from ? { type, from } : null;
+  });
+  const byQuestion = new Set<keyof HistoryRecords>();
+  for (const kind of new Set(asked.flatMap((one) => (one ? [one.from[0]] : [])))) {
+    const order = asked.flatMap((one) => (one?.from[0] === kind ? [one.type] : []));
+    const runs = order.filter((type, n) => n === 0 || order[n - 1] !== type);
+    if (new Set(runs).size === runs.length) byQuestion.add(kind);
+  }
+  const blocks = new Map<keyof HistoryRecords, { index: number; asked: Set<string> }>();
+  const counts = new Map<string, number>();
+  return rows.map((row, n) => {
+    const one = asked[n];
+    if (!one) return row;
+    const { type, from } = one;
+    let index: number;
+    if (byQuestion.has(from[0])) {
+      index = counts.get(type) ?? 0;
+      counts.set(type, index + 1);
+    } else {
+      let block = blocks.get(from[0]);
+      if (!block || block.asked.has(type)) {
+        block = { index: (block?.index ?? -1) + 1, asked: new Set() };
+        blocks.set(from[0], block);
+      }
+      block.asked.add(type);
+      index = block.index;
+    }
+    if (!takesRecord(row)) return row;
+    const base = { key: row.key, field: row.field, isUnsaved: row.isUnsaved };
+    if (index === 0 && row.status !== "manual") {
+      recordsOf(from[0]);
+      const pick = picked.get(from[0]);
+      const theirs = pick && pick.type !== type && row.status === "ready" ? from[1](pick.record) : "";
+      const kept = row.proposed || row.field.current;
+      return theirs && kept && !sameText(theirs, kept) ? { ...base, status: "manual", reason: OTHER_ENTRY } : row;
+    }
+    const record = recordsOf(from[0])[index];
+    const value = record ? from[1](record) : "";
+    return value ? rowFor(base, value) : { ...base, status: "manual", reason: "The résumé has no entry for this block." };
+  });
+}
+
 export function suggestedRow({ key, field, isUnsaved }: ReviewRow, entry: BankEntry): ReviewRow {
   return rowFor({ key, field, isUnsaved }, entry.answer, entry);
 }
@@ -223,7 +322,8 @@ function reviewField(scanned: Base, repeated: boolean, review: Review): ReviewRo
   return row.status === "blocked" ? row : withStatus(row, typeOf(scanned.field), workStatus(saved));
 }
 
-const typeOf = (field: TabField) => {
+/** What a field asks, as the engine names it: the type its answer is matched by. */
+export const typeOf = (field: TabField) => {
   const asked = { ...field, label: questionOf(field.label) };
   return fieldTypeFor(asked) ?? classifyField(asked);
 };
@@ -234,7 +334,8 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   const type = fieldTypeFor(asked) ?? classifyField(asked);
   const blocked = neverFillReason(field) ?? (type && manualOnlyReason(type));
   if (blocked) return { ...scanned, status: "blocked", reason: blocked, isUnsaved: staysOutOfSavedForm(blocked) };
-  const base = type?.startsWith("eeo-") ? { ...scanned, isUnsaved: true } : scanned;
+  // Self-identification (the EEO questions, pronouns) is never kept in the form saved with an application (docs/02 §8.1).
+  const base = type?.startsWith("eeo-") || type === "pronouns" ? { ...scanned, isUnsaved: true } : scanned;
   const manual = (reason: string): ReviewRow => ({ ...base, status: "manual", reason });
   if (asksForSelfRating(asked.label)) return manual("This asks for a self-rating, so it's yours to answer.");
   if (field.kind === "custom") return manual("BenchQ can't fill this kind of control yet.");

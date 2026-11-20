@@ -21,10 +21,16 @@ def log_llm_call(
     success: bool = True,
     error: Optional[str] = None,
     firm_id: Optional[UUID] = None,
-) -> None:
+    cost_usd: Optional[float] = None,
+    db=None,
+):
     """Insert a row into llm_call_log; swallows DB errors so logging never breaks scoring. usage: {input_tokens, output_tokens, cache_read_tokens, cache_write_tokens}. `firm_id`: the firm the call was for, so AI spend can be split by firm (Q33); an entry point that knows its firm passes it."""
+    # `cost_usd` (optional): a known amount, e.g. the provider's own charge, used instead of the price table.
+    # `db` (optional): add the row to the caller's session inside a savepoint and return its id; the caller's
+    # transaction is never committed, closed or rolled back here (candidate email classification, PR 4).
+    caller_db = db
     try:
-        cost = calc_cost(
+        cost = cost_usd if cost_usd is not None else calc_cost(
             provider,
             model,
             input_tokens=usage.get("input_tokens", 0),
@@ -32,7 +38,7 @@ def log_llm_call(
             cache_read_tokens=usage.get("cache_read_tokens", 0),
             cache_write_tokens=usage.get("cache_write_tokens", 0),
         )
-        db = SessionLocal()
+        db = caller_db if caller_db is not None else SessionLocal()
         try:
             row = LlmCallLog(
                 purpose=purpose,
@@ -49,12 +55,19 @@ def log_llm_call(
                 success=success,
                 error=(error[:500] if error else None),  # truncate long error strings
             )
+            if caller_db is not None:
+                with caller_db.begin_nested():
+                    caller_db.add(row)
+                    caller_db.flush()
+                return row.id
             db.add(row)
             db.commit()
         finally:
-            db.close()
+            if caller_db is None:
+                db.close()
     except Exception as e:
         logger.warning(f"log_llm_call failed (non-fatal): {e}")
+    return None
 
 
 @asynccontextmanager

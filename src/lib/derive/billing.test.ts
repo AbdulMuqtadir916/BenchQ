@@ -10,7 +10,7 @@ const period = (over: Partial<BillingPeriod> = {}): BillingPeriod => ({
   createdAt: "2026-11-01T00:00:00.000Z", ...over,
 });
 
-describe("the arithmetic (07 Q64)", () => {
+describe("the arithmetic (07 Q65)", () => {
   it("gives a firm ten candidates per BDE and bills the BDE count times the price", () => {
     expect([10, 12, 1].map(candidateLimitFor)).toEqual([100, 120, 10]);
     expect(periodAmountCents(10, 3500)).toBe(35000);
@@ -30,7 +30,7 @@ describe("the arithmetic (07 Q64)", () => {
   });
 });
 
-describe("the overdue flag (07 Q65)", () => {
+describe("the overdue flag (07 Q66)", () => {
   it("is 'none', never overdue, for a firm with no period", () => {
     expect(billingState("firm_a", [], "2026-11-12")).toBe("none");
     expect(billingState("firm_a", [period({ firmId: "firm_b" })], "2026-11-12")).toBe("none");

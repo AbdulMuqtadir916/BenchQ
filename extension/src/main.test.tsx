@@ -184,6 +184,21 @@ it("follows the BDE between tabs, and stays on that candidate on a tab with no j
   expect(jobCards().map((card) => card.querySelector("[data-slot='job-select']")?.textContent)).toEqual(["Data Engineer"]);
 });
 
+it("starts the panel afresh when its tab is connected to another job, so nothing of the last one's run carries over", async () => {
+  connectTab();
+  await mount();
+  const before = document.querySelector("[data-slot='autofill']");
+  expect(before).not.toBeNull();
+  await act(async () => {
+    connectTab(7, otherJob);
+    fake.storage.onChanged.fire({ [connectionKey(7)]: {} }, "session");
+  });
+  await settle();
+  const after = document.querySelector("[data-slot='autofill']");
+  expect(after).not.toBeNull();
+  expect(after).not.toBe(before);
+});
+
 it("gives the list back when the card is closed, with the job still saved and the dropdown free", async () => {
   connectTab();
   await mount();

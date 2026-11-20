@@ -15,6 +15,8 @@ that isn't, so a new setting has to say whose it is.
 """
 from enum import Enum
 
+from backend.resume_tailor import settings as tailor_settings
+
 
 class Scope(str, Enum):
     PLATFORM = "platform"
@@ -49,6 +51,7 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "dedup_tracking_params": (P, ""),
     "scoring_max_concurrent": (P, ""),
     "tailoring_max_concurrent": (P, ""),
+    "resume_tailor_max_concurrent": (P, ""),
     "tracer_links_base_url": (P, ""),
     "tracer_links_url_style": (P, ""),
     "job_search_provider": (P, ""),        # the job source every firm's search uses (job search PR 1)
@@ -73,12 +76,6 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "scoring_output_light": (AI, "AI presets"),
     "scoring_output_full": (AI, "AI presets"),
     "scoring_default_depth": (AI, "AI presets"),
-    "cv_tailor_llm_provider": (AI, "AI presets"),
-    "cv_tailor_llm_model": (AI, "AI presets"),
-    "cv_tailor_llm_api_key": (AI, "AI presets"),
-    "cv_tailor_llm_effort": (AI, "AI presets"),
-    "cv_tailor_prompt": (AI, "AI presets"),
-    "persona_tailor_prompt": (AI, "AI presets"),
     "cover_letter_llm_provider": (AI, "AI presets"),
     "cover_letter_llm_model": (AI, "AI presets"),
     "cover_letter_llm_api_key": (AI, "AI presets"),
@@ -90,6 +87,8 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "resume_parse_llm_provider": (AI, "AI presets"),
     "resume_parse_llm_model": (AI, "AI presets"),
     "resume_parse_llm_api_key": (AI, "AI presets"),
+    # The résumé tailor's model, prompts and formats (backend/resume_tailor/settings.py).
+    **{key: (AI, "AI presets") for key in tailor_settings.DEFAULT_SETTINGS},
     "cover_letter_voice_presets": (AI, "AI presets"),
     "email_llm_enabled": (AI, "AI presets"),
     "email_llm_provider": (AI, "AI presets"),

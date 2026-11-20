@@ -6,6 +6,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from backend.tests.auth_support import make_user, seed_accounts
+from backend.tests.migration_support import downgrade_to, upgrade_head
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
 
 
@@ -47,9 +48,9 @@ def _world(engine) -> dict:
                      {"id": ids["link"], "f": ids["firm"], "r": tailored})
         conn.execute(text("INSERT INTO tracer_click_events (id, firm_id, tracer_link_id, clicked_at) VALUES (gen_random_uuid(), :f, :l, now())"),
                      {"f": ids["firm"], "l": ids["link"]})
-        conn.execute(text("INSERT INTO applications (id, firm_id, job_id, status, resume_id) "
-                          "VALUES (:id, :f, :j, 'applied', :r)"),
-                     {"id": ids["app"], "f": ids["firm"], "j": ids["job"], "r": tailored})
+        conn.execute(text("INSERT INTO applications (id, firm_id, candidate_id, job_id, status, resume_id) "
+                          "VALUES (:id, :f, :c, :j, 'applied', :r)"),
+                     {"id": ids["app"], "f": ids["firm"], "c": ids["asha"], "j": ids["job"], "r": tailored})
     return ids
 
 
@@ -57,7 +58,7 @@ def test_old_rows_are_deleted_what_pointed_at_them_lets_go_and_the_old_columns_g
     name, engine = scratch_db
     _ok(_alembic(name, "upgrade", "0012"))
     ids = _world(engine)
-    _ok(_alembic(name, "upgrade", "head"))
+    upgrade_head(name, engine)
 
     with engine.connect() as conn:
         assert {r.id for r in conn.execute(text("SELECT id FROM resumes"))} == {ids["v1"]}   # BenchQ's own row stays
@@ -76,10 +77,10 @@ def test_the_way_back_restores_the_columns_empty_and_up_again_works(scratch_db):
     name, engine = scratch_db
     _ok(_alembic(name, "upgrade", "0012"))
     ids = _world(engine)
-    _ok(_alembic(name, "upgrade", "head"))
-    _ok(_alembic(name, "downgrade", "0012"))
+    upgrade_head(name, engine)
+    downgrade_to(name, engine, "0012")
     with engine.connect() as conn:
         row = conn.execute(text("SELECT is_base, json_data FROM resumes WHERE id = :id"), {"id": ids["v1"]}).one()
         assert row.is_base is True and row.json_data is None                  # back, empty: deleted rows stay deleted
         assert conn.execute(text("SELECT count(*) FROM resumes")).scalar_one() == 1
-    _ok(_alembic(name, "upgrade", "head"))
+    upgrade_head(name, engine)

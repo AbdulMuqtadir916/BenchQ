@@ -146,7 +146,7 @@ export const InviteLookupDto = z.union([
 
 /** What creating a firm or sending / resending an invite returns: the link's token, shown once (07 Q38). */
 export const InviteWithTokenDto = z.object({ invite: InviteDto, invite_token: z.string() });
-/** A firm as the Super Admin reads it: the firm plus its price per BDE (07 Q66). No firm-side response has the price. */
+/** A firm as the Super Admin reads it: the firm plus its price per BDE (07 Q67). No firm-side response has the price. */
 export const AdminFirmDto = FirmDto.extend({ price_cents_per_seat: z.number() });
 export const CreatedFirmDto = InviteWithTokenDto.extend({ firm: AdminFirmDto });
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from backend.analyzer.llm_client import resolve_llm_config
 from backend.models.db import SessionLocal, Setting
+from backend.resume_tailor import settings as tailor_settings
 
 
 @dataclass(frozen=True)
@@ -23,13 +24,16 @@ class AiModule:
     `prompts` maps each prompt the module uses to the setting that holds it today."""
     feature: str
     prompts: dict[str, str] = field(default_factory=dict)
+    # False: the module runs only on its own `<feature>_llm_*` settings and never borrows the primary model's
+    # provider/model/key (candidate email classification is OpenRouter Decisions only, OPERATIONS.md).
+    fallback: bool = True
 
 
 # The AI modules that get presets first (08 Q3). Email classification and autofill join when their tracks are live.
 AI_MODULES: dict[str, AiModule] = {
-    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"}),
+    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"},
+                                     fallback=False),
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
-    "tailoring": AiModule("cv_tailor", {"tailor": "cv_tailor_prompt", "persona_tailor": "persona_tailor_prompt"}),
     # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it; the
     # résumé parser is `resume_parse` below. Kept so the AI presets' module list doesn't change.
     "resume_building": AiModule(""),
@@ -38,6 +42,11 @@ AI_MODULES: dict[str, AiModule] = {
     # primary's; candidates/parse.py checks them), its two prompts and its strict response format.
     "resume_parse": AiModule("resume_parse", {"system": "resume_parse_system_prompt", "parse": "resume_parse_prompt",
                                               "response_format": "resume_parse_response_format"}),
+    # The résumé tailor (docs/team/tailoring.md): its own model (resume_tailor_llm_*, never the primary's;
+    # resume_tailor/settings.py read_setup checks them), nine prompts and four strict response formats.
+    "resume_tailor": AiModule("resume_tailor", {**tailor_settings.PROMPT_ROWS,
+                                                **{f"{step}_format": row
+                                                   for step, row in tailor_settings.FORMAT_ROWS.items()}}),
 }
 
 
@@ -61,6 +70,11 @@ class AiConfig:
         return text
 
 
+def _setting(db, key: str) -> str:
+    row = db.query(Setting).filter(Setting.key == key).first()
+    return row.value if row and row.value else ""
+
+
 def ai_config(module: str, db=None) -> AiConfig:
     """The setup `module` runs with now. An unknown module is a bug, so it raises."""
     if module not in AI_MODULES:
@@ -70,7 +84,10 @@ def ai_config(module: str, db=None) -> AiConfig:
     if own_db:
         db = SessionLocal()
     try:
-        llm = resolve_llm_config(spec.feature, db=db)
+        if spec.fallback:
+            llm = resolve_llm_config(spec.feature, db=db)
+        else:
+            llm = {name: _setting(db, f"{spec.feature}_llm_{name}") for name in ("provider", "model", "api_key", "effort")}
         prompts = {}
         for name, key in spec.prompts.items():
             row = db.query(Setting).filter(Setting.key == key).first()

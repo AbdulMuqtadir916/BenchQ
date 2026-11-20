@@ -3,6 +3,7 @@ import type { CandidateInbox } from "@/lib/schemas/inbox";
 
 export type InboxPages = InfiniteData<CandidateInbox, string | null>;
 export const MAX_RESTORE_PAGES = 3;
+const CLASSIFYING = new Set(["PENDING", "PROCESSING"]);
 type RefreshCycle = {signal: AbortSignal; cycles: WeakMap<AbortSignal, boolean>};
 
 /** Refresh the head without replaying all cached history. If more than one
@@ -41,6 +42,14 @@ export async function loadInboxPage(
     // Import can backfill old dates, and other users can erase history. Refresh
     // loaded pages once when counts indicate a change outside the newest mail;
     // ordinary same-count/newest-only polling still reuses history.
+    refresh?.cycles.set(refresh.signal, true);
+    return head;
+  }
+  // Mail still being classified outside the fresh head would keep its stale state, and polling would never stop:
+  // refresh every loaded page once instead, so finished classifications replace the cached ones.
+  const freshIds = new Set(fresh.map(message => message.id));
+  if (cached!.pages.some(cachedPage => cachedPage.messages.some(message =>
+    !freshIds.has(message.id) && CLASSIFYING.has(message.classificationState ?? "")))) {
     refresh?.cycles.set(refresh.signal, true);
     return head;
   }

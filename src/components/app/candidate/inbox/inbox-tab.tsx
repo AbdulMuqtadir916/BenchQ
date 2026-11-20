@@ -6,33 +6,36 @@ import { useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/stores/session-store";
 import { can } from "@/lib/auth/policy";
 import { Mail, RefreshCw } from "lucide-react";
-import type { InboxMessage } from "@/lib/schemas/inbox";
-import { useInboxBody, useDisconnectMailbox, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
+import { EmailCategory, type InboxMessage, type MailSignal } from "@/lib/schemas/inbox";
+import { useInboxBody, useMarkRead, useSyncMailbox } from "@/lib/hooks/use-inbox";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonList } from "@/components/app/skeleton-list";
-import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
+import { CATEGORY_META, mailSignalMeta } from "@/components/app/inbox/signal-meta";
+import { NeedsReviewBadge } from "@/components/app/inbox/needs-review-badge";
 import type { CandidateWorkspace } from "../use-candidate-workspace";
 import type { CandidateActions } from "../candidate-actions";
 import { InboxConnect } from "./inbox-connect";
 import { InboxReader } from "./inbox-reader";
 import { MailboxConfirmation } from "./mailbox-confirmation";
 import { InboxContentDialog } from "./inbox-content-dialog";
+import { DisconnectMailboxDialog } from "./disconnect-mailbox-dialog";
 
-const InboxFilter = z.enum(["ALL", "ACTION", "INTERVIEW_SCHEDULED", "SHORTLISTED", "CALL_REQUEST", "OFFER", "REJECTED"]).catch("ALL");
+/** All, then one filter per email category (docs/02 §2.1), labelled like the email badges. */
+const InboxFilter = z.enum(["ALL", ...EmailCategory.options]).catch("ALL");
 type Filter = z.infer<typeof InboxFilter>;
 const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "ALL", label: "All" },
-  { id: "ACTION", label: "Needs update" },
-  { id: "INTERVIEW_SCHEDULED", label: "Interviews" },
-  { id: "SHORTLISTED", label: "Shortlisted" },
-  { id: "CALL_REQUEST", label: "Calls" },
-  { id: "OFFER", label: "Offers" },
-  { id: "REJECTED", label: "Not selected" },
+  ...EmailCategory.options.map((category) => ({ id: category, label: CATEGORY_META[category].label })),
 ];
+/** Mock mail carries a signal instead of a category; the same filters apply to it. */
+const SIGNAL_CATEGORY: Record<MailSignal, EmailCategory> = {
+  SHORTLISTED: "shortlisted", CALL_REQUEST: "screening_call", INTERVIEW_SCHEDULED: "interview_scheduled",
+  ASSESSMENT: "assessment", OFFER: "offer", REJECTED: "move_on", CONFIRMATION: "applied",
+};
 
 /** The candidate's recruiter mail, matched to applications. Connect first if it isn't. */
 export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; selectedId: string | null; onSelect: (id: string) => void }) {
@@ -47,6 +50,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
   const candidate = ws.candidate!;
   const attempt = params.get("mailbox_confirmation");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const more = ws.inboxQuery;
   const principal = useSession(s => s.principal);
   const canDelete = !!principal && can(principal, "candidate.assign");
@@ -62,12 +66,13 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     window.history.replaceState(null, "", url.pathname + url.search);
   }, [params]);
   const markRead = useMarkRead(candidate.id);
-  const disconnect = useDisconnectMailbox(candidate.id);
   const sync = useSyncMailbox(candidate.id);
   const connected = ws.inbox?.connection?.status === "CONNECTED";
   const pendingIds = new Set(ws.suggestions.map((s) => s.message.id));
-  const inFilter = (f: Filter, m: InboxMessage) =>
-    f === "ALL" || (f === "ACTION" ? pendingIds.has(m.id) : m.signal === f || (f === "SHORTLISTED" && m.signal === "ASSESSMENT"));
+  const reviewIds = new Set(ws.reviews.map((r) => r.messageId));
+  // Live mail carries the classifier's category; mock mail carries a signal (PR 4).
+  const categoryOf = (m: InboxMessage): EmailCategory | null => m.classificationCategory ?? (m.signal ? SIGNAL_CATEGORY[m.signal] : null);
+  const inFilter = (f: Filter, m: InboxMessage) => f === "ALL" || categoryOf(m) === f;
   const filtered = ws.messages.filter((m) => inFilter(filter, m));
   const count = (f: Filter) => ws.messages.filter((m) => inFilter(f, m)).length;
   const selectedSummary = ws.messages.find((m) => m.id === selectedId) ?? filtered[0] ?? null;
@@ -101,10 +106,12 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     return canAct ? (
       <>
         {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
-        {ws.inbox?.connection?.status === "ERROR" ? <><p role="alert">Reconnect required: Google access expired.</p><Button variant="secondary" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>Disconnect</Button></> : null}
+        {ws.inbox?.connection?.status === "ERROR" ? <><p role="alert">Reconnect required: Google access expired.</p><Button variant="secondary" onClick={() => setConfirmDisconnect(true)}>Disconnect</Button></> : null}
         {ws.inbox?.connection?.lastSyncError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{ws.inbox.connection.lastSyncError}</p> : null}
-        {disconnect.error ? <ErrorState error={disconnect.error} onRetry={() => disconnect.mutate()} /> : null}
         <InboxConnect candidate={candidate} />
+        {/* The Disconnect button above opens this; the main screen below is never reached here (Abdul's review on #127). */}
+        {confirmDisconnect ? <DisconnectMailboxDialog candidateId={candidate.id} candidateName={candidate.fullName}
+          onClose={() => setConfirmDisconnect(false)} /> : null}
       </>
     ) : (
       <EmptyState icon={Mail} title={ws.inbox?.connection?.status === "ERROR" ? "Reconnect required" : "Inbox not connected"} description="A recruiter on this candidate can connect their Google account." />
@@ -115,6 +122,11 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
     <div className="space-y-3">
       {callbackMessage ? <p role="status">{callbackMessage}</p> : null}
       {["QUEUED", "IMPORTING"].includes(ws.inbox?.connection?.syncState ?? "") ? <p role="status">Importing emails… You can continue using BenchQ.</p> : null}
+      {ws.inbox?.hiddenCount ? (
+        <p className="text-caption text-[var(--color-text-3)]">
+          {ws.inbox.hiddenCount} {ws.inbox.hiddenCount === 1 ? "email was" : "emails were"} hidden as not about a job (newsletters, notifications). They are kept encrypted for 30 days and are never deleted from Gmail. When the inbox was connected, BenchQ imported the last 3 days of mail.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-[var(--color-text-3)]">
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"><Mail size={13} /></span>
@@ -124,14 +136,13 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           {connected && canAct ? <Button size="sm" variant="secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
             <RefreshCw size={13} aria-hidden className={sync.isPending ? "animate-spin" : undefined} />Sync now
           </Button> : null}
-          {ws.inbox?.connection && ws.inbox.connection.status !== "DISCONNECTED" && canAct ? <Button size="sm" variant="ghost" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>Disconnect</Button> : null}
+          {ws.inbox?.connection && ws.inbox.connection.status !== "DISCONNECTED" && canAct ? <Button size="sm" variant="ghost" onClick={() => setConfirmDisconnect(true)}>Disconnect</Button> : null}
         </div>
       </div>
 
       {!connected && canAct ? <InboxConnect candidate={candidate} compact /> : null}
       {ws.inbox?.connection?.lastSyncError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{ws.inbox.connection.lastSyncError}</p> : null}
       {sync.error ? <ErrorState error={sync.error} onRetry={() => sync.mutate()} /> : null}
-      {disconnect.error ? <ErrorState error={disconnect.error} onRetry={() => disconnect.mutate()} /> : null}
       {markRead.error && selected ? <ErrorState error={markRead.error} onRetry={() => markRead.mutate(selected.id)} /> : null}
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter emails">
         {FILTERS.map((f) => (
@@ -145,7 +156,7 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
         <ul className="max-h-[26rem] divide-y divide-[var(--color-border)] overflow-y-auto border-b border-[var(--color-border)] lg:max-h-none lg:border-b-0 lg:border-r" aria-label="Emails">
           {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-[var(--color-text-3)]">No emails in this view.</li> : null}
           {list.map((m, i) => {
-            const meta = mailSignalMeta(m.signal, m.classificationState);
+            const meta = mailSignalMeta(m.signal, m.classificationState, m.classificationCategory, m.classificationError);
             const isSelected = selected?.id === m.id;
             return (
               <li key={m.id}>
@@ -169,8 +180,9 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
                       <span className={cn("shrink-0 text-caption", isSelected ? "text-[var(--color-text-2)]" : "text-[var(--color-text-3)]")}>{formatRelative(m.receivedAt)}</span>
                     </span>
                     <span className="block truncate text-sm text-[var(--color-text-2)]">{m.subject}</span>
-                    <span className="mt-1 flex items-center gap-1.5">
-                      {m.classificationState !== "NOT_QUEUED" ? <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span> : null}
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {meta.isBadge ? <span data-tone={meta.tone} className="bq-tag"><meta.Icon size={11} aria-hidden />{meta.label}</span> : null}
+                      {reviewIds.has(m.id) ? <NeedsReviewBadge /> : null}
                       {pendingIds.has(m.id) ? <span className="text-caption font-[550] text-[var(--color-violet-fg)]">Update suggested</span> : null}
                     </span>
                   </span>
@@ -180,7 +192,6 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           })}
         </ul>
         <div className="min-h-[24rem] min-w-0">
-          {body.isFetching ? <p role="status">Loading email…</p> : null}
           {body.error ? <ErrorState error={body.error} onRetry={() => void body.refetch()} /> : null}
           <InboxReader
             message={selected}
@@ -188,6 +199,9 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
             suggestion={ws.suggestions.find((s) => s.message.id === selected?.id)}
             canAct={canAct}
             actions={actions}
+            review={ws.reviews.find((r) => r.messageId === selected?.id)}
+            isBodyLoading={body.isLoading}
+            applications={ws.applications}
           />
         </div>
       </div>
@@ -202,6 +216,8 @@ export function InboxTab({ ws, actions, canAct, selectedId, onSelect }: { ws: Ca
           {selected ? <Button variant="secondary" onClick={() => setDeleteTarget(selected.id)}>Delete selected email</Button> : null}
         </div>
       </details> : null}
+      {confirmDisconnect ? <DisconnectMailboxDialog candidateId={candidate.id} candidateName={candidate.fullName}
+        onClose={() => setConfirmDisconnect(false)} /> : null}
       {deleteTarget ? <InboxContentDialog candidateId={candidate.id} candidateName={candidate.fullName}
         count={deleteTarget === "all" ? ws.inbox?.totalCount ?? ws.messages.length : 1}
         messageId={deleteTarget === "all" ? undefined : deleteTarget} onDeleted={onSelect} onClose={() => setDeleteTarget(null)} /> : null}

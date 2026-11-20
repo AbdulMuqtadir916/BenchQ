@@ -34,7 +34,7 @@ export function ResumeLibrary({
   canSeeHidden: (candidateId: string) => boolean;
   actions?: TreeActions;
 }) {
-  const labels = useTreeLabels(candidates);
+  const labels = useTreeLabels(candidates, shelf);
   const [query, setQuery] = useState("");
   const [showTailored, setShowTailored] = useState(true);
   const [candidateId, setCandidateId] = useState("all");

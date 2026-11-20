@@ -18,20 +18,28 @@ type ResumePickerProps = {
 };
 
 const SECTION = "grid gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5";
+/** The one résumé, as text: no border, so it doesn't pass for a dropdown that won't open. */
+const PLAIN = "flex min-w-0 flex-1 items-center gap-2 px-0.5";
+const CHANGE = "flex flex-none items-center gap-1 text-sm font-[550] text-[var(--color-text-2)] [&_svg]:size-[var(--icon-md)] [&_svg]:text-[var(--color-text-3)] [&_svg]:transition-transform motion-reduce:[&_svg]:transition-none";
 const TITLE = "flex min-w-0 items-center gap-1.5 text-sm font-[550] [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none [&_svg]:text-[var(--color-text-3)]";
 const LINK = `justify-self-start ${button("secondary", "compact")}`;
-/** The résumé in use, as a select: the whole row opens the list (07 Q55). */
-const SELECT = `flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:size-[var(--icon-md)] [&>svg]:flex-none [&>svg]:text-[var(--color-text-3)] [&>svg]:transition-transform motion-reduce:[&>svg]:transition-none aria-expanded:[&>svg]:rotate-180`;
-const ROW = "flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5";
+/** The résumé in use, as a select: the whole row opens the list (07 Q55), and says so with "Change ▾". */
+const SELECT = `group flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50`;
 /** One résumé in the open list: the whole row picks it; the one in use is ticked. */
 const OPTION = `flex min-w-0 flex-1 items-start gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] aria-pressed:bg-[var(--color-primary-subtle)] disabled:cursor-not-allowed disabled:opacity-50`;
 const TICK = "mt-0.5 flex-none text-[var(--color-primary)] [&_svg]:size-[var(--icon-md)]";
 /** The base in use, tagged as the website tags it (its blue Active tag). */
 const ACTIVE = "flex-none rounded-full bg-[var(--color-primary-subtle)] px-1.5 text-caption font-[550] text-[var(--color-primary-subtle-fg)]";
 
-function Section({ children }: { children: ReactNode }) {
+const resumesCount = (count: number) => `${count} resume${count === 1 ? "" : "s"}`;
+
+/** The section, titled with how many résumés the candidate has once they're known (07 Q5): "Answers from · 3 resumes". */
+function Section({ count, children }: { count?: number; children: ReactNode }) {
   return <section data-slot="resume-picker" className={SECTION} aria-labelledby="resume-picker-title">
-    <h3 id="resume-picker-title" className={TITLE}>{RESUME_ICON}Answers from</h3>
+    <h3 id="resume-picker-title" className={TITLE}>
+      {RESUME_ICON}Answers from
+      {count ? <span data-slot="resume-count" className="font-normal text-[var(--color-text-3)]">· {resumesCount(count)}</span> : null}
+    </h3>
     {children}
   </section>;
 }
@@ -55,10 +63,11 @@ function Named({ choice }: { choice: ResumeChoice }) {
   </span>;
 }
 
-/** Which résumé Autofill answers from (docs/02 §8.1): closed by default on the one in use, a select-style row whose ▾
- * opens the candidate's résumés, one row each (07 Q55). A click or Enter on a row picks it, the arrow keys move through
- * them, and Esc closes the list. Picking reads that résumé's answers and fills the form at once when it's on the page
- * (the panel does that), its file first when BenchQ has one. One résumé is a plain row: there's nothing to change. */
+/** Which résumé Autofill answers from (docs/02 §8.1), with how many the candidate has in the title. Several: closed by
+ * default on the one in use, a select-style row whose "Change ▾" opens the candidate's résumés, one row each (07 Q55). A
+ * click or Enter on a row picks it, the arrow keys move through them, and Esc closes the list. Picking reads that
+ * résumé's answers and fills the form at once when it's on the page (the panel does that), its file first when BenchQ
+ * has one. One résumé is plain text that says it's the only one, with a way to add another in BenchQ. */
 export default function ResumePicker({ resumes, candidateName, resumesUrl, studioUrl, isBusy, onPick, onRetry, onRetryContext }: ResumePickerProps) {
   const [isListed, setIsListed] = useState(false);
   const listId = useId();
@@ -99,8 +108,16 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
     </Section>;
   }
   if (choices.length < 2) {
-    return <Section>
-      <div className="flex min-w-0 items-center gap-1"><div className={ROW}><Named choice={current} /></div><ViewLink url={studioUrl(current.id)} choice={current} /></div>
+    return <Section count={1}>
+      <div className="flex min-w-0 items-center gap-1"><div className={PLAIN}><Named choice={current} /></div><ViewLink url={studioUrl(current.id)} choice={current} /></div>
+      <p data-slot="resume-only" className={`flex flex-wrap items-center gap-x-1.5 px-0.5 ${MUTED_TEXT}`}>
+        <span>Only resume</span>
+        {resumesUrl && <>
+          <span aria-hidden="true">·</span>
+          <a className="inline-flex items-center gap-1 text-[var(--color-text-2)] underline-offset-2 hover:text-[var(--color-primary)] hover:underline [&_svg]:size-[var(--icon-sm)]"
+            href={resumesUrl} target="_blank" rel="noreferrer">Add another in BenchQ{EXTERNAL_ICON}</a>
+        </>}
+      </p>
     </Section>;
   }
   const close = () => {
@@ -135,27 +152,31 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
     close();
     if (id !== current.id) onPick(id);
   };
-  return <Section>
+  return <Section count={choices.length}>
     <div className="flex min-w-0 items-center gap-1">
       <button ref={select} type="button" data-slot="resume-select" className={SELECT} disabled={isBusy} aria-expanded={isListed}
-        aria-controls={listId} aria-label={`Change the resume. In use: ${current.label}`} onKeyDown={onSelectKey} onClick={() => setIsListed(!isListed)}>
+        aria-controls={listId} aria-label={`Change the resume, ${resumesCount(choices.length)} to choose from. In use: ${current.label}`}
+        onKeyDown={onSelectKey} onClick={() => setIsListed(!isListed)}>
         <Named choice={current} />
-        {CHEVRON_DOWN_ICON}
+        <span data-slot="resume-change" className={`${CHANGE} group-aria-expanded:[&_svg]:rotate-180`}>Change{CHEVRON_DOWN_ICON}</span>
       </button>
       {!isListed && <ViewLink url={studioUrl(current.id)} choice={current} />}
     </div>
-    {isListed && <ul ref={list} id={listId} className="grid gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-1" aria-label={`${candidateName}'s resumes`}>
-      {choices.map((choice) => {
-        const isPicked = choice.id === current.id;
-        return <li key={choice.id} data-slot="resume-choice" className="flex min-w-0 items-center gap-1">
-          <button type="button" data-slot="resume-option" className={OPTION} disabled={isBusy} aria-pressed={isPicked}
-            onKeyDown={onOptionKey} onClick={() => pick(choice.id)}>
-            <span className={`${TICK} ${isPicked ? "" : "invisible"}`} aria-hidden="true">{CHECK}</span>
-            <Named choice={choice} />
-          </button>
-          <ViewLink url={studioUrl(choice.id)} choice={choice} />
-        </li>;
-      })}
-    </ul>}
+    {isListed && <div className="grid gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-border)] p-1">
+      <p id={`${listId}-title`} data-slot="resume-list-title" className={`px-2 pt-1 pb-0.5 ${MUTED_TEXT}`}>{resumesCount(choices.length)} for {candidateName}</p>
+      <ul ref={list} id={listId} className="grid gap-0.5" aria-labelledby={`${listId}-title`}>
+        {choices.map((choice) => {
+          const isPicked = choice.id === current.id;
+          return <li key={choice.id} data-slot="resume-choice" className="flex min-w-0 items-center gap-1">
+            <button type="button" data-slot="resume-option" className={OPTION} disabled={isBusy} aria-pressed={isPicked}
+              onKeyDown={onOptionKey} onClick={() => pick(choice.id)}>
+              <span className={`${TICK} ${isPicked ? "" : "invisible"}`} aria-hidden="true">{CHECK}</span>
+              <Named choice={choice} />
+            </button>
+            <ViewLink url={studioUrl(choice.id)} choice={choice} />
+          </li>;
+        })}
+      </ul>
+    </div>}
   </Section>;
 }

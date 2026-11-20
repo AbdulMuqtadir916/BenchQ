@@ -38,7 +38,7 @@ def list_firm_resumes(firm_id: uuid.UUID, principal: Principal = Depends(current
 
 
 @router.get("/{resume_id}", summary="One version with its content, by its id alone")
-def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, autofill: bool = False,
+def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, autofill: bool = False, editor: bool = False,
                     principal: Principal = Depends(current_principal), db: DbSession = Depends(get_db)):
     _member_of(firm_id, principal)
     row = scoped(db, Resume, firm_id).filter(Resume.id == resume_id, Resume.base_resume_id.isnot(None),
@@ -46,4 +46,4 @@ def get_firm_resume(firm_id: uuid.UUID, resume_id: uuid.UUID, autofill: bool = F
     if row is None:
         raise HTTPException(status_code=404, detail="Not found.")
     candidate = _candidate(db, firm_id, principal, row.candidate_id)  # outside the principal's scope: the same 404
-    return versions.opened_json(row, candidate, with_autofill=autofill)
+    return versions.opened_json(row, candidate, with_autofill=autofill, editor=editor)

@@ -65,7 +65,7 @@ export function FunnelCard({ applications, ratios, period, links }: { applicatio
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-[var(--color-border)] pt-4">
         <div><dt className="text-caption text-[var(--color-text-3)]">Submitted to interview</dt><dd className="text-h2 tabular text-[var(--color-text)]">{ratioText(ratios.submissionToInterviewPct)}</dd></div>
         <div><dt className="text-caption text-[var(--color-text-3)]">Interview to offer</dt><dd className="text-h2 tabular text-[var(--color-text)]">{ratioText(ratios.interviewToOfferPct)}</dd></div>
-        <div><dt className="text-caption text-[var(--color-text-3)]">Applications per placement</dt><dd className="text-h2 tabular text-[var(--color-text)]">{ratioText(ratios.applicationsPerPlacement, "")}</dd></div>
+        <div><dt className="text-caption text-[var(--color-text-3)]">Applications per offer</dt><dd className="text-h2 tabular text-[var(--color-text)]">{ratioText(ratios.applicationsPerOffer, "")}</dd></div>
       </dl>
     </Card>
   );
@@ -115,12 +115,12 @@ export function BenchAgingCard({ health, links }: { health: BenchHealth; links: 
 }
 
 /** Average days for each step, finished in the period, as one strip; the slowest is where applications wait. */
-export function SpeedStrip({ speeds, daysToPlace }: { speeds: StageSpeed[]; daysToPlace: number | null }) {
+export function SpeedStrip({ speeds, daysToOffer }: { speeds: StageSpeed[]; daysToOffer: number | null }) {
   return (
     <Card>
       <CardHeader>
         <div><CardTitle>Time between stages</CardTitle><Hint>Average days, for the steps finished in this period</Hint></div>
-        {daysToPlace !== null ? <Tag tone="blue">{daysToPlace} days to place</Tag> : null}
+        {daysToOffer !== null ? <Tag tone="blue">{daysToOffer} days to an offer</Tag> : null}
       </CardHeader>
       <ol className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {speeds.map((speed, index) => (

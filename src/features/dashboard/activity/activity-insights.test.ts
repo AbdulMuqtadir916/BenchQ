@@ -3,7 +3,7 @@ import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
 import type { User } from "@/lib/schemas/session";
-import { averageDaysToPlace, benchHealth, candidateProgress, changeFrom, compareActivity, needsAttention, previousWindow, ratios, roleDemand, sourceEffectiveness, stageSpeeds } from "./activity-insights";
+import { averageDaysToOffer, benchHealth, candidateProgress, changeFrom, compareActivity, needsAttention, previousWindow, ratios, roleDemand, sourceEffectiveness, stageSpeeds } from "./activity-insights";
 import { windowOf } from "./activity-numbers";
 
 const NOW = new Date("2026-11-10T12:00:00Z");
@@ -11,7 +11,7 @@ const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).to
 const window = windowOf("30d", NOW);
 
 const app = (over: Partial<Application>): Application => ({
-  id: "a", firmId: "f", candidateId: "c1", jobId: "j", resumeVersionId: null, submittedByUserId: "u", status: "APPLIED",
+  id: "a", firmId: "f", candidateId: "c1", jobId: "j", resumeVersionId: null, submittedByUserId: "u", status: "APPLIED", statusRevision: 0, pendingReviewCount: 0,
   companyNameAtApply: "Acme", jobTitleAtApply: "Engineer", appliedAt: daysAgo(2), firstResponseAt: null, interviewAt: null,
   offerAt: null, closedAt: null, expiresAt: null, coverLetterText: null, notes: null, events: [], createdAt: daysAgo(3), ...over,
 });
@@ -41,27 +41,27 @@ describe("speed and ratios", () => {
       app({ appliedAt: daysAgo(20), firstResponseAt: daysAgo(18), interviewAt: daysAgo(8) }),
       app({ appliedAt: daysAgo(10), firstResponseAt: daysAgo(6) }),
     ], window);
-    expect(speeds.map((speed) => speed.averageDays)).toEqual([3, 10, null, null]);
+    expect(speeds.map((speed) => speed.averageDays)).toEqual([3, 10, null]);
     expect(speeds.find((speed) => speed.isSlowest)?.label).toBe("Response → interview");
   });
 
-  it("counts days to place only for placements in the period", () => {
-    expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(40), closedAt: daysAgo(10) }), app({ status: "PLACED", appliedAt: daysAgo(90), closedAt: daysAgo(60) })], window)).toBe(30);
-    expect(averageDaysToPlace([], window)).toBeNull();
-    // A placement dated before its application can't have taken negative time: it is left out, not averaged in.
-    expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(10), closedAt: daysAgo(20) }), app({ status: "PLACED", appliedAt: daysAgo(40), closedAt: daysAgo(10) })], window)).toBe(30);
-    expect(averageDaysToPlace([app({ status: "PLACED", appliedAt: daysAgo(10), closedAt: daysAgo(20) })], window)).toBeNull();
+  it("counts days to an offer only for offers in the period", () => {
+    expect(averageDaysToOffer([app({ status: "OFFER", appliedAt: daysAgo(40), offerAt: daysAgo(10) }), app({ status: "OFFER", appliedAt: daysAgo(90), offerAt: daysAgo(60) })], window)).toBe(30);
+    expect(averageDaysToOffer([], window)).toBeNull();
+    // An offer dated before its application can't have taken negative time: it is left out, not averaged in.
+    expect(averageDaysToOffer([app({ status: "OFFER", appliedAt: daysAgo(10), offerAt: daysAgo(20) }), app({ status: "OFFER", appliedAt: daysAgo(40), offerAt: daysAgo(10) })], window)).toBe(30);
+    expect(averageDaysToOffer([app({ status: "OFFER", appliedAt: daysAgo(10), offerAt: daysAgo(20) })], window)).toBeNull();
   });
 
-  it("gives the submission, interview and placement ratios", () => {
+  it("gives the submission, interview and offer ratios", () => {
     const result = ratios([
       app({ id: "1", interviewAt: daysAgo(1), offerAt: daysAgo(0) }),
       app({ id: "2", interviewAt: daysAgo(1) }),
       app({ id: "3" }),
-      app({ id: "4", status: "PLACED", appliedAt: daysAgo(4), closedAt: daysAgo(1) }),
+      app({ id: "4", appliedAt: daysAgo(4) }),
     ], window);
-    expect(result).toEqual({ submissionToInterviewPct: 50, interviewToOfferPct: 50, applicationsPerPlacement: 4 });
-    expect(ratios([], window)).toEqual({ submissionToInterviewPct: null, interviewToOfferPct: null, applicationsPerPlacement: null });
+    expect(result).toEqual({ submissionToInterviewPct: 50, interviewToOfferPct: 50, applicationsPerOffer: 4 });
+    expect(ratios([], window)).toEqual({ submissionToInterviewPct: null, interviewToOfferPct: null, applicationsPerOffer: null });
   });
 });
 
@@ -116,12 +116,12 @@ describe("a BDE's candidates", () => {
   it("gives the furthest stage, today's count, and flags the quiet ones first", () => {
     const rows = candidateProgress([candidate("busy", { fullName: "Busy" }), candidate("quiet", { fullName: "Quiet" }), candidate("done", { fullName: "Done", status: "PLACED" })], [
       app({ candidateId: "busy", appliedAt: daysAgo(0.5) }),
-      app({ candidateId: "busy", status: "INTERVIEW", appliedAt: daysAgo(3) }),
+      app({ candidateId: "busy", status: "INTERVIEW_SCHEDULED", appliedAt: daysAgo(3) }),
       app({ candidateId: "quiet", appliedAt: daysAgo(20) }),
       app({ candidateId: "done", status: "PLACED", appliedAt: daysAgo(40) }),
     ], NOW);
     expect(rows.map((row) => [row.candidate.id, row.stage, row.today, row.isQuiet])).toEqual([
-      ["quiet", 1, 0, true], ["done", 6, 0, false], ["busy", 4, 1, false],
+      ["quiet", 1, 0, true], ["done", 7, 0, false], ["busy", 5, 1, false],
     ]);
   });
 });

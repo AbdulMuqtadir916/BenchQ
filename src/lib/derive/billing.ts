@@ -2,7 +2,7 @@ import type { Firm } from "@/lib/schemas/session";
 import type { BillingPeriod } from "@/lib/schemas/tenancy";
 
 /**
- * Billing arithmetic and flags (docs/02 §3.5, 07 Q64–Q65). Super Admin only: nothing here is for a firm screen. The
+ * Billing arithmetic and flags (docs/02 §3.5, 07 Q65–Q66). Super Admin only: nothing here is for a firm screen. The
  * amount is never typed or stored: it is the BDE count times the price, and the backend writes the same number.
  */
 
@@ -35,7 +35,7 @@ export type BillingState = "none" | "paid" | "overdue";
 
 /**
  * "No billing period" until the first one starts (an onboarding firm is never overdue). Overdue = the firm has had a
- * period and no PAID period covers today (07 Q65), so a period just started and not yet marked paid counts.
+ * period and no PAID period covers today (07 Q66), so a period just started and not yet marked paid counts.
  */
 export function billingState(firmId: Firm["id"], periods: readonly BillingPeriod[], today: string): BillingState {
   const own = periods.filter((period) => period.firmId === firmId);

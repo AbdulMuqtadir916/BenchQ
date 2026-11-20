@@ -29,9 +29,9 @@ def test_a_module_without_its_own_model_uses_the_primary(test_db):
 
 
 def test_an_empty_prompt_is_a_setup_error(test_db):
-    _set(test_db, cv_tailor_prompt="")
-    with pytest.raises(RuntimeError, match="tailoring module has no 'tailor' prompt"):
-        ai_config("tailoring", db=test_db).prompt("tailor")
+    _set(test_db, cover_letter_prompt="")
+    with pytest.raises(RuntimeError, match="cover_letter module has no 'letter' prompt"):
+        ai_config("cover_letter", db=test_db).prompt("letter")
 
 
 def test_an_unknown_module_raises(test_db):

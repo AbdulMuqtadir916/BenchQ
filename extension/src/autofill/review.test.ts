@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildReview } from "./review";
+import { buildReview, withHistory } from "./review";
 import type { BankEntry, ReviewRow, TabField } from "./types";
 
 const field = (label: string, overrides: Partial<TabField> = {}): TabField => ({
@@ -530,5 +530,83 @@ describe("suggestions for a question nothing answers", () => {
     const offered = review(field("Are you available to work on public holidays?", radio), bank).suggestions!;
     expect(offered).toHaveLength(3);
     expect(offered[0]!.question).toBe("Can you work holidays?");
+  });
+});
+
+describe("a school or job block that repeats (#132)", () => {
+  const history = { education: [{ school: "Osmania University", degree: "MS" }, { school: "JNTU", degree: "BTech" }], work: [] };
+
+  it("fills the n-th block from the résumé's n-th school, and leaves a block past the last one to the BDE", () => {
+    const fields = ["School", "School", "School"].map((label, n) => field(label, { id: `f${n}` }));
+    const rows = withHistory(buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]), history);
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["ready", "Osmania University"], ["ready", "JNTU"], ["manual", null]]);
+  });
+
+  it("gives a block's fields that block's record when an earlier block lacks one, and a year range its last year", () => {
+    // CodeRabbit #129: the third school's degree was the second school's when the second block had no degree field.
+    const three = { education: [{ school: "Osmania University", degree: "MS", graduation_date: "2015 – 2017" },
+      { school: "JNTU", degree: "BTech", graduation_date: "2011 – 2015" }, { school: "IIT", degree: "PhD", graduation_date: "2018 – 2022" }], work: [] };
+    const fields = ["School", "Degree", "School", "School", "Degree", "Graduation year"].map((label, n) => field(label, { id: `f${n}` }));
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }, { ...entry("What year did you graduate?", "2017"), key: "graduation-year" }];
+    expect(withHistory(buildReview(fields, bank), three).map((row) => row.proposed ?? null))
+      .toEqual(["Osmania University", "MS", "JNTU", "IIT", "PhD", "2022"]);
+  });
+
+  it("counts each question on a form that asks every school, then every degree (CodeRabbit #129)", () => {
+    const fields = ["School", "School", "Degree", "Degree"].map((label, n) => field(label, { id: `g${n}` }));
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }];
+    expect(withHistory(buildReview(fields, bank), history).map((row) => row.proposed ?? null))
+      .toEqual(["Osmania University", "JNTU", "MS", "BTech"]);
+  });
+
+  it("starts from the school the first block already holds, and keeps a row the review held back for another reason", () => {
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("School", { id: "f1" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }];
+    const rows = withHistory(buildReview(fields, bank), history);
+    expect(rows.map((row) => row.proposed ?? null)).toEqual(["JNTU", "Osmania University"]);
+    const held = { ...rows[1]!, status: "blocked" as const, reason: "A reference's employer." };
+    expect(withHistory([{ ...rows[0]!, status: "manual", reason: "This asks the same thing again, for another entry, so it's yours to fill." }, held], history)
+      .map((row) => [row.status, row.proposed ?? null])).toEqual([["same", "JNTU"], ["blocked", "Osmania University"]]);
+    expect(withHistory([rows[0]!, held], history)[1]).toEqual(held);
+  });
+
+  it("counts a block whose row the review held back, so the blocks after it keep their own records", () => {
+    const fields = ["School", "School", "School"].map((label, n) => field(label, { id: `f${n}` }));
+    const [first, second, third] = buildReview(fields, [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
+    const held = { ...second!, status: "manual" as const, reason: "None of the options is the saved answer." };
+    const three = { education: [...history.education, { school: "IIT Bombay", degree: "PhD" }], work: [] };
+    const rows = withHistory([first!, held, third!], three);
+    expect(rows[1]).toEqual(held);
+    expect(rows[2]).toMatchObject({ status: "ready", proposed: "IIT Bombay" });
+  });
+
+  it("leaves a first-block answer from another entry to the BDE, so a block never mixes two schools", () => {
+    // The page's first school picks the résumé's entry (JNTU, BTech); the bank's degree is another entry's (MS).
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("Degree", { id: "f1" }), field("School", { id: "f2" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "MS"), key: "education-degree" }];
+    const rows = withHistory(buildReview(fields, bank), history);
+    expect(rows.map((row) => [row.status, row.proposed ?? null])).toEqual([["same", "JNTU"], ["manual", null], ["ready", "Osmania University"]]);
+    expect(rows[1]!.reason).toBe("This block's other answers are from another entry on the résumé.");
+  });
+
+  it("keeps a first-block answer from the entry its block picked", () => {
+    const fields = [field("School", { id: "f0", current: "JNTU" }), field("Degree", { id: "f1" }), field("School", { id: "f2" })];
+    const bank = [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" },
+      { ...entry("What is your highest degree?", "BTech"), key: "education-degree" }];
+    expect(withHistory(buildReview(fields, bank), history)[1]).toMatchObject({ status: "ready", proposed: "BTech" });
+  });
+
+  it("leaves a form with one block as it was", () => {
+    const rows = buildReview([field("School")], [{ ...entry("What school did you attend?", "Osmania University"), key: "education-school" }]);
+    expect(withHistory(rows, history)).toEqual(rows);
+  });
+});
+
+describe("self-identification stays out of the saved form (CodeRabbit #129)", () => {
+  it("keeps pronouns out, like the EEO questions", () => {
+    expect(review(field("Pronouns")).isUnsaved).toBe(true);
   });
 });

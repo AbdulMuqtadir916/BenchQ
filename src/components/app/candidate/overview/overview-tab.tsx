@@ -33,7 +33,7 @@ export function OverviewTab({ ws, actions, canAct, canEditProfile, onNotify }: {
       </div>
       <div className="space-y-5">
         <HandoffNote candidateId={candidate.id} />
-        <TopMatches matches={matches} onFindJobs={actions.findJobs} failed={Boolean(ws.jobsQuery.error)} onRetry={() => void ws.jobsQuery.refetch()} />
+        <TopMatches candidateId={candidate.id} matches={matches} onFindJobs={actions.findJobs} failed={Boolean(ws.jobsQuery.error)} onRetry={() => void ws.jobsQuery.refetch()} />
         <SubmissionFacts candidate={candidate} canEdit={canEditProfile} onSaved={() => onNotify("Submission facts updated")} />
         <BaseResumeCard base={ws.base} onOpenResumes={() => actions.openTab("resumes")} />
       </div>

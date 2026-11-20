@@ -16,7 +16,7 @@ import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
 import type { FirmDetail } from "./use-firm-detail";
 
 /**
- * A firm's billing record (docs/02 §3.5, 07 Q65): its 30-day periods, each a snapshot of the BDE count, the price and
+ * A firm's billing record (docs/02 §3.5, 07 Q66): its 30-day periods, each a snapshot of the BDE count, the price and
  * the calculated amount. Start next 30 days copies the firm's current limits; Mark paid / unpaid edits one period.
  * Super Admin only: amounts appear nowhere a firm can open.
  */

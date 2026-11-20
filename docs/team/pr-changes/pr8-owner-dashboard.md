@@ -148,6 +148,28 @@ firm" becomes a button once a manager is open). The Finance / Activity tabs sit 
 - **Smaller:** a placement dated before its application is left out of "days to place"; Esc that something else already handled (a closed menu) doesn't also go up a level.
 - **Docs:** the sidebar diagram and table (BDEs added, Ledger back, no "Activity" item), the manager's single-dashboard wording, the file path, the integration inventory and the `FollowUpTask` mention in docs/02; and the two cards that do not link (job sources, time between stages) are named.
 
+## Merged with PR 4's stage list (2026-11-11)
+
+PR 4 (`feat/inbox-masking-and-review`) replaced the application stages: Applied → Screening call → Shortlisted →
+Interview schedule request → Interview scheduled → Assessment → Offer, plus Move On. Response, Screening, Interview and
+Placed are legacy values now: shown on old records, never chosen again. When main was merged into that branch, this
+dashboard moved to the new stages, so it doesn't count new work as zero:
+
+- **"Reached"** (`reachedStatuses`, the `reached` filter, the candidate stage meter) uses the funnel's rule: every stage
+  up to the furthest one in the history, a skipped stage included (D1), a legacy Placed as reaching Offer (D6).
+- **Offer is the last stage, so placements are offers:** the Placements tile, columns and card counts are Offers;
+  "Offer → placed" is gone from Time between stages; "days to place" is "days to an offer"; "Applications per
+  placement" is "Applications per offer"; the Applications `by` filter has no `placed`. The Finance tab's Placements and
+  Time to place are Offers and Time to offer.
+- **Per-BDE chart:** applied / Shortlisted / Interview scheduled / Offer.
+- **Dates:** the live backend stores no interview or offer dates, so both come from the history (when the application
+  first got there) when the record has none (`applicationDate` in `list-filters.ts`). On live data the
+  applications mapper now fills all three dates from the history too (`firstResponseAt` = the first move out of
+  Applied), so Responses and % heard back count as well.
+- **Kept:** "Placed" as a candidate status, and Bench placed (bench utilization) with it.
+
+Logged in [cross-area-changes.md](../cross-area-changes.md); for Umamah to review.
+
 ## Files changed
 
 | File | Changes and reason |

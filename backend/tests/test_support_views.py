@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import text
 
 from backend.models.db import Application, Job
+from backend.models.candidates import Candidate
 from backend.models.tenancy import Firm, LedgerEntry, Session, SupportView
 from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_plan, make_user
 from backend.tests.ledger_support import assert_logged
@@ -41,10 +42,20 @@ def world(test_db, accounts):
     job = Job(external_id="ext-1", title="Engineer", company="Initech", url="https://i.test", source="manual")
     test_db.add(job)
     test_db.flush()
-    acme_app = Application(firm_id=acme.id, job_id=job.id, status="applied")
-    globex_app = Application(firm_id=globex.id, job_id=job.id, status="applied")
-    test_db.add_all([acme_app, globex_app])
     resume = make_version(test_db, acme.id, name="Acme base", full_name="A")
+    globex_resume = make_version(test_db, globex.id, name="Globex base", full_name="G")
+    from backend.tests.posting_support import posting_for
+    acme_candidate = test_db.get(Candidate, resume.candidate_id)
+    globex_candidate = test_db.get(Candidate, globex_resume.candidate_id)
+    acme_posting = posting_for(test_db, acme.id, acme_candidate.id, title=job.title, company=job.company,
+                               url=job.url, old_job_id=job.id)
+    globex_posting = posting_for(test_db, globex.id, globex_candidate.id, title=job.title, company=job.company,
+                                 url=job.url, old_job_id=job.id)
+    acme_app = Application(firm_id=acme.id, candidate_id=acme_candidate.id, job_id=acme_posting.id,
+                            status="applied")
+    globex_app = Application(firm_id=globex.id, candidate_id=globex_candidate.id, job_id=globex_posting.id,
+                              status="applied")
+    test_db.add_all([acme_app, globex_app])
     test_db.commit()
     return {"acme": acme.id, "globex": globex.id, "suspended": suspended.id, "onboarding": onboarding.id,
             "acme_app": acme_app.id, "globex_app": globex_app.id, "resume": resume.id, "candidate": resume.candidate_id,

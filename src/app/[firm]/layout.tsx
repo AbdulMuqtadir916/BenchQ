@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { FirmGate } from "@/components/routes/firm-gate";
+import { TailoringPanel } from "@/components/app/tailoring/tailoring-panel";
 import { enforceFirm } from "@/lib/server/principal";
 
 /**
@@ -10,5 +11,6 @@ import { enforceFirm } from "@/lib/server/principal";
 export default async function FirmLayout({ children, params }: { children: ReactNode; params: Promise<{ firm: string }> }) {
   const { firm } = await params;
   await enforceFirm(firm);
-  return <FirmGate slug={firm}>{children}</FirmGate>;
+  // The BDE's tailorings follow them across every page of the firm, the studio and Focus mode included (tailoring part 3).
+  return <FirmGate slug={firm}>{children}<TailoringPanel /></FirmGate>;
 }

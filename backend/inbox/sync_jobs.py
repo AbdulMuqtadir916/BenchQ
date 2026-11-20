@@ -108,12 +108,19 @@ def run_import(firm_id, candidate_id, generation):
                         page_token = page.get('nextPageToken')
                         if not page_token:
                             break
-                params = {'startHistoryId': checkpoint, 'historyTypes': 'messageAdded', 'maxResults': 100}
+                params = {'startHistoryId': checkpoint, 'historyTypes': ['messageAdded', 'labelAdded'], 'maxResults': 100}
                 try:
                     while True:
                         page = gmail._api_get(http, 'history', token, params)
-                        count += import_ids([w['message']['id'] for e in page.get('history', [])
-                            for w in e.get('messagesAdded', []) if w.get('message', {}).get('id')])
+                        ids = []
+                        for event in page.get('history', []):
+                            ids += [w['message']['id'] for w in event.get('messagesAdded', [])
+                                    if w.get('message', {}).get('id')]
+                            # Moved into the inbox later (out of Spam, out of an archive): Gmail reports a label
+                            # change, not a new message. Already-imported ids are skipped by _store_message.
+                            ids += [w['message']['id'] for w in event.get('labelsAdded', [])
+                                    if 'INBOX' in (w.get('labelIds') or []) and w.get('message', {}).get('id')]
+                        count += import_ids(ids)
                         if not page.get('nextPageToken'):
                             checkpoint = str(page.get('historyId') or checkpoint)
                             break

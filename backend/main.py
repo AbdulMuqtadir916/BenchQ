@@ -1,4 +1,5 @@
 """FastAPI entry point for JobNavigator."""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -38,6 +39,7 @@ from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
 from backend.api.routes_candidates import router as candidates_router
 from backend.api.routes_candidate_resumes import router as candidate_resumes_router
+from backend.api.routes_resume_tailoring import firm_router as resume_tailoring_firm_router, router as resume_tailoring_router
 from backend.api.routes_job_search import router as job_search_router
 from backend.api.routes_firm_resumes import router as firm_resumes_router
 from backend.api.routes_ledger import router as ledger_router
@@ -79,8 +81,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"OpenRouter price warmup failed: {e}")
 
+    # The résumé tailor's heartbeat: this worker stamps the tailorings it holds (backend/resume_tailor/runs.py).
+    from backend.resume_tailor.runs import keep_stamping
+    heartbeat = asyncio.create_task(keep_stamping())
+
     yield
 
+    heartbeat.cancel()
     scheduler.shutdown()
     logger.info("Shutting down JobNavigator backend...")
 
@@ -197,6 +204,9 @@ app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")
 app.include_router(candidates_router, prefix="/api")
+# Before the résumé routes: `…/resumes/tailorings` must not be read as a résumé id.
+app.include_router(resume_tailoring_router, prefix="/api")
+app.include_router(resume_tailoring_firm_router, prefix="/api")
 app.include_router(candidate_resumes_router, prefix="/api")
 app.include_router(job_search_router, prefix="/api")
 app.include_router(firm_resumes_router, prefix="/api")
@@ -1346,6 +1356,29 @@ def get_stats_sankey(firm_id=Depends(reader_firm_id)):
 
 # ── LLM cost stats ───────────────────────────────────────────────────────────
 
+def _classification_uncounted(db, since) -> dict:
+    """unpriced_calls: dispatched, finished, cost unknown (no llm_call_log row). unconfirmed_calls: dispatch started but
+    the attempt never finished (crash/abandoned), so it may have been charged. Calls refused for credentials are not
+    charged and not counted."""
+    from datetime import datetime, timedelta, timezone
+    from backend.models.db import JobRun
+
+    q = db.query(JobRun).filter(JobRun.job_type == "candidate_email_classification")
+    if since is not None:
+        q = q.filter(JobRun.started_at >= since)
+    stale = datetime.now(timezone.utc) - timedelta(minutes=5)
+    unpriced = unconfirmed = 0
+    for run in q.all():
+        meta = run.meta or {}
+        if not meta.get("dispatch_started"):
+            continue
+        if run.status == "running":
+            unconfirmed += bool(run.started_at and run.started_at < stale)
+        elif (meta.get("usage") or {}).get("cost_quality") == "UNKNOWN" and meta.get("error_code") != "PROVIDER_AUTH_REJECTED":
+            unpriced += 1
+    return {"unpriced_calls": unpriced, "unconfirmed_calls": unconfirmed}
+
+
 def _llm_costs_stats(days: int = 7) -> dict:
     """Aggregate llm_call_log rows within the last `days` days."""
     from datetime import datetime, timedelta, timezone
@@ -1402,6 +1435,8 @@ def _llm_costs_stats(days: int = 7) -> dict:
             "total_calls": total_calls,
             "total_cost_usd": round(total_cost, 6),
             "by_purpose": sorted(by_purpose, key=lambda x: -x["cost_usd"]),
+            # Classification calls whose charge is not in total_cost_usd (PR 4, DEBUG D-15).
+            "candidate_email_classification": _classification_uncounted(db, since if days and days > 0 else None),
         }
     finally:
         db.close()

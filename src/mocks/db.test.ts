@@ -79,15 +79,15 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     const first = await load(T0, ADNAN);
     const app = first.applications.allApplications.find((a) => a.id === "app_001")!;
     const before = app.status;
-    await first.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: "persist me" });
+    await first.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "MOVE_ON", note: "persist me" });
     first.db.flush();
     first.signIn.signOutForTest();
     expect(Object.keys(stored()!.tables)).toEqual(["applications"]);
 
     const second = await load(at(1), FATIMA); // next day, another account in the same browser
     const moved = await second.applications.applicationsMock.byId("firm_hts", "app_001");
-    expect(before).not.toBe("WITHDRAWN");
-    expect(moved.status).toBe("WITHDRAWN");
+    expect(before).not.toBe("MOVE_ON");
+    expect(moved.status).toBe("MOVE_ON");
     expect(moved.events.at(-1)).toMatchObject({ note: "persist me", actorUserId: "user_adnan" });
     expect(stored()!.seededAt).toBe(T0);
   });
@@ -118,7 +118,7 @@ describe("persistence across reloads, sign-outs and accounts", () => {
 
   it("reset (Super Admin only) wipes every change and re-anchors to now; nobody else may reset", async () => {
     const m = await load(T0, ADNAN);
-    await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: null });
+    await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "MOVE_ON", note: null });
     m.db.flush();
     await expect(m.demo.demoDataMock.reset()).rejects.toMatchObject({ status: 403 });
 
@@ -127,10 +127,10 @@ describe("persistence across reloads, sign-outs and accounts", () => {
     later.db.watchDemoData(() => heard.push("changed"));
     await later.demo.demoDataMock.reset();
     expect(stored()).toMatchObject({ seededAt: at(6), tables: {} });
-    expect(later.applications.allApplications.find((a) => a.id === "app_001")?.status).not.toBe("WITHDRAWN"); // replaced in place
+    expect(later.applications.allApplications.find((a) => a.id === "app_001")?.status).not.toBe("MOVE_ON"); // replaced in place
     expect(heard).toEqual(["changed"]);
     const after = await load(at(6), FATIMA);
-    expect((await after.applications.applicationsMock.byId("firm_hts", "app_001")).status).not.toBe("WITHDRAWN");
+    expect((await after.applications.applicationsMock.byId("firm_hts", "app_001")).status).not.toBe("MOVE_ON");
   });
 
   it("reseeds when the stored data is from another fixture version, unreadable, or a table no longer fits its schema", async () => {
@@ -159,12 +159,12 @@ describe("persistence across reloads, sign-outs and accounts", () => {
 
     // Tab B (another set of modules) moves an application and saves.
     const tabB = await load(T0, ADNAN);
-    await tabB.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "WITHDRAWN", note: null });
+    await tabB.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "MOVE_ON", note: null });
     tabB.db.flush();
     window.dispatchEvent(Object.assign(new Event("storage"), { key: KEY }));
 
     expect(heard).toEqual(["refresh"]);
-    expect(rowsA.find((a) => a.id === "app_001")?.status).toBe("WITHDRAWN"); // the same array, now holding tab B's rows
+    expect(rowsA.find((a) => a.id === "app_001")?.status).toBe("MOVE_ON"); // the same array, now holding tab B's rows
   });
 });
 
@@ -211,18 +211,18 @@ describe("a full localStorage (docs/03 §3.3)", () => {
     m.db.watchStorageFull((isFull) => states.push(isFull));
 
     full.full = true;
-    await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "RESPONSE", note: "kept" });
+    await m.applications.applicationsMock.updateStatus("firm_hts", "app_001", { status: "SCREENING_CALL", note: "kept" });
     m.db.flush();
-    expect(m.applications.allApplications.find((a) => a.id === "app_001")?.status).toBe("RESPONSE"); // not lost in this tab
+    expect(m.applications.allApplications.find((a) => a.id === "app_001")?.status).toBe("SCREENING_CALL"); // not lost in this tab
     expect(stored()!.tables).toEqual({}); // nothing reached storage
     expect(states).toEqual([false, true]); // the app shows "Demo storage is full…"
 
     full.full = false;
-    await m.applications.applicationsMock.updateStatus("firm_hts", "app_003", { status: "RESPONSE", note: null });
+    await m.applications.applicationsMock.updateStatus("firm_hts", "app_003", { status: "SCREENING_CALL", note: null });
     m.db.flush();
     const saved = stored()!.tables.applications as { id: string; status: string }[];
-    expect(saved.find((a) => a.id === "app_001")?.status).toBe("RESPONSE"); // the earlier change made it after all
-    expect(saved.find((a) => a.id === "app_003")?.status).toBe("RESPONSE");
+    expect(saved.find((a) => a.id === "app_001")?.status).toBe("SCREENING_CALL"); // the earlier change made it after all
+    expect(saved.find((a) => a.id === "app_003")?.status).toBe("SCREENING_CALL");
     expect(states).toEqual([false, true, false]);
   });
 

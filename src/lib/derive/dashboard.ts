@@ -37,7 +37,7 @@ export function deriveBdeDashboard(
     queueCount: myCandidates.filter((c) => c.status === "ON_BENCH").length,
     applicationsThisWeek: submittedThisWeek.length,
     responsesThisWeek: responsesThisWeek.length,
-    interviewsScheduled: myApps.filter((a) => a.status === "INTERVIEW").length,
+    interviewsScheduled: myApps.filter((a) => a.status === "INTERVIEW_SCHEDULED" || a.status === "INTERVIEW").length,
     candidatesAssigned: myCandidates.length,
     atRiskCandidateIds: atRisk.map((c) => c.id),
   };

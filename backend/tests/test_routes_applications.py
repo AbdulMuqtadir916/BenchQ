@@ -1,4 +1,7 @@
-"""Tests for /api/applications endpoints + dedup + transition + company auto-create."""
+"""Tests for /api/applications endpoints: status transitions and the list's filter.
+
+Logging a job with no candidate (with its URL dedup, company auto-create and JD fetch) is retired since applications
+moved onto job_postings (2026-11-11); adding a job for a candidate is test_applications_on_postings.py's."""
 import pytest
 
 # Bound at import time, before the autouse fixture below replaces the module attribute.
@@ -37,156 +40,54 @@ def _stub_background_tasks(monkeypatch):
     )
 
 
-def test_create_application_returns_id(api_client, test_db):
-    """POST /api/applications with valid body → 200 + id."""
-    resp = api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "Senior Product Manager",
-        "url": "https://careers.acme.com/jobs/123",
-    })
-    assert resp.status_code in (200, 201), f"Unexpected status {resp.status_code}: {resp.text}"
-    data = resp.json()
-    assert "id" in data
-    assert data.get("status") == "applied"
-    assert data.get("company") == "Acme"
-
-
-def test_create_application_dedups_by_url(api_client, test_db):
-    """Same URL with different UTM params → single Job row (external_id collision)."""
-    api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "Senior PM",
-        "url": "https://careers.acme.com/jobs/123?utm_source=linkedin",
-    })
-    api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "Senior PM",
-        "url": "https://careers.acme.com/jobs/123?utm_campaign=x",
-    })
-
-    from backend.models.db import Job
-    jobs = test_db.query(Job).filter(Job.company == "Acme").all()
-    assert len(jobs) == 1, (
-        f"Expected UTM-dedup to collapse both URLs into 1 job, got {len(jobs)}"
-    )
-
-
-def test_create_application_auto_creates_company(api_client, test_db):
-    """POST with an unknown company name → Company row auto-created."""
-    api_client.post("/api/applications", json={
-        "company": "NewCoTestAbc",
-        "title": "Senior PM",
-        "url": "https://example.com/jobs/456",
-    })
-
-    from backend.models.db import Company
-    co = test_db.query(Company).filter(Company.name == "NewCoTestAbc").first()
-    assert co is not None, "Company should have been auto-created on apply"
+def _application(test_db, title):
+    """A candidate's Applied application on a posting of theirs (every application is one since migration 0027)."""
+    from backend.models.db import Application
+    from backend.models.tenancy import DEFAULT_FIRM_ID
+    from backend.tests.posting_support import posting_for
+    from backend.tests.resume_support import make_version
+    candidate_id = make_version(test_db, DEFAULT_FIRM_ID).candidate_id
+    posting = posting_for(test_db, DEFAULT_FIRM_ID, candidate_id, title=title, company="Acme", url="https://x.com/1")
+    app = Application(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate_id, job_id=posting.id, status="applied")
+    test_db.add(app)
+    test_db.commit()
+    return app
 
 
 def test_patch_application_status_records_transition(api_client, test_db):
     """PATCH status → Application.status_transitions has an entry with source='ui'."""
-    created = api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "Senior PM",
-        "url": "https://x.com/1",
-    }).json()
-    aid = created["id"]
+    aid = _application(test_db, "Senior PM").id
 
-    resp = api_client.patch(f"/api/applications/{aid}", json={"status": "interview"})
-    assert resp.status_code == 200
+    resp = api_client.patch(f"/api/applications/{aid}", json={"status": "interview_scheduled", "expected_revision": 0})
+    assert resp.status_code == 200, resp.text
 
     from backend.models.db import Application
+    test_db.expire_all()
     app = test_db.query(Application).filter(Application.id == aid).first()
     assert app is not None
-    assert app.status == "interview"
+    assert app.status == "interview_scheduled"
     assert any(
-        t.get("to") == "interview" and t.get("source") == "ui"
+        t.get("to") == "interview_scheduled" and t.get("source") == "ui"
         for t in (app.status_transitions or [])
-    ), f"Expected ui-sourced transition to interview, got: {app.status_transitions}"
+    ), f"Expected ui-sourced transition to interview_scheduled, got: {app.status_transitions}"
 
 
 def test_list_applications_filters_by_status(api_client, test_db):
-    """GET /api/applications?status=rejected returns only rejected apps."""
-    api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "PM1",
-        "url": "https://x.com/1",
-    })
-    a2 = api_client.post("/api/applications", json={
-        "company": "Acme",
-        "title": "PM2",
-        "url": "https://x.com/2",
-    }).json()
-    api_client.patch(f"/api/applications/{a2['id']}", json={"status": "rejected"})
+    """GET /api/applications?status=move_on returns only the applications moved on."""
+    _application(test_db, "PM1")
+    a2 = _application(test_db, "PM2")
+    moved = api_client.patch(f"/api/applications/{a2.id}", json={"status": "move_on", "expected_revision": 0})
+    assert moved.status_code == 200, moved.text
 
-    resp = api_client.get("/api/applications?status=rejected")
+    resp = api_client.get("/api/applications?status=move_on")
     assert resp.status_code == 200
     data = resp.json()
     # Response shape: {"total": N, "applications": [...]}
     apps = data.get("applications") if isinstance(data, dict) else data
     assert apps is not None, f"Unexpected response shape: {data}"
     titles = [a.get("title") for a in apps]
-    assert "PM2" in titles, f"Expected PM2 in rejected list, got titles: {titles}"
-    assert "PM1" not in titles, f"PM1 should not be in rejected list, got titles: {titles}"
-
-
-def test_create_application_twice_returns_409(api_client, test_db):
-    """A second POST for the same posting must not overwrite the first."""
-    body = {"company": "Acme", "title": "PM", "url": "https://acme.example/jobs/1", "notes": "first"}
-    first = api_client.post("/api/applications", json=body)
-    assert first.status_code == 200
-    second = api_client.post("/api/applications", json={**body, "notes": "second", "status": "interview"})
-    assert second.status_code == 409
-    assert second.json()["detail"]["application_id"] == first.json()["id"]
-    apps = api_client.get("/api/applications").json()
-    apps = apps if isinstance(apps, list) else apps.get("applications", [])
-    mine = [a for a in apps if a.get("id") == first.json()["id"]]
-    assert len(mine) == 1 and mine[0]["status"] == "applied"
-    assert mine[0].get("notes", "first") == "first"
-
-
-# ── JD fetched at log time ───────────────────────────────────────────────────
-
-def test_log_schedules_a_description_fetch(api_client, test_db, monkeypatch):
-    """A hand-logged job has no description, so the route queues one fetch."""
-    import backend.api.routes_applications as ra
-    seen = []
-
-    async def _spy(job_id, url):
-        seen.append((job_id, url))
-
-    monkeypatch.setattr(ra, "_fetch_and_store_description", _spy, raising=False)
-    resp = api_client.post("/api/applications", json={
-        "url": "https://acme.com/jobs/7", "title": "Senior PM", "company": "Acme"})
-    assert resp.status_code == 200
-    assert len(seen) == 1
-    assert seen[0][1] == "https://acme.com/jobs/7"
-
-
-def test_log_skips_the_fetch_when_the_job_already_has_a_description(api_client, test_db, monkeypatch):
-    """The job row exists from a scrape and carries a JD, so nothing is fetched."""
-    import uuid
-    import backend.api.routes_applications as ra
-    from backend.models.db import Job
-    from backend.scraper._shared.dedup import make_external_id
-
-    url = "https://acme.com/jobs/8"
-    test_db.add(Job(id=uuid.uuid4(), external_id=make_external_id("Acme", "Senior PM", url),
-                    company="Acme", title="Senior PM", url=url, status="saved",
-                    description="Scraped JD"))
-    test_db.commit()
-
-    seen = []
-
-    async def _spy(job_id, url):
-        seen.append(job_id)
-
-    monkeypatch.setattr(ra, "_fetch_and_store_description", _spy, raising=False)
-    resp = api_client.post("/api/applications", json={
-        "url": url, "title": "Senior PM", "company": "Acme"})
-    assert resp.status_code == 200
-    assert seen == []
+    assert "PM2" in titles, f"Expected PM2 in the moved-on list, got titles: {titles}"
+    assert "PM1" not in titles, f"PM1 should not be in the moved-on list, got titles: {titles}"
 
 
 @pytest.mark.asyncio

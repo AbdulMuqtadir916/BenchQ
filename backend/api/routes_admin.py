@@ -63,8 +63,8 @@ class CreateFirmBody(BaseModel):
     name: str = Field(max_length=200)
     slug: str = Field(max_length=64)
     plan_id: uuid.UUID
-    seat_limit: int | None = Field(default=None, ge=1, le=MAX_SEATS)     # BDEs; the plan's count when left out (Q64)
-    candidate_limit: int | None = Field(default=None, ge=0, le=100_000)   # 10 per BDE when left out (Q67)
+    seat_limit: int | None = Field(default=None, ge=1, le=MAX_SEATS)     # BDEs; the plan's count when left out (Q65)
+    candidate_limit: int | None = Field(default=None, ge=0, le=100_000)   # 10 per BDE when left out (Q68)
     primary_timezone: str = Field(default="Asia/Kolkata", max_length=64)
     client_timezone: str = Field(default="America/New_York", max_length=64)
     contact_phone: str | None = Field(default=None, max_length=40)

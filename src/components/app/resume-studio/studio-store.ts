@@ -4,6 +4,8 @@ import { create } from "zustand";
 import type { ResumeDocument, ResumeSectionKey } from "@/lib/schemas/resume-document";
 
 export type StudioMode = "build" | "view";
+/** The studio's tabs: its two ways of editing the document, and the version's Autofill answers (its own page). */
+export type StudioTab = StudioMode | "autofill";
 export type Zoom = "fit" | number;
 
 interface StudioState {

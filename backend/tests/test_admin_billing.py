@@ -1,4 +1,4 @@
-"""Billing records (07 Q64-Q66, docs/02 §3.5): a firm's BDE count and the candidate limit that follows, 30-day
+"""Billing records (07 Q65-Q67, docs/02 §3.5): a firm's BDE count and the candidate limit that follows, 30-day
 periods, the base plan's price, suspend and reactivate, and the rule that no money reaches a firm."""
 from datetime import date, timedelta
 import json
@@ -234,7 +234,7 @@ def test_a_firm_user_cannot_reach_billing_or_firm_actions(anonymous_client, acco
     assert r.status_code == 403
 
 
-# ── No money reaches a firm (Q66) ────────────────────────────────────────────
+# ── No money reaches a firm (Q67) ────────────────────────────────────────────
 
 def test_no_firm_side_response_carries_price_amount_or_periods(api_client, anonymous_client, accounts):
     _start(api_client, accounts, starts_on="2026-11-12")

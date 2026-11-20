@@ -1,7 +1,7 @@
-"""Billing records: a price per BDE and 30-day billing periods (docs/07 Q64-Q66, docs/02 §3.5).
+"""Billing records: a price per BDE and 30-day billing periods (docs/07 Q65-Q67, docs/02 §3.5).
 
-Revision ID: 0025
-Revises: 0024
+Revision ID: 0028
+Revises: 0027
 Create Date: 2026-11-12 12:00:00.000000
 
 `plans.price_cents_per_seat` and `firms.price_cents_per_seat` (USD cents, default $35, the firm's copied from its plan
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = '0025'
-down_revision = '0024'
+revision = '0028'
+down_revision = '0027'
 branch_labels = None
 depends_on = None
 

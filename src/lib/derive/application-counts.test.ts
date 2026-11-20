@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CLOSED, isClosed } from "@/components/app/applications/status-meta";
-import { ApplicationStatus } from "@/lib/schemas/enums";
+import { CLOSED, isActive, isClosed } from "@/components/app/applications/status-meta";
+import { ApplicationStatus, LegacyApplicationStatus, type StoredApplicationStatus } from "@/lib/schemas/enums";
 import { allApplications } from "@/mocks/applications";
 import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
-import { CLOSED_STATUSES, OPEN_STATUSES, applicationsInScope, applicationsSubmittedWithin, countApplications, describeApplicationCounts, isSubmitted } from "./application-counts";
+import { CLOSED_STATUSES, applicationsInScope, applicationsSubmittedWithin, countApplications, describeApplicationCounts, isSubmitted } from "./application-counts";
 import { deriveCandidateStats } from "./candidate-stats";
 import { deriveFunnel } from "./funnel";
 
@@ -12,13 +12,15 @@ import { deriveFunnel } from "./funnel";
  * out), the tab said "13 active" (saved jobs counted as active), and the board showed 13 cards. A saved job is a draft or
  * favourite, "not proof of submission" (docs/02), so it is not an application; this file pins one definition for every screen.
  */
-const some = (spec: Partial<Record<ApplicationStatus, number>>) =>
-  Object.entries(spec).flatMap(([status, n]) => Array.from({ length: n }, () => ({ status: status as ApplicationStatus })));
+const some = (spec: Partial<Record<StoredApplicationStatus, number>>) =>
+  Object.entries(spec).flatMap(([status, n]) => Array.from({ length: n }, () => ({ status: status as StoredApplicationStatus })));
+/** Every value an application can hold: the selectable stages and the preserved legacy ones (docs/02 §2.1). */
+const EVERY_STATUS: StoredApplicationStatus[] = [...ApplicationStatus.options, ...LegacyApplicationStatus.options];
 
 describe("countApplications", () => {
   it("splits a candidate's list into saved, active, placed and closed, and the submitted ones are everything but saved", () => {
     // cand_06's shape: 15 in all, 3 of them only saved.
-    const counts = countApplications(some({ SAVED: 3, APPLIED: 4, RESPONSE: 2, SCREENING: 2, INTERVIEW: 1, OFFER: 1, REJECTED: 1, WITHDRAWN: 1 }));
+    const counts = countApplications(some({ SAVED: 3, APPLIED: 4, SCREENING_CALL: 2, SHORTLISTED: 2, INTERVIEW_SCHEDULED: 1, OFFER: 1, MOVE_ON: 1, WITHDRAWN: 1 }));
     expect(counts).toEqual({ saved: 3, open: 10, placed: 0, closed: 2, submitted: 12 });
   });
 
@@ -27,7 +29,7 @@ describe("countApplications", () => {
   });
 
   it("puts every status in exactly one bucket, so nothing is counted twice or lost", () => {
-    for (const status of ApplicationStatus.options) {
+    for (const status of EVERY_STATUS) {
       const c = countApplications([{ status }]);
       expect(c.saved + c.open + c.placed + c.closed, status).toBe(1);
       expect(c.submitted, status).toBe(status === "SAVED" ? 0 : 1);
@@ -36,13 +38,19 @@ describe("countApplications", () => {
 
   it("a saved job is not submitted; every other status is", () => {
     expect(isSubmitted("SAVED")).toBe(false);
-    for (const status of ApplicationStatus.options.filter((s) => s !== "SAVED")) expect(isSubmitted(status), status).toBe(true);
+    for (const status of EVERY_STATUS.filter((s) => s !== "SAVED")) expect(isSubmitted(status), status).toBe(true);
   });
 
   it("agrees with the board's own idea of closed (status-meta), so the two lists cannot drift apart", () => {
-    expect([...CLOSED_STATUSES].sort()).toEqual([...CLOSED].sort());
-    for (const status of ApplicationStatus.options) expect(isClosed(status), status).toBe(CLOSED_STATUSES.includes(status));
-    expect(OPEN_STATUSES.some((s) => CLOSED_STATUSES.includes(s))).toBe(false);
+    // status-meta's CLOSED also holds a legacy Placed, which is counted on its own here.
+    expect([...CLOSED_STATUSES].sort()).toEqual(CLOSED.filter((s) => s !== "PLACED").sort());
+    for (const status of EVERY_STATUS) expect(isClosed(status), status).toBe(CLOSED_STATUSES.includes(status) || status === "PLACED");
+    expect(EVERY_STATUS.some((s) => isActive(s) && isClosed(s))).toBe(false);
+  });
+
+  it("counts every new stage from Applied to Offer as active, and Move On as closed", () => {
+    expect(countApplications(some({ APPLIED: 1, SCREENING_CALL: 1, SHORTLISTED: 1, INTERVIEW_SCHEDULE_REQUEST: 1, INTERVIEW_SCHEDULED: 1, ASSESSMENT: 1, OFFER: 1, INCOMPLETE_APPLICATION: 1 })).open).toBe(8);
+    expect(countApplications(some({ MOVE_ON: 2 }))).toMatchObject({ open: 0, closed: 2, submitted: 2 });
   });
 });
 
@@ -79,7 +87,7 @@ describe("one definition across the candidate screen", () => {
  */
 describe("applicationsSubmittedWithin, an Analytics period", () => {
   const NOW = new Date("2026-11-10T12:00:00.000Z");
-  const app = (status: ApplicationStatus, daysAgo: number | null) => ({
+  const app = (status: StoredApplicationStatus, daysAgo: number | null) => ({
     status, appliedAt: daysAgo === null ? null : new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString(),
   });
 
@@ -89,9 +97,9 @@ describe("applicationsSubmittedWithin, an Analytics period", () => {
   });
 
   it("keeps submitted applications from inside the period and drops the older ones (the last day counts)", () => {
-    const apps = [app("APPLIED", 0), app("RESPONSE", 7), app("APPLIED", -0.01), app("APPLIED", 7.01), app("INTERVIEW", 8), app("OFFER", 29), app("PLACED", 31), app("REJECTED", 89), app("EXPIRED", 120)];
-    expect(applicationsSubmittedWithin(apps, 7, NOW).map((a) => a.status)).toEqual(["APPLIED", "RESPONSE"]);
-    expect(applicationsSubmittedWithin(apps, 30, NOW).map((a) => a.status)).toEqual(["APPLIED", "RESPONSE", "APPLIED", "INTERVIEW", "OFFER"]);
+    const apps = [app("APPLIED", 0), app("SCREENING_CALL", 7), app("APPLIED", -0.01), app("APPLIED", 7.01), app("INTERVIEW_SCHEDULED", 8), app("OFFER", 29), app("PLACED", 31), app("MOVE_ON", 89), app("EXPIRED", 120)];
+    expect(applicationsSubmittedWithin(apps, 7, NOW).map((a) => a.status)).toEqual(["APPLIED", "SCREENING_CALL"]);
+    expect(applicationsSubmittedWithin(apps, 30, NOW).map((a) => a.status)).toEqual(["APPLIED", "SCREENING_CALL", "APPLIED", "INTERVIEW_SCHEDULED", "OFFER"]);
     expect(applicationsSubmittedWithin(apps, 90, NOW)).toHaveLength(7);
   });
 
@@ -111,21 +119,26 @@ describe("applicationsSubmittedWithin, an Analytics period", () => {
   });
 });
 
-// PR #128 review: Active excludes Saved and Placed, and the count, the board and the list use the same rule; All keeps everything.
+// PR #128 review: the count, the board and the list use the same rule; All keeps everything. On the PR 4 board Saved and Move On
+// have their own columns, so Active shows them, and the line above the board names them (saved; Move On under closed).
 describe("applicationsInScope", () => {
-  const list = some({ SAVED: 2, APPLIED: 3, INTERVIEW: 1, OFFER: 1, PLACED: 2, REJECTED: 1, EXPIRED: 1 });
+  const list = some({ SAVED: 2, APPLIED: 3, INTERVIEW_SCHEDULED: 1, OFFER: 1, MOVE_ON: 1, PLACED: 2, REJECTED: 1, EXPIRED: 1 });
 
-  it("Active keeps only the open stages, so Saved, Placed and the closed ones are left out", () => {
+  it("Active keeps what the board has a column for: Saved, the open stages and Move On; legacy Placed and closed are left out", () => {
     const active = applicationsInScope(list, "active");
-    expect(active).toHaveLength(5);
-    expect(active.every((a) => OPEN_STATUSES.includes(a.status))).toBe(true);
+    expect(active).toHaveLength(8);
+    expect(active.some((a) => a.status === "PLACED" || a.status === "REJECTED" || a.status === "EXPIRED")).toBe(false);
   });
 
   it("All keeps every application", () => {
     expect(applicationsInScope(list, "all")).toHaveLength(list.length);
   });
 
-  it("the Active count is exactly the number of Active rows", () => {
-    expect(countApplications(list).open).toBe(applicationsInScope(list, "active").length);
+  it("every Active row is named in the line: active, saved, or Move On under closed", () => {
+    const counts = countApplications(list);
+    const active = applicationsInScope(list, "active");
+    expect(active.filter((a) => isActive(a.status))).toHaveLength(counts.open);
+    expect(active.filter((a) => a.status === "SAVED")).toHaveLength(counts.saved);
+    expect(active.filter((a) => a.status === "MOVE_ON").length).toBeLessThanOrEqual(counts.closed);
   });
 });

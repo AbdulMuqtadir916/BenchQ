@@ -1,7 +1,7 @@
 import { optionFor, pickOneReason } from "./options";
 import { racePartsFor } from "./race";
 import type {
-  ChoiceList, ChoiceRequest, FieldOption, FieldTarget, FillRequest, FillResult, FrameRead, FrameScan, PageApi, PageSignals, TabField,
+  ChoiceList, ChoiceRequest, FieldOption, FieldTarget, FillRequest, FillResult, FrameRead, FrameScan, PageApi, PageJob, PageSignals, TabField,
   UndoResult,
 } from "./types";
 
@@ -63,6 +63,23 @@ export async function scanTab(tabId: number): Promise<TabScan> {
     signals: scans.find(({ result }) => result.signals)?.result.signals ?? null,
     unreadableFrames: await countUnreadable(tabId, scans),
   };
+}
+
+/** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
+/** Clicks the form's "Add another" for a kind of history entry (#132) in the frame that has one: whether one was found. */
+export async function addEntryIn(tabId: number, kind: "education" | "work"): Promise<boolean> {
+  const frames = (await chrome.webNavigation.getAllFrames({ tabId })) ?? [];
+  for (const { frameId } of frames.length > 0 ? frames : [{ frameId: MAIN_FRAME }]) {
+    const [found] = await inFrames<boolean>({ tabId, frameIds: [frameId] }, "addEntry", [kind]).catch(() => []);
+    if (found?.result === true) return true;
+  }
+  return false;
+}
+
+export async function readJobPage(tabId: number): Promise<PageJob | null> {
+  await chrome.scripting.executeScript({ target: { tabId, frameIds: [MAIN_FRAME] }, files: [PAGE_SCRIPT] });
+  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJob", []);
+  return found?.result ?? null;
 }
 
 /** A light look at a scanned tab, between scans. A frame that came, went or scanned again means the form has moved on. */

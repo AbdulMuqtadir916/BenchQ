@@ -13,7 +13,7 @@ import type { Job } from "@/lib/schemas/job";
 import type { User } from "@/lib/schemas/session";
 import { CandidateProgressCard, PaceRing, StageCounts } from "./activity/activity-bde-cards";
 import { AttentionChips, BenchAgingCard, FunnelCard, plural, RankedBars, SpeedStrip } from "./activity/activity-firm-cards";
-import { averageDaysToPlace, benchHealth, type BenchHealth, candidateProgress, compareActivity, needsAttention, ratios, roleDemand, sourceEffectiveness, stageSpeeds } from "./activity/activity-insights";
+import { averageDaysToOffer, benchHealth, type BenchHealth, candidateProgress, compareActivity, needsAttention, ratios, roleDemand, sourceEffectiveness, stageSpeeds } from "./activity/activity-insights";
 import { useListLinks, type ListLinks } from "./activity/activity-links";
 import { DemandCard, SourceCard, type JobsState } from "./activity/activity-market-cards";
 import { bdeRows, bdeStageRows, countActivity, eventBins, managerRows, paceOf, periodLabel, stackedByBde, submittedIn, type Period, type Window } from "./activity/activity-numbers";
@@ -34,7 +34,7 @@ export interface JobsData extends JobsState {
   jobs: Job[];
 }
 
-/** Applications, interviews and placements in the period, each against the period before, with its shape. */
+/** Applications, interviews and offers in the period, each against the period before, with its shape. */
 function ActivityTiles({ applications, period, window, links, first }: Omit<ViewProps, "candidates" | "now"> & { links: ListLinks; first?: ReactNode }) {
   const counts = countActivity(applications, window);
   const change = compareActivity(applications, window);
@@ -48,8 +48,8 @@ function ActivityTiles({ applications, period, window, links, first }: Omit<View
         bins={eventBins(applications, window, "applied")} href={links.applications({ period, by: "applied" })} />
       <KpiTile icon={CalendarDays} label="Interviews" value={counts.interviews} detail={since} change={change.interviews} versus={versus}
         bins={eventBins(applications, window, "interview")} href={links.applications({ period, by: "interview" })} />
-      <KpiTile icon={Trophy} label="Placements" value={counts.placements} detail={since} change={change.placements} versus={versus}
-        bins={eventBins(applications, window, "placed")} href={links.applications({ period, by: "placed" })} />
+      <KpiTile icon={Trophy} label="Offers" value={counts.offers} detail={since} change={change.offers} versus={versus}
+        bins={eventBins(applications, window, "offer")} href={links.applications({ period, by: "offer" })} />
     </section>
   );
 }
@@ -94,7 +94,7 @@ export function FirmView({ managers, users, candidates, applications, period, wi
       <BenchAgingCard health={health} links={links} />
       <DemandCard rows={roleDemand(jobs.jobs, candidates)} jobs={jobs} links={links} />
     </div>
-    <SpeedStrip speeds={stageSpeeds(applications, window)} daysToPlace={averageDaysToPlace(applications, window)} />
+    <SpeedStrip speeds={stageSpeeds(applications, window)} daysToOffer={averageDaysToOffer(applications, window)} />
     <SourceCard rows={sourceEffectiveness(applications, jobs.jobs, window)} jobs={jobs} />
     <TableCard title="Every BDE" hint={`Busiest first, across the firm. Workload is candidates being worked. Open a BDE to see their candidates.`}>
       <BdeTable rows={bdes} onOpen={(row) => onSelectBde(row.id)} />
@@ -138,7 +138,7 @@ export function ManagerView({ user, bdes, candidates, applications, period, wind
       <BenchAgingCard health={health} links={links} />
     </div>
     <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-      <SpeedStrip speeds={stageSpeeds(applications, window)} daysToPlace={averageDaysToPlace(applications, window)} />
+      <SpeedStrip speeds={stageSpeeds(applications, window)} daysToOffer={averageDaysToOffer(applications, window)} />
       <DemandCard rows={roleDemand(jobs.jobs, candidates)} jobs={jobs} links={links} />
     </div>
     <SourceCard rows={sourceEffectiveness(applications, jobs.jobs, window)} jobs={jobs} />

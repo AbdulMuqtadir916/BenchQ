@@ -1,5 +1,5 @@
-"""Billing records (07 Q64-Q66, docs/02 §3.5): Super Admin only, no payment provider. A new firm's candidate limit starts at
-CANDIDATES_PER_SEAT times its BDE count and is then set by the Super Admin (Q67); a 30-day period snapshots the numbers it was billed on, and the amount
+"""Billing records (07 Q65-Q67, docs/02 §3.5): Super Admin only, no payment provider. A new firm's candidate limit starts at
+CANDIDATES_PER_SEAT times its BDE count and is then set by the Super Admin (Q68); a 30-day period snapshots the numbers it was billed on, and the amount
 is the BDE count times the price, calculated here and nowhere else. Nothing here is serialized to a firm user."""
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -50,7 +50,7 @@ def current_period(db: DbSession, firm_id, today: date) -> BillingPeriod | None:
 
 
 def new_period(firm: Firm, starts_on: date, note: str | None) -> BillingPeriod:
-    """A period from the firm's limits and price as they are now (Q65)."""
+    """A period from the firm's limits and price as they are now (Q66)."""
     return BillingPeriod(
         firm_id=firm.id, starts_on=starts_on, ends_on=starts_on + timedelta(days=PERIOD_DAYS),
         seat_limit=firm.seat_limit, candidate_limit=firm.candidate_limit,
@@ -59,7 +59,7 @@ def new_period(firm: Firm, starts_on: date, note: str | None) -> BillingPeriod:
 
 
 def sync_current_period(db: DbSession, firm: Firm, today: date) -> BillingPeriod | None:
-    """A change to the firm's BDE count or price applies to the period running today, without proration (Q65)."""
+    """A change to the firm's BDE count or price applies to the period running today, without proration (Q66)."""
     period = current_period(db, firm.id, today)
     if period is not None:
         period.seat_limit = firm.seat_limit

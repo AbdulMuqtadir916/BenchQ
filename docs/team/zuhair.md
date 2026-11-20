@@ -69,24 +69,28 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    and name the résumés tailored on it (they are deleted with it, `resumes.job_id` CASCADE). The per-candidate
    delete proposal is in [resume-versioning.md](./resume-versioning.md) §7.
 
-## 3. Résumé tailoring (+ ATS score) (Track 04, `docs/integration/04-resumes-and-tailoring.md`)
+## 3. Résumé tailoring (+ ATS score) — design and plan in [tailoring.md](./tailoring.md)
 
-1. Its Phase 0 design review first (no code).
-2. **Tailored résumés** from the active base's version 1 for one job (`category = 'TAILORED'`, `base_resume_id`,
+1. Designed (grilling, 2026-11-11 and 2026-11-12): one PR, `feat/resume-tailoring`, in three commits (the backend
+   package, the wiring, the frontend), decisions in [tailoring.md](./tailoring.md) §1, §7 and §8. All three parts
+   built 2026-11-12 (part 3 after a commit that makes a candidate's screens read only their own jobs).
+2. **Tailored résumés** from a version of a visible base (default the active base's v1; a later version becomes a
+   base of its own, not active, part 3 R3-Q1) for one job (`category = 'TAILORED'`, `base_resume_id`,
    `job_id`; [resume-versioning.md](./resume-versioning.md) §4), many per candidate.
    Tailoring creates them; editing one is résumé versioning PR 5's save (the next version), and only the
-   candidate's BDE tailors (07 Q55, `can_manage_resume`). Decide here whether tailoring may choose the base per job
-   (a candidate has several target roles but one active base).
+   candidate's BDE tailors (07 Q55, `can_manage_resume`). The active base by default; the BDE may pick another
+   (decided 2026-11-12, tailoring.md Q1).
 3. **No persona** (decided 2026-11-05, Abdul): cover letters, job scoring and tailoring stop reading the shared
    `personas` row; what each read moves to the candidate and their résumé ([persona-to-candidates.md](./persona-to-candidates.md) §6–§7).
 4. **Frozen once sent:** a résumé an application points at (`applications.resume_id`) is never changed: every edit
    or re-tailoring inserts the next version.
-5. **ATS score** for a tailored résumé against its job. The old `score-check` route and the old tailor route were
-   removed in résumé versioning PR 6; their pipeline is kept, unwired, in `backend/analyzer/legacy_tailoring.py`
-   (with the prompts in settings and `llm_client.call_cv_tailor_llm`) to port to the versions.
-   A PDF the server makes itself (extension, email, tracer links, the export gate on the backend) is built here
-   from the studio's designs (resume-versioning.md §8).
-6. Frontend live behind `resumes`.
+5. **ATS score** for a tailored résumé against its job: a later PR, after tailoring's. The old `score-check`
+   route and the old tailor route were removed in résumé versioning PR 6; the tailor is rebuilt on the handoff's
+   workflow (tailoring.md), and tailoring's part 2 deletes the old pipeline (`backend/analyzer/legacy_tailoring.py`).
+   A PDF the server makes itself (extension, email, tracer links) is also a later PR, built from the studio's designs
+   (resume-versioning.md §8).
+6. Frontend live: the Tailor control (job pane, job page for a candidate, dashboard queue, Focus mode's T) and the
+   tailoring panel on every firm page (tailoring.md §8).
 
 ## Rules for you
 

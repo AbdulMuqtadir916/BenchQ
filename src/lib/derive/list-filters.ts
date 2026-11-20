@@ -1,7 +1,9 @@
 import type { Application } from "@/lib/schemas/application";
+import type { ApplicationStatus } from "@/lib/schemas/enums";
+import { stageRank } from "@/components/app/applications/status-meta";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { ApplicationDate, ApplicationsSearchState, BenchBand, CandidatesSearchState, ListPeriod } from "@/lib/schemas/list-search";
-import { reachedStatuses } from "./funnel";
+import { effectiveEvents, reachedStatuses } from "./funnel";
 
 /**
  * The rules behind the Applications and Candidates filters. The dashboard counts with the same rules, so a number on
@@ -19,13 +21,26 @@ export interface TimeWindow {
 export const periodWindow = (period: ListPeriod, now: Date): TimeWindow =>
   ({ start: now.getTime() - Number(period.slice(0, -1)) * DAY_MS, end: now.getTime() });
 
-/** The date a filter's period is about. A saved job was never submitted, and only a placement has a placed date. */
+/**
+ * When the application first got to `stage` or further, from its history: the live backend sends no stage dates.
+ * A skipped stage counts as reached (D1), and a legacy placement as reaching Offer (D6).
+ */
+function firstReached(app: Application, stage: ApplicationStatus): string | null {
+  const rank = stageRank(stage);
+  const times = effectiveEvents(app)
+    .filter((event) => (event.toStatus === "PLACED" ? stageRank("OFFER") : stageRank(event.toStatus)) >= rank)
+    .map((event) => event.createdAt)
+    .sort();
+  return times[0] ?? null;
+}
+
+/** The date a filter's period is about. A Saved draft was never submitted (no appliedAt); a job moved back to Saved
+ * keeps the date it was submitted. */
 export function applicationDate(app: Application, by: ApplicationDate): string | null {
-  if (by === "applied") return app.status === "SAVED" ? null : app.appliedAt;
+  if (by === "applied") return app.appliedAt;
   if (by === "response") return app.firstResponseAt;
-  if (by === "interview") return app.interviewAt;
-  if (by === "offer") return app.offerAt;
-  return app.status === "PLACED" ? app.closedAt : null;
+  if (by === "interview") return app.interviewAt ?? firstReached(app, "INTERVIEW_SCHEDULED");
+  return app.offerAt ?? firstReached(app, "OFFER");
 }
 
 export function happenedIn(app: Application, by: ApplicationDate, window: TimeWindow): boolean {

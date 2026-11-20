@@ -13,11 +13,11 @@ import { ApplicationBoard } from "./application-board";
  */
 const apps = allApplications.filter((app) => app.firmId === "firm_hts").slice(0, 30);
 const firm = firms.find((item) => item.id === "firm_hts")!;
-const render = (canAct: boolean) =>
+const render = (canAct: boolean, boardApps = apps) =>
   renderToString(
     createElement(QueryClientProvider, { client: new QueryClient() },
       createElement(FirmProvider, { firm } as ComponentProps<typeof FirmProvider>,
-        createElement(ApplicationBoard, { apps, canAct, onMove: () => {}, candidateName: () => "x" }))),
+        createElement(ApplicationBoard, { apps: boardApps, canAct, onMove: () => {}, candidateName: () => "x" }))),
   );
 
 describe("application board: who can drag", () => {
@@ -33,5 +33,42 @@ describe("application board: who can drag", () => {
     const html = render(true);
     expect(html).toContain('aria-roledescription="draggable"');
     expect(html).toContain("Space to move");
+  });
+});
+
+
+describe("application board: review and incomplete columns", () => {
+  it("hides Incomplete when no application has that status", () => {
+    const html = render(false, [{ ...apps[0], status: "APPLIED" }]);
+    expect(html).not.toContain('aria-label="Incomplete application,');
+    expect(html.indexOf('aria-label="Applied,')).toBeLessThan(html.indexOf('aria-label="BDE Review,'));
+    expect(html.indexOf('aria-label="BDE Review,')).toBeLessThan(html.indexOf('aria-label="Screening call,'));
+  });
+
+  it("inserts populated Incomplete between Applied and BDE Review", () => {
+    const app = { ...apps[0], status: "INCOMPLETE_APPLICATION" as const, pendingReviewCount: 1 };
+    const html = render(true, [app]);
+    expect(html.indexOf('aria-label="Applied,')).toBeLessThan(html.indexOf('aria-label="Incomplete application, 1"'));
+    expect(html.indexOf('aria-label="Incomplete application, 1"')).toBeLessThan(html.indexOf('aria-label="BDE Review, 1"'));
+    expect(html.replaceAll("<!-- -->", "")).toContain("Last confirmed: Incomplete application");
+    expect(html).not.toContain('aria-roledescription="draggable"');
+    expect(app.status).toBe("INCOMPLETE_APPLICATION");
+  });
+});
+
+describe("application board: the BDE review column", () => {
+  const renderWith = (showReviewColumn?: boolean) =>
+    renderToString(
+      createElement(QueryClientProvider, { client: new QueryClient() },
+        createElement(FirmProvider, { firm } as ComponentProps<typeof FirmProvider>,
+          createElement(ApplicationBoard, { apps, canAct: true, onMove: () => {}, candidateName: () => "x", showReviewColumn }))),
+    );
+
+  it("is on the board by default (the firm-wide Applications page)", () => {
+    expect(renderWith()).toContain("BDE Review");
+  });
+
+  it("is left out where BDE review has its own tab (the candidate's Applications tab)", () => {
+    expect(renderWith(false)).not.toContain("BDE Review");
   });
 });

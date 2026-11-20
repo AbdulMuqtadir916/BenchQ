@@ -11,7 +11,7 @@ export type EngineFieldType =
   | "eeo-hispanic" | "eeo-orientation" | "eeo-transgender" | "referral-source" | "over-18" | "lives-in-us"
   | "minimum-experience" | "accommodations" | "essential-functions" | "criminal-history" | "background-check" | "drug-test"
   | "security-clearance" | "non-compete" | "government-work" | "relative-at-company" | "former-employee" | "onsite-work"
-  | "willing-to-travel" | "commute" | "languages" | "current-pay" | "pay-rate" | "job-applied";
+  | "willing-to-travel" | "commute" | "languages" | "current-pay" | "pay-rate" | "floor-rate" | "job-applied";
 
 /** universal-ai-autofill's field kinds, in the merged names. */
 export const KIND_TO_TYPE: Partial<Record<FieldKind, EngineFieldType>> = {

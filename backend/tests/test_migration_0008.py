@@ -34,8 +34,7 @@ def world(test_db, accounts):
                       is_active=True, created_by_user_id=owner.id)
     test_db.add(base)
     test_db.flush()
-    # What a tailored résumé names since 0023: Asha's job postings. `jobs` (the old pool) is what an application
-    # still names until Arbaz's repoint.
+    # What a tailored résumé names since 0023, and an application since 0027: Asha's job postings.
     postings = [make_posting(test_db, firm.id, people[0].id, owner.id, n) for n in (7, 8)]
     return {"firm": firm, "owner": owner, "asha": people[0], "ravi": people[1], "jobs": jobs, "postings": postings,
             "parse": parse, "base": base}
@@ -136,16 +135,16 @@ def test_deleting_a_job_deletes_the_resumes_tailored_for_it(test_db, world):
     assert sorted(left, key=str) == sorted([("BASE", None), ("TAILORED", job8.id)], key=str)
 
 
-def test_a_job_an_application_names_cannot_be_deleted(test_db, world):
-    job7 = world["jobs"][0]                    # the application's job: the old pool's until Arbaz's repoint
-    tailored = _version(world, category="TAILORED", job_id=world["postings"][0].id)
+def test_a_posting_an_application_names_cannot_be_deleted(test_db, world):
+    posting = world["postings"][0]          # the application's job, and its tailored résumé's (0023, 0027)
+    tailored = _version(world, category="TAILORED", job_id=posting.id)
     test_db.add(tailored)
     test_db.flush()
-    test_db.add(Application(firm_id=world["firm"].id, candidate_id=world["asha"].id, job_id=job7.id,
+    test_db.add(Application(firm_id=world["firm"].id, candidate_id=world["asha"].id, job_id=posting.id,
                             resume_id=tailored.id, submitted_by_user_id=world["owner"].id))
     test_db.commit()
     with pytest.raises(IntegrityError):
-        test_db.delete(job7)
+        test_db.delete(posting)
         test_db.commit()
     test_db.rollback()
     assert test_db.get(Resume, tailored.id) is not None                # the résumé that was sent stays

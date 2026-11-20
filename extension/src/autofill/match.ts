@@ -94,6 +94,9 @@ const LABELS: [EngineFieldType, string[]][] = [
   ["pay-rate", ["rate", "hourly rate", "pay rate", "bill rate", "expected rate", "desired rate", "expected hourly rate",
     "desired hourly rate", "expected pay rate", "desired pay rate", "hourly pay", "rate per hour", "c2c rate", "w2 rate",
     "1099 rate", "rate expectation", "hourly rate expectation", "rate on c2c", "rate on w2"]],
+  // The lowest rate the candidate takes (2026-11-12): never the expected rate.
+  ["floor-rate", ["floor rate", "rate floor", "minimum rate", "minimum acceptable rate", "lowest acceptable rate",
+    "lowest rate", "minimum hourly rate", "lowest hourly rate", "minimum pay rate", "walk away rate", "walkaway rate"]],
   ["start-date", ["start", "start date", "start day", "earliest start date", "available to start", "available from",
     "date available", "availability", "availability date", "joining date", "start a new role"]],
   ["notice-period", ["notice period"]],
@@ -247,7 +250,8 @@ const ABOUT_THE_COMPANY = new Set<EngineFieldType>(["former-employee", "relative
 /** Where a question stands on its subject. Checked in order, so "Have you ever failed..." is the past, not a stance on
  * the present. */
 const STANCES: [string, RegExp][] = [
-  ["past", /\b(ever|previously|in the past|before|failed|fail|been (?:convicted|charged|terminated|fired|dismissed|employed|engaged|a)|convicted|conviction|record|worked|used to)\b/],
+  // "Current or former" asks about the past too: it's answered by "Have you ever…", never by "Are you now…".
+  ["past", /\b(ever|previously|in the past|before|failed|fail|been (?:convicted|charged|terminated|fired|dismissed|employed|engaged|a)|convicted|conviction|record|worked|used to|former)\b/],
   ["need", /\b(require|requires|required|need|needs|needed)\b/],
   ["willing", /\b(willing|open|able|comfortable|prepared|agree|okay|ok|eligible|consent|can|could|would|plan|pass)\b/],
   ["now", /\b(have|has|hold|holds|possess|active|current|currently|bound|subject|working)\b/],

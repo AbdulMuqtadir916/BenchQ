@@ -18,7 +18,7 @@ import type { Plan } from "@/lib/schemas/tenancy";
 import { AdminDialog, Field, errorMessage, fieldAria } from "./admin-dialog";
 
 /**
- * /admin/plans (docs/04 §14.6, 07 Q64): the base plan. A firm's BDE count is the only thing that varies; a BDE brings
+ * /admin/plans (docs/04 §14.6, 07 Q65): the base plan. A firm's BDE count is the only thing that varies; a BDE brings
  * 10 candidates, and each candidate fetches 100 new jobs a day (fixed). Editing the plan changes firms created later,
  * never existing ones (A3). Super Admin only: the price appears nowhere a firm can open.
  */

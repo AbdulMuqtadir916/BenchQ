@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api/client";
 import type { CaptureJob, Job } from "@/lib/schemas/job";
 import type { JobSearches } from "@/lib/schemas/job-search";
 import { toBackendId } from "./dto/demo-ids";
-import { CapturedPostingDto, FirmJobDto, FirmJobListDto, JobSearchesDto, toBackendCapture, toCapturedJob, toFirmJob, toJobSearches } from "./dto/jobs";
+import { CandidatePostingDto, CapturedPostingDto, FirmJobDto, FirmJobListDto, JobSearchesDto, toBackendCapture, toCandidateJob, toCapturedJob, toFirmJob, toJobSearches } from "./dto/jobs";
 import { http } from "./http";
 
 /** The most jobs one list read returns (the backend's FIRM_LIST_MAX). */
@@ -31,6 +31,8 @@ const live = {
     return items.map((item) => toFirmJob(item, firmId));
   },
   byId: async (firmId: string, id: string): Promise<Job> => toFirmJob(await http.get(`${firmPath(firmId)}/job-postings/${id}`, FirmJobDto), firmId),
+  candidateJob: async (firmId: string, candidateId: string, id: string): Promise<Job> =>
+    toCandidateJob(await http.get(`${candidatePath(firmId, candidateId)}/job-postings/${id}`, CandidatePostingDto), firmId),
   capture: async (firmId: string, body: CaptureJob): Promise<Job> => {
     const dto = await http.post(`${candidatePath(firmId, body.candidateId)}/job-postings`, CapturedPostingDto, { body: toBackendCapture(body) });
     if (!dto.created) throw duplicateJobError(dto.id);
@@ -50,6 +52,9 @@ export const jobsApi = {
   list: (firmId: string, params?: JobListParams): Promise<Job[]> => live.list(firmId, params),
 
   byId: (firmId: string, id: string): Promise<Job> => live.byId(firmId, id),
+
+  /** One of the candidate's own jobs; another candidate's is not-found (Zuhair 2026-11-12: only their jobs). */
+  candidateJob: (firmId: string, candidateId: string, id: string): Promise<Job> => live.candidateJob(firmId, candidateId, id),
 
   /** For one candidate (their BDE only); the same job again throws `DUPLICATE_JOB` naming the one they have. */
   capture: (firmId: string, body: CaptureJob): Promise<Job> => live.capture(firmId, body),

@@ -19,7 +19,7 @@ import { UploadResume } from "@/components/app/resumes/upload-resume";
 export function ResumesTab({ candidate, shelf, isLoading, error, onRetry, canAct }: { candidate: Candidate; shelf: ResumeShelf | undefined; isLoading: boolean; error: Error | null; onRetry: () => void; canAct: boolean }) {
   const principal = useSignedInPrincipal();
   const candidates = useMemo(() => [candidate], [candidate]);
-  const labels = useTreeLabels(candidates);
+  const labels = useTreeLabels(candidates, shelf);
   const tree = useMemo(() => (shelf ? buildResumeTree(shelf, [candidate.id]) : []), [shelf, candidate.id]);
   const { actions, dialogs } = useResumeActions((id) => (id === candidate.id ? candidate : undefined));
   const canUpload = canManageResume(principal, candidate);

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Play, Sparkles, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
+import { Play, Send, Mail, ArrowRight, CalendarDays, MailCheck } from "lucide-react";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { scopeApplications, scopeCandidates } from "@/lib/auth/permissions";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useJobs } from "@/lib/hooks/use-jobs";
+import { TailorButton } from "@/components/app/tailoring/tailor-button";
 import { deriveCandidateStats, deriveBdeDashboard, rankJobsForCandidate } from "@/lib/derive";
 import { StatCard } from "@/components/app/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,30 +37,31 @@ export function BdeDashboard() {
   const userId = principal.userId;
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
-  const jobsQuery = useJobs({ limit: 300 });
-  // docs/04 §13: one group per set of cards that read the same queries.
-  const numbers = queryGroup(candidatesQuery, applicationsQuery);
-  const mine = queryGroup(candidatesQuery, applicationsQuery);
-  const queueGroup = queryGroup(candidatesQuery, applicationsQuery, jobsQuery);
-  const page = queryGroup(candidatesQuery, applicationsQuery, jobsQuery);
-
   const candidates = candidatesQuery.data ?? EMPTY;
   const applications = applicationsQuery.data ?? EMPTY;
-  const jobs = jobsQuery.data ?? EMPTY;
 
   const myCandidates = useMemo(
     () => scopeCandidates(principal, candidates),
     [principal, candidates],
   );
+  const topCandidate = useMemo(
+    () => myCandidates.find((c) => c.status === "ON_BENCH") ?? myCandidates[0],
+    [myCandidates],
+  );
+  // The queue is one candidate's: only their jobs are read (Zuhair 2026-11-12), once the candidate is known.
+  const jobsQuery = useJobs({ limit: 300, candidateId: topCandidate?.id }, { isEnabled: Boolean(topCandidate) });
+  // With no candidate there is no jobs read to wait for (a disabled query stays pending).
+  const jobReads = topCandidate ? [jobsQuery] : [];
+  // docs/04 §13: one group per set of cards that read the same queries.
+  const numbers = queryGroup(candidatesQuery, applicationsQuery);
+  const mine = queryGroup(candidatesQuery, applicationsQuery);
+  const queueGroup = queryGroup(candidatesQuery, applicationsQuery, ...jobReads);
+  const page = queryGroup(candidatesQuery, applicationsQuery, ...jobReads);
+  const jobs = jobsQuery.data ?? EMPTY;
 
   const dash = useMemo(
     () => deriveBdeDashboard(userId, candidates, scopeApplications(principal, applications, candidates)),
     [userId, principal, candidates, applications],
-  );
-
-  const topCandidate = useMemo(
-    () => myCandidates.find((c) => c.status === "ON_BENCH") ?? myCandidates[0],
-    [myCandidates],
   );
 
   const queue = useMemo(() => {
@@ -85,7 +87,7 @@ export function BdeDashboard() {
     />
   );
 
-  if (hasPageFailed(candidatesQuery, applicationsQuery, jobsQuery)) {
+  if (hasPageFailed(candidatesQuery, applicationsQuery, ...jobReads)) {
     return (
       <div className="bq-page">
         {header}
@@ -170,7 +172,7 @@ export function BdeDashboard() {
               {queue.map(({ job, score }) => (
                 <li key={job.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
                   <div className="min-w-0 flex-1">
-                    <Link href={toHref("jobs.detail", { id: job.id })} className="text-body-strong truncate hover:underline block">
+                    <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })} className="text-body-strong truncate hover:underline block">
                       {job.title}
                     </Link>
                     <div className="flex items-center gap-2 text-caption text-[var(--color-text-3)]">
@@ -180,11 +182,9 @@ export function BdeDashboard() {
                   </div>
                   <MatchScore score={score} className="hidden sm:flex" />
                   <div className="flex shrink-0 items-center gap-1">
-                    <Button asChild variant="ghost" size="icon" aria-label="Tailor resume">
-                      <Link href={toHref("jobs.detail", { id: job.id })}><Sparkles size={15} aria-hidden /></Link>
-                    </Button>
+                    {topCandidate ? <TailorButton candidate={topCandidate} job={job} variant="icon" /> : null}
                     <Button asChild variant="ghost" size="icon" aria-label="Mark applied">
-                      <Link href={toHref("jobs.detail", { id: job.id })}><Send size={15} aria-hidden /></Link>
+                      <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })}><Send size={15} aria-hidden /></Link>
                     </Button>
                     <Button asChild variant="ghost" size="icon" aria-label="Open outreach">
                       <Link href={toHref("outreach")}><Mail size={15} aria-hidden /></Link>

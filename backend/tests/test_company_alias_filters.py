@@ -67,7 +67,10 @@ def test_jobs_filter_expands_aliases(api_client, test_db):
 
 def test_update_application_returns_canonical_company(api_client, test_db):
     """PATCH /api/applications/{id} response should include canonical company name when alias matched."""
+    from backend.models.candidates import Candidate
     from backend.models.db import Company, Job, Application
+    from backend.tests.posting_support import posting_for
+    from backend.tests.resume_support import make_version
     test_db.add(Company(
         name="Amazon",
         tier=1,
@@ -79,7 +82,12 @@ def test_update_application_returns_canonical_company(api_client, test_db):
     job = Job(external_id="upd1", content_hash="uh1", company="Audible", title="PM", status="applied")
     test_db.add(job)
     test_db.flush()
-    app_row = Application(firm_id=DEFAULT_FIRM_ID, job_id=job.id, status="applied")
+    resume = make_version(test_db, DEFAULT_FIRM_ID)
+    candidate = test_db.get(Candidate, resume.candidate_id)
+    posting = posting_for(test_db, DEFAULT_FIRM_ID, candidate.id, title=job.title, company=job.company,
+                          old_job_id=job.id)
+    app_row = Application(firm_id=DEFAULT_FIRM_ID, candidate_id=candidate.id, job_id=posting.id,
+                          status="applied")
     test_db.add(app_row)
     test_db.commit()
 

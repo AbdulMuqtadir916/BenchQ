@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { button, MOTION, SOFT_TEXT } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
-import { CHEVRON_DOWN_ICON, LIGHTBULB_ICON } from "./icons";
+import { CHECK, CHEVRON_DOWN_ICON, LIGHTBULB_ICON } from "./icons";
 import { Tick } from "./marks";
 import type { BankEntry, ReviewRow } from "./types";
 
@@ -17,9 +17,11 @@ type ReviewListProps = {
   onChoose?: (row: ReviewRow, label: string) => void;
   /** Fills a field with one of the saved answers suggested for it. */
   onSuggest?: (row: ReviewRow, entry: BankEntry) => void;
+  /** Keeps an answer the BDE typed for next time, for every job of the candidate or this one only (07 Q58). */
+  onSave?: (row: ReviewRow, isOnlyThisResume: boolean) => Promise<boolean>;
 };
 
-type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions" | "onChoose" | "onSuggest">;
+type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions" | "onChoose" | "onSuggest" | "onSave">;
 
 /** One line per field: its tick, its label, and what it holds. The row hangs into the margin, so ticks line up with the
  * heading above. */
@@ -35,6 +37,30 @@ const LINK = "text-caption text-[var(--color-text-2)] underline-offset-2 hover:t
 const FOLD = `-mx-1.5 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-left text-sm font-[550] transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:transition-transform motion-reduce:[&_svg]:transition-none aria-expanded:[&_svg]:rotate-180`;
 /** An answer longer than this shows four lines until "Show all". */
 const LONG_ANSWER = 220;
+
+const SAVE_BUTTON = `bq-secondary inline-flex min-h-[var(--control-sm)] max-w-full items-center rounded-[var(--radius-md)] px-2 py-0.5 text-left text-sm font-[550] wrap-anywhere transition-[background,box-shadow] ${MOTION} disabled:cursor-not-allowed disabled:opacity-50`;
+const SAVED = "flex items-center gap-1 text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
+
+/** Keeping a typed answer for next time (07 Q58): the button says what saving does, saving a new answer or updating the
+ * one saved before (Q21), and "Only this résumé" keeps it to the picked résumé (Q22): that version, which other jobs may use too. */
+function SaveAnswer({ row, isFilling, onSave }: { row: ReviewRow; isFilling: boolean; onSave: NonNullable<ReviewListProps["onSave"]> }) {
+  const [isOnlyThisResume, setIsOnlyThisResume] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const offer = row.saveOffer;
+  if (offer === "saved") return <p data-slot="review-saved-note" className={`pl-[calc(var(--icon-md)+var(--spacing)*2)] ${SAVED}`}>{CHECK}Saved for next time</p>;
+  if (!offer) return null;
+  const save = async () => {
+    setIsSaving(true);
+    await onSave(row, isOnlyThisResume);
+    setIsSaving(false);
+  };
+  return <div data-slot="review-save" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
+    <button type="button" className={SAVE_BUTTON} disabled={isFilling || isSaving} onClick={() => void save()}>{isSaving ? "Saving…" : offer.label}</button>
+    <label className="flex items-center gap-1 text-caption text-[var(--color-text-2)]">
+      <input type="checkbox" checked={isOnlyThisResume} onChange={(event) => setIsOnlyThisResume(event.target.checked)} />Only this résumé
+    </label>
+  </div>;
+}
 
 const isFilled = (row: ReviewRow) => Boolean(filledValue(row));
 const isUpload = ({ field }: ReviewRow) => field.kind === "file";
@@ -91,6 +117,7 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
       <ChoicePicker row={row} isFilling={actions.isFilling} onListOptions={actions.onListOptions} onChoose={actions.onChoose} />
     </div>}
     {row.suggestions && !filled && actions.onSuggest && <Suggestions row={row} suggestions={row.suggestions} isFilling={actions.isFilling} onSuggest={actions.onSuggest} />}
+    {row.saveOffer && actions.onSave && <SaveAnswer row={row} isFilling={actions.isFilling} onSave={actions.onSave} />}
   </li>;
 }
 
@@ -174,14 +201,18 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
 /** The form's fields and what each holds: what the form already held that differs from the saved answers, what still
  * needs the BDE (required first, each marked), what's filled (folded under its count), then any upload the Resume and
  * Cover letter sections don't stand for. Labels and values come from the employer's page and render as plain text. */
-export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest }: ReviewListProps) {
-  const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest };
+export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest, onSave }: ReviewListProps) {
+  const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest, onSave };
+  // Answers the BDE typed and can keep come first, in sight, until they're saved (07 Q58).
+  // A saved one stays there, saying so, rather than folding away the moment it's kept.
+  const isOffered = (row: ReviewRow) => (typeof row.saveOffer === "object" || row.saveOffer === "saved") && Boolean(onSave);
   const isKept = (row: ReviewRow) => row.status === "kept";
-  const typed = rows.filter((row) => !isUpload(row) && !isKept(row));
+  const typed = rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row));
   const needed = typed.filter((row) => !isFilled(row));
   const uploads = rows.filter(isUpload);
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">
     <KeptGroup rows={rows.filter(isKept)} onReplace={onReplace} {...actions} />
+    <Group title="Save for next time" count={String(rows.filter(isOffered).length)} rows={rows.filter(isOffered)} {...actions} />
     <Group title="Needs you" count={String(needed.length)} {...actions}
       rows={[...needed.filter(({ field }) => field.required), ...needed.filter(({ field }) => !field.required)]} />
     <FilledGroup rows={typed.filter(isFilled)} {...actions} />

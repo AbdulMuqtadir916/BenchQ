@@ -4,17 +4,20 @@ docs/02 §8.1): every question an application form can ask, answered in two part
 - **Fixed answers** are built by `build()` from the version and the candidate's profile when they're asked for. They
   aren't stored as answers, so they're never stale: a profile edit, or a new question added here, shows on every
   version at once. The one copy kept is an edit's `over`, below.
-- **The user's entries** are stored in `resumes.autofill` (`{}` by default):
-  `{"edited": {key: {"answer": …, "over": …}}, "custom": {question: answer}}`. An edit is kept by its question's key,
-  so rewording a question here never loses it, with `over`: a copy of the built answer it replaced (for a list such
-  as the work history, the whole list). It applies while that is still the built answer: once the version's own text
-  or the profile changes it, the new built answer shows. A save and a promote copy the entries, as tailoring will
-  (docs/02 §8.1); on the new version an edit applies only where its built answer is still `over`.
+- **The user's entries** are stored in `resumes.autofill` (`{}` by default): `{"edited": {key: {"answer": …, "over":
+  …}}, "custom": [{"question": …, "also": [wording…], "answer": …}]}`. An edit is kept by its question's key, so
+  rewording a question here never loses it, with `over`: a copy of the built answer it replaced. It applies while that
+  is still the built answer: once the version's own text or the profile changes it, the new built answer shows, and
+  the read marks the edit as `replaced` (07 Q15). The questions the user added are a list, oldest first (07 Q40), each
+  with the other wordings it answers (`also`, Q41). A save and a promote copy the entries, as tailoring will (docs/02
+  §8.1); on the new version an edit applies only where its built answer is still `over`. `change()` is how the
+  Autofill screen's save writes them (`PATCH …/resumes/{id}/autofill`, docs/02 §8.4).
 
 `merged()` is what `GET …/resumes/{id}?autofill=true` returns: every question once, with its `kind` (FIXED; EDITED,
-with `built`, the answer reset gives back; CUSTOM) and, for a question built here, its `key`: a fixed name for what it
-asks (`address-city`, `work-auth-status`…), so a reader such as the extension can match it whatever its wording.
-Answers keep their JSON type: 10, true/false, a list, a date as "YYYY-MM-DD".
+with `built`, the answer reset gives back; CUSTOM, with `also`) and, for a question built here, its `key`: a fixed
+name for what it asks (`address-city`, `work-auth-status`…), so a reader such as the extension can match it whatever
+its wording. Answers keep their JSON type: 10, true/false, a list, a date as "YYYY-MM-DD". With `editor=true` (the
+Autofill screen) it also lists the fixed questions with no answer, as null, and each keyed answer's `type`.
 
 - **From the version:** the header (name, contact, location, title), the summary, skills, every job with its dates
   and bullets (the current one: marked current, else the one that ended last), every education (the highest degree,
@@ -24,12 +27,16 @@ Answers keep their JSON type: 10, true/false, a list, a date as "YYYY-MM-DD".
   (the profile's status: every candidate has one), its expiry, sponsorship, transfer, the target rate, availability,
   notice period, relocation, engagement types, work settings, preferred locations and industries, primary and target
   roles.
+- **Self-identification** (gender, pronouns, race, Hispanic or Latino, veteran and disability status, sexual
+  orientation, transgender): voluntary, and not in the profile, so never built. The Autofill screen lists them to
+  answer, and the BDE adds the candidate's own answer to that version (an edit over no built answer).
 - **Years of experience:** worked out from the version's own jobs for today (`years_from_work`, the rule the New
   candidate form uses, src/lib/api/dto/resume-parse.ts `yearsFromWork`), else the candidate's `years_experience`.
 
 Never in it: ids (candidate, firm, BDE, manager, base, job), and what is the firm's own: the floor rate (`rate_min`),
 the notes for the BDE (`contact_notes`), `deal_breakers`, `status`, `bench_start_date`. A fact that is missing leaves
-its question out (no empty answers).
+its question out (no empty answers). The Autofill screen asks a floor rate of its own (`floor-rate`, decided
+2026-11-12): the BDE answers it for the version, and `rate_min` never fills it.
 """
 import json
 import re
@@ -69,8 +76,10 @@ QUESTIONS: dict[str, str] = {
     "current-title": "What is your current or most recent job title?",
     "work-history": "List your work experience.",
     "education-degree": "What is your highest degree?",
+    "education-field": "What did you study?",
     "education-school": "Which school did you attend?",
     "graduation-year": "What year did you graduate?",
+    "education-grade": "What was your GPA?",
     "education-history": "List your education.",
     "projects": "List your projects.",
     "awards": "Which awards have you received?",
@@ -90,8 +99,100 @@ QUESTIONS: dict[str, str] = {
     "work-settings": "Do you prefer remote, hybrid or on-site work?",
     "preferred-locations": "Which locations do you prefer?",
     "preferred-industries": "Which industries do you prefer?",
+    # Personal and screening questions forms ask (decided 2026-11-11): the BDE adds the candidate's answer on the
+    # Autofill screen, for that version. Only citizenship is built (the profile's status). Never a date of birth, an ID
+    # or a password: the extension never fills those.
+    "preferred-name": "What is your preferred name?",
+    "middle-name": "What is your middle name?",
+    "address-line1": "What is your street address?",
+    "address-line2": "What is your apartment, suite or unit?",
+    "address-postal": "What is your ZIP or postal code?",
+    "portfolio-url": "What is your portfolio or personal website?",
+    "citizenship": "Are you a US citizen?",
+    "nationality": "What is your nationality?",
+    "current-pay": "What is your current pay rate?",
+    "salary-expectation": "What is your expected annual salary?",
+    # The lowest rate the candidate takes (decided 2026-11-12): the BDE's own answer, never the profile's `rate_min`.
+    "floor-rate": "What is your floor rate?",
+    "onsite-work": "Are you willing to work on-site?",
+    "willing-to-travel": "Are you willing to travel for work?",
+    "commute": "Can you commute to the job's location?",
+    "over-18": "Are you at least 18 years old?",
+    "criminal-history": "Have you ever been convicted of a crime?",
+    "background-check": "Are you willing to undergo a background check?",
+    "drug-test": "Are you willing to take a drug test?",
+    "security-clearance": "Do you hold an active security clearance?",
+    "non-compete": "Are you bound by a non-compete agreement?",
+    "government-work": "Have you ever worked for a government agency?",
+    "relative-at-company": "Do you have relatives who work at the company?",
+    "former-employee": "Have you worked for the company before?",
+    "accommodations": "Do you need accommodations during the hiring process?",
+    "essential-functions": "Can you perform the job's essential functions, with or without reasonable accommodation?",
+    # Voluntary self-identification (decided 2026-11-11): the profile doesn't hold it, so it's never built; the BDE adds
+    # the candidate's own answer on the Autofill screen, for that version. Never logged; the extension leaves these
+    # answers out of the form saved with an application (docs/02 §8.1).
+    "gender": "What is your gender?",
+    "pronouns": "What are your pronouns?",
+    "race": "What is your race or ethnicity?",
+    "hispanic-latino": "Are you Hispanic or Latino?",
+    "veteran-status": "What is your veteran status?",
+    "disability-status": "Do you have a disability?",
+    "sexual-orientation": "What is your sexual orientation?",
+    "transgender": "Do you identify as transgender?",
 }
 YEARS = QUESTIONS["years-experience"]
+
+# What each question's answer is, for the Autofill screen's editor and the save's check: text, texts (a list of short
+# texts), number, boolean, date ("YYYY-MM-DD") or entries: a list of records, changed in the résumé itself and never
+# edited here, since an edit's `over` would be a copy of the whole list (07 Q42).
+ANSWER_TYPES: dict[str, str] = {
+    "full-name": "text", "email": "text", "phone": "text", "linkedin-url": "text", "github-url": "text",
+    "address-city": "text", "address-region": "text", "address-country": "text", "professional-title": "text",
+    "summary": "text", "work-auth-status": "text", "skills": "texts", "current-company": "text", "current-title": "text",
+    "work-history": "entries", "education-degree": "text", "education-field": "text", "education-school": "text",
+    "graduation-year": "number", "education-grade": "text",
+    "education-history": "entries", "projects": "entries", "awards": "entries", "certifications": "texts",
+    "languages": "texts", "work-auth-expiry": "date", "visa-sponsorship": "boolean", "visa-transfer": "boolean",
+    "years-experience": "number", "primary-role": "text", "target-roles": "texts", "pay-rate": "number",
+    "start-date": "date", "notice-period-days": "number", "relocation-willing": "boolean", "employment-types": "texts",
+    "work-settings": "texts", "preferred-locations": "texts", "preferred-industries": "texts",
+    "preferred-name": "text", "middle-name": "text", "address-line1": "text", "address-line2": "text",
+    "address-postal": "text", "portfolio-url": "text", "citizenship": "boolean", "nationality": "text",
+    "current-pay": "text", "salary-expectation": "number", "floor-rate": "number", "onsite-work": "boolean",
+    "willing-to-travel": "text", "commute": "boolean", "over-18": "boolean", "criminal-history": "boolean",
+    "background-check": "boolean",
+    "drug-test": "boolean", "security-clearance": "text", "non-compete": "boolean", "government-work": "boolean",
+    "relative-at-company": "boolean", "former-employee": "boolean", "accommodations": "boolean",
+    "essential-functions": "boolean",
+    "gender": "text", "pronouns": "text", "race": "text", "hispanic-latino": "text", "veteran-status": "text",
+    "disability-status": "text", "sexual-orientation": "text", "transgender": "text",
+}
+# Other wordings forms use for a fixed question that has no field type of its own, sent as its `also` on the
+# extension's read (docs/02 §8.1), so the extension matches any of them as it does a saved question's. Wordings live
+# here as data, not in the extension's tables (07 Q35).
+ALSO: dict[str, list[str]] = {
+    "visa-transfer": ["Do you need an H-1B transfer?", "Will you require an H1B visa transfer?",
+                      "Do you require a visa transfer?"],
+    "work-settings": ["Are you open to remote, hybrid or onsite work?", "Work arrangement preference",
+                      "Preferred work setting", "Preferred work arrangement", "Work arrangement"],
+    # Found unanswered by the question corpus (extension/src/autofill/question-corpus.test.ts, 2026-11-11).
+    "languages": ["Languages", "Languages spoken", "What languages do you speak?"],
+    "willing-to-travel": ["Willingness to travel", "Are you open to travel?"],
+    "employment-types": ["Employment type", "What type of employment are you looking for?",
+                         "Are you looking for full-time or contract roles?"],
+    "preferred-industries": ["Preferred industry", "Which industries are you interested in?"],
+    "preferred-locations": ["Which locations are you open to working in?"],
+    "education-field": ["Field of study", "What is your field of study?", "Major", "What was your major?", "Area of study",
+                        "Discipline", "Specialization", "Concentration"],
+    "education-grade": ["GPA", "What is your GPA?", "Cumulative GPA", "Overall GPA", "Overall result (GPA)", "CGPA"],
+    # How forms ask the floor rate (2026-11-12).
+    "floor-rate": ["Floor rate", "What is the lowest rate you would accept?", "Minimum acceptable rate", "Minimum rate",
+                   "Lowest acceptable rate", "Minimum hourly rate"],
+}
+# How much one version keeps (docs/02 §8.4): a question, a text answer, a list's items and each item, the questions
+# the user adds.
+MAX_QUESTION, MAX_ANSWER, MAX_ITEMS, MAX_ITEM, MAX_CUSTOM = 300, 4000, 100, 300, 200
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # A month is 01–12: "2024-00" or "2024-13" isn't one (src/lib/api/dto/resume-parse.ts `monthIndex`, in step).
 _MONTH = re.compile(r"^(\d{4})(?:-(0[1-9]|1[0-2]))?$")
@@ -299,6 +400,34 @@ def _highest_school(schools: list[dict]) -> dict:
     return max(named, key=lambda school: _level(text(school.get("degree"))), default={})
 
 
+# What a degree line says was studied, after the degree's own words: "B.Tech in Computer Science", "B.S., Information
+# Systems", "B.E. - Mechanical Engineering", or after a degree's short code: "BS Computer Science", "MBA Finance".
+_FIELD_AFTER = re.compile(r"\s+in\s+|\s*,\s+|\s+[-–—:]\s+", re.IGNORECASE)
+_FIELD_AFTER_CODE = re.compile(
+    r"^(?:b\.?\s?tech|m\.?\s?tech|b\.?\s?sc|m\.?\s?sc|b\.?\s?com|m\.?\s?com|b\.?\s?e|m\.?\s?e|b\.?\s?s|m\.?\s?s|b\.?\s?a|"
+    r"m\.?\s?a|mba|bba|bca|mca|ph\.?\s?d)\.?\s+(.+)$", re.IGNORECASE)
+# A note at the end of the line that isn't the subject: "(Honors)", "(2019)", ", GPA 3.8".
+_FIELD_NOTE = re.compile(r"\s*\([^)]*\)\s*$|\s*[,;|]\s*(?:c?gpa|grade|percentage|honou?rs)\b.*$", re.IGNORECASE)
+
+
+def _field_of_study(degree: str) -> str | None:
+    """The subject a degree line names, as printed: "B.Tech in Computer Science and Engineering" is "Computer Science and
+    Engineering", "B.S., Information Systems" is "Information Systems", "MS Data Science" is "Data Science". A line that
+    only names the degree ("MBA", "Master of Computer Applications", "B.Tech (CSE)") gives none, and none is guessed; nor
+    does a certificate row."""
+    degree = text(degree)
+    if not degree or _is_certificate(degree):
+        return None
+    # A note in parentheses ("(Certificate in Data Science)") isn't searched for the separator.
+    found = _FIELD_AFTER.search(re.sub(r"\([^)]*\)", lambda note: " " * len(note.group()), degree))
+    rest = degree[found.end():] if found else (_FIELD_AFTER_CODE.match(degree) or [None, None])[1]
+    if not rest:
+        return None
+    for _ in range(3):
+        rest = _FIELD_NOTE.sub("", rest).strip(" .,-–—:;")
+    return rest or None
+
+
 def _graduation_year(school: Mapping) -> int | None:
     """The year a degree ended: the last year written, so "2013 – 2017" is 2017."""
     years = _YEAR.findall(text(school.get("graduation_date")))
@@ -347,10 +476,12 @@ def _answers(candidate, version, today: date) -> dict:
             "dates": text(j.get("dates")), "start": text(j.get("start")), "end": text(j.get("end")),
             "current": bool(j.get("current")), "bullets": _bullets(j)} for j in jobs if _is_job(j)),
         "education-degree": text(school.get("degree")),
+        "education-field": _field_of_study(school.get("degree")),
         "education-school": text(school.get("institution")),
         "graduation-year": _graduation_year(school),
+        "education-grade": text(school.get("grade")),
         "education-history": _entries({
-            "degree": text(e.get("degree")), "school": text(e.get("institution")),
+            "degree": text(e.get("degree")), "field": _field_of_study(e.get("degree")), "school": text(e.get("institution")),
             "graduation_date": text(e.get("graduation_date")), "grade": text(e.get("grade"))} for e in schools),
         "projects": _entries({
             "name": text(p.get("name")), "url": text(p.get("url")), "dates": text(p.get("dates")),
@@ -362,6 +493,8 @@ def _answers(candidate, version, today: date) -> dict:
         "languages": _texts(x.get("name") for x in dicts(v("languages"))),
         # The candidate's profile (the owner's and the manager's, 07 Q56).
         "work-auth-expiry": _day(c("work_auth_expiry")),
+        # A US citizen is exactly the USC status; any other status the profile records isn't one.
+        "citizenship": (text(c("work_auth")) == "USC") if text(c("work_auth")) else None,
         "visa-sponsorship": c("needs_sponsorship"),
         "visa-transfer": c("needs_transfer"),
         "years-experience": _years(version, candidate, today),
@@ -381,9 +514,10 @@ def _answers(candidate, version, today: date) -> dict:
 
 def entries_of(version) -> dict:
     """The user's entries a version stores, as they're read and copied: `edited` by key, each with the built answer it
-    replaced (`over`), and `custom` by question. Anything else stored is no entry: a value that isn't an object, the
-    first 0019's `{question: answer}` (built answers, not typed ones), an edit without an answer, a blank question. A
-    question in a fixed question's words stays (a question added or reworded here can take them after it was typed):
+    replaced (`over`), and `custom`, the questions the user added, oldest first, each `{question, also, answer}`.
+    Anything else stored is no entry: a value that isn't an object, the first 0019's `{question: answer}` (built
+    answers, not typed ones), an edit without an answer, a custom entry that isn't one (a blank question, no answer).
+    A question in a fixed question's words stays (a question added or reworded here can take them after it was typed):
     `merged()` decides whether it shows. `{}` when none are left."""
     stored = _get(version, "autofill")
     if not isinstance(stored, Mapping):
@@ -391,9 +525,20 @@ def entries_of(version) -> dict:
     edited, custom = stored.get("edited"), stored.get("custom")
     edits = {key: {"answer": edit["answer"], "over": edit.get("over")} for key, edit in edited.items()
              if isinstance(key, str) and isinstance(edit, Mapping) and "answer" in edit} if isinstance(edited, Mapping) else {}
-    added = {question: answer for question, answer in custom.items()
-             if isinstance(question, str) and question.strip()} if isinstance(custom, Mapping) else {}
+    added = [{"question": entry["question"], "also": _wordings(entry.get("also")), "answer": entry["answer"]}
+             for entry in (custom if isinstance(custom, list) else [])
+             if isinstance(entry, Mapping) and isinstance(entry.get("question"), str) and entry["question"].strip()
+             and "answer" in entry]
     return {"edited": edits, "custom": added} if edits or added else {}
+
+
+def _wordings(also) -> list[str]:
+    return [wording for wording in also if isinstance(wording, str) and wording.strip()] if isinstance(also, list) else []
+
+
+def wording(question: str) -> str:
+    """A question as two are compared (07 Q43): without capitals, spacing or punctuation."""
+    return " ".join(re.sub(r"[^\w\s]", " ", question.casefold()).split())
 
 
 def _plain(value):
@@ -416,22 +561,177 @@ def _same(left, right) -> bool:
     return dump(left) == dump(right)
 
 
-def merged(candidate, version, today: date | None = None) -> list[dict]:
+def merged(candidate, version, today: date | None = None, *, editor: bool = False) -> list[dict]:
     """Every question of one version once: the fixed ones in QUESTIONS order, each the user's edit while the answer it
-    replaced is still the built one, then the questions the user added. Built for this read; nothing is written."""
+    replaced is still the built one, then the questions the user added, oldest first, with their other wordings
+    (`also`, when there are any). A fixed answer whose edit stopped applying carries that edit's answer as `replaced`
+    (07 Q15). `editor` (the Autofill screen, Q34) also lists the fixed questions with no answer, as null, and gives
+    each keyed answer its `type`. Built for this read; nothing is written."""
     built = _answers(candidate, version, today or date.today())
     entries = entries_of(version)
-    edits, added = entries.get("edited", {}), entries.get("custom", {})
+    edits, added = entries.get("edited", {}), entries.get("custom", [])
     out = []
     for key, question in QUESTIONS.items():
         answer, edit = built.get(key), edits.get(key)
+        typed = {"type": ANSWER_TYPES[key]} if editor else {}
+        worded = {"also": ALSO[key]} if key in ALSO and not editor else {}
         if edit is not None and _same(edit["over"], answer):
-            out.append({"question": question, "answer": edit["answer"], "kind": EDITED, "key": key, "built": answer})
-        elif answer is not None:
-            out.append({"question": question, "answer": answer, "kind": FIXED, "key": key})
+            out.append({"question": question, "answer": edit["answer"], "kind": EDITED, "key": key, **typed,
+                        **worded, "built": answer})
+        elif answer is not None or editor:
+            fixed = {"question": question, "answer": answer, "kind": FIXED, "key": key, **typed, **worded}
+            out.append({**fixed, "replaced": edit["answer"]} if edit is not None else fixed)
     # A question the user added in words a fixed question took later shows only while that one has no answer: each
     # question once.
-    shown = {entry["question"] for entry in out}
-    out.extend({"question": question, "answer": answer, "kind": CUSTOM}
-               for question, answer in added.items() if question not in shown)
+    shown = {entry["question"] for entry in out if entry["answer"] is not None}
+    own = [entry for entry in added if entry["question"] not in shown]
+    # The editor lists an unanswered fixed question as a placeholder: an added question in its words stands for it.
+    asked = {entry["question"] for entry in own}
+    out = [entry for entry in out if entry["answer"] is not None or entry["question"] not in asked]
+    out.extend({"question": entry["question"], "answer": entry["answer"], "kind": CUSTOM,
+                **({"also": entry["also"]} if entry["also"] else {})}
+               for entry in own)
     return out
+
+
+class Refused(ValueError):
+    """A change the save route refuses (400), with what to tell the user."""
+
+
+def _checked(key: str, answer):
+    """`answer` as fixed question `key` keeps it, or Refused."""
+    kind = ANSWER_TYPES.get(key)
+    if kind is None:
+        raise Refused(f"No question has the key {key!r}.")
+    if kind == "entries":
+        raise Refused(f"{QUESTIONS[key]} Change it in the résumé itself.")
+    if kind == "text" and isinstance(answer, str) and answer.strip() and len(answer) <= MAX_ANSWER:
+        return answer.strip()
+    if kind == "texts" and isinstance(answer, list) and all(isinstance(item, str) for item in answer):
+        items = [item.strip() for item in answer if item.strip()]
+        if items and len(items) <= MAX_ITEMS and all(len(item) <= MAX_ITEM for item in items):
+            return items
+    if kind == "number" and isinstance(answer, (int, float)) and not isinstance(answer, bool) and 0 <= answer < 10**7:
+        return _number(answer)
+    if kind == "boolean" and isinstance(answer, bool):
+        return answer
+    if kind == "date" and isinstance(answer, str) and _DATE.match(answer):
+        try:
+            return date.fromisoformat(answer).isoformat()
+        except ValueError:
+            pass
+    raise Refused(f"That isn't an answer to {QUESTIONS[key]!r}: it takes {_TAKES[kind]}.")
+
+
+_TAKES = {"text": f"text, up to {MAX_ANSWER} characters", "texts": f"a list of up to {MAX_ITEMS} short texts",
+          "number": "a number", "boolean": "yes or no", "date": "a date (YYYY-MM-DD)"}
+
+
+def checked_change(edit: Mapping, reset: list, add: Mapping, remove: list) -> dict:
+    """A save's change with each answer as it's kept, or Refused: an unknown key, a list answer (Q42), an answer of the
+    wrong kind, a key both edited and reset, an added question in a fixed question's words (edit that one instead)."""
+    if not (edit or reset or add or remove):
+        raise Refused("Nothing to save.")
+    edits = {key: _checked(key, answer) for key, answer in edit.items()}
+    for key in reset:
+        if key not in QUESTIONS:
+            raise Refused(f"No question has the key {key!r}.")
+        if key in edits:
+            raise Refused(f"{QUESTIONS[key]} is both changed and reset.")
+    fixed = {wording(question) for question in QUESTIONS.values()}
+    added = {}
+    for question, answer in add.items():
+        question, answer = question.strip(), answer.strip() if isinstance(answer, str) else answer
+        if not question or len(question) > MAX_QUESTION:
+            raise Refused(f"A question is 1 to {MAX_QUESTION} characters.")
+        if not isinstance(answer, str) or not answer or len(answer) > MAX_ANSWER:
+            raise Refused(f"An answer to {question!r} is text, up to {MAX_ANSWER} characters.")
+        if wording(question) in fixed:
+            raise Refused(f"{question!r} is one of BenchQ's own questions: change its answer instead.")
+        added[question] = answer
+    return {"edit": edits, "reset": list(dict.fromkeys(reset)), "add": added,
+            "remove": [q.strip() for q in remove if isinstance(q, str) and q.strip()]}
+
+
+def unseen(candidate, version, edited: Mapping, shown_built: Mapping, today: date, *, answered: Mapping | None = None,
+           reset=(), added=(), removed=()) -> list[str]:
+    """The edited keys whose built answer now isn't the one the user was shown (`shown_built`), and the edited or reset
+    keys whose answer (an edit, else the built one) now isn't the one they were shown (`answered`, when sent): saving
+    over it would replace an answer they never saw, such as a rate the manager changed meanwhile (Abdul's fourth
+    review, §8.1) or an answer saved from another tab after this page opened."""
+    built = _answers(candidate, version, today)
+    stale = [key for key in edited if not _same(shown_built.get(key), built.get(key))]
+    if answered:
+        now = shown(candidate, version, today)
+        stale += [key for key in dict.fromkeys([*edited, *reset])
+                  if key in answered and key not in stale and not _same(answered[key], now.get(key))]
+        # A question of the user's own, added again or removed: the answer it had then (none, for a new one) must
+        # still be its answer.
+        stale += [question for question in dict.fromkeys([*added, *removed])
+                  if question in answered and question not in stale
+                  and not _same(answered[question], now.get(("custom", wording(question))))]
+    return stale
+
+
+def shown(candidate, version, today: date) -> dict:
+    """What a version answers now, for comparing one version with another: each fixed question's answer by key (an
+    edit while it applies), and each added question's by its wording, its other wordings too."""
+    built = _answers(candidate, version, today)
+    entries = entries_of(version)
+    edits = entries.get("edited", {})
+    out = {key: (edit["answer"] if (edit := edits.get(key)) is not None and _same(edit["over"], built.get(key))
+                 else built.get(key)) for key in QUESTIONS}
+    for entry in entries.get("custom", []):
+        for asked in (entry["question"], *entry["also"]):
+            out.setdefault(("custom", wording(asked)), entry["answer"])
+    return out
+
+
+def change(candidate, version, change: dict, before: dict, today: date, *, is_opened: bool) -> dict | None:
+    """`version`'s entries with `change` made (from `checked_change`), or None when it changes nothing. On the version
+    opened on the screen (`is_opened`) every part applies. On another version of the same résumé (07 Q30, Q44) a new
+    answer goes where that version has no answer to the question yet or still answers what the opened one did before
+    the save (`before`, from `shown()`); a reset or a removal only where it still answers the same. A version that
+    answers differently keeps its own. An edit's `over` is the version's own built answer; an edit equal to it is no
+    edit."""
+    built = _answers(candidate, version, today)
+    now = shown(candidate, version, today)
+    entries = entries_of(version)
+    edits = dict(entries.get("edited", {}))
+    custom = [dict(entry) for entry in entries.get("custom", [])]
+
+    def reaches(slot, *, answers: bool = False) -> bool:
+        return is_opened or _same(now.get(slot), before.get(slot)) or (answers and now.get(slot) is None)
+
+    for key, answer in change["edit"].items():
+        if reaches(key, answers=True):
+            if _same(answer, built.get(key)):
+                edits.pop(key, None)
+            else:
+                edits[key] = {"answer": answer, "over": built.get(key)}
+    for key in change["reset"]:
+        if reaches(key):
+            edits.pop(key, None)
+
+    def find(question: str) -> dict | None:
+        asked = wording(question)
+        return next((entry for entry in custom if asked in {wording(q) for q in (entry["question"], *entry["also"])}),
+                    None)
+
+    for question, answer in change["add"].items():
+        if not reaches(("custom", wording(question)), answers=True):
+            continue
+        found = find(question)
+        if found is not None:
+            found["answer"] = answer
+        elif len(custom) < MAX_CUSTOM:
+            custom.append({"question": question, "also": [], "answer": answer})
+        elif is_opened:
+            raise Refused(f"A résumé keeps up to {MAX_CUSTOM} questions of your own.")
+    for question in change["remove"]:
+        found = find(question)
+        if found is not None and reaches(("custom", wording(question))):
+            custom.remove(found)
+
+    result = {"edited": edits, "custom": custom} if edits or custom else {}
+    return None if result == entries else result

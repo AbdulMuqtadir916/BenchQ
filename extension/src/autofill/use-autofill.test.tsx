@@ -2,13 +2,14 @@
 import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getResumeAnswers, getResumeFile } from "../api";
+import { getResumeAnswers, getResumeFile, saveResumeAnswers } from "../api";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
+import { confirmationKey } from "./job-check";
 import { fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, TabField } from "./types";
 import { forgetTabs, useAutofill } from "./use-autofill";
 
-vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn() }));
+vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn(), saveResumeAnswers: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(), focusField: vi.fn(),
   undoFills: vi.fn(), undoCount: vi.fn(), takeBackField: vi.fn(), removeFileOnPage: vi.fn(),
@@ -81,6 +82,7 @@ beforeEach(() => {
   vi.stubGlobal("chrome", fake);
   vi.mocked(getResumeAnswers).mockResolvedValue(answers);
   vi.mocked(getResumeFile).mockResolvedValue(null);
+  vi.mocked(saveResumeAnswers).mockResolvedValue({});
   vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], onSite));
   vi.mocked(fillField).mockResolvedValue({ status: "filled", current: "" });
   vi.mocked(fillChoice).mockResolvedValue({ status: "filled", current: "" });
@@ -284,6 +286,28 @@ describe("scanning", () => {
   });
 });
 
+describe("a résumé's answers that come back late", () => {
+  /** A résumé's first school, and its schools in order: what "Add another" blocks fill from (#132). */
+  const schooling = (first: string, second: string) => [
+    { question: "What school did you attend?", key: "education-school", answer: first, kind: "FIXED" },
+    { question: "Education", key: "education-history", answer: [{ school: first }, { school: second }], kind: "FIXED" },
+  ];
+
+  it("never pair the picked résumé's answers with another résumé's schools", async () => {
+    let answerFirst: (entries: unknown[]) => void = () => undefined;
+    vi.mocked(getResumeAnswers).mockImplementation((_firm, _candidate, resumeId) => resumeId === "res-1"
+      ? new Promise((resolve) => { answerFirst = resolve; })
+      : Promise.resolve(schooling("Beta University", "Beta College")));
+    vi.mocked(scanTab).mockResolvedValue(page([field("s1", "School"), field("s2", "School")]));
+    await mount();
+    await pickResume("res-2");
+    expect(hook.rows!.map((row) => row.proposed ?? null)).toEqual(["Beta University", "Beta College"]);
+    await act(async () => { answerFirst(schooling("Alpha University", "Alpha College")); });
+    await run(() => hook.rescan(undefined, true));
+    expect(hook.rows!.map((row) => row.proposed ?? null)).toEqual(["Beta University", "Beta College"]);
+  });
+});
+
 describe("the job check", () => {
   it("pauses Autofill on a page for another job", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
@@ -294,12 +318,21 @@ describe("the job check", () => {
     expect(fillField).not.toHaveBeenCalled();
   });
 
-  it("lets the BDE carry on after confirming the host", async () => {
+  it("lets the BDE carry on after confirming the job", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
-    await mount({ ...connection, confirmedHosts: ["other.test"] });
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
     expect(hook.needsConfirmation).toBe(false);
+    expect(hook.confirmKey).toBe("other.test · Data Analyst");
     await run(() => hook.autofill());
     expect(fillField).toHaveBeenCalled();
+  });
+
+  it("asks again for another job on a site where the BDE confirmed one", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Product Manager")] });
+    expect(hook.needsConfirmation).toBe(true);
+    await run(() => hook.autofill());
+    expect(fillField).not.toHaveBeenCalled();
   });
 });
 
@@ -681,6 +714,81 @@ describe("following the form", () => {
   });
 });
 
+describe("the next page of a form (07 Q4)", () => {
+  // Other questions than the first page's: a field without an id of its own is known by its label.
+  const nextPage = page([field("s", "Do you need sponsorship?"), field("e", "Nickname")]);
+  /** The form moves on: its fields went and new ones came. */
+  async function moveOn(next: TabScan) {
+    vi.mocked(scanTab).mockResolvedValue(next);
+    vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: true });
+    await finalForm();
+    vi.mocked(readTab).mockResolvedValue({ values: new Map(), moved: false });
+  }
+  const filledIds = () => vi.mocked(fillField).mock.calls.map(([, , request]) => request.fieldId);
+
+  it("fills on its own once the BDE has run Autofill on this application, after the page goes still", async () => {
+    await mount();
+    await run(() => hook.autofill());
+    expect(hook.isFollowingSteps).toBe(true);
+    vi.mocked(fillField).mockClear();
+    await moveOn(nextPage);
+    await wait(50);
+    expect(filledIds()).toEqual(["s"]);
+  });
+
+  it("waits for the BDE's first Autofill", async () => {
+    await mount();
+    expect(hook.isFollowingSteps).toBe(false);
+    await moveOn(nextPage);
+    await wait(50);
+    expect(fillField).not.toHaveBeenCalled();
+    expect(hook.rows!.map(({ field: { id } }) => id)).toEqual(["s", "e"]);
+  });
+
+  it("leaves a question an answer brought out to the next Autofill: that's not a new page", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City"), field("n", "Nickname")]));
+    await mount();
+    await run(() => hook.autofill());
+    vi.mocked(fillField).mockClear();
+    await moveOn(page([field("a", "Email", "text", "priya@example.test"), field("b", "City", "text", "Phoenix"), field("n", "Nickname"), field("s", "Do you need sponsorship?")]));
+    await wait(50);
+    expect(fillField).not.toHaveBeenCalled();
+  });
+
+  it("fills the next page of a job the BDE confirmed", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
+    await run(() => hook.autofill());
+    vi.mocked(fillField).mockClear();
+    await moveOn(page(nextPage.fields, elsewhere));
+    await wait(50);
+    expect(filledIds()).toEqual(["s"]);
+  });
+
+  it("waits for the BDE when the next page shows another job on a site where they confirmed one", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email"), field("b", "City")], elsewhere));
+    await mount({ ...connection, confirmedHosts: [confirmationKey(elsewhere.url, "Data Analyst")] });
+    await run(() => hook.autofill());
+    vi.mocked(fillField).mockClear();
+    await moveOn(page(nextPage.fields, { ...elsewhere, heading: "Product Manager" }));
+    await wait(50);
+    expect(fillField).not.toHaveBeenCalled();
+    expect(hook.needsConfirmation).toBe(true);
+  });
+
+  it("stops after Undo, until the BDE runs Autofill again", async () => {
+    vi.mocked(undoFills).mockResolvedValue({ restored: 2, kept: 0, skipped: 0 });
+    await mount();
+    await run(() => hook.autofill());
+    await run(() => hook.undo());
+    expect(hook.isFollowingSteps).toBe(false);
+    vi.mocked(fillField).mockClear();
+    await moveOn(nextPage);
+    await wait(50);
+    expect(fillField).not.toHaveBeenCalled();
+  });
+});
+
 describe("the regular check", () => {
   const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
@@ -935,6 +1043,48 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     await run(() => hook.rescan());
     expect(getResumeFile).toHaveBeenCalledTimes(1);
     expect(getResumeFile).toHaveBeenCalledWith("firm-1", "cand-1", "res-1");
+  });
+});
+
+describe("keeping a typed answer for next time (07 Q58)", () => {
+  const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  const WHY = "Why do you want to work here?";
+
+  async function typeAnAnswer() {
+    vi.mocked(scanTab).mockResolvedValue(page([field("w", WHY)], onSite));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    expect(hook.rows![0]!.saveOffer).toBeUndefined();
+    typed(["0:w", "Payments."]);
+    await advance(2000);
+  }
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("offers what the BDE typed, saves it to the picked résumé, and then says so", async () => {
+    await typeAnAnswer();
+    const row = hook.rows![0]!;
+    expect(row.saveOffer).toEqual({ label: "Save for next time", change: { add: { [WHY]: "Payments." } } });
+    vi.mocked(getResumeAnswers).mockResolvedValue([...answers, custom(WHY, "Payments.")]);
+    vi.mocked(scanTab).mockResolvedValue(page([field("w", WHY, "text", "Payments.")], onSite));
+    await act(async () => { expect(await hook.saveAnswer(row, true)).toBe(true); });
+    expect(saveResumeAnswers).toHaveBeenCalledWith("firm-1", "cand-1", "res-1", { add: { [WHY]: "Payments." }, only_this: true });
+    expect(hook.rows![0]!.saveOffer).toBe("saved");
+  });
+
+  it("saves nothing, and says why, when the answer changed in BenchQ meanwhile", async () => {
+    vi.mocked(saveResumeAnswers).mockRejectedValue(Object.assign(new Error("Request failed (409)"), { status: 409 }));
+    await typeAnAnswer();
+    await act(async () => { expect(await hook.saveAnswer(hook.rows![0]!, false)).toBe(false); });
+    expect(hook.error).toBe("This answer changed in BenchQ after the page loaded, so it wasn't saved. The new one is shown now.");
+  });
+
+  it("offers nothing for a value the form held before BenchQ looked", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("w", WHY, "text", "Typed earlier.")], onSite));
+    await mount();
+    expect(hook.rows![0]!.saveOffer).toBeUndefined();
   });
 });
 
