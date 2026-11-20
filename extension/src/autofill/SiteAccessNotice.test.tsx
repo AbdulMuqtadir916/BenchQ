@@ -16,17 +16,20 @@ async function show(props: Partial<Parameters<typeof SiteAccessNotice>[0]> = {})
 }
 
 describe("the notice asking to read a site", () => {
-  it("says which site, why, and what BenchQ does with it, before Chrome asks", async () => {
+  it("says which site, why, and what BenchQ does with it, before Chrome asks, in a compact card", async () => {
     const { container } = await show();
     const text = container.textContent ?? "";
-    expect(text).toContain("Permission needed");
-    expect(text).toContain("Allow BenchQ to work on this site?");
+    expect(text).toContain("Allow BenchQ on this site?");
     expect(container.querySelector("[data-slot=site-access-host]")?.textContent).toBe("careers.employer.test");
-    expect(text).toContain("needs to read the form on this page");
+    expect(text).toContain("needs to read the form on careers.employer.test to fill it");
     expect(text).toContain("isn't on BenchQ's list yet");
-    expect(text).toContain("Reads only this tab's form");
-    expect(text).toContain("Asks once for this site");
-    expect(text).toContain("Yours to take back");
+    // What BenchQ will and won't do is there, folded away until asked for.
+    const details = container.querySelector("details")!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")?.textContent).toBe("What BenchQ can see");
+    expect(details.textContent).toContain("Reads only this tab's form");
+    expect(details.textContent).toContain("Asks once for this site");
+    expect(details.textContent).toContain("Yours to take back");
     expect(container.querySelector("[data-slot=site-access-allow]")?.textContent).toBe("Allow on careers.employer.test");
   });
 

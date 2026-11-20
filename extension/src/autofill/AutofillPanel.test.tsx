@@ -6,6 +6,7 @@ import type { Application } from "../api";
 import { installDialog } from "../test/dialog";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import AutofillPanel from "./AutofillPanel";
+import { forgetOwnFiles } from "./own-files";
 import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
@@ -109,29 +110,30 @@ afterEach(() => {
   host.remove();
   tailoring = { status: "idle" };
   refreshFailed = false;
+  // The BDE's own file outlives the panel while the side panel is open: each test starts without one.
+  forgetOwnFiles();
   vi.clearAllMocks();
 });
 
 describe("Autofill", () => {
-  it("sits at the top of the form, above the list, and gives no count", () => {
+  it("floats at the bottom of the panel, in reach however long the form, and gives no count", () => {
     show({ fillCount: 3, rows: [row("Email", true)] });
-    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
-    expect(inBody()[0]!.className).toContain("bq-primary");
-    const button = inBody()[0]!;
-    const list = host.querySelector("[data-slot='review']")!;
-    expect(button.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(inBody()).toEqual([]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(atBottom()[0]!.className).toContain("bq-primary");
+    expect(host.querySelector("[data-slot='autofill-actions']")!.className).toContain("sticky");
   });
 
   it("runs when clicked", () => {
     show({ fillCount: 1 });
-    act(() => { inBody()[0]!.click(); });
+    act(() => { atBottom()[0]!.click(); });
     expect(autofill).toHaveBeenCalledTimes(1);
   });
 
   it("says it's filling during a run", () => {
     show({ fillCount: 3, filling: true });
-    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
-    expect(inBody()[0]!.disabled).toBe(true);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
+    expect(atBottom()[0]!.disabled).toBe(true);
   });
 
   it("makes way for a summary of the run once it leaves nothing to fill", () => {
@@ -143,7 +145,7 @@ describe("Autofill", () => {
 
   it("isn't complete while there's more to fill", () => {
     show({ fillCount: 2, outcome: { filled: 3, handedBack: 0, stopped: true } });
-    expect(inBody().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
     expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
   });
 
@@ -410,9 +412,9 @@ describe("the résumé the answers come from", () => {
 
   it("doesn't say a file is attached once the upload is gone and no chip names it (#148)", () => {
     show({ fillCount: 0, rows: [row("Email", true)], attachedFile: "Priya - Java Developer.pdf", attachedShown: false });
-    const resume = host.querySelector("[data-document='resume']")!;
-    expect(resume.querySelector("[data-slot='document-status']")!.textContent).toBe("No field found");
-    expect(resume.querySelector("[data-slot='document-attached']")).toBeNull();
+    // Nor shows a Resume or Cover letter section the form no longer asks for.
+    expect(host.querySelector("[data-slot='document-attached']")).toBeNull();
+    expect(host.querySelector("[data-slot='documents']")).toBeNull();
   });
 
   it("shows the file Autofill attached when the site swapped its upload for a chip (07 Q53)", () => {
@@ -525,6 +527,60 @@ describe("the résumé the answers come from", () => {
     expect(host.querySelector("[data-document='resume'] [data-slot='document-status']")!.textContent).toBe("No field found");
     expect(named("Remove")).toBeTruthy();
     expect(host.querySelector("[data-document='resume'] [data-slot='document-held']")).toBeNull();
+  });
+
+  it("keeps the BDE's own file when the panel is rebuilt, as on a switch to another tab and back (#148's review)", async () => {
+    show(generated);
+    await pickOwn({ ...generated, attachmentSource: "picked" });
+    act(() => { root!.unmount(); });
+    root = createRoot(host);
+    act(() => { root!.render(cloneElement(element)); });
+    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile).toMatchObject({ name: "mine.pdf", source: "picked" });
+    expect(host.querySelector("[data-slot='resume-file-source']")!.textContent).toBe("Your file");
+    // Another candidate's panel has none of it.
+    act(() => { root!.render(cloneElement(element, { connection: { ...connection, candidateId: "cand-2", applicationId: "app-2" } })); });
+    expect(vi.mocked(useAutofill).mock.lastCall![0].pickedFile).toBeNull();
+  });
+
+  it("keeps holding fills for a pick still being read when the panel is rebuilt, and uses the file once read", async () => {
+    show(generated);
+    let finishRead: (buffer: ArrayBuffer) => void = () => undefined;
+    const file = new File(["%PDF-1.4"], "slow.pdf", { lastModified: 2 });
+    Object.defineProperty(file, "arrayBuffer", { value: () => new Promise<ArrayBuffer>((resolve) => { finishRead = resolve; }) });
+    const input = host.querySelector<HTMLInputElement>("[data-slot='own-file-input']")!;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    act(() => { root!.unmount(); });
+    root = createRoot(host);
+    act(() => { root!.render(cloneElement(element)); });
+    expect(vi.mocked(useAutofill).mock.lastCall![0].isHeld).toBe(true);
+    await act(async () => {
+      finishRead(new TextEncoder().encode("%PDF-1.4").buffer as ArrayBuffer);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(vi.mocked(useAutofill).mock.lastCall![0]).toMatchObject({ isHeld: false, pickedFile: { name: "slow.pdf" } });
+  });
+
+  it("offers Use a different file on the card of a file BenchQ attached, never on one attached by hand (#148's review)", () => {
+    const onForm = (name: string) => ({ ...upload(), status: "same", field: { ...upload().field, current: name } }) as ReviewRow;
+    show({ ...generated, fillCount: 0, rows: [onForm("Priya - Java Developer.pdf")], attachedFile: "Priya - Java Developer.pdf" });
+    expect(host.querySelector("[data-document='resume'] [data-slot='document-attached'] [data-slot='own-file-pick']")!.textContent).toBe("Use a different file");
+    update({ ...generated, fillCount: 0, rows: [onForm("by-hand.pdf")], attachedFile: null }, oneResume);
+    expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
+  });
+
+  it("swaps a file picked in place of BenchQ's at once, and swaps back on Remove (#148's review)", async () => {
+    const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    const attached = { ...generated, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" };
+    show(attached);
+    expect(autofill).not.toHaveBeenCalled();
+    await pickOwn({ ...attached, fillCount: 1, attachmentSource: "picked" });
+    expect(autofill).toHaveBeenCalledTimes(1);
+    // The BDE's file is the one on the form now: Remove puts the résumé's own back, the same way.
+    update({ ...attached, fillCount: 0, attachedFile: "mine.pdf", attachmentSource: "picked", reviewedFor: reviewedForOwn() }, oneResume);
+    await click("Remove");
+    update({ ...attached, fillCount: 1, attachedFile: "mine.pdf", reviewedFor: { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: null } }, oneResume);
+    expect(autofill).toHaveBeenCalledTimes(2);
   });
 
   it("says when the form's upload won't take the file, and keeps the BDE's controls", async () => {
@@ -665,12 +721,13 @@ describe("a run's first steps", () => {
 describe("the buttons at the bottom", () => {
   it("make Mark applied plain to see while there are fields to fill: a done look of its own, and what it's for", () => {
     show({ fillCount: 3 }, { onApply: vi.fn() });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
-    expect(atBottom()[0]!.className).toContain("color-success-bg");
-    expect(atBottom()[0]!.className).not.toContain("bq-primary");
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill", "Mark applied"]);
+    const markApplied = named("Mark applied");
+    expect(markApplied.className).toContain("color-success-bg");
+    expect(markApplied.className).not.toContain("bq-primary");
     const hint = host.querySelector("[data-slot='mark-applied-hint']")!;
     expect(hint.textContent).toBe("Submitted the form? Mark the job applied in BenchQ.");
-    expect(atBottom()[0]!.getAttribute("aria-describedby")).toBe(hint.id);
+    expect(markApplied.getAttribute("aria-describedby")).toBe(hint.id);
   });
 
   it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
@@ -692,8 +749,8 @@ describe("the buttons at the bottom", () => {
 
   it("leave Mark applied out while a run fills the form, and keep Undo waiting", () => {
     show({ fillCount: 3, filling: true, undoable: 2 }, { onApply: vi.fn() });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Undo"]);
-    expect(atBottom().map(({ disabled }) => disabled)).toEqual([true]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…", "Undo"]);
+    expect(atBottom().map(({ disabled }) => disabled)).toEqual([true, true]);
   });
 
   it("keep Undo beside it", () => {
@@ -838,9 +895,9 @@ describe("confirming Mark applied", () => {
     it("scrolls smoothly to Autofill complete once a run ends, with Mark applied back", () => {
       const rows = [row("Email", true, "a@example.test"), row("Phone", true)];
       show({ fillCount: 1, rows }, { onApply });
-      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
+      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill", "Mark applied"]);
       rerender({ fillCount: 1, filling: true, rows });
-      expect(atBottom()).toEqual([]);
+      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
       expect(scrolled).not.toHaveBeenCalled();
       rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
       expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
@@ -950,35 +1007,15 @@ describe("Tailor for this job", () => {
   });
 });
 
-describe("the job's steps, for a BDE new to the panel", () => {
-  const steps = () => [...host.querySelectorAll("[data-slot='next-step']")]
-    .map((step) => [step.lastElementChild!.firstChild!.textContent, step.getAttribute("data-state")]);
-
-  it("say what's done and what to do now, from the resume to Mark applied", () => {
-    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
-    expect(steps()).toEqual([["Resume", "done"], ["Autofill", "now"], ["Submit on site", "later"], ["Mark applied", "later"]]);
-    expect(host.querySelector("[aria-current='step']")!.textContent).toContain("Autofill");
-  });
-
-  it("move on to submitting once nothing is left to fill, and are all done once the job is applied", () => {
-    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } }, { onApply: vi.fn() });
-    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "now", "later"]);
-    act(() => { root?.unmount(); });
-    host.remove();
-    show({ fillCount: 0, rows: [row("Email", true, "priya@example.test")] }, { isApplied: true });
-    expect(steps().map(([, state]) => state)).toEqual(["done", "done", "done", "done"]);
-    expect(host.querySelector("[aria-current='step']")).toBeNull();
-  });
-});
-
 describe("what the panel shows first", () => {
   const body = () => host.querySelector("[data-slot='autofill-body']")!;
 
-  it("puts Autofill above the resume it answers from", () => {
+  it("shows no step list: the floating actions say what's next, the resume leads the body", () => {
     show({ fillCount: 2, rows: [row("Email", true)] });
-    const run = body().querySelector("[data-slot='autofill-run']")!;
-    const resume = body().querySelector("[data-slot='resume-picker']")!;
-    expect(run.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(host.querySelector("[data-slot='next-steps']")).toBeNull();
+    expect(body().querySelector("[data-slot='autofill-run']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='autofill-run']")).not.toBeNull();
+    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
   });
 
   it("asks for a site's permission alone, Mark applied kept, and shows the rest once it's given", () => {

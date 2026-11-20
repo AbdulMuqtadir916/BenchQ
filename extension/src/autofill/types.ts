@@ -60,7 +60,9 @@ export type FrameScan = { scanId: number; url: string; fields: ScannedField[]; s
 export type FrameRead = { scanId: number; values: Record<string, string>; moved: boolean };
 
 export type FieldWrite =
-  | { type: "text"; value: string }
+  /** `also`: other ways to write the same value, tried in turn when the form refuses `value`, like a phone number's
+   * digits alone (#148). */
+  | { type: "text"; value: string; also?: string[] }
   | { type: "option"; optionId: string }
   | { type: "check"; checked: boolean; optionIds?: string[] }
   /** `also`: other wordings of the answer, tried in turn when the dropdown has no option for `value`, like the status a

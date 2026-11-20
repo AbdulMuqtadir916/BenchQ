@@ -496,7 +496,7 @@ function App() {
             )}
           </button>
           <button
-            className={button("secondary", "small")}
+            className={ICON_BUTTON_RAISED}
             onClick={() => void refresh()}
             aria-label="Refresh saved jobs"
             title="Refresh saved jobs"
@@ -507,7 +507,6 @@ function App() {
               <path d="M3 22v-6h6" />
               <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
             </svg>
-            <span>Refresh</span>
           </button>
         </div>
       </header>
@@ -538,7 +537,8 @@ function App() {
         </section>
       ) : (
         <>
-          <div
+          {/* Who's signed in and whose jobs show: while a tab is connected to a job, its card says whose job it is. */}
+          {!connection && <div
             className={`flex min-w-0 items-center gap-1.5 pt-3 pb-2 ${MUTED_TEXT}`}
           >
             <svg
@@ -555,7 +555,7 @@ function App() {
             <span className="min-w-0 flex-[1_1_0] truncate">
               · BDE · {session.firm?.name || session.firm?.slug || "BenchQ"}
             </span>
-          </div>
+          </div>}
           {error && (
             <p data-slot="error" className={`mb-2.5 ${ALERT}`}>
               {error}
@@ -568,7 +568,7 @@ function App() {
               Apply.
             </p>
           )}
-          <div className="mb-3 grid gap-1">
+          {!connection && <div className="mb-3 grid gap-1">
             <label
               className="text-label text-[var(--color-text-2)]"
               htmlFor="candidate-select"
@@ -606,7 +606,7 @@ function App() {
                 </span>
               )}
             </div>
-          </div>
+          </div>}
           {connection ? (
             <AutofillPanel
               // One panel per tab and job: a tab connected to another job starts afresh (its own form memory, next pages

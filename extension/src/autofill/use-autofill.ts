@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
 import { DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, resumeUploadOf, withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
+import { forgetOwnFiles } from "./own-files";
 import { checkJob, confirmationKey, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume, historyOf, type HistoryRecords } from "./resume-answers";
@@ -140,6 +141,7 @@ function memoryOf({ tabId, applicationId }: Connection): TabMemory {
 export function forgetTabs() {
   tabMemory.clear();
   forgetForms();
+  forgetOwnFiles();
 }
 
 /** What a tab remembers a field by: the control itself, which keeps its id while the page lasts, else its label and

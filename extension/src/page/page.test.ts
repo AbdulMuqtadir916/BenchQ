@@ -457,6 +457,40 @@ describe("filling", () => {
     expect(seen).toEqual(["input", "change", "blur", "focusout"]);
   });
 
+  it("writes a phone number again its other ways when the form won't take or pass it as written", async () => {
+    const write = (value: string) => ({ type: "text" as const, value });
+    // A number box drops "98765 43210" whole: its digits go in.
+    const numbers = setup(`<input id="a" type="number" aria-label="WhatsApp number">`);
+    let scanned = numbers.rescan();
+    expect(await numbers.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "9876543210" });
+    // A box whose own rule takes digits only.
+    const pattern = setup(`<input id="a" type="tel" pattern="[0-9]{10}" aria-label="Mobile">`);
+    scanned = pattern.rescan();
+    expect(await pattern.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "9876543210" });
+    // One that wants the "+" kept, without the spaces.
+    const plus = setup(`<input id="a" type="tel" pattern="\\+[0-9]{12}" aria-label="Mobile">`);
+    scanned = plus.rescan();
+    expect(await plus.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("+91 98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "+919876543210" });
+    // A site whose own check takes only the digits with the code: the other ways the panel sent are tried in turn.
+    const site = setup(`<input id="a" type="tel" aria-label="Phone number">`);
+    element("#a").addEventListener("input", (event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      input.setAttribute("aria-invalid", String(!/^\d{12}$/.test(input.value)));
+    });
+    scanned = site.rescan();
+    const ways = { type: "text" as const, value: "98765 43210", also: ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"] };
+    expect(await site.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: ways, current: "" }))
+      .toEqual({ status: "filled", current: "919876543210" });
+    // A number its rule takes as written stays as written; text that isn't a number is never rewritten.
+    const plain = setup(`<input id="a" type="tel" aria-label="Mobile">`);
+    scanned = plain.rescan();
+    expect(await plain.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("+91 98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "+91 98765 43210" });
+  });
+
   it("writes past a framework's value tracker", async () => {
     const { filler, rescan } = setup(`<input id="a" aria-label="Name">`);
     const input = element<HTMLInputElement>("#a");

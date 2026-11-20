@@ -33,9 +33,17 @@ type DocumentSectionsProps = {
   ownFile?: { name: string } | null;
   /** The kinds the form's résumé upload takes, when the file offered isn't one of them. */
   refusedAccept?: string | null;
+  /** The file BenchQ attached on this page, whether or not a chip shows it: its card offers Use a different file, which
+   * BenchQ swaps in (#148's review). A file attached by hand is the BDE's to change on the page. */
+  benchQFile?: string | null;
 };
 
-type Actions = Pick<DocumentSectionsProps, "isFilling" | "onGoTo"> & { onChange?: () => void };
+type Actions = Pick<DocumentSectionsProps, "isFilling" | "onGoTo"> & {
+  onChange?: () => void;
+  /** Use a different file, on the card of the file BenchQ attached. */
+  onPickFile?: (file: File) => void;
+  benchQFile?: string | null;
+};
 
 type SectionProps = Actions & {
   kind: DocumentKind;
@@ -57,11 +65,13 @@ const FILE_ACTIONS = "flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-[calc(var
 const FILE_STATUS = "flex items-center gap-1 font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
 const FILE_LINK = "font-[550] text-[var(--color-text-2)] underline underline-offset-2 hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50";
 
-type AttachedProps = { name: string; isFilling?: boolean; onChange?: () => void; onGoTo?: () => void };
+type AttachedProps = { name: string; isFilling?: boolean; onChange?: () => void; onGoTo?: () => void; onPickFile?: (file: File) => void };
 
 /** A file on the form (07 Q53, Q56): one line with its name, two at most (the whole name on hover), then small actions:
- * that it's attached, Change resume (another résumé to pick) and Go to field. */
-function AttachedFile({ name, isFilling = false, onChange, onGoTo }: AttachedProps) {
+ * that it's attached, Change resume (another résumé to pick), Use a different file (one from the computer, in place of
+ * the file BenchQ attached: #148's review) and Go to field. */
+function AttachedFile({ name, isFilling = false, onChange, onGoTo, onPickFile }: AttachedProps) {
+  const input = useRef<HTMLInputElement>(null);
   return <div data-slot="document-attached" className="grid gap-0.5">
     <div className="flex min-w-0 items-start gap-2">
       <span className={FILE_ICON} aria-hidden="true">{RESUME_ICON}</span>
@@ -70,6 +80,14 @@ function AttachedFile({ name, isFilling = false, onChange, onGoTo }: AttachedPro
     <div className={FILE_ACTIONS}>
       <span className={FILE_STATUS}>{CHECK}Attached</span>
       {onChange && <button type="button" data-slot="document-change" className={FILE_LINK} disabled={isFilling} onClick={onChange}>Change resume</button>}
+      {onPickFile && <>
+        <input ref={input} type="file" accept={OWN_FILE_TYPES} hidden data-slot="own-file-input" onChange={(event) => {
+          const chosen = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (chosen) onPickFile(chosen);
+        }} />
+        <button type="button" data-slot="own-file-pick" className={FILE_LINK} disabled={isFilling} onClick={() => input.current?.click()}>Use a different file</button>
+      </>}
       {onGoTo && <button type="button" className={FILE_LINK} disabled={isFilling} onClick={onGoTo}>Go to field</button>}
     </div>
   </div>;
@@ -88,10 +106,13 @@ function letterHeld(details: Application | null): string | null {
 }
 
 /** One field the section stands for: an upload shows the file's name once attached, a text box whether it's written. */
-function DocumentField({ row, isFilling, onGoTo, onChange }: Actions & { row: ReviewRow }) {
+function DocumentField({ row, isFilling, onGoTo, onChange, onPickFile, benchQFile = null }: Actions & { row: ReviewRow }) {
   const value = filledValue(row);
   const isUpload = row.field.kind === "file";
-  if (isUpload && value) return <AttachedFile name={value} isFilling={isFilling} onChange={onChange} onGoTo={() => onGoTo(row)} />;
+  if (isUpload && value) {
+    return <AttachedFile name={value} isFilling={isFilling} onChange={onChange} onGoTo={() => onGoTo(row)}
+      onPickFile={value === benchQFile ? onPickFile : undefined} />;
+  }
   const state = isUpload ? "No file attached yet" : value ? "Written" : "Not written yet";
   return <div data-slot="document-field" className="flex items-start gap-2">
     <Tick isFilled={Boolean(value)} slot="document-tick" />
@@ -103,7 +124,7 @@ function DocumentField({ row, isFilling, onGoTo, onChange }: Actions & { row: Re
   </div>;
 }
 
-function DocumentSection({ kind, title, icon, rows, held, link, attached = null, extra = null, isFilling, onGoTo, onChange }: SectionProps) {
+function DocumentSection({ kind, title, icon, rows, held, link, attached = null, extra = null, isFilling, onGoTo, onChange, onPickFile, benchQFile }: SectionProps) {
   const id = `document-${kind}-title`;
   const status = rows.length === 0 ? (attached ? "Attached" : "No field found") : rows.some(({ field }) => field.required) ? "Required" : "Optional";
   return <section data-slot="document" data-document={kind} className={SECTION} aria-labelledby={id}>
@@ -111,8 +132,8 @@ function DocumentSection({ kind, title, icon, rows, held, link, attached = null,
       <h3 id={id} className={TITLE}>{icon}{title}</h3>
       <span data-slot="document-status" className={`flex-none ${MUTED_TEXT}`}>{status}</span>
     </div>
-    {rows.map((row) => <DocumentField key={row.key} row={row} isFilling={isFilling} onGoTo={onGoTo} onChange={onChange} />)}
-    {rows.length === 0 && attached && <AttachedFile name={attached} isFilling={isFilling} onChange={onChange} />}
+    {rows.map((row) => <DocumentField key={row.key} row={row} isFilling={isFilling} onGoTo={onGoTo} onChange={onChange} onPickFile={onPickFile} benchQFile={benchQFile} />)}
+    {rows.length === 0 && attached && <AttachedFile name={attached} isFilling={isFilling} onChange={onChange} onPickFile={onPickFile} />}
     {extra ?? (rows.length > 0 && held && <p data-slot="document-held" className={MUTED_TEXT}>{held}</p>)}
     {rows.length > 0 && link && <a className={`justify-self-start ${button("secondary", "compact")}`} href={link} target="_blank" rel="noreferrer">
       Open in BenchQ{EXTERNAL_ICON}
@@ -203,7 +224,7 @@ function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, 
  * when BenchQ has it, and otherwise says which résumé to attach; once a file is on the form, its card says so instead.
  * A cover letter is always the BDE's. */
 export default function DocumentSections({ rows, details, resumesUrl, isFilling, onGoTo, picked = null, attached = null, onChangeResume,
-  fileProblem, onRetryFile, ownFileError, onOwnFile, onRemoveOwnFile, ownFile = null, refusedAccept = null }: DocumentSectionsProps) {
+  fileProblem, onRetryFile, ownFileError, onOwnFile, onRemoveOwnFile, ownFile = null, refusedAccept = null, benchQFile = null }: DocumentSectionsProps) {
   const of = (kind: DocumentKind) => rows.filter(({ field }) => documentOf(field) === kind);
   const actions = { isFilling, onGoTo };
   const resumes = of("resume");
@@ -215,9 +236,14 @@ export default function DocumentSections({ rows, details, resumesUrl, isFilling,
     isFilling={isFilling} fileProblem={fileProblem}
     onRetryFile={onRetryFile} ownFileError={ownFileError} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} ownFile={ownFile}
     refusedAccept={refusedAccept} /> : null;
+  // A section the form doesn't ask for says nothing the BDE needs: it shows only for a field of its kind, a file BenchQ
+  // put on the page, or the BDE's own file, which keeps Remove.
+  const letters = of("cover-letter");
+  const hasResume = resumes.length > 0 || Boolean(attached) || Boolean(fileLine);
+  if (!hasResume && letters.length === 0) return null;
   return <div data-slot="documents" className="grid gap-2">
-    <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={resumes} held={picked ? null : resumeHeld(details)} extra={fileLine}
-      link={picked ? null : resumesUrl} attached={attached} onChange={onChangeResume} {...actions} />
-    <DocumentSection kind="cover-letter" title="Cover letter" icon={LETTER_ICON} rows={of("cover-letter")} held={letterHeld(details)} link={null} {...actions} />
+    {hasResume && <DocumentSection kind="resume" title="Resume" icon={RESUME_ICON} rows={resumes} held={picked ? null : resumeHeld(details)} extra={fileLine}
+      link={picked ? null : resumesUrl} attached={attached} onChange={onChangeResume} onPickFile={onOwnFile} benchQFile={benchQFile} {...actions} />}
+    {letters.length > 0 && <DocumentSection kind="cover-letter" title="Cover letter" icon={LETTER_ICON} rows={letters} held={letterHeld(details)} link={null} {...actions} />}
   </div>;
 }

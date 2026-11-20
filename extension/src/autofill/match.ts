@@ -67,7 +67,7 @@ const LABELS: [EngineFieldType, string[]][] = [
   ["preferred-name", ["preferred name", "preferred first name", "preferred full name", "preferred first and last name",
     "chosen name", "nickname", "name you go by"]],
   ["email", ["email", "e mail"]],
-  ["phone", ["phone", "mobile", "cell", "telephone"]],
+  ["phone", ["phone", "mobile", "cell", "telephone", "contact number", "whatsapp", "whatsapp number"]],
   ["phone-country-code", ["country code", "phone country code", "dial code"]],
   ["address-city", ["city"]],
   ["address-region", ["state", "province", "state reside", "state province live"]],
@@ -227,12 +227,24 @@ function knownKind(label: string): EngineFieldType | null {
   return best.length === 1 ? best[0]!.type : null;
 }
 
+/** A phone number with a word on its code: "Phone number with country code", "Mobile (incl. country code)", "Phone
+ * number (without country code)", "Contact number (international format)". That's the number, with or without its code
+ * as the label says (`shaped`), never the code alone, as "Phone country code" is. */
+const NUMBER_WORDS = /\b(phone|mobile|cell|telephone|whatsapp|contact (?:number|no))\b/;
+const WITH_CODE = /\b(?:with|without|incl\w*|including|excluding|exclude)(?: the)?(?: country)? code\b|\binternational(?: format)?\b|\be 164\b/;
+const NOT_THE_CANDIDATES = /\b(emergency|reference|referee|referrer|recruiter|manager|supervisor|spouse|parent)\b/;
+const asksWholeNumber = (label: string) => {
+  const text = canonical(label);
+  return NUMBER_WORDS.test(text) && WITH_CODE.test(text) && !NOT_THE_CANDIDATES.test(text);
+};
+
 /** What a field or a bank question asks for, only when its whole label is about that and nothing else, so "Referrer
  * email", "State your reason" and "Years of experience with Java" stay out. The browser's autocomplete hints are the
  * engine's to read (`classifyField`), bar the one it lacks. */
 export function fieldTypeFor(field: Asked): EngineFieldType | null {
   const shaped = askedByShape(field);
   if (shaped) return shaped;
+  if (asksWholeNumber(field.label)) return "phone";
   const known = knownKind(field.label);
   if (known) return asksOtherDetail(known, field.label) ? null : known;
   return /\btel-country-code$/i.test(field.autocomplete.trim()) ? "phone-country-code" : null;

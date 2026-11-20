@@ -2,7 +2,7 @@ import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
-import { derivedAnswer, inTheUs, isoDate, shaped } from "./derive";
+import { derivedAnswer, inTheUs, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
 import { asksForSelfRating, fieldTypeFor, matchBank, sameAsk } from "./match";
 import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
 import { authorizedIn, sponsorshipIn, sponsorshipWordsIn, statusAnswer, statusOptionFor } from "./authorization";
@@ -133,6 +133,12 @@ function rowFor(base: Base, answer: string, source?: BankEntry): ReviewRow {
 
 function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, answer = entry.answer): ReviewRow {
   const row = rowFor(base, shaped(type, answer, base.field), entry);
+  // A phone number goes with its other ways, which the page tries in turn when the form refuses the first (#148).
+  if (type === "phone" && row.write?.type === "text") {
+    const written = row.write.value;
+    const also = phoneWays(answer, base.field).filter((way) => way !== written);
+    return also.length > 0 ? { ...row, write: { ...row.write, also } } : row;
+  }
   // A "location" dropdown can be a list of countries.
   const isCountryList = type === "city-state" && row.status === "manual" && base.field.options.length > 0 && inTheUs(entry.answer);
   return isCountryList ? rowFor(base, "United States", entry) : row;
@@ -359,8 +365,10 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (type === "job-applied") return job?.title ? rowFor(base, job.title) : manual(NO_ANSWER);
 
   const answers = (entry: BankEntry) => answersField(type, field, asked.label, entry, job);
-  // A race answer brings the saved Hispanic one along, for forms that ask both in one list.
-  const answerOf = (entry: BankEntry) => (type === "eeo-race" ? raceAnswer(field, entry.answer, saved) : entry.answer);
+  // A race answer brings the saved Hispanic one along, for forms that ask both in one list. A phone number saved without
+  // its code gets the home country's where the field wants the whole number.
+  const answerOf = (entry: BankEntry) => (type === "eeo-race" ? raceAnswer(field, entry.answer, saved)
+    : type === "phone" ? withHomeCode(entry.answer, field, saved) : entry.answer);
   const fromSaved = (entry: BankEntry) => fromBank(base, entry, type, answerOf(entry));
   const match = matchBank(asked.label, bank);
   // The same words can still want another kind of answer: "Do you live in the US?" isn't "Where do you live?". Then the

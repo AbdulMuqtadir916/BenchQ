@@ -91,9 +91,111 @@ describe("answers the bank holds inside another", () => {
     expect(review(field("Last name"), [entry("Full name", "Ravi Kumar V")]).proposed).toBe("V");
   });
 
-  it("won't split one word, or a last name first with more than one first name", () => {
-    expect(review(field("First name"), [entry("Full name", "Madonna")]).status).toBe("manual");
-    expect(review(field("First name"), [entry("Full name", "Reddy, Sai Kiran")]).status).toBe("manual");
+  it("splits a full name of any number of words, and one word is a first name alone", () => {
+    const named = (name: string, label: string) => review(field(label), [entry("Full name", name)]);
+    expect(named("Madonna", "First name").proposed).toBe("Madonna");
+    expect(named("Madonna", "Last name").status).toBe("manual");
+    // The last name first, then the first name and the middle ones.
+    expect(named("Reddy, Sai Kiran", "First name").proposed).toBe("Sai");
+    expect(named("Reddy, Sai Kiran", "Middle name").proposed).toBe("Kiran");
+    expect(named("Reddy, Sai Kiran", "Last name").proposed).toBe("Reddy");
+    expect(named("Mohammed Abdul Arbaz Qureshi", "First name").proposed).toBe("Mohammed");
+    expect(named("Mohammed Abdul Arbaz Qureshi", "Middle name").proposed).toBe("Abdul Arbaz");
+    expect(named("Mohammed Abdul Arbaz Qureshi", "Last name").proposed).toBe("Qureshi");
+    // A title and credentials aren't the name; a suffix after a comma stays with the last name; particles start it.
+    expect(named("Dr. Meera Krishnan, PhD", "First name").proposed).toBe("Meera");
+    expect(named("Dr. Meera Krishnan, PhD", "Last name").proposed).toBe("Krishnan");
+    expect(named("Martin Luther King, Jr.", "Last name").proposed).toBe("King Jr.");
+    expect(named("Ludwig van Beethoven", "Last name").proposed).toBe("van Beethoven");
+    expect(named("Juan Carlos de la Cruz", "Last name").proposed).toBe("de la Cruz");
+    expect(named("Juan Carlos de la Cruz", "Preferred name").proposed).toBe("Juan");
+  });
+
+  it("reads a phone number's calling code however the résumé writes it, for any country", () => {
+    const code = (phone: string) => review(field("Phone country code"), [entry("Phone", phone)]).proposed;
+    const number = (phone: string) => review(field("Phone"), [entry("Phone", phone)]).proposed;
+    for (const [phone, dial, local] of [
+      ["+91 98765 43210", "+91", "98765 43210"], ["+919876543210", "+91", "9876543210"], ["91 98765 43210", "+91", "98765 43210"],
+      ["919876543210", "+91", "9876543210"], ["0091 98765 43210", "+91", "98765 43210"], ["(+91) 98765-43210", "+91", "98765-43210"],
+      ["+44 20 7946 0958", "+44", "20 7946 0958"], ["+447946095800", "+44", "7946095800"], ["+44 (0)20 7946 0958", "+44", "20 7946 0958"],
+      ["+971 50 123 4567", "+971", "50 123 4567"], ["+971501234567", "+971", "501234567"], ["+65 6123 4567", "+65", "6123 4567"],
+      ["+880 1712-345678", "+880", "1712-345678"], ["+1 (214) 555-0167", "United States +1", "(214) 555-0167"],
+      ["1 214 555 0167", "United States +1", "214 555 0167"],
+    ] as const) {
+      expect(code(phone), phone).toBe(dial);
+      expect(number(phone), phone).toBe(local);
+    }
+    // A number no longer than a country's own is that country's: "212" is a New York area code, not Morocco's +212.
+    expect(number("212 555 0167")).toBe("212 555 0167");
+    expect(review(field("Phone country code"), [entry("Phone", "212 555 0167")]).status).toBe("manual");
+  });
+
+  it("writes a phone number the way its field wants it, on every kind of phone field", () => {
+    const phone = [entry("Phone", "+91 98765 43210")];
+    const wrote = (label: string, overrides: Partial<TabField> = {}, saved = phone) => review(field(label, overrides), saved);
+    // A WhatsApp number, a placeholder with a "+", and a widget that reads the country from the number: the whole number.
+    expect(wrote("Phone Number (WhatsApp Number)")).toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
+    expect(wrote("WhatsApp number", {}, [entry("Phone", "91 98765 43210")]).proposed).toBe("+91 98765 43210");
+    expect(wrote("Phone", { clues: { ...field("").clues, placeholder: "+1 201 555 0123" } }).proposed).toBe("+91 98765 43210");
+    expect(wrote("Phone", { clues: { ...field("").clues, className: "iti__tel-input" } }).proposed).toBe("+91 98765 43210");
+    // A number asked with its code is the whole number, never the code alone.
+    for (const label of ["Phone number with country code", "Mobile number (with country code)", "Phone (incl. country code)",
+      "Contact number (international format)"]) {
+      expect(wrote(label), label).toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
+    }
+    expect(wrote("Phone country code").proposed).toBe("+91");
+    expect(wrote("Phone number (without country code)").proposed).toBe("98765 43210");
+    expect(wrote("Contact number").proposed).toBe("98765 43210");
+    // A box that only takes a number gets digits: the country's own unless it asks for the code.
+    expect(wrote("Phone Number (WhatsApp Number)", { kind: "number" })).toMatchObject({ status: "ready", proposed: "9876543210" });
+    expect(wrote("Mobile number with country code", { kind: "number" })).toMatchObject({ status: "ready", proposed: "919876543210" });
+    // A length limit gets the first way that fits it.
+    expect(wrote("Phone Number (WhatsApp Number)", { maxLength: 10 })).toMatchObject({ status: "ready", proposed: "9876543210" });
+    expect(wrote("Phone Number (WhatsApp Number)", { maxLength: 13 })).toMatchObject({ status: "ready", proposed: "+919876543210" });
+    expect(wrote("Phone", { maxLength: 10 }, [entry("Phone", "+1 (214) 555-0167")])).toMatchObject({ status: "ready", proposed: "2145550167" });
+    // The field from the bug report: a number saved as "+91 …" in a box that takes only a number, or only ten
+    // characters, was handed back ("This form wants a number", "this field allows 10"). It's filled now.
+    expect(wrote("Phone number", { kind: "number" })).toMatchObject({ status: "ready", proposed: "9876543210" });
+    expect(wrote("Phone number", { maxLength: 10 })).toMatchObject({ status: "ready", proposed: "9876543210" });
+    expect(wrote("Phone number", { kind: "number" }, [entry("Phone", "9876543210")])).toMatchObject({ status: "ready", proposed: "9876543210" });
+    // Every other way goes along, for the page to try when the form refuses the first.
+    expect(wrote("Phone number").write).toEqual({ type: "text", value: "98765 43210",
+      also: ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"] });
+    // Someone else's number isn't the candidate's.
+    expect(wrote("Emergency contact number (with country code)").proposed).not.toBe("+91 98765 43210");
+  });
+
+  it("gives a number saved without its code the home country's, where the field wants the whole number", () => {
+    const indian = [entry("Phone", "98765 43210"), entry("Current location", "Hyderabad, Telangana, India")];
+    expect(review(field("Phone Number (WhatsApp Number)"), indian)).toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
+    expect(review(field("Phone"), indian).proposed).toBe("98765 43210");
+    expect(review(field("Phone", { kind: "number" }), indian).proposed).toBe("9876543210");
+    const british = [entry("Phone", "07946 095800"), entry("Street address", "10 Downing St, London, Westminster, UK")];
+    expect(review(field("Mobile (with country code)"), british).proposed).toBe("+44 7946 095800");
+    expect(review(field("Mobile"), british).proposed).toBe("07946 095800");
+    // No country to go by: the number as saved.
+    expect(review(field("WhatsApp number"), [entry("Phone", "98765 43210")]).proposed).toBe("98765 43210");
+  });
+
+  it("reads the street, city, state, ZIP and country of a whole saved address", () => {
+    const address = [entry("Street address", "Flat 302, Sai Residency, Madhapur, Hyderabad, Telangana 500081, India")];
+    expect(review(field("City"), address).proposed).toBe("Hyderabad");
+    expect(review(field("State"), address).proposed).toBe("Telangana");
+    expect(review(field("ZIP / Postal code"), address).proposed).toBe("500081");
+    expect(review(field("Country"), address).proposed).toBe("India");
+    expect(review(field("Address line 1"), address).proposed).toBe("Flat 302, Sai Residency, Madhapur");
+    expect(review(field("Current location"), address).proposed).toBe("Hyderabad, Telangana");
+    expect(review(field("Phone country code"), [...address, entry("Phone", "98765 43210")]).proposed).toBe("+91");
+    const us = [entry("Street address", "1234 Elm St, Apt 5, Dallas, TX 75201")];
+    expect(review(field("City"), us).proposed).toBe("Dallas");
+    expect(review(field("State"), us).proposed).toBe("TX");
+    expect(review(field("ZIP code"), us).proposed).toBe("75201");
+    expect(review(field("Country"), us).proposed).toBe("United States");
+    expect(review(field("Street address"), us).proposed).toBe("1234 Elm St, Apt 5");
+    expect(review(field("Address"), us).proposed).toBe("1234 Elm St, Apt 5, Dallas, TX 75201");
+    // A saved location still comes first, and a state with no country is a state: "Hyderabad, Telangana".
+    expect(review(field("City"), [location, ...us]).source).toMatchObject({ question: "Current location" });
+    expect(review(field("State"), [entry("Current location", "Hyderabad, Telangana")]).proposed).toBe("Telangana");
   });
 
   it("takes a phone's country code from the location's country when the number has none (Q8)", () => {
@@ -115,8 +217,9 @@ describe("answers the bank holds inside another", () => {
       .toMatchObject({ status: "ready", proposed: "United States", source: { question: "Current location" }, write: { optionId: "o1" } });
   });
 
-  it("says nothing about the country of a place it can't place", () => {
-    expect(review(field("Country"), [entry("Current location", "Hyderabad, India")]).status).toBe("manual");
+  it("names the country a place ends with, and says nothing of one it can't place", () => {
+    expect(review(field("Country"), [entry("Current location", "Hyderabad, India")]).proposed).toBe("India");
+    expect(review(field("Country"), [entry("Current location", "London, UK")]).proposed).toBe("United Kingdom");
     expect(review(field("Country"), [entry("Current location", "Dallas")]).status).toBe("manual");
   });
 
