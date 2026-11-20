@@ -299,9 +299,29 @@ def test_a_stamped_run_stays_running_until_the_thirty_minute_backstop(anonymous_
 def test_a_run_failed_by_the_startup_clean_up_reads_as_lost(anonymous_client, test_db, world, launched, setup):
     from backend.job_monitor import cleanup_stale_runs
     run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _age(test_db, run_id, 3)          # never stamped since: its process stopped
     cleanup_stale_runs()
     test_db.expire_all()
     assert _status(anonymous_client, world, setup, run_id).json()["error_code"] == "lost"
+
+
+def test_a_run_the_heartbeat_failed_while_it_was_still_going_saves_no_version(anonymous_client, test_db, world,
+                                                                              launched, setup, monkeypatch):
+    """Its process only stalled past SILENT_FOR: the sweep fails the row with no error code, and when the run reaches
+    its save it stops there, so the BDE told it was lost finds no version (CodeRabbit on #147)."""
+    from backend.job_monitor import cleanup_stale_runs
+    run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _age(test_db, run_id, 3)
+    cleanup_stale_runs()
+    test_db.expire_all()
+    swept = test_db.get(JobRun, uuid.UUID(run_id))
+    assert swept.status == "failed" and "error_code" not in (swept.meta or {})   # what the old check let through
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    run = test_db.get(JobRun, uuid.UUID(run_id))
+    assert run.status == "failed" and run.meta["error_code"] == "lost" and "resume_id" not in run.meta
+    assert test_db.query(Resume).filter(Resume.category == "TAILORED").count() == 0
+    status = _status(anonymous_client, world, setup, run_id).json()
+    assert (status["status"], status["error_code"], status["resume_id"]) == ("failed", "lost", None)
 
 
 def test_the_heartbeat_stamps_only_running_rows(test_db, world):

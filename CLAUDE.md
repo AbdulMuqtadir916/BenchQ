@@ -183,7 +183,7 @@ Respect `prefers-reduced-motion`.
 ## Commands
 
 Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the backend, so run
-`docker compose up -d db backend` alongside `pnpm dev`. Setup and failures: `README.md` Quick start,
+`docker compose up -d db backend worker` alongside `pnpm dev` (`worker` runs the scheduler). Setup and failures: `README.md` Quick start,
 `docs/troubleshooting.md`.
 
 ---

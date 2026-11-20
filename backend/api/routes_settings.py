@@ -4,7 +4,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.models.db import get_db, Setting
-from backend.scheduler import configure_scheduler
 from backend.analyzer.cv_scorer import reset_scoring_semaphore
 from backend.scraper._shared.dedup import reload_tracking_params
 
@@ -36,7 +35,7 @@ def get_settings(db: Session = Depends(get_db)):
 
 @router.patch("")
 def update_settings(updates: dict, db: Session = Depends(get_db)):
-    """Update one or more settings; only keys the app reads are writable (unknown -> 400 as a group), and values are validated (integers non-negative, `*_cron` a parseable 5-field expression, enums known) since a bad one could crash configure_scheduler() and prevent the backend from starting."""
+    """Update one or more settings; only keys the app reads are writable (unknown -> 400 as a group), and values are validated (integers non-negative, `*_cron` a parseable 5-field expression, enums known) since a bad one could crash configure_scheduler() and stop the worker from starting."""
     from backend.seed import invalid_setting_values, unknown_setting_keys
 
     unknown = unknown_setting_keys(updates.keys())
@@ -82,12 +81,8 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
             warnings.append(f"{name} failed — see server logs")
             logger.exception("%s failed after settings update", name)
 
-    timing_keys = {
-        "scrape_interval_minutes", "email_check_interval_minutes",
-        "backup_cron", "digest_cron", "h1b_cron", "cleanup_cron", "reject_cron",
-    }
-    if timing_keys & set(updated):
-        _reconfigure("configure_scheduler", configure_scheduler)
+    # A schedule setting (scheduler.SCHEDULE_SETTING_KEYS) needs nothing here: the scheduler runs in the worker
+    # process, which re-reads them every minute (production layer step 3).
 
     if "scoring_max_concurrent" in updated:
         _reconfigure("reset_scoring_semaphore", reset_scoring_semaphore)
