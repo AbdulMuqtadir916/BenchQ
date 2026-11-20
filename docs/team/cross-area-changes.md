@@ -3,6 +3,21 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## The scheduler out of the API, production layer step 3 (`feat/scheduler-worker`, Uzair)
+
+Planned with Uzair 2026-11-14 ([uzair.md](./uzair.md), step 3). The scheduler runs in its own process,
+`python -m backend.worker`, the `worker` service. These rows wait for their owners.
+
+| Area (owner) | File | What changed | Why | Agreed |
+|---|---|---|---|---|
+| Inbox jobs (Samad) | `backend/job_monitor.py` (`cleanup_stale_runs`) | Stale runs are failed by a heartbeat (2 minutes unstamped), not at start-up. It never fails `candidate_gmail_import` rows (`recover_imports` finalizes them, as before), the classifier's pause row (failing it cleared the pause), or a `candidate_email_classification` row less than 10 minutes old. Your inbox jobs (sync, classification, purge, grant cleanup) now run in the worker; `wake_worker` and "sync now" still run in the API. | With two processes, one restarting must not fail the other's live rows; your leases already make the rows safe across processes. | **Pending: Samad** |
+| Tailoring (Zuhair) | `backend/main.py`, `docs/team/tailoring.md` (Lost row), `test_resume_tailor_routes.py` | The app starts `job_monitor.start_heartbeat` instead of `runs.keep_stamping`: it stamps every run a process holds, tailorings included, with the same `seen_at` and 2 minutes, from a thread. `runs.keep_stamping` and `_stamp_now` are now unused (delete them or keep, your call). The start-up clean-up test ages its run 3 minutes first (a fresh run is alive now). Done in this PR (CodeRabbit on #147): the save in `runs.py` (`_finish`) locks the run's row and also stops with `lost` when the row is no longer `running`, not only on an error code, so a run failed as silent can't come back as completed. New test: `test_a_run_the_heartbeat_failed_while_it_was_still_going_saves_no_version`. | One heartbeat for every run; a restart or a deploy's overlap no longer fails a live tailoring. | **Pending: Zuhair** |
+| Settings (Abdul, F2c) | `backend/api/routes_settings.py`, `test_r4_contract_settings.py` | `PATCH /api/settings` no longer calls `configure_scheduler()`; the worker re-reads the schedule settings every minute. The warning test uses the scoring reconfigure instead. | The API has no scheduler to tell. | **Pending: Abdul** |
+| Deployment (Abdul) | `docker-compose.yml`, `backend/scripts/start_worker.sh`, `start.sh` | A `worker` service, same image, `start_worker.sh` (the migration, then the worker). Production runs exactly one worker, and still one API process. | The scheduler's own process. | **Pending: Abdul** |
+| Old JobNavigator route | `backend/main.py` | `GET /api/scheduler/jobs` answers 410; no screen or extension called it. | It read the in-process scheduler (decided by Uzair 2026-11-14). | Informational |
+| Test fixtures (shared) | `backend/tests/conftest.py`, `r4_support.py` | The test clients stub `start_heartbeat` (it was `cleanup_stale_runs`), so no heartbeat thread sweeps the test database mid-test. | The heartbeat replaced the start-up clean-up. | Informational |
+| Setup docs (shared) | `CLAUDE.md`, `docs/integration/README.md`, `docs/troubleshooting.md`, `docs/integration/07-auth-and-tenancy.md` | `docker compose up -d db backend worker`; the one-worker rule now says one scheduler worker. | Without the worker nothing runs on a timer. | Informational |
+
 ## Résumé tailoring, part 3: the screens (`feat/resume-tailoring`, Zuhair)
 
 Grilled and built 2026-11-12 ([tailoring.md](./tailoring.md) §8). These rows wait for their owners.

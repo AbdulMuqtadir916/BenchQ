@@ -189,15 +189,25 @@ def test_patch_settings_unicode_prompt_round_trips(client):
 
 
 def test_patch_settings_reports_a_reconfigure_failure_as_a_warning(client, monkeypatch):
-    """A broken scheduler reconfigure must not turn a valid PATCH into a 500."""
+    """A broken reconfigure must not turn a valid PATCH into a 500."""
     import backend.api.routes_settings as rs
 
     def _boom():
-        raise RuntimeError("scheduler down")
-    monkeypatch.setattr(rs, "configure_scheduler", _boom)
+        raise RuntimeError("semaphore down")
+    monkeypatch.setattr(rs, "reset_scoring_semaphore", _boom)
     r = assert_clean(client.patch("/api/settings",
-                                  json={"scrape_interval_minutes": "30"}), 200)
-    assert r.json()["warnings"] and "configure_scheduler" in r.json()["warnings"][0]
+                                  json={"scoring_max_concurrent": "3"}), 200)
+    assert r.json()["warnings"] and "reset_scoring_semaphore" in r.json()["warnings"][0]
+
+
+def test_patch_a_schedule_setting_leaves_the_scheduler_to_the_worker(client, monkeypatch):
+    """The API has no scheduler (production layer step 3): saving a schedule setting reconfigures nothing here; the
+    worker picks it up within a minute (scheduler.reload_schedule_if_changed)."""
+    import backend.scheduler as sched
+    calls = []
+    monkeypatch.setattr(sched, "configure_scheduler", lambda: calls.append(1))
+    r = assert_clean(client.patch("/api/settings", json={"backup_cron": "0 5 * * *"}), 200)
+    assert calls == [] and not r.json().get("warnings")
 
 
 def test_patch_dedup_tracking_params_reloads_the_cache(client, test_db):

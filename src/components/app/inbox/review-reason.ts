@@ -16,7 +16,7 @@ const REASONS: Record<string, string> = {
   BACKWARD_STAGE: "It would move the application backwards",
   AUTO_STATUS_DISABLED: "Automatic updates are off",
   FORWARDED_EMAIL: "It is a forwarded email",
-  INSUFFICIENT_CONTENT: "The email has too little text to judge",
+  INSUFFICIENT_CONTENT: "The email has too little text to rely on AI judged email type",
   CONFIDENCE_DISAGREEMENT: "The classifier's two confidence values disagree",
   EMAIL_ALREADY_APPLIED: "This email already changed the application once",
   AUTOMATIC_CHANGE_UNDONE: "The automatic change from this email was undone",

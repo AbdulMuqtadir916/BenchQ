@@ -24,7 +24,7 @@ architecture of the Node that first downloaded it).
 
 **Cause:** the backend isn't running, or `BACKEND_URL` in `.env.local` points elsewhere (it defaults to
 `http://localhost:8000` in development).
-**Fix:** `docker compose up -d db backend`; `docker compose logs -f backend` shows why it stopped. Restart `pnpm dev`
+**Fix:** `docker compose up -d db backend worker`; `docker compose logs -f backend` shows why it stopped. Restart `pnpm dev`
 after editing `.env.local`.
 *Done when* `curl http://localhost:8000/health` returns `"status":"ok"` and `http://localhost:3000/health` shows the
 same JSON.
