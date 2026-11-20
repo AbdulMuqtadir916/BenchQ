@@ -26,6 +26,8 @@ from backend.tests.test_log_lint import PEOPLE_MODELS, PERSONAL_HOSTS, _safe_att
 from backend.tests.test_logging_canary import EMAIL, NAME, PASSWORD, PHONE, RESUME, TOKEN
 
 PLANTED = f"{NAME}, {RESUME}"
+# The email the seed gives the candidate's résumé row (`_value` below), so the candidate's own email.
+SEEDED_RESUME_EMAIL = "zorvath.quillane+resumes@canary-mail.test"
 # Request fields that hold a job posting or a company, not a person: neutral, as a job board's reply is.
 NEUTRAL_FIELDS = re.compile(r"(^|_)(url|urls|link|href|domain|company|companies|title|job|jobs|keywords?|"
                             r"search_term|location|locations|provider|model|source|sources|board|ats|slug|timezone|"
@@ -369,7 +371,10 @@ def build_request(app, method: str, path: str, ids: dict) -> dict:
             v = next((_resolve(o, spec) for o in v.get("anyOf", []) if o.get("type") != "null"), v)  # Optional[File]
             items = _resolve(v.get("items", {}), spec) if v.get("type") == "array" else v
             if items.get("format") == "binary" or items.get("contentMediaType") == "application/octet-stream":
-                files[k] = (f"{NAME}.pdf", _pdf(f"{NAME}\n{EMAIL} | {PHONE}\n{RESUME}"), "application/pdf")
+                # The seeded candidate's own email too (its résumé row's, `_value`): a later upload must hold the
+                # candidate's name and email or it is refused before its work runs (07 Q69).
+                files[k] = (f"{NAME}.pdf", _pdf(f"{NAME}\n{EMAIL} | {SEEDED_RESUME_EMAIL} | {PHONE}\n{RESUME}"),
+                            "application/pdf")
             else:
                 data[k] = example(v, spec, ids, k)
         out["files"], out["data"] = files or None, data or None
