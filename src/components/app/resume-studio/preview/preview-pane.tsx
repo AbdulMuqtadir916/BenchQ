@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, Minimize2, Minus, Plus } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { cn } from "@/lib/cn";
@@ -17,7 +17,7 @@ const iconBtn = "inline-flex h-7 w-7 items-center justify-center rounded-[var(--
 export function PreviewPane({ doc, editable = false, aside }: { doc: ResumeDocument; editable?: boolean; aside?: ReactNode }) {
   const deskRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(1);
-  const { zoom, setZoom, galleryOpen, setGalleryOpen, setTemplate, pageCount } = useStudio();
+  const { zoom, setZoom, galleryOpen, setGalleryOpen, setTemplate, pageCount, fitOnePage, setFitOnePage, fitOverflowLines } = useStudio();
   const template = templateById(doc.templateId);
   const scale = zoom === "fit" ? fitScale : zoom;
 
@@ -74,7 +74,24 @@ export function PreviewPane({ doc, editable = false, aside }: { doc: ResumeDocum
           <button type="button" className={iconBtn} onClick={() => stepZoom(1)} disabled={scale >= ZOOM_STEPS[ZOOM_STEPS.length - 1]!} aria-label="Zoom in"><Plus size={14} aria-hidden /></button>
         </div>
 
-        <span className="tabular text-sm text-[var(--color-text-3)]" aria-live="polite">{pageCount} {pageCount === 1 ? "page" : "pages"} · US Letter</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={fitOnePage}
+            onClick={() => setFitOnePage(!fitOnePage)}
+            title="Shrink type and spacing, within readable minimums, to fit one page"
+            className={cn("inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 text-sm", fitOnePage ? "bg-[var(--color-primary-subtle)] text-[var(--color-primary-subtle-fg)]" : "text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)]")}
+          >
+            <Minimize2 size={13} aria-hidden />
+            Fit to one page
+          </button>
+          <span className="tabular text-sm text-[var(--color-text-3)]" aria-live="polite">
+            {pageCount} {pageCount === 1 ? "page" : "pages"} · US Letter
+            {fitOnePage && fitOverflowLines ? (
+              <span className="text-[var(--color-warning-fg)]"> · Can&apos;t fit on one page — trim about {fitOverflowLines} {fitOverflowLines === 1 ? "line" : "lines"}</span>
+            ) : null}
+          </span>
+        </div>
         {aside ? <div className="ml-auto">{aside}</div> : null}
       </div>
 
@@ -83,7 +100,7 @@ export function PreviewPane({ doc, editable = false, aside }: { doc: ResumeDocum
       <div ref={deskRef} className="rs-desk min-h-0 flex-1 overflow-auto" data-studio-desk="" role="region" aria-label="Résumé preview" tabIndex={0}>
         <div className="flex min-w-fit justify-center px-8 py-8">
           <div style={{ zoom: scale }}>
-            <ResumePaper doc={doc} editable={editable} reportPages />
+            <ResumePaper doc={doc} editable={editable} fitOnePage={fitOnePage} reportPages />
           </div>
         </div>
       </div>

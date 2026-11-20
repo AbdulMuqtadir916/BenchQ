@@ -192,6 +192,7 @@ export const hasTeamScope = (principal: Principal): boolean => scopeOf(principal
 /**
  * A MANAGER's team (Q40): themself, the BDEs who report to them, and the BDE of any candidate they manage. The last
  * keeps the team whole while the live team doesn't yet carry `managerId` (docs/candidate-onboarding/06-backend.md PR 1).
+ * The backend's ledger limit counts only the reports, so a BDE with no manager can differ there (07 Q64).
  */
 export function teamMemberIds(managerId: string, users: readonly Pick<User, "id" | "role" | "managerId">[], candidates: readonly { managerId: string; bdeId: string | null }[]): Set<string> {
   const ids = new Set([managerId]);
@@ -209,9 +210,11 @@ export function scopeCandidates<T extends { managerId: string; bdeId: string | n
 
 /**
  * Applications in scope: a MANAGER's are the ones for the candidates they manage, so a candidate's history moves with
- * it (Q43); a BDE's are the ones they submitted. `candidates` is the firm's (only read for a MANAGER).
+ * it (Q43); a BDE's are the ones they submitted, and the Saved drafts of the candidates they work. A Saved draft has no
+ * submitter (saving isn't a submission, docs/02 §9), so without that a BDE's Saved column was always empty (found
+ * testing, 2026-11-13). `candidates` is the firm's.
  */
-export function scopeApplications<T extends { submittedByUserId: string; candidateId: string }>(
+export function scopeApplications<T extends { submittedByUserId: string; candidateId: string; status: string }>(
   principal: Principal,
   applications: readonly T[],
   candidates: readonly { id: string; managerId: string; bdeId: string | null }[],
@@ -221,7 +224,12 @@ export function scopeApplications<T extends { submittedByUserId: string; candida
     const mine = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
     return applications.filter((application) => mine.has(application.candidateId));
   }
-  if (scope.kind === "own") return applications.filter((application) => application.submittedByUserId === scope.userId);
+  if (scope.kind === "own") {
+    // Saved drafts only: one with no submitter in another status (moved on from Saved) stays out (PR #140's review).
+    const theirs = new Set(scopeCandidates(principal, candidates).map((candidate) => candidate.id));
+    return applications.filter((application) => application.submittedByUserId === scope.userId
+      || (!application.submittedByUserId && application.status === "SAVED" && theirs.has(application.candidateId)));
+  }
   return [...applications];
 }
 
@@ -244,8 +252,9 @@ export interface TeamContext {
 
 /**
  * The ledger a principal sees (07 §2.2 `ledger`): a BDE, the entries they made and the ASSIGN entries about the
- * candidates they work now (07 Q52: who assigned them, and the note); a MANAGER, the entries their team made and every
- * entry about a candidate they manage; everyone else the firm's. The backend enforces the same (routes_ledger.py).
+ * candidates they work now (07 Q52: who assigned them, and the note); a MANAGER, the entries their team made and the
+ * ASSIGN entries about the candidates they manage (07 Q64); everyone else the firm's. The backend enforces this
+ * (routes_ledger.py); here it is UX.
  */
 export function scopeLedger<T extends { actorUserId: string | null; entityType: string; entityId: string; action: string }>(
   principal: Principal,
@@ -260,7 +269,7 @@ export function scopeLedger<T extends { actorUserId: string | null; entityType: 
   if (scope.kind === "team") {
     const team = teamMemberIds(scope.managerId, context.users, context.candidates);
     const managed = new Set(scopeCandidates(principal, context.candidates).map((candidate) => candidate.id));
-    return entries.filter((entry) => (entry.actorUserId !== null && team.has(entry.actorUserId)) || (entry.entityType === "candidate" && managed.has(entry.entityId)));
+    return entries.filter((entry) => (entry.actorUserId !== null && team.has(entry.actorUserId)) || (entry.action === "ASSIGN" && entry.entityType === "candidate" && managed.has(entry.entityId)));
   }
   return [...entries];
 }

@@ -183,7 +183,7 @@ Respect `prefers-reduced-motion`.
 ## Commands
 
 Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the backend, so run
-`docker compose up -d db backend` alongside `pnpm dev`. Setup and failures: `README.md` Quick start,
+`docker compose up -d db backend worker` alongside `pnpm dev` (`worker` runs the scheduler). Setup and failures: `README.md` Quick start,
 `docs/troubleshooting.md`.
 
 ---
@@ -257,6 +257,6 @@ own (`docs/team/README.md` §3); `candidates` changes are confirmed with Abdul.
 a five-step new-candidate flow). Modules 01–07 in `docs/candidate-onboarding/`; frontend 01–05 run on mocks, 06 is the
 backend Candidates track (Zuhair).
 
-**Decisions** (Q1–Q55: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
-rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
+**Decisions** (Q1–Q64: firm in the URL, one firm per user, read-only support view, seat and plan rules, invite
+rules, the firm hierarchy, password recovery by approval, who changes a candidate's résumés, what a Manager reads in the ledger (Q64)) are in `docs/07-ROUTES-AND-RBAC.md` §0 and `docs/integration/07-auth-and-tenancy.md` §0 and §2. Open: nothing.
 The system contracts in `docs/02` §3.2 are approved and not built.

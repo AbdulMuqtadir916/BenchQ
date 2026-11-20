@@ -35,12 +35,12 @@ function composeDocument(id: string, start: StartFrom, candidate: Candidate, rec
   return doc;
 }
 
-export function NewResume({ initialMode, upload }: { initialMode: StudioMode; upload: string | null }) {
+export function NewResume({ initialMode, upload, candidateId: initialCandidateId = null }: { initialMode: StudioMode; upload: string | null; candidateId?: string | null }) {
   const principal = useSignedInPrincipal();
   const close = useCloseStudio();
   const candidatesQuery = useCandidates();
   const [draftId] = useState(() => newId("resume_new"));
-  const [candidateId, setCandidateId] = useState("");
+  const [candidateId, setCandidateId] = useState(initialCandidateId ?? "");
   const [templateId, setTemplateId] = useState("template_modern");
   const [start, setStart] = useState<StartFrom | null>(null);
   const loadedId = useStudio((s) => s.doc?.resumeId);

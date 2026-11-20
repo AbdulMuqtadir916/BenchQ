@@ -68,7 +68,10 @@ export function AnswerEditor({ question, type, initial, isMultiline, suggestions
       ) : isBox ? (
         <textarea {...field} rows={type === "texts" ? 5 : 4} onChange={(event) => setDraft(event.target.value)} className="bq-input h-auto w-full py-2 text-body" />
       ) : (
+        // `step="any"`: a rate of 85.5 or 7.5 years is an answer, which the browser's whole-number step refused on Save
+        // (the PR 129 review, finding 4).
         <Input {...field} type={type === "number" ? "number" : type === "date" ? "date" : "text"} min={type === "number" ? 0 : undefined}
+          step={type === "number" ? "any" : undefined}
           inputMode={type === "number" ? "decimal" : undefined} onChange={(event) => setDraft(event.target.value)} className="w-full sm:max-w-md"
           list={suggestions?.length ? `${id}-suggestions` : undefined} />
       )}

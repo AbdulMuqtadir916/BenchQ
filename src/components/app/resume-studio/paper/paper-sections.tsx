@@ -1,97 +1,68 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { BulletSection, ResumeDocument, ResumeSectionKey, RichText } from "@/lib/schemas/resume-document";
-import { newText } from "@/lib/resume-doc/build";
-import { isBlank } from "@/lib/resume-doc/rich-text";
+import type { ResumeDocument, ResumeSectionKey } from "@/lib/schemas/resume-document";
+import type { PageItem } from "@/lib/resume-doc/paginate";
+import type { OrderedSection } from "@/lib/resume-doc/section-order";
 import { EditableText } from "../editable-text";
 import { useDocActions } from "../use-doc-actions";
-import { useStudio } from "../studio-store";
+import { blockId, ExperienceEntry, ProjectEntry, shows } from "./paper-entries";
 
-type BlockProps = { doc: ResumeDocument; editable: boolean };
+export { blockId };
 
-/** Blank text only shows while editing. */
-const shows = (t: RichText, editable: boolean) => editable || !isBlank(t.html);
+/**
+ * `only`: the blocks on this page by id (resume-doc/paginate.ts); left out, every block renders whole. A section
+ * prints its heading only on the page that holds its first block; a job or project split between pages prints its
+ * head (title, company or tech line) with its first bullets only.
+ */
+export type BlockProps = { doc: ResumeDocument; editable: boolean; only?: ReadonlyMap<string, PageItem> };
 
-function Section({ id, title, children }: { id: ResumeSectionKey; title: string; children: ReactNode }) {
+/** The rows of a section on this page, and whether its heading is too. */
+function pick<T extends { id: string }>(section: OrderedSection, rows: readonly T[], only?: ReadonlyMap<string, PageItem>) {
+  const shown = only ? rows.filter((r) => only.has(blockId(section, r.id))) : [...rows];
+  // The heading goes with the start of the first entry, not with the rest of it on a later page.
+  const first = shown[0];
+  const startsHere = !!first && first === rows[0] && (only?.get(blockId(section, first.id))?.from ?? 0) === 0;
+  return { shown, hasHeading: startsHere };
+}
+
+function Section({ id, title, hasHeading = true, block, children }: { id: ResumeSectionKey; title: string; hasHeading?: boolean; block?: string; children: ReactNode }) {
   return (
-    <section className="rt-section" data-rt-section={id}>
-      <h2 className="rt-h">{title}</h2>
+    <section className="rt-section" data-rt-section={id} data-rt-block={block}>
+      {hasHeading ? <h2 className="rt-h">{title}</h2> : null}
       {children}
     </section>
   );
 }
 
-export function PaperSummary({ doc, editable }: BlockProps) {
+export function PaperSummary({ doc, editable, only }: BlockProps) {
   const a = useDocActions();
-  if (!shows(doc.summary, editable)) return null;
+  if (!shows(doc.summary, editable) || (only && !only.has("summary"))) return null;
   return (
-    <Section id="summary" title="Summary">
+    <Section id="summary" title="Summary" block="summary">
       <EditableText as="p" rich value={doc.summary.html} onChange={(v) => a.setTextHtml(doc.summary.id, v)} editable={editable} label="Summary" fieldId={doc.summary.id} />
     </Section>
   );
 }
 
-/** The bullets of one job or project, editable in place: Enter starts the next, Backspace in an empty one drops it. */
-function PaperBullets({ section, entryId, bullets, editable }: { section: BulletSection; entryId: string; bullets: RichText[]; editable: boolean }) {
-  const a = useDocActions();
-  const requestFocus = useStudio((s) => s.requestFocus);
-  const visible = bullets.filter((b) => shows(b, editable));
-  if (!visible.length) return null;
+export function PaperExperience({ doc, editable, only }: BlockProps) {
+  const { shown, hasHeading } = pick("experience", doc.experience, only);
+  if (!shown.length) return null;
   return (
-    <ul className="rt-bullets">
-      {visible.map((b) => (
-        <EditableText
-          key={b.id}
-          as="li"
-          rich
-          value={b.html}
-          onChange={(v) => a.setTextHtml(b.id, v)}
-          editable={editable}
-          label="Bullet"
-          placeholder="Describe an outcome"
-          fieldId={b.id}
-          onEnter={() => {
-            const next = newText();
-            a.addBullet(section, entryId, next, b.id);
-            requestFocus(next.id);
-          }}
-          onBackspaceEmpty={() => a.removeBullet(section, entryId, b.id)}
-        />
-      ))}
-    </ul>
-  );
-}
-
-export function PaperExperience({ doc, editable }: BlockProps) {
-  const a = useDocActions();
-  if (!doc.experience.length) return null;
-  return (
-    <Section id="experience" title="Experience">
-      {doc.experience.map((e) => (
-        <div key={e.id} className="rt-entry">
-          <div className="rt-entry-head">
-            <EditableText className="rt-role" value={e.title} onChange={(v) => a.patch("experience", e.id, { title: v })} editable={editable} label="Job title" />
-            <EditableText className="rt-meta" value={e.dates} onChange={(v) => a.patch("experience", e.id, { dates: v })} editable={editable} label="Dates" />
-          </div>
-          <div className="rt-entry-head">
-            <EditableText className="rt-org" value={e.company} onChange={(v) => a.patch("experience", e.id, { company: v })} editable={editable} label="Company" />
-            {editable || e.location ? <EditableText className="rt-meta" value={e.location} onChange={(v) => a.patch("experience", e.id, { location: v })} editable={editable} label="Location" /> : null}
-          </div>
-          <PaperBullets section="experience" entryId={e.id} bullets={e.bullets} editable={editable} />
-        </div>
-      ))}
+    <Section id="experience" title="Experience" hasHeading={hasHeading}>
+      {shown.map((e) => <ExperienceEntry key={e.id} e={e} editable={editable} only={only} />)}
     </Section>
   );
 }
 
-export function PaperSkills({ doc, editable }: BlockProps) {
+export function PaperSkills({ doc, editable, only }: BlockProps) {
   const a = useDocActions();
-  if (!doc.skills.length) return null;
+  const { shown, hasHeading } = pick("skills", doc.skills, only);
+  if (!shown.length) return null;
   return (
-    <Section id="skills" title="Skills">
-      {doc.skills.map((row) => (
-        <div key={row.id} className="rt-skill-row">
+    <Section id="skills" title="Skills" hasHeading={hasHeading}>
+      {shown.map((row) => (
+        <div key={row.id} className="rt-skill-row" data-rt-block={blockId("skills", row.id)}>
           <EditableText className="rt-skill-cat" value={row.category} onChange={(v) => a.patch("skills", row.id, { category: v })} editable={editable} label="Skill category" />
           <span className="rt-skill-sep">: </span>
           <EditableText value={row.items} onChange={(v) => a.patch("skills", row.id, { items: v })} editable={editable} label="Skills" />
@@ -101,13 +72,14 @@ export function PaperSkills({ doc, editable }: BlockProps) {
   );
 }
 
-export function PaperEducation({ doc, editable }: BlockProps) {
+export function PaperEducation({ doc, editable, only }: BlockProps) {
   const a = useDocActions();
-  if (!doc.education.length) return null;
+  const { shown, hasHeading } = pick("education", doc.education, only);
+  if (!shown.length) return null;
   return (
-    <Section id="education" title="Education">
-      {doc.education.map((e) => (
-        <div key={e.id} className="rt-entry">
+    <Section id="education" title="Education" hasHeading={hasHeading}>
+      {shown.map((e) => (
+        <div key={e.id} className="rt-entry" data-rt-block={blockId("education", e.id)}>
           <div className="rt-entry-head">
             <EditableText className="rt-role" value={e.school} onChange={(v) => a.patch("education", e.id, { school: v })} editable={editable} label="School" />
             <EditableText className="rt-meta" value={e.graduationDate} onChange={(v) => a.patch("education", e.id, { graduationDate: v })} editable={editable} label="Graduation" />
@@ -122,14 +94,14 @@ export function PaperEducation({ doc, editable }: BlockProps) {
   );
 }
 
-function PaperCredentials({ doc, editable, section, title }: BlockProps & { section: "certifications" | "awards"; title: string }) {
+function PaperCredentials({ doc, editable, only, section, title }: BlockProps & { section: "certifications" | "awards"; title: string }) {
   const a = useDocActions();
-  const rows = doc[section];
-  if (!rows.length) return null;
+  const { shown, hasHeading } = pick(section, doc[section], only);
+  if (!shown.length) return null;
   return (
-    <Section id={section} title={title}>
-      {rows.map((c) => (
-        <div key={c.id} className="rt-entry">
+    <Section id={section} title={title} hasHeading={hasHeading}>
+      {shown.map((c) => (
+        <div key={c.id} className="rt-entry" data-rt-block={blockId(section, c.id)}>
           <div className="rt-entry-head">
             <span>
               <EditableText className="rt-role" value={c.name} onChange={(v) => a.patch(section, c.id, { name: v })} editable={editable} label="Name" />
@@ -147,26 +119,12 @@ function PaperCredentials({ doc, editable, section, title }: BlockProps & { sect
 export const PaperCertifications = (props: BlockProps) => <PaperCredentials {...props} section="certifications" title="Certifications" />;
 export const PaperAwards = (props: BlockProps) => <PaperCredentials {...props} section="awards" title="Awards" />;
 
-export function PaperProjects({ doc, editable }: BlockProps) {
-  const a = useDocActions();
-  if (!doc.projects.length) return null;
+export function PaperProjects({ doc, editable, only }: BlockProps) {
+  const { shown, hasHeading } = pick("projects", doc.projects, only);
+  if (!shown.length) return null;
   return (
-    <Section id="projects" title="Projects">
-      {doc.projects.map((p) => (
-        <div key={p.id} className="rt-entry">
-          <div className="rt-entry-head">
-            <EditableText className="rt-role" value={p.name} onChange={(v) => a.patch("projects", p.id, { name: v })} editable={editable} label="Project name" />
-            {editable || p.dates ? <EditableText className="rt-meta" value={p.dates} onChange={(v) => a.patch("projects", p.id, { dates: v })} editable={editable} label="Project dates" placeholder="Dates" /> : null}
-          </div>
-          {editable || p.link || p.technologies ? (
-            <div className="rt-entry-head">
-              {editable || p.technologies ? <EditableText className="rt-org" value={p.technologies} onChange={(v) => a.patch("projects", p.id, { technologies: v })} editable={editable} label="Technologies" placeholder="Technologies" /> : <span />}
-              {editable || p.link ? <EditableText className="rt-meta" value={p.link} onChange={(v) => a.patch("projects", p.id, { link: v })} editable={editable} label="Project link" placeholder="Link" /> : null}
-            </div>
-          ) : null}
-          <PaperBullets section="projects" entryId={p.id} bullets={p.bullets} editable={editable} />
-        </div>
-      ))}
+    <Section id="projects" title="Projects" hasHeading={hasHeading}>
+      {shown.map((p) => <ProjectEntry key={p.id} p={p} editable={editable} only={only} />)}
     </Section>
   );
 }

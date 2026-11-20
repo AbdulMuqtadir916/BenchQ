@@ -1,15 +1,17 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import { emailLink, phoneLink, profileLink, type PaperLink } from "@/lib/resume-doc/paper-links";
 import { isProfileLinkField, normalizeProfileLink, PROFILE_LINK_ERROR } from "@/lib/resume-doc/profile-link";
 import type { ResumeDocument } from "@/lib/schemas/resume-document";
 import { EditableText } from "../editable-text";
 import { useDocActions } from "../use-doc-actions";
+import { PaperAnchor } from "./paper-link";
 
 export function PaperName({ doc, editable, children }: { doc: ResumeDocument; editable: boolean; children?: ReactNode }) {
   const a = useDocActions();
   return (
-    <header className="rt-header" data-rt-section="header">
+    <header className="rt-header" data-rt-section="header" data-rt-block="header">
       <EditableText className="rt-name" value={doc.fullName} onChange={(v) => a.setTop("fullName", v)} editable={editable} label="Full name" />
       {editable || doc.title ? (
         <EditableText className="rt-title" value={doc.title} onChange={(v) => a.setTop("title", v)} editable={editable} label="Title" placeholder="Headline, e.g. Senior Java Developer" />
@@ -20,11 +22,11 @@ export function PaperName({ doc, editable, children }: { doc: ResumeDocument; ed
 }
 
 const PRINTED = [
-  { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
-  { key: "linkedin", label: "LinkedIn" },
-  { key: "github", label: "GitHub" },
-] as const;
+  { key: "phone", label: "Phone", toLink: (v: string, country: string) => phoneLink(v, country) },
+  { key: "email", label: "Email", toLink: emailLink },
+  { key: "linkedin", label: "LinkedIn", toLink: (v: string) => profileLink("linkedin", v) },
+  { key: "github", label: "GitHub", toLink: (v: string) => profileLink("github", v) },
+] as const satisfies ReadonlyArray<{ key: string; label: string; toLink: (value: string, country: string) => PaperLink | null }>;
 
 function PaperContact({ value, label, editable, isLink, onChange }: { value: string; label: string; editable: boolean; isLink: boolean; onChange: (value: string) => void }) {
   const id = useId();
@@ -57,7 +59,9 @@ export function PaperContacts({ doc, editable }: { doc: ResumeDocument; editable
           <EditableText value={h.country} onChange={(v) => a.setHeader("country", v)} editable label="Country" placeholder="Country" />
         </span>
       ) : place.length ? <span className="rt-contact">{place.join(", ")}</span> : null}
-      {shown.map((f) => (
+      {shown.map((f) => !editable ? (
+        <span key={f.key} className="rt-contact"><PaperAnchor link={f.toLink(h[f.key], h.country)} text={h[f.key]} /></span>
+      ) : (
         <PaperContact key={f.key} value={h[f.key]} label={f.label} editable={editable} isLink={isProfileLinkField(f.key)}
           onChange={(v) => a.setHeader(f.key, v)} />
       ))}

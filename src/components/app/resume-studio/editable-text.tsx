@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type ElementType } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ElementType } from "react";
 import { sanitizeRichText } from "@/lib/resume-doc/rich-text";
 import { cn } from "@/lib/cn";
 import { useStudio } from "./studio-store";
+
+/**
+ * True inside the paper's off-screen measuring copy: fields keep their size (placeholders included) but aren't
+ * editable, focusable or addressable, so the copy never takes focus or a field id from the real page.
+ */
+export const PaperMeasureContext = createContext(false);
 
 interface EditableTextProps {
   value: string;
@@ -45,7 +51,8 @@ export function EditableText({
   onBackspaceEmpty,
 }: EditableTextProps) {
   const ref = useRef<HTMLElement>(null);
-  const isFlashing = useStudio((s) => !!fieldId && s.flashId === fieldId);
+  const isMeasuring = useContext(PaperMeasureContext);
+  const isFlashing = useStudio((s) => !isMeasuring && !!fieldId && s.flashId === fieldId);
   const focusRequest = useStudio((s) => s.focusRequest);
 
   useLayoutEffect(() => {
@@ -59,11 +66,11 @@ export function EditableText({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || !fieldId || focusRequest?.fieldId !== fieldId) return;
+    if (!el || isMeasuring || !fieldId || focusRequest?.fieldId !== fieldId) return;
     if (Date.now() - focusRequest.nonce > 1500) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.focus({ preventScroll: true });
-  }, [focusRequest, fieldId]);
+  }, [focusRequest, fieldId, isMeasuring]);
 
   const shared = {
     ref,
@@ -71,6 +78,7 @@ export function EditableText({
     "data-field-id": fieldId,
   };
 
+  if (isMeasuring) return <Tag ref={ref} className={className} data-editable={editable ? "" : undefined} data-placeholder={editable ? (placeholder ?? label) : undefined} />;
   if (!editable) return <Tag {...shared} />;
 
   return (

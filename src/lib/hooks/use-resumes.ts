@@ -47,6 +47,16 @@ export function useOpenedResume(versionId: string) {
 }
 
 /**
+ * Load one version on demand (Download PDF from a list): the same query as useOpenedResume, fetched once per call, so a
+ * failure is the caller's to handle and nothing refetches it in the background.
+ */
+export function useLoadOpenedResume() {
+  const firmId = useFirmId();
+  const client = useQueryClient();
+  return (versionId: string) => client.fetchQuery({ queryKey: queryKeys.resumes.detail(firmId, versionId), queryFn: () => resumesApi.open(firmId, versionId) });
+}
+
+/**
  * After a résumé write, refetch this firm's résumé queries, and its candidates too: a candidate's name, email, phone
  * and location are read from the active base's newest version (07 Q57), so an upload, a switch or a save can change
  * them, and the header, the list and ⌘K must show it at once (Abdul's PR 7 review, #2).

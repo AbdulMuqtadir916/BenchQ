@@ -90,6 +90,8 @@ NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
     "POST /api/jobs/backfill-descriptions", "POST /api/scrape/company/{company_id}", "POST /api/searches/{search_id}/run",
     "POST /api/searches/{search_id}/test", "POST /api/companies/{company_id}/test-scrape", "POST /api/cover-letters",
     "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
+# The scheduler runs in the worker process (production layer step 3), so the API's list of its jobs is retired.
+NOT_REACHED["GET /api/scheduler/jobs"] = "410: Scheduled jobs run in the worker process"
 # A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
 NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
 # Only the candidate's BDE adds a job for them (backend/auth/policy.py can_add_job), and the sweep signs in as the OWNER.

@@ -134,10 +134,12 @@ def move(db, app, principal, *, status, expected_revision, note=None, command_id
         # Saved changes the queue, not the historical fact of a submission. The form goes: the next apply sends its own.
         app.form_data = None
     else:
+        # The first move out of Saved is the submission, whichever stage it lands on: whoever moves it is its submitter,
+        # so a BDE who moves a draft straight to Screening call still sees it (PR #140's review). Never overwritten.
+        if old_status == 'saved' and app.submitted_by_user_id is None:
+            app.submitted_by_user_id = actor.id
         if status == 'applied' and old_status == 'saved' and app.applied_at is None:
             app.applied_at = now
-            if app.submitted_by_user_id is None:
-                app.submitted_by_user_id = actor.id
         if form_data is not None:
             app.form_data = form_data
         if sent is not None:

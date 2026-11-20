@@ -95,12 +95,12 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-1 sm:items-end">
+    <div className="flex flex-col items-end gap-1">
       <Button variant="secondary" onClick={run} disabled={Boolean(blocked) || isSearching || isUnknown} aria-describedby={`find-jobs-${candidate.id}`}>
         {isSearching ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
         {isSearching ? "Searching…" : "Find jobs"}
       </Button>
-      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-caption text-[var(--color-text-3)] sm:max-w-none sm:text-right" aria-live="polite">
+      <p id={`find-jobs-${candidate.id}`} className="max-w-xs text-right text-caption text-[var(--color-text-3)] sm:max-w-none" aria-live="polite">
         {isUnknown ? (
           <span className="inline-flex items-center gap-2">Today&apos;s searches didn&apos;t load.<button type="button" onClick={() => void searchesQuery.refetch()} className="underline">Retry</button></span>
         ) : blocked ? (

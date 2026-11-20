@@ -51,7 +51,7 @@ export function TemplateGallery({ doc }: { doc: ResumeDocument }) {
               >
                 <span className="relative block h-[calc(var(--paper-height)*0.16)] w-[calc(var(--paper-width)*0.2)] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-paper)]" aria-hidden="true" inert>
                   <span className="block" style={{ zoom: THUMB_ZOOM }}>
-                    <ResumePaper doc={doc} templateId={t.id} />
+                    <ResumePaper doc={doc} templateId={t.id} paginate={false} />
                   </span>
                   {isActive ? (
                     <span className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-[var(--radius-full)] bg-[var(--color-primary)] text-[var(--color-primary-fg)]">
