@@ -183,8 +183,9 @@ def test_monitor_run_detail_missing_id_is_404(client):
     assert_clean(client.get(f"/api/monitor/run/{MISSING_UUID}"), 404)
 
 
-def test_scheduler_jobs_is_a_list(client):
-    assert isinstance(assert_clean(client.get("/api/scheduler/jobs"), 200).json(), list)
+def test_scheduler_jobs_is_retired(client):
+    """The scheduler runs in the worker process (production layer step 3); the API can't list its jobs."""
+    assert assert_clean(client.get("/api/scheduler/jobs"), 410).status_code == 410
 
 
 # ══ Stats ════════════════════════════════════════════════════════════════════

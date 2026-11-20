@@ -358,7 +358,11 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
         firm = db.get(Firm, firm_id)
         if candidate is None or firm is None or firm.status == "SUSPENDED":
             raise _Stop(GONE)
-        if ((db.get(JobRun, run_id).meta or {}).get("error_code")):
+        # The run's row locked too, after the candidate's (the order admit's expire_lost takes them in): a heartbeat
+        # sweep (job_monitor.cleanup_stale_runs) fails a silent run with no error code, and a sweep that commits first
+        # is read here; one that comes later waits for this commit and finds the version saved (CodeRabbit on #147).
+        current = db.query(JobRun).filter(JobRun.id == run_id).with_for_update().first()
+        if current is None or current.status != "running" or (current.meta or {}).get("error_code"):
             raise _Stop(LOST)                 # told the BDE it failed: keep it that way
         source = _source(db, firm_id, candidate, source_resume_id)
         posting = scoped(db, JobPosting, firm_id).filter(JobPosting.id == job_posting_id).first()

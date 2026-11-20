@@ -251,7 +251,7 @@ def api_client(test_db, accounts, monkeypatch):
     import backend.main as main_mod
     monkeypatch.setattr(main_mod, "check_schema_at_head", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
-    monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
+    monkeypatch.setattr(main_mod, "start_heartbeat", lambda: (lambda: None))
     # Prevent the real scheduler from booting.
     import backend.scheduler as sched_mod
     monkeypatch.setattr(sched_mod, "configure_scheduler", lambda: None)
