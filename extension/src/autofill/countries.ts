@@ -48,6 +48,24 @@ const COUNTRIES: [name: string, code: string, ...aliases: string[]][] = [
 const BY_NAME = new Map(COUNTRIES.flatMap(([name, , ...aliases]) => [name, ...aliases].map((alias) => [normalize(alias), name] as const)));
 const CODE_OF = new Map(COUNTRIES.map(([name, code]) => [name, code]));
 
+/** States and provinces an address may end with outside the US (`isUsState` has those): India's states and union
+ * territories and Canada's provinces and territories, by name and by the codes addresses write them with. */
+const REGIONS = new Set([
+  "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh", "goa", "gujarat", "haryana", "himachal pradesh",
+  "jharkhand", "karnataka", "kerala", "madhya pradesh", "maharashtra", "manipur", "meghalaya", "mizoram", "nagaland",
+  "odisha", "orissa", "punjab", "rajasthan", "sikkim", "tamil nadu", "telangana", "tripura", "uttar pradesh", "uttarakhand",
+  "uttaranchal", "west bengal", "andaman and nicobar islands", "chandigarh", "dadra and nagar haveli and daman and diu",
+  "delhi", "new delhi", "nct of delhi", "jammu and kashmir", "ladakh", "lakshadweep", "puducherry", "pondicherry",
+  "ap", "as", "br", "cg", "gj", "hr", "hp", "jh", "ka", "kl", "mh", "mp", "ml", "mz", "od", "pb", "rj", "tn", "ts", "tg", "up",
+  "wb", "dl", "jk", "py",
+  "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador", "nova scotia", "ontario",
+  "prince edward island", "quebec", "saskatchewan", "northwest territories", "nunavut", "yukon",
+  "ab", "bc", "mb", "nb", "nl", "ns", "on", "pe", "qc", "sk", "nt", "nu", "yt",
+].map(normalize));
+
+/** Whether a part of an address names a state or province outside the US: "Telangana", "TS", "Ontario". */
+export const isKnownRegion = (text: string) => REGIONS.has(normalize(text));
+
 /** The country a part of an address names, as a form's country list would: "USA" is "United States". */
 export const countryNamed = (text: string): string | null => BY_NAME.get(normalize(text)) ?? null;
 

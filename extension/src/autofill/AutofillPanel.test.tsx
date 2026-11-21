@@ -29,9 +29,10 @@ const form: AppliedForm = { fields: [{ label: "City", value: "Dallas", required:
 const finalForm = vi.fn(async () => form);
 const autofill = vi.fn();
 
+const holdsFile = vi.fn<(id: string) => boolean>(() => false);
 const reviewed = {
   rows: [], scanning: false, error: "", filling: false, outcome: null, undoable: 0, fillCount: 0, needsConfirmation: false, unreadableFrames: 0,
-  check: { conflict: false, detected: "" }, finalForm, autofill,
+  check: { conflict: false, detected: "" }, finalForm, autofill, holdsFile,
 };
 
 const row = (label: string, required: boolean, current = ""): ReviewRow => ({
@@ -576,11 +577,54 @@ describe("the résumé the answers come from", () => {
     expect(autofill).not.toHaveBeenCalled();
     await pickOwn({ ...attached, fillCount: 1, attachmentSource: "picked" });
     expect(autofill).toHaveBeenCalledTimes(1);
-    // The BDE's file is the one on the form now: Remove puts the résumé's own back, the same way.
-    update({ ...attached, fillCount: 0, attachedFile: "mine.pdf", attachmentSource: "picked", reviewedFor: reviewedForOwn() }, oneResume);
+    // The BDE's file is the one on the form now, under the résumé's file name: Remove knows it by its identity, and puts
+    // the résumé's own back the same way.
+    const ownId = vi.mocked(useAutofill).mock.lastCall![0].pickedFile!.id;
+    holdsFile.mockImplementation((id) => id === ownId);
+    update({ ...attached, fillCount: 0, attachedFile: "Priya - Java Developer.pdf", attachmentSource: "picked", reviewedFor: reviewedForOwn() }, oneResume);
     await click("Remove");
-    update({ ...attached, fillCount: 1, attachedFile: "mine.pdf", reviewedFor: { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: null } }, oneResume);
+    expect(holdsFile).toHaveBeenCalledWith(ownId);
+    update({ ...attached, fillCount: 1, reviewedFor: { applicationId: connection.applicationId, candidateId: connection.candidateId, resumeId: base.id, fileId: null } }, oneResume);
     expect(autofill).toHaveBeenCalledTimes(2);
+    // A rebuilt panel doesn't swap the same pick again.
+    act(() => { root!.unmount(); });
+    root = createRoot(host);
+    act(() => { root!.render(cloneElement(element)); });
+    expect(autofill).toHaveBeenCalledTimes(2);
+  });
+
+  it("still swaps a pick read while the panel was rebuilt, as on a switch to another tab and back (#148's review)", async () => {
+    const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    const attached = { ...generated, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf", fillCount: 1 };
+    show(attached);
+    let finishRead: (buffer: ArrayBuffer) => void = () => undefined;
+    const file = new File(["%PDF-1.4"], "slow.pdf", { lastModified: 3 });
+    Object.defineProperty(file, "arrayBuffer", { value: () => new Promise<ArrayBuffer>((resolve) => { finishRead = resolve; }) });
+    const input = host.querySelector<HTMLInputElement>("[data-slot='own-file-input']")!;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    act(() => { root!.unmount(); });
+    root = createRoot(host);
+    act(() => { root!.render(cloneElement(element)); });
+    await act(async () => {
+      finishRead(new TextEncoder().encode("%PDF-1.4").buffer as ArrayBuffer);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    update({ ...attached, attachmentSource: "picked", reviewedFor: reviewedForOwn() }, oneResume);
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows why a file wasn't taken, though a file is already on the form (#148's review)", async () => {
+    const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    show({ ...generated, fillCount: 0, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" });
+    const input = host.querySelector<HTMLInputElement>("[data-document='resume'] [data-slot='document-attached'] [data-slot='own-file-input']")!;
+    Object.defineProperty(input, "files", { value: [new File(["x"], "photo.png")], configurable: true });
+    await act(async () => {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(host.querySelector("[data-document='resume'] [data-slot='own-file-error']")!.textContent).toBe("Pick a PDF or Word file.");
+    expect(host.querySelector("[data-slot='document-attached'] [data-slot='own-file-pick']")).not.toBeNull();
   });
 
   it("says when the form's upload won't take the file, and keeps the BDE's controls", async () => {

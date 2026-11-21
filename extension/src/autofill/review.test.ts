@@ -91,6 +91,28 @@ describe("answers the bank holds inside another", () => {
     expect(review(field("Last name"), [entry("Full name", "Ravi Kumar V")]).proposed).toBe("V");
   });
 
+  it("finds a saved middle name wherever it leaves a first and a last name, though it comes earlier too (#148's review)", () => {
+    const lee = [entry("Full name", "Lee Ann Lee Wong"), entry("Middle name", "Lee")];
+    expect([review(field("First name"), lee).proposed, review(field("Last name"), lee).proposed]).toEqual(["Lee Ann", "Wong"]);
+  });
+
+  it("gives no answer of the candidate's to a field about someone else, by its own label (#148's review)", () => {
+    const saved = [entry("Phone", "+91 98765 43210"), entry("Full name", "Meera Krishnan")];
+    for (const label of ["Next of kin mobile (international format)", "Emergency contact phone", "Father's name", "Reference's phone number"]) {
+      const row = review(field(label), saved);
+      expect(row.status, label).toBe("manual");
+      expect(row.write, label).toBeUndefined();
+    }
+    // An example in the label isn't who it's about: this is the candidate's own title.
+    expect(review(field("Current job title (e.g. Engineering Manager)"), [entry("Current job title", "QA Lead")]).proposed).toBe("QA Lead");
+  });
+
+  it("reads a box for the country code as one, whatever its label, when the page says so (#148's review)", () => {
+    const phone = [entry("Phone", "+91 98765 43210")];
+    expect(review(field("International phone country code"), phone).proposed).toBe("+91");
+    expect(review(field("International phone", { autocomplete: "tel-country-code" }), phone).proposed).toBe("+91");
+  });
+
   it("splits a full name of any number of words, and one word is a first name alone", () => {
     const named = (name: string, label: string) => review(field(label), [entry("Full name", name)]);
     expect(named("Madonna", "First name").proposed).toBe("Madonna");
@@ -112,22 +134,38 @@ describe("answers the bank holds inside another", () => {
   });
 
   it("reads a phone number's calling code however the résumé writes it, for any country", () => {
-    const code = (phone: string) => review(field("Phone country code"), [entry("Phone", phone)]).proposed;
-    const number = (phone: string) => review(field("Phone"), [entry("Phone", phone)]).proposed;
+    const code = (phone: string, home: BankEntry[] = []) => review(field("Phone country code"), [entry("Phone", phone), ...home]).proposed;
+    const number = (phone: string, home: BankEntry[] = []) => review(field("Phone"), [entry("Phone", phone), ...home]).proposed;
     for (const [phone, dial, local] of [
-      ["+91 98765 43210", "+91", "98765 43210"], ["+919876543210", "+91", "9876543210"], ["91 98765 43210", "+91", "98765 43210"],
-      ["919876543210", "+91", "9876543210"], ["0091 98765 43210", "+91", "98765 43210"], ["(+91) 98765-43210", "+91", "98765-43210"],
+      ["+91 98765 43210", "+91", "98765 43210"], ["+919876543210", "+91", "9876543210"],
+      ["0091 98765 43210", "+91", "98765 43210"], ["(+91) 98765-43210", "+91", "98765-43210"],
       ["+44 20 7946 0958", "+44", "20 7946 0958"], ["+447946095800", "+44", "7946095800"], ["+44 (0)20 7946 0958", "+44", "20 7946 0958"],
       ["+971 50 123 4567", "+971", "50 123 4567"], ["+971501234567", "+971", "501234567"], ["+65 6123 4567", "+65", "6123 4567"],
-      ["+880 1712-345678", "+880", "1712-345678"], ["+1 (214) 555-0167", "United States +1", "(214) 555-0167"],
-      ["1 214 555 0167", "United States +1", "214 555 0167"],
+      ["+880 1712-345678", "+880", "1712-345678"], ["+1 (214) 555-0167", "+1", "(214) 555-0167"],
     ] as const) {
       expect(code(phone), phone).toBe(dial);
       expect(number(phone), phone).toBe(local);
     }
-    // A number no longer than a country's own is that country's: "212" is a New York area code, not Morocco's +212.
+    // Written without "+", digits say a code only with the candidate's home country to read it by (#148's review).
+    const india = [entry("Current location", "Hyderabad, Telangana, India")];
+    expect([code("91 98765 43210", india), number("91 98765 43210", india)]).toEqual(["+91", "98765 43210"]);
+    expect([code("919876543210", india), number("919876543210", india)]).toEqual(["+91", "9876543210"]);
+    expect([code("1 214 555 0167", [location]), number("12145550167", [location])]).toEqual(["United States +1", "2145550167"]);
+    expect(number("91 98765 43210")).toBe("91 98765 43210");
+    expect(review(field("Phone country code"), [entry("Phone", "91 98765 43210")]).status).toBe("manual");
+    // "61912345678" is a Brasília mobile, never Australia's +61; "212 555 0167" a New York number, never Morocco's +212.
+    expect(number("61912345678")).toBe("61912345678");
+    expect(review(field("Phone country code"), [entry("Phone", "61912345678")]).status).toBe("manual");
     expect(number("212 555 0167")).toBe("212 555 0167");
     expect(review(field("Phone country code"), [entry("Phone", "212 555 0167")]).status).toBe("manual");
+  });
+
+  it("names +1 for the country the candidate lives in, and leaves it unnamed when that can't be told (#148's review)", () => {
+    const code = (phone: string, home: BankEntry[] = []) => review(field("Phone country code"), [entry("Phone", phone), ...home]).proposed;
+    expect(code("001 416 555 0100", [entry("Current location", "Toronto, Canada")])).toBe("Canada +1");
+    expect(code("+1 214 555 0167", [location])).toBe("United States +1");
+    expect(code("+1 214 555 0167")).toBe("+1");
+    expect(code("+1 214 555 0167", [entry("Current location", "Hyderabad, India")])).toBe("+1");
   });
 
   it("writes a phone number the way its field wants it, on every kind of phone field", () => {
@@ -135,7 +173,8 @@ describe("answers the bank holds inside another", () => {
     const wrote = (label: string, overrides: Partial<TabField> = {}, saved = phone) => review(field(label, overrides), saved);
     // A WhatsApp number, a placeholder with a "+", and a widget that reads the country from the number: the whole number.
     expect(wrote("Phone Number (WhatsApp Number)")).toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
-    expect(wrote("WhatsApp number", {}, [entry("Phone", "91 98765 43210")]).proposed).toBe("+91 98765 43210");
+    expect(wrote("WhatsApp number", {}, [entry("Phone", "91 98765 43210"), entry("Current location", "Hyderabad, India")]).proposed)
+      .toBe("+91 98765 43210");
     expect(wrote("Phone", { clues: { ...field("").clues, placeholder: "+1 201 555 0123" } }).proposed).toBe("+91 98765 43210");
     expect(wrote("Phone", { clues: { ...field("").clues, className: "iti__tel-input" } }).proposed).toBe("+91 98765 43210");
     // A number asked with its code is the whole number, never the code alone.
@@ -162,7 +201,9 @@ describe("answers the bank holds inside another", () => {
     expect(wrote("Phone number").write).toEqual({ type: "text", value: "98765 43210",
       also: ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"] });
     // Someone else's number isn't the candidate's.
-    expect(wrote("Emergency contact number (with country code)").proposed).not.toBe("+91 98765 43210");
+    const emergency = wrote("Emergency contact number (with country code)");
+    expect(emergency.status).toBe("manual");
+    expect(emergency.write).toBeUndefined();
   });
 
   it("gives a number saved without its code the home country's, where the field wants the whole number", () => {
@@ -173,8 +214,43 @@ describe("answers the bank holds inside another", () => {
     const british = [entry("Phone", "07946 095800"), entry("Street address", "10 Downing St, London, Westminster, UK")];
     expect(review(field("Mobile (with country code)"), british).proposed).toBe("+44 7946 095800");
     expect(review(field("Mobile"), british).proposed).toBe("07946 095800");
-    // No country to go by: the number as saved.
+    // No country to go by: the number as saved, where the code is only inferred; the BDE's, where the label asks for it.
     expect(review(field("WhatsApp number"), [entry("Phone", "98765 43210")]).proposed).toBe("98765 43210");
+    expect(review(field("Mobile number (with country code)"), [entry("Phone", "98765 43210")]))
+      .toMatchObject({ status: "manual", reason: "This field wants the number with its country code, and the saved number has none." });
+    // A leading 0 that's part of the number stays: Italy's "06 6982 1234" (#148's review).
+    const roman = [entry("Phone", "06 6982 1234"), entry("Current location", "Rome, Italy")];
+    expect(review(field("Phone (with country code)"), roman).proposed).toBe("+39 06 6982 1234");
+    // The number as saved, with its trunk 0, is among the ways the page tries where the code was only inferred.
+    expect(review(field("WhatsApp number"), british).write).toMatchObject({ value: "+44 7946 095800", also: expect.arrayContaining(["07946 095800"]) });
+    expect(review(field("Mobile (with country code)"), british).write).not.toMatchObject({ also: expect.arrayContaining(["07946 095800"]) });
+  });
+
+  it("keeps a label's call for the code: none too short for it, and none filled without it (#148's review)", () => {
+    const phone = [entry("Phone", "+91 98765 43210")];
+    // No way with the code fits ten characters: the box says why, rather than taking the number without its code.
+    expect(review(field("Mobile number with country code", { maxLength: 10 }), phone))
+      .toMatchObject({ status: "manual", reason: "The answer is 12 characters; this field allows 10." });
+    // A field that asks for the code isn't done while it holds the number without it; one that doesn't ask, is.
+    expect(review(field("Mobile number with country code", { current: "98765 43210" }), phone))
+      .toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
+    expect(review(field("Mobile number with country code", { current: "+91 98765 43210" }), phone).status).toBe("same");
+    expect(review(field("WhatsApp number", { current: "98765 43210" }), phone).status).toBe("same");
+  });
+
+  it("splits an address only where its state is plain to see, keeping the whole street otherwise (#148's review)", () => {
+    const london = [entry("Street address", "10 Downing St, Flat A, London, UK")];
+    expect(review(field("City"), london).status).toBe("manual");
+    expect(review(field("State"), london).status).toBe("manual");
+    expect(review(field("Country"), london).proposed).toBe("United Kingdom");
+    expect(review(field("Address line 1"), london).proposed).toBe("10 Downing St, Flat A, London, UK");
+    // An Indian state with no PIN, and a Canadian province with its postal code, are states.
+    const madhapur = [entry("Street address", "Plot 5, Madhapur, Hyderabad, Telangana, India")];
+    expect([review(field("City"), madhapur).proposed, review(field("State"), madhapur).proposed]).toEqual(["Hyderabad", "Telangana"]);
+    const toronto = [entry("Street address", "100 Queen St W, Toronto, ON M5H 2N2, Canada")];
+    expect([review(field("City"), toronto).proposed, review(field("State"), toronto).proposed, review(field("Postal code"), toronto).proposed])
+      .toEqual(["Toronto", "ON", "M5H 2N2"]);
+    expect(review(field("Street address"), toronto).proposed).toBe("100 Queen St W");
   });
 
   it("reads the street, city, state, ZIP and country of a whole saved address", () => {
@@ -255,7 +331,7 @@ describe("answers the bank holds inside another", () => {
 describe("the phone number", () => {
   it.each([
     ["+1 (214) 555-0167", "(214) 555-0167"], ["+1-214-555-0167", "214-555-0167"], ["+12145550167", "2145550167"],
-    ["12145550167", "2145550167"], ["(214) 555-0167", "(214) 555-0167"], ["+91 98765 43210", "98765 43210"],
+    ["(214) 555-0167", "(214) 555-0167"], ["+91 98765 43210", "98765 43210"],
     ["+919876543210", "9876543210"],
   ])("goes into the field without its country code: %s", (saved, number) => {
     expect(review(field("Phone", { kind: "tel" }), [entry("Phone number", saved)]).proposed).toBe(number);
@@ -270,7 +346,9 @@ describe("the phone number", () => {
 
     it("takes the code from the saved number", () => {
       expect(review(dropdown(), [entry("Phone number", "+91 98765 43210")]).proposed).toBe("+91");
-      expect(review(dropdown(), [entry("Phone number", "+1 214 555 0167")]).proposed).toBe("United States +1");
+      expect(review(dropdown(), [entry("Phone number", "+1 214 555 0167"), location]).proposed).toBe("United States +1");
+      // A US number saved without its "+" reads by the candidate's home country (#148's review).
+      expect(review(field("Phone", { kind: "tel" }), [entry("Phone number", "12145550167"), location]).proposed).toBe("2145550167");
     });
 
     it("falls back on where the candidate lives", () => {

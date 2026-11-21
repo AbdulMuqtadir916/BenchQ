@@ -18,7 +18,7 @@ import RunList from "./RunList";
 import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./types";
 import { SiteAccessNotice } from "./SiteAccessNotice";
 import { useAutofill, type Outcome } from "./use-autofill";
-import { finishOwnFile, removeOwnFile as forgetOwnFile, startOwnFile, useOwnFile } from "./own-files";
+import { finishOwnFile, removeOwnFile as forgetOwnFile, settleSwap, startOwnFile, useOwnFile } from "./own-files";
 import { useResumes, type ApplicationContextStatus } from "./use-resumes";
 import TailorResume from "./TailorResume";
 import { useTailoring } from "./use-tailoring";
@@ -126,18 +126,27 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     pick(id);
   };
   // A file picked while BenchQ's is on the form takes its place at once, as a résumé pick does (07 Q24): once the read
-  // settles and the form is looked at again, Autofill takes the old file off and puts this one on. Remove does the same
-  // the other way, when the BDE's file is the one on the form (#148's review).
+  // settles and the form is looked at again, Autofill takes the old file off and puts this one on. The swap is the
+  // candidate's, in the store, so a panel rebuilt while the file was read (a switch to another tab and back) still makes
+  // it; whichever panel queues it settles it there, so none queues it twice. Remove does the same the other way, when
+  // the BDE's file is the one on the form, known by its identity: it goes on under the résumé's file name (#148's review).
   const takeOwnFile = async (chosen: File) => {
     const candidateId = connection.candidateId;
-    const pick = startOwnFile(candidateId);
+    const pick = startOwnFile(candidateId, Boolean(state.attachedFile));
     const read = await readOwnFile(chosen).catch(() => "That file couldn't be read. Pick it again.");
     if (!finishOwnFile(candidateId, pick, typeof read === "string" ? null : read)) return;
     setOwnFileError(typeof read === "string" ? read : null);
-    if (typeof read !== "string" && state.attachedFile) setPendingFill({ context, resumeId: resumeId ?? null });
   };
+  const [queuedSwap, setQueuedSwap] = useState<number | null>(null);
+  if (own.swap !== null && !own.isReading && own.file && own.swap !== queuedSwap) {
+    setQueuedSwap(own.swap);
+    setPendingFill({ context, resumeId: resumeId ?? null });
+  }
+  useEffect(() => {
+    if (own.swap !== null && own.swap === queuedSwap) settleSwap(connection.candidateId, own.swap);
+  }, [own.swap, queuedSwap, connection.candidateId]);
   const removeOwnFile = () => {
-    const isOnForm = Boolean(pickedFile && state.attachedFile === pickedFile.name);
+    const isOnForm = Boolean(pickedFile && state.holdsFile(fileKey(pickedFile)));
     forgetOwnFile(connection.candidateId);
     setOwnFileError(null);
     if (isOnForm) setPendingFill({ context, resumeId: resumeId ?? null });

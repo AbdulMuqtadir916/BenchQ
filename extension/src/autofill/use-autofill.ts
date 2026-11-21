@@ -1000,9 +1000,13 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     return appliedForm(formOf(applicationId));
   }, [applicationId, watchForm]);
 
+  /** Whether a file BenchQ attached on this page is this one, by its identity (`fileKey`): the BDE's own file goes on
+   * under the résumé's file name, so its name can't say (#148's review). For a click, not a render. */
+  const holdsFile = useCallback((id: string) => [...memory.current.attachedId.values()].includes(id), []);
+
   return {
     rows, scanning, error, needsAccess: access, isAccessDenied, isAsking, allowAccess, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachmentSource, attachedFile, attachedShown, fileProblem, refusedAccept, step, isFollowingSteps,
     needsConfirmation, confirmKey, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
-    saveAnswer,
+    saveAnswer, holdsFile,
   };
 }
