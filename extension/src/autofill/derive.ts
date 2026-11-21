@@ -21,6 +21,10 @@ const INTERNATIONAL = /^\(?\s*(?:\+|00)/;
 /** Countries whose numbers keep a leading 0 with the calling code: Italy ("+39 06 6982 1234"), San Marino, the
  * Vatican and Côte d'Ivoire. Elsewhere a leading 0 is the trunk prefix, dialled only at home, and goes. */
 const KEEPS_LEADING_ZERO = new Set(["39", "378", "379", "225"]);
+/** How long a country's own numbers run, where it's past ten digits: Brazil's area code and mobile ("55 99999 1234", a
+ * Porto Alegre number whose area code is also Brazil's calling code), China's mobiles, Germany's, Italy's, Indonesia's,
+ * Finland's and Austria's longest. Ten elsewhere. */
+const LONGEST_NATIONAL: Record<string, number> = { "55": 11, "86": 11, "49": 11, "39": 11, "62": 12, "358": 12, "43": 13 };
 const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** A US ZIP code, with or without its four extra digits, a six-digit PIN code or a Canadian postal code ("M5H 2N2"),
@@ -276,7 +280,10 @@ export function withHomeCode(answer: string, asked: Asked, saved: Saved): string
   const home = homeCountry(saved);
   if (!home) return answer;
   const digits = value.replace(/\D/g, "");
-  if (digits.length > 10 && digits.startsWith(home.code)) return `+${home.code} ${afterDigits(value, home.code.length)}`;
+  // Longer than any of the country's own numbers, or it's one of them, its area code perhaps the calling code's digits.
+  if (digits.length > (LONGEST_NATIONAL[home.code] ?? 10) && digits.startsWith(home.code)) {
+    return `+${home.code} ${afterDigits(value, home.code.length)}`;
+  }
   if (!wantsCode(asked)) return answer;
   return `+${home.code} ${KEEPS_LEADING_ZERO.has(home.code) ? value : value.replace(/^0/, "")}`;
 }

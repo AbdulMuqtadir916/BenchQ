@@ -153,6 +153,10 @@ describe("answers the bank holds inside another", () => {
     expect([code("1 214 555 0167", [location]), number("12145550167", [location])]).toEqual(["United States +1", "2145550167"]);
     expect(number("91 98765 43210")).toBe("91 98765 43210");
     expect(review(field("Phone country code"), [entry("Phone", "91 98765 43210")]).status).toBe("manual");
+    // A Brazilian number whose area code is Brazil's calling code stays whole; one long enough to carry the code doesn't.
+    const brazil = [entry("Current location", "Porto Alegre, Brazil")];
+    expect(number("55 99999 1234", brazil)).toBe("55 99999 1234");
+    expect([code("55 55 99999 1234", brazil), number("55 55 99999 1234", brazil)]).toEqual(["+55", "55 99999 1234"]);
     // "61912345678" is a Brasília mobile, never Australia's +61; "212 555 0167" a New York number, never Morocco's +212.
     expect(number("61912345678")).toBe("61912345678");
     expect(review(field("Phone country code"), [entry("Phone", "61912345678")]).status).toBe("manual");
