@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tag } from "@/components/ui/tag";
 import { WORK_AUTH_LABEL, WorkAuthChip } from "@/components/app/work-auth-chip";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 export const EMPLOYMENT_LABEL: Record<EmploymentType, string> = { C2C: "C2C", W2: "W2", TEEN99: "1099", FTE: "Full-time" };
 const toDate = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd") : "");
@@ -123,7 +125,7 @@ function FactsForm({ candidate, onCancel, onSaved }: { candidate: Candidate; onC
         <span className="text-sm text-[var(--color-text-2)]" id="relocate-label">Open to relocate</span>
         <button type="button" role="switch" aria-checked={form.willingToRelocate} aria-labelledby="relocate-label" onClick={() => setForm({ ...form, willingToRelocate: !form.willingToRelocate })} className="bq-switch"><span /></button>
       </div>
-      {error || update.error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{error ?? update.error?.message}</p> : null}
+      <ErrorNote text={error ?? (update.error ? describeError(update.error) : null)} />
       <div className="flex justify-end gap-2 border-t border-[var(--color-border)] pt-3">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
         <Button type="submit" size="sm" disabled={!!error || update.isPending}>

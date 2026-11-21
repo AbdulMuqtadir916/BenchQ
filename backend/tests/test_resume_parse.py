@@ -21,6 +21,8 @@ USER_MESSAGE_PDF = (pathlib.Path(__file__).parent / "fixtures/resume_parse/user_
 PARSER_ROWS = ("resume_parse_system_prompt", "resume_parse_prompt", "resume_parse_response_format",
                "resume_parse_llm_provider", "resume_parse_llm_model", "resume_parse_llm_api_key")
 
+NOT_SET_UP = "The résumé reader isn't set up yet. Ask your admin."
+
 
 def _pdf(text: str, links: tuple[str, ...] = ()) -> bytes:
     """A one-page PDF with `text` on it and a link annotation per address, built by hand (no PDF library)."""
@@ -232,12 +234,13 @@ def test_16_and_18_the_format_and_the_rules_are_the_handoffs():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("row,value", [("resume_parse_llm_api_key", ""), ("resume_parse_llm_model", ""),
                                        ("resume_parse_llm_provider", ""), ("resume_parse_llm_provider", "claude_api")])
-async def test_11_the_parser_never_borrows_the_shared_model(test_db, model, row, value):
-    """The shared rows hold Claude values (the fixture); an empty or wrong own row still stops the parse."""
+async def test_11_the_parser_never_borrows_the_shared_model(test_db, model, log, row, value):
+    """The shared rows hold Claude values (the fixture); an empty or wrong own row still stops the parse. The BDE reads
+    what to do; the row is named in the log, for the admin (docs/02 §12)."""
     _set(test_db, **{row: value})
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and row in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and row in log.getvalue()
     assert model == []
 
 
@@ -248,11 +251,12 @@ async def test_11_the_parser_never_borrows_the_shared_model(test_db, model, row,
     ("resume_parse_response_format", "", "response_format"),
     ("resume_parse_prompt", "Structure this résumé.", "{resume}"),
     ("resume_parse_system_prompt", "", "system")])
-async def test_6_a_broken_stored_setting_is_a_500_and_the_model_is_never_called(test_db, model, row, value, named):
+async def test_6_a_broken_stored_setting_is_a_500_and_the_model_is_never_called(test_db, model, log, row, value,
+                                                                               named):
     _set(test_db, **{row: value})
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and named in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and named in log.getvalue()
     assert model == []
 
 
@@ -386,7 +390,7 @@ def test_who_may_read_a_resume(anonymous_client, test_db, accounts, model):
 
 
 @pytest.mark.parametrize("failure,status,detail", [
-    ("deadline", 504, "There was an issue while parsing your resume, please try again."),
+    ("deadline", 504, "The résumé reader took too long. Try again in a minute."),
     ("exhausted", 500, "The résumé reader didn't answer. Try again in a minute."),
     ("nonsense", 422, "Couldn't read this résumé. Try another file, or enter the details yourself.")])
 def test_a_failed_parse_is_a_clear_error_and_stores_nothing(anonymous_client, test_db, accounts, model, monkeypatch,

@@ -15,6 +15,7 @@ import { useCreatePlan, usePlans, usePlatformFirms, useSetPlanActive, useUpdateP
 import { queryGroup } from "@/lib/query/query-group";
 import type { Plan } from "@/lib/schemas/tenancy";
 import { AdminDialog, Field, errorMessage, fieldAria } from "./admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 /**
  * /admin/plans (docs/04 §14.6): the plan catalogue. A plan is a template (A3): editing it never
@@ -74,7 +75,7 @@ export function PlansPage() {
         subtitle="Templates for a firm's limits. Assigning a plan copies its limits onto the firm."
         actions={canEdit ? <Button onClick={() => setEditing("new")}><Plus size={14} aria-hidden /> New plan</Button> : undefined}
       />
-      {setActive.isError ? <p role="alert" className="mb-3 text-sm text-[var(--color-danger-fg)]">{errorMessage(setActive.error)}</p> : null}
+      {setActive.isError ? <ErrorNote text={errorMessage(setActive.error)} className="mb-3" /> : null}
       <DataTable
         columns={columns}
         data={plans.data ?? []}

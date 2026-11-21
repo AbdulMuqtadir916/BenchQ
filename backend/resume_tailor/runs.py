@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import func, text as sql
 
+from backend.problem import TAILORINGS_RUNNING, Problem
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.candidates import autofill, versions
@@ -277,8 +278,8 @@ def admit(db, candidate, actor: User, job_posting_id, resume_id=None) -> dict:
     if any(m.get("source_resume_id") == str(source.id) and m.get("job_posting_id") == str(posting.id) for m in running):
         raise HTTPException(status_code=409, detail="This résumé is already being tailored for this job.")
     if sum(m.get("user_id") == str(actor.id) for m in running) >= MOST_RUNNING_PER_BDE:
-        raise HTTPException(status_code=429, detail=f"You have {MOST_RUNNING_PER_BDE} tailorings running. "
-                                                    "Wait for one to finish, then try again.")
+        raise Problem(429, f"You have {MOST_RUNNING_PER_BDE} tailorings running. Wait for one to finish, then try "
+                           "again.", TAILORINGS_RUNNING)
     return {"candidate_id": str(candidate.id), "source_resume_id": str(source.id),
             "base_resume_id": str(source.base_resume_id) if source.version == 1 else None,
             "job_posting_id": str(posting.id), "job_title": title[:300], "user_id": str(actor.id)}

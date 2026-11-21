@@ -14,6 +14,8 @@ import { Tag } from "@/components/ui/tag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { DualTimestamp } from "@/components/app/dual-timestamp";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 import { EmptyState } from "@/components/app/empty-state";
 import { mailSignalMeta } from "@/components/app/inbox/signal-meta";
 import { NeedsReviewBadge } from "@/components/app/inbox/needs-review-badge";
@@ -69,7 +71,7 @@ export function InboxReader({ message, application, suggestion, canAct, actions,
             </Button>
           ) : null}
         </div>
-        {openReview.error && openReview.variables === message.id ? <p role="alert" className="mt-2 text-sm text-[var(--color-danger-fg)]">{openReview.error.message}</p> : null}
+        {openReview.error && openReview.variables === message.id ? <ErrorNote text={describeError(openReview.error)} className="mt-2" /> : null}
         <p className="mt-1 text-sm text-[var(--color-text-2)]">
           <span className="font-[550]">{message.fromName}</span> <span className="text-[var(--color-text-3)]">&lt;{message.fromEmail}&gt;</span>
         </p>

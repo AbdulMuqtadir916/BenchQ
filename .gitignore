@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# Playwright MCP server's logs and screenshots; ignored so Tailwind v4's source scan doesn't rebuild on every write
+.playwright-mcp/
 
 # next.js
 /.next/

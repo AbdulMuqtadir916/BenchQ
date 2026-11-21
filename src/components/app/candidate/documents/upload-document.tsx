@@ -10,6 +10,8 @@ import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 import { KIND_META, KIND_ORDER, detectKind, formatSize, titleFromFile } from "./document-meta";
 
 interface Pending { fileName: string; mimeType: string; sizeKb: number; kind: DocumentKind; title: string; expires: string }
@@ -52,7 +54,7 @@ export function UploadDocument({ candidateId, onSaved }: { candidateId: string; 
               <Select aria-label="Document type" value={pending.kind} onValueChange={(v) => setPending({ ...pending, kind: v as DocumentKind })} options={KIND_ORDER.map((k) => ({ value: k, label: KIND_META[k].label }))} />
               {KIND_META[pending.kind].hasExpiry ? <Input type="date" aria-label="Expiry date" value={pending.expires} onChange={(e) => setPending({ ...pending, expires: e.target.value })} /> : <span className="hidden sm:block" />}
             </div>
-            {upload.error ? <p role="alert" className="mt-2 text-sm text-[var(--color-danger-fg)]">{upload.error.message}</p> : null}
+            {upload.error ? <ErrorNote text={describeError(upload.error)} className="mt-2" /> : null}
             <div className="mt-3 flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
               <Button size="sm" onClick={save} disabled={upload.isPending || !pending.title.trim()}>

@@ -12,6 +12,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import text
 
+from backend.tests.problem_support import body_of, expected
 from backend.models.db import Application, Job
 from backend.models.candidates import Candidate
 from backend.models.tenancy import Firm, LedgerEntry, Session, SupportView
@@ -20,8 +21,8 @@ from backend.tests.ledger_support import assert_logged
 from backend.tests.resume_support import make_version
 
 REASON = "Customer reported a missing application"
-READ_ONLY = {"detail": "A support view is read-only."}
-NO_VIEW = {"detail": "A platform admin can't act inside a firm."}
+READ_ONLY = expected(403, "A support view is read-only.")
+NO_VIEW = expected(403, "A platform admin can't act inside a firm.")
 
 
 def _cookie(token):
@@ -93,7 +94,7 @@ def _expire(test_db, minutes=61):
 def test_start_opens_the_firms_reads_read_only_and_logs_it_with_the_admins_name(anonymous_client, world, test_db,
                                                                                 accounts):
     admin = world["admin"]
-    assert anonymous_client.get("/api/applications", headers=admin).json() == NO_VIEW   # no view yet
+    assert body_of(anonymous_client.get("/api/applications", headers=admin)) == NO_VIEW   # no view yet
 
     resp = _start(anonymous_client, world)
     assert resp.status_code == 200, resp.text
@@ -107,7 +108,7 @@ def test_start_opens_the_firms_reads_read_only_and_logs_it_with_the_admins_name(
     assert [a["id"] for a in apps["applications"]] == [str(world["acme_app"])]      # acme's only, never globex's
     write = anonymous_client.patch(f"/api/applications/{world['acme_app']}", json={"status": "interview"},
                                    headers=admin)
-    assert (write.status_code, write.json()) == (403, READ_ONLY)
+    assert (write.status_code, body_of(write)) == (403, READ_ONLY)
     assert anonymous_client.get(f"/api/firms/{world['globex']}/ledger", headers=admin).status_code == 404
 
     view_id = session["principal"]["support"]["id"]
@@ -121,15 +122,15 @@ def test_start_opens_the_firms_reads_read_only_and_logs_it_with_the_admins_name(
 
 def test_start_needs_a_reason_an_existing_firm_and_a_super_admin(anonymous_client, world):
     short = _start(anonymous_client, world, reason="too short")
-    assert (short.status_code, short.json()) == (400, {"detail": "Give a reason of at least 10 characters."})
+    assert (short.status_code, body_of(short)) == (400, expected(400, "Give a reason of at least 10 characters."))
     assert _start(anonymous_client, world, reason="   padded    ").status_code == 400   # trimmed first
     for firm_id in ("firm_nope", "00000000-0000-0000-0000-000000000000"):
         resp = anonymous_client.post("/api/support-views", json={"firm_id": firm_id, "reason": REASON},
                                      headers=world["admin"])
-        assert (resp.status_code, resp.json()) == (404, {"detail": "Not found."})
+        assert (resp.status_code, body_of(resp)) == (404, expected(404, "Not found."))
     by_owner = anonymous_client.post("/api/support-views", json={"firm_id": str(world["globex"]), "reason": REASON},
                                      headers=world["owner"])
-    assert (by_owner.status_code, by_owner.json()) == (403, {"detail": "Platform admins only."})
+    assert (by_owner.status_code, body_of(by_owner)) == (403, expected(403, "Platform admins only."))
     assert anonymous_client.delete("/api/support-views/current", headers=world["owner"]).status_code == 403
 
 
@@ -188,7 +189,7 @@ def test_exit_logs_the_end_returns_the_firm_to_go_back_to_and_closes_it(anonymou
     end = assert_logged(test_db, action="ADMIN_ACCESS_END", entity_type="support_view", entity_id=view_id,
                         firm_id=world["acme"])
     assert (end.summary, end.entity_label, end.actor_name) == ("Support view ended", "Acme", "Sam Admin")
-    assert anonymous_client.get("/api/applications", headers=world["admin"]).json() == NO_VIEW
+    assert body_of(anonymous_client.get("/api/applications", headers=world["admin"])) == NO_VIEW
 
 
 def test_exit_with_no_view_open_is_not_an_error(anonymous_client, world, test_db):
@@ -204,7 +205,7 @@ def test_sixty_minutes_no_extension_then_closed_and_the_end_logged_at_the_expiry
     assert view.expires_at - view.started_at == timedelta(minutes=60)
 
     _expire(test_db)
-    assert anonymous_client.get("/api/applications", headers=world["admin"]).json() == NO_VIEW
+    assert body_of(anonymous_client.get("/api/applications", headers=world["admin"])) == NO_VIEW
     me = anonymous_client.get("/api/auth/me", headers=world["admin"]).json()
     assert me["principal"]["support"] is None
 
@@ -266,7 +267,7 @@ def test_the_viewed_firms_reads_answer(anonymous_client, world, path):
 def test_every_write_and_every_export_is_refused_inside_a_view(anonymous_client, world, method, path):
     _start(anonymous_client, world)
     resp = anonymous_client.request(method, path.format(**world), json={}, headers=world["admin"])
-    assert (resp.status_code, resp.json()) == (403, READ_ONLY)
+    assert (resp.status_code, body_of(resp)) == (403, READ_ONLY)
 
 
 @pytest.mark.parametrize("path", ["/api/firms/{globex}/ledger", "/api/firms/{globex}/members",
@@ -306,8 +307,8 @@ def test_a_firm_user_and_a_super_admin_without_a_view_are_unchanged(anonymous_cl
     assert anonymous_client.get("/api/applications", headers=world["owner"]).status_code == 200
     assert anonymous_client.patch(f"/api/applications/{world['acme_app']}", json={"notes": "x"},
                                   headers=world["owner"]).status_code == 200
-    assert anonymous_client.get("/api/applications", headers=world["admin"]).json() == NO_VIEW
-    assert anonymous_client.get(f"/api/firms/{world['acme']}/members", headers=world["admin"]).json() == NO_VIEW
+    assert body_of(anonymous_client.get("/api/applications", headers=world["admin"])) == NO_VIEW
+    assert body_of(anonymous_client.get(f"/api/firms/{world['acme']}/members", headers=world["admin"])) == NO_VIEW
 
 
 def test_a_view_belongs_to_the_session_that_started_it(anonymous_client, world, test_db, accounts):
