@@ -614,6 +614,27 @@ describe("the résumé the answers come from", () => {
     expect(autofill).toHaveBeenCalledTimes(1);
   });
 
+  it("runs a swap though no answer is left to fill, and waits for the résumés before queuing one (#148's review)", async () => {
+    // The site swapped its upload for a chip and every answer is in: the swap still runs Autofill, to take the old off.
+    const done = { ...generated, fillCount: 0, rows: [row("Email", true, "a@example.test")], attachedFile: "Priya - Java Developer.pdf", attachedShown: true };
+    show(done);
+    let finishRead: (buffer: ArrayBuffer) => void = () => undefined;
+    const file = new File(["%PDF-1.4"], "mine.pdf", { lastModified: 4 });
+    Object.defineProperty(file, "arrayBuffer", { value: () => new Promise<ArrayBuffer>((resolve) => { finishRead = resolve; }) });
+    const input = host.querySelector<HTMLInputElement>("[data-slot='document-attached'] [data-slot='own-file-input']")!;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    // The résumés load again while the file is read: the swap waits for them.
+    update(done, { status: "loading" });
+    await act(async () => {
+      finishRead(new TextEncoder().encode("%PDF-1.4").buffer as ArrayBuffer);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(autofill).not.toHaveBeenCalled();
+    update({ ...done, attachmentSource: "picked", reviewedFor: reviewedForOwn() }, oneResume);
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
   it("shows why a file wasn't taken, though a file is already on the form (#148's review)", async () => {
     const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
     show({ ...generated, fillCount: 0, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" });

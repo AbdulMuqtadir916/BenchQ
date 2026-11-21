@@ -67,7 +67,9 @@ function scrollToResult(card: HTMLElement | null) {
 }
 
 /** A fill waiting for its résumé's review: which application it's for and which résumé answers it. */
-type PendingFill = { context: string; resumeId: string | null };
+/** `isFileSwap`: a file to put in place of the one on the form, which runs Autofill though no answer is left to fill:
+ * taking the old file off is what brings the upload back for the new one (#148's review). */
+type PendingFill = { context: string; resumeId: string | null; isFileSwap?: boolean };
 
 /** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
@@ -138,9 +140,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     setOwnFileError(typeof read === "string" ? read : null);
   };
   const [queuedSwap, setQueuedSwap] = useState<number | null>(null);
-  if (own.swap !== null && !own.isReading && own.file && own.swap !== queuedSwap) {
+  // Queued once the résumés are in: one queued while they load would wait for a résumé that never comes (#148's review).
+  if (own.swap !== null && !own.isReading && own.file && own.swap !== queuedSwap && canReview && resumeId !== undefined) {
     setQueuedSwap(own.swap);
-    setPendingFill({ context, resumeId: resumeId ?? null });
+    setPendingFill({ context, resumeId, isFileSwap: true });
   }
   useEffect(() => {
     if (own.swap !== null && own.swap === queuedSwap) settleSwap(connection.candidateId, own.swap);
@@ -149,7 +152,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     const isOnForm = Boolean(pickedFile && state.holdsFile(fileKey(pickedFile)));
     forgetOwnFile(connection.candidateId);
     setOwnFileError(null);
-    if (isOnForm) setPendingFill({ context, resumeId: resumeId ?? null });
+    if (isOnForm && resumeId !== undefined) setPendingFill({ context, resumeId, isFileSwap: true });
   };
   // Tailor for this job: the connected job as BenchQ holds it for the candidate, once its record is confirmed.
   const jobPostingId = applicationStatus === "ready" ? details?.job_id ?? null : null;
@@ -179,7 +182,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     if (!wanted || movedAway || isReadingOwnFile || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
     startedFill.current = wanted;
     // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
-    const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0) ? autofill() : undefined;
+    const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0 || wanted.isFileSwap) ? autofill() : undefined;
     void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
   }, [pendingFill, movedAway, isReadingOwnFile, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the

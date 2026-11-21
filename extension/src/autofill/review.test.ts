@@ -236,6 +236,9 @@ describe("answers the bank holds inside another", () => {
       .toMatchObject({ status: "ready", proposed: "+91 98765 43210" });
     expect(review(field("Mobile number with country code", { current: "+91 98765 43210" }), phone).status).toBe("same");
     expect(review(field("WhatsApp number", { current: "98765 43210" }), phone).status).toBe("same");
+    // A digits-only proposal with the code counts the same way.
+    expect(review(field("Mobile number with country code", { maxLength: 12, current: "9876543210" }), phone))
+      .toMatchObject({ status: "ready", proposed: "919876543210" });
   });
 
   it("splits an address only where its state is plain to see, keeping the whole street otherwise (#148's review)", () => {

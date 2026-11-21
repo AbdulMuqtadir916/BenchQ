@@ -130,7 +130,8 @@ function holdsAnswer({ current, kind, label }: TabField, proposed: string): bool
   if (kind === "combobox" && current && dropdownHolds(current, proposed)) return true;
   if (current.trim() === proposed.trim() || (proposed === UNCHECKED && current === "")) return true;
   if (!PHONE_LIKE.test(proposed) || !samePhone(current, proposed)) return false;
-  return !(asksForCode(label) && proposed.trim().startsWith("+")) || holdsWholeNumber(current, proposed);
+  // With or without its "+": a digits-only "919876543210" is the code and the number too (#148's review).
+  return !asksForCode(label) || holdsWholeNumber(current, proposed);
 }
 
 function rowFor(base: Base, answer: string, source?: BankEntry): ReviewRow {
