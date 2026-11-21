@@ -1,0 +1,39 @@
+BenchQ Apply: third-party notices
+
+BenchQ Apply includes the open-source software below. Each licence text is in this folder.
+
+React and React DOM (with Scheduler)
+  https://github.com/facebook/react
+  MIT License. Copyright (c) Meta Platforms, Inc. and affiliates.
+  Text: react.MIT.txt
+
+ats-autofill-engine, commit f5a3ed9: per-site field rules and the field taxonomy
+  https://github.com/ebenezer-isaac/ats-autofill-engine
+  MIT License. Copyright (c) 2026 Ebenezer Isaac.
+  Text: ats-autofill-engine.MIT.txt
+
+Form autofill heuristics ported from Mozilla Firefox, through ats-autofill-engine (core/heuristics/mozilla)
+  Original: https://searchfox.org/mozilla-central/source/toolkit/components/formautofill/
+  Mozilla Public License 2.0. These files are in the extension's code in compiled form. Their source, as this
+  extension ships them, is in the mpl-2.0-source folder here.
+  Text: MPL-2.0.txt
+
+universal-ai-autofill, commit e7f3d50: weighted fuzzy field matching
+  https://github.com/Vikhyat24/universal-ai-autofill
+  MIT License, as declared in its package.json. The project names no copyright holder.
+  Text: universal-ai-autofill.MIT.txt
+
+Tailwind CSS, which generates the panel's styles
+  https://github.com/tailwindlabs/tailwindcss
+  MIT License. Copyright (c) Tailwind Labs, Inc.
+  Text: tailwindcss.MIT.txt
+
+Host Grotesk font
+  https://github.com/Element-Type/HostGrotesk
+  SIL Open Font License 1.1. Copyright 2023 The Host Grotesk Project Authors.
+  Text: host-grotesk.OFL-1.1.txt
+
+JetBrains Mono font
+  https://github.com/JetBrains/JetBrainsMono
+  SIL Open Font License 1.1. Copyright 2020 The JetBrains Mono Project Authors.
+  Text: jetbrains-mono.OFL-1.1.txt

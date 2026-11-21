@@ -4,6 +4,8 @@ export const CHECK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 
 
 export const CROSS_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
 
+export const UPLOAD_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>;
+
 export const CHEVRON_DOWN_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
 
 export const LIGHTBULB_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">

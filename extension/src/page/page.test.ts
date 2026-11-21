@@ -278,14 +278,14 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
   const UPLOAD = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>${NAME}</span><button id="mine" type="button" aria-label="Remove file">×</button></div></div>`;
 
   /** The page in `html`, once BenchQ attached its file to the upload `#r` the way the panel does. */
-  async function attached(html: string) {
+  async function attached(html: string, name = NAME) {
     vi.stubGlobal("DataTransfer", FakeTransfer);
     const { filler, rescan } = setup(html);
     let held: File[] = [];
     Object.defineProperty(element("#r"), "files", { configurable: true, get: () => held, set: (next: File[]) => { held = [...next]; } });
     const { scanId, fields } = rescan();
     const upload = fields.find(({ kind }) => kind === "file")!;
-    const write = { type: "file" as const, name: NAME, mimeType: "application/pdf", data: btoa("%PDF-1.7") };
+    const write = { type: "file" as const, name, mimeType: "application/pdf", data: btoa("%PDF-1.7") };
     expect((await filler.fill({ scanId, fieldId: upload.id, write, current: upload.current })).status).toBe("filled");
     return filler;
   }
@@ -298,6 +298,24 @@ describe("taking a file off through the page's own control (07 Q51)", () => {
   };
 
   afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("says whether a chip names a file (#148)", async () => {
+    const filler = await attached(UPLOAD);
+    expect(filler.showsFile(NAME)).toBe(true);
+    expect(filler.showsFile("Priya - Data Engineer.pdf")).toBe(false);
+  });
+
+  it("doesn't take an upload error that names the file for its chip (#148)", async () => {
+    const failed = `<div class="upload"><input id="r" type="file" aria-label="Resume/CV"><div><span>Could not upload ${NAME}</span></div></div>`;
+    const filler = await attached(failed);
+    expect(filler.showsFile(NAME)).toBe(false);
+  });
+
+  it("still takes a chip whose file name holds such a word (#148)", async () => {
+    const errorName = "Error Analyst - Resume.pdf";
+    const filler = await attached(UPLOAD.replaceAll(NAME, errorName), errorName);
+    expect(filler.showsFile(errorName)).toBe(true);
+  });
 
   it("clicks the remove control beside the chip of the file it attached", async () => {
     const filler = await attached(UPLOAD);
@@ -386,6 +404,15 @@ describe("attaching the résumé's file (07 Q49–Q51)", () => {
 
   afterEach(() => { vi.unstubAllGlobals(); });
 
+  it("writes no file the upload no longer takes: the page can change that after the scan (#148)", async () => {
+    const { filler, rescan, input, held } = upload();
+    const { scanId, fields } = rescan();
+    input.accept = ".docx";
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    expect(result).toEqual({ status: "failed", current: "", reason: "This upload doesn't take this kind of file." });
+    expect(held()).toEqual([]);
+  });
+
   it("puts the file on the upload, tells the page, and undo takes it off again", async () => {
     const { filler, rescan, input, held } = upload();
     const seen: string[] = [];
@@ -428,6 +455,54 @@ describe("filling", () => {
     expect(result).toEqual({ status: "filled", current: "Priya" });
     expect(element<HTMLInputElement>("#a").value).toBe("Priya");
     expect(seen).toEqual(["input", "change", "blur", "focusout"]);
+  });
+
+  it("writes a phone number again its other ways when the form won't take or pass it as written", async () => {
+    // The ways a phone number's row sends along with it (`phoneWays`): only those are tried.
+    const OTHER_WAYS: Record<string, string[]> = {
+      "98765 43210": ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"],
+      "+91 98765 43210": ["+919876543210", "919876543210", "98765 43210", "9876543210"],
+    };
+    const write = (value: string) => ({ type: "text" as const, value, also: OTHER_WAYS[value] });
+    // A number box drops "98765 43210" whole: its digits go in.
+    const numbers = setup(`<input id="a" type="number" aria-label="WhatsApp number">`);
+    let scanned = numbers.rescan();
+    expect(await numbers.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "9876543210" });
+    // A box whose own rule takes digits only.
+    const pattern = setup(`<input id="a" type="tel" pattern="[0-9]{10}" aria-label="Mobile">`);
+    scanned = pattern.rescan();
+    expect(await pattern.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "9876543210" });
+    // One that wants the "+" kept, without the spaces.
+    const plus = setup(`<input id="a" type="tel" pattern="\\+[0-9]{12}" aria-label="Mobile">`);
+    scanned = plus.rescan();
+    expect(await plus.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("+91 98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "+919876543210" });
+    // A site whose own check takes only the digits with the code: the other ways the panel sent are tried in turn.
+    const site = setup(`<input id="a" type="tel" aria-label="Phone number">`);
+    element("#a").addEventListener("input", (event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      input.setAttribute("aria-invalid", String(!/^\d{12}$/.test(input.value)));
+    });
+    scanned = site.rescan();
+    const ways = { type: "text" as const, value: "98765 43210", also: ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"] };
+    expect(await site.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: ways, current: "" }))
+      .toEqual({ status: "filled", current: "919876543210" });
+    // A number its rule takes as written stays as written; text that isn't a number is never rewritten.
+    const plain = setup(`<input id="a" type="tel" aria-label="Mobile">`);
+    scanned = plain.rescan();
+    expect(await plain.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("+91 98765 43210"), current: "" }))
+      .toEqual({ status: "filled", current: "+91 98765 43210" });
+  });
+
+  it("never rewrites a value no other ways came with: a salary keeps its point (#148's review)", async () => {
+    // A number box with the default whole-number step fails "85000.5": it stays as written, never "850005".
+    const { filler, rescan } = setup(`<input id="a" type="number" aria-label="Expected salary">`);
+    const { scanId, fields } = rescan();
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: "85000.5" }, current: "" });
+    expect(element<HTMLInputElement>("#a").value).toBe("85000.5");
+    expect(result.current).toBe("85000.5");
   });
 
   it("writes past a framework's value tracker", async () => {

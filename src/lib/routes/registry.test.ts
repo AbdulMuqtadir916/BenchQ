@@ -56,12 +56,12 @@ describe("route registry", () => {
     for (const route of ROUTES) {
       expect(route.path.startsWith("/[firm]/"), route.id).toBe(route.area === "firm");
     }
-    expect(ROUTES.filter((route) => route.area === "public").map((route) => route.path)).toEqual(["/", "/sign-in", "/forgot-password", "/reset-password", "/invite/[token]"]);
+    expect(ROUTES.filter((route) => route.area === "public").map((route) => route.path)).toEqual(["/", "/sign-in", "/forgot-password", "/reset-password", "/invite/[token]", "/privacy"]);
   });
 
   it("reserves every top-level static segment, so no firm slug can shadow a route (docs/07 §2.4)", () => {
     const topLevel = new Set(pagePaths().map((path) => path.split("/")[1]!).filter((segment) => segment && !segment.startsWith("[")));
-    expect([...topLevel].sort()).toEqual(["admin", "dev", "forgot-password", "invite", "reset-password", "sign-in"]);
+    expect([...topLevel].sort()).toEqual(["admin", "dev", "forgot-password", "invite", "privacy", "reset-password", "sign-in"]);
     for (const segment of topLevel) expect(RESERVED_SLUGS as readonly string[], segment).toContain(segment);
   });
 
@@ -208,7 +208,7 @@ const FIRM_TABLE: ReadonlyArray<readonly [RouteId, Access, Access, Access, Acces
 ];
 
 /** Routes outside the firm table: public pages, and the dev-only design system (docs/07 §2.1, §2.4). */
-const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "forgot-password", "reset-password", "invite"];
+const PUBLIC_ROUTES: readonly RouteId[] = ["root", "sign-in", "forgot-password", "reset-password", "invite", "privacy"];
 const DEV_ROUTES: readonly RouteId[] = ["design-system"];
 /** docs/07 §2.3: PLATFORM_ADMIN only, every route of the list (P3). */
 const PLATFORM_ROUTES: readonly RouteId[] = [
