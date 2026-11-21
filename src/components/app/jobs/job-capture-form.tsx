@@ -62,11 +62,9 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
         router.push(toHref("jobs.detail", { id: job.id }, { candidate: parsed.data.candidateId }));
       },
       onError: (error) => {
-        if (isDuplicateJob(error)) setProblem({ message: error.message, jobId: error.jobId });
-        else {
-          const text = describeError(error, { fallback: "The job wasn't captured. Try again." });
-          setProblem({ message: text.message, reference: text.reference });
-        }
+        // The duplicate keeps the backend's words, through describeError like every other error (docs/02 §12).
+        const text = describeError(error, { fallback: "The job wasn't captured. Try again." });
+        setProblem(isDuplicateJob(error) ? { message: text.message, jobId: error.jobId } : { message: text.message, reference: text.reference });
       },
     });
   }

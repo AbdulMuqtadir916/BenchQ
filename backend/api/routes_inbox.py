@@ -40,6 +40,8 @@ router = APIRouter(tags=["candidate-inbox"])
 logger = logging.getLogger("jobnavigator.inbox")
 GMAIL_OFF = "Connecting Gmail isn't turned on in BenchQ yet."
 GMAIL_NOT_SET_UP = "Connecting Gmail isn't set up on this server yet. Ask BenchQ support."
+# The connect 400: the website sends the return path, so it names no value.
+RETURN_PATH_REFUSED = "Invalid local return path."
 
 
 def _audit(db, principal, *, firm_id, candidate_id, entity_id, summary):
@@ -292,14 +294,16 @@ def start_candidate_google_oauth(candidate_id: uuid.UUID, body: OAuthStartBody,
     _candidate(db, firm_id, candidate_id, principal)
     try:
         return_to = validate_return_to(body.return_to)
+    except ValueError:
+        # Fixed words, never the exception's (docs/02 §12.2, rule 2).
+        raise HTTPException(status_code=400, detail=RETURN_PATH_REFUSED) from None
+    try:
         auth = build_authorization()
         attempt = CandidateGoogleOAuthAttempt(
             state_hash=state_digest(auth.state), firm_id=firm_id, candidate_id=candidate_id,
             initiated_by_user_id=principal.user_id, code_verifier_ciphertext=encrypt_secret(auth.verifier),
             return_to=return_to, expires_at=utcnow() + timedelta(minutes=10),
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         # Not set up on this server (backend/inbox/google_oauth.py). The admin reads which setting in the log (its
         # RuntimeErrors are fixed sentences, no values); the answer never carries an exception's text (§12.2, rule 2).

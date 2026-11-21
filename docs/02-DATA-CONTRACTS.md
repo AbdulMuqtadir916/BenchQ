@@ -2392,6 +2392,18 @@ ones keep the old shape until Abdul's clean-up track, listed in the sweep test.
 7. **Retries.** Queries never retry a 4xx; network errors and 5xx are retried, waiting what `Retry-After` asks (with
    a ceiling). Mutations are never retried.
 
+**How it's enforced.** The central handlers in `backend/main.py` give every raised error the body; `backend/problem.py`
+refuses an unregistered code, and a specific code or extra field on a 403/404, when the error is raised.
+`test_error_responses_lint.py` fails a hand-built error response outside `problem.py`. `test_error_detail_lint.py`
+fails a `detail` built from a caught exception (`str(e)`, `f"{e}"`, `.args`, `repr`, a traceback) or one with
+"please", "Oops" or "!". The route sweep (`test_log_every_route.py` with `problem_support.assert_problem`) checks
+every route's error has the shape, a registered code, and a system code only from its named sender.
+`test_error_shape.py` covers the cases the sweep doesn't reach. `test_isolation.py` holds out-of-scope records to a
+plain `NOT_FOUND`. `test_error_codes_doc.py` fails when §12.1's tables and `backend.problem.CODES` differ (it runs in
+CI, which has the whole checkout; the backend container mounts only `backend/`, so locally it skips). On the website,
+`src/lib/api/error-display.test.ts` fails a screen that shows a raw `error.message` instead of `describeError`.
+Leftovers are listed by file:line in each test, and each list has a stale check.
+
 ### 12.3 Writing an error message
 
 For every `detail` the backend writes, and the frontend's own messages.

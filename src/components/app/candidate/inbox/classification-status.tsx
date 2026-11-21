@@ -10,14 +10,13 @@ import { useRetryClassification } from "@/lib/hooks/use-email-reviews";
 import { SETUP_ERRORS, classificationFailureReason } from "@/components/app/inbox/signal-meta";
 import { Button } from "@/components/ui/button";
 
-/** The screen's words for a 409 and a 403; a system error reads as everywhere else (src/lib/api/error-text.ts). */
+/** The screen's words for a 403, and for a 409 that came without the backend's own; a system error reads as
+ * everywhere else (src/lib/api/error-text.ts). */
 function retryFailure(error: Error): ErrorText {
+  const isConflict = error instanceof ApiError && error.status === 409;
   return describeError(error, {
-    screenText: (e) => {
-      if (e instanceof ApiError && e.status === 409) return e.message || "This email changed or the classifier is paused. Reload and try again.";
-      if (e instanceof ApiError && e.status === 403) return "You don't have permission to retry classification.";
-      return null;
-    },
+    fallback: isConflict ? "This email changed or the classifier is paused. Reload and try again." : undefined,
+    screenText: (e) => (e instanceof ApiError && e.status === 403 ? "You don't have permission to retry classification." : null),
   });
 }
 
