@@ -6,24 +6,47 @@ correct. The privacy text in particular needs a person who is responsible for it
 
 ## 0. Order of work (the first release)
 
-1. **Production backend reachable through the website.** `https://www.benchq.io/api/*` must reach the backend. On
-   2026-11-10 `/api/auth/me` there returned 404: `next.config.ts` only proxies `/api` when `BACKEND_URL` is set for the
-   Vercel project. Without it the extension cannot sign in, and a reviewer cannot test it.
-2. Developer account ($5, one time) at the Chrome Web Store developer dashboard.
-3. Build the store package: `npm run build:store` in `extension/`, then zip the contents of `extension/dist`.
-4. **First upload by hand** (Items, New item). This creates the item and its permanent ID. Visibility: **Unlisted**.
-5. Put `chrome-extension://<the item's ID>` in the production backend's `ALLOWED_ORIGINS`, next to the website's own
-   address, **before submitting**: the reviewer marks a job applied, and without it every write the extension makes is
-   refused with 403 "Cross-origin request refused" (`backend/auth/access.py`). Never `chrome-extension://*`.
-6. Fill in the listing (sections 1 to 5 below) and submit for review.
-7. Add the five GitHub secrets (section 6). Then, **after the first version is approved**, turn on automatic uploads:
+1. **The app's address.** The extension signs in and calls `/api/*` on `https://app.benchq.io`, the BenchQ app.
+   `www.benchq.io` is the marketing site, with no sign-in and no `/api`: on 2026-11-21 its `/sign-in` and
+   `/api/auth/me` returned 404, while `app.benchq.io/api/auth/me` returned the backend's 401. `npm run build:store`
+   builds for `storeOrigin` in `extension/hosts.json` and nothing else.
+2. **Developer account** ($5, one time) at the Chrome Web Store developer dashboard, on a company-owned Google account
+   with 2-Step Verification: the item stays with the account that publishes it.
+3. **Build the store package:** `npm run build:store` in `extension/`, then zip the contents of `extension/dist` (not
+   the folder itself, and without `*.map` files).
+4. **First upload by hand, as a draft** (Items, New item). This creates the item and its permanent ID. Nothing is
+   reviewed until Submit for review, and the package can be replaced until then, so any store build will do here.
+   Visibility: **Unlisted**.
+5. Put `chrome-extension://<the item's ID>` in the production backend's `ALLOWED_ORIGINS`, next to
+   `https://app.benchq.io`, **before submitting**: the reviewer marks a job applied, and without it every write the
+   extension makes (Mark applied, Add job, saving an answer, tailoring) is refused with 403 "Cross-origin request
+   refused" (`backend/auth/access.py`). Never `chrome-extension://*`.
+6. **Production backend up to date:** redeploy it from `main`, with its migrations, so every route the extension calls
+   is there, including `GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file` (a résumé as a
+   file, which the extension attaches to a form; PR #148). A reviewer who meets a missing route sees a broken extension.
+7. The reviewer's demo account (section 5), and the privacy policy live at `https://app.benchq.io/privacy`
+   (section 4), which goes out with the website once #148 is merged and the website is deployed.
+8. Replace the draft's package with a store build from `main`, fill in the listing (sections 1 to 5 below) and submit
+   for review.
+9. Add the five GitHub secrets (section 6). Then, **after the first version is approved**, turn on automatic uploads:
    the workflow starts as manual-only (Actions, Publish extension, Run workflow, from `main`), and the comment at the
    top of `.github/workflows/extension-publish.yml` shows the `push` trigger to add. From then on a push to `main` that
    changes `extension/**` uploads the next version by itself.
 
-A pinned `"key"` is **not** needed for the store: the store owns the ID. It only keeps the ID the same for people who load
-the folder unpacked: in the dashboard, Package, View public key, and put it in `extension/manifest.base.json` for dev
-builds only. Do not ship a `key` in the store package.
+### Before the store approves it: a copy to load unpacked
+
+The store reviews a new extension before anyone can install it, which can take days. Until then BDEs can run the same
+build loaded unpacked:
+
+1. In the dashboard, open the item's Package page and choose View public key. Copy the key: the text between the
+   `BEGIN` and `END` lines, joined into one line. It is public, not a secret.
+2. Build the store package (step 3), add `"key": "<that key>"` to `extension/dist/manifest.json`, and zip `dist`. With
+   the key, Chrome gives the unpacked copy the store item's ID, so the `ALLOWED_ORIGINS` entry from step 5 covers it too.
+3. Each BDE unzips it, opens `chrome://extensions`, turns on Developer mode, and chooses Load unpacked on the folder.
+4. That copy never updates itself, and a company-managed Chrome may not allow Developer mode. Once the store approves
+   the extension, each BDE removes the unpacked copy and installs it from the store link.
+
+Never upload a package with a `key` to the store: the store owns the ID.
 
 ## 1. Listing
 
@@ -35,8 +58,9 @@ builds only. Do not ship a `key` in the store package.
 - **Description:**
   > BenchQ Apply is for recruiting teams that use BenchQ. Open a saved job from BenchQ, and the side panel connects to the
   > employer's application page. BenchQ Apply shows which fields it can fill from the candidate's saved answers, fills them
-  > when you press Autofill, lets you undo, and records the application in BenchQ when you mark it applied. You always
-  > review and submit the form yourself.
+  > and attaches the candidate's résumé when you press Autofill, lets you undo, and records the application in BenchQ when
+  > you mark it applied. You always review and submit the form yourself. Found a job on a board or an employer's site?
+  > Add it to the candidate's jobs in BenchQ from the panel.
   >
   > It works on the job boards and application systems BenchQ knows (LinkedIn, Indeed, Greenhouse, Lever, Workday and
   > others). On any other site it asks you first, once per site, and explains why.
@@ -51,79 +75,64 @@ builds only. Do not ship a `key` in the store package.
 | Permission | Why |
 |---|---|
 | `sidePanel` | The whole interface is the side panel next to the employer's page. |
-| `scripting` | Reads the application form in the connected tab and writes the chosen answers into it, in that tab only. |
+| `scripting` | Reads the application form in the connected tab and writes the chosen answers and the résumé file into it, in that tab only. To add a job, reads the job posting in the tab the user is on. |
 | `storage` | Keeps which tab is connected to which job, for the browser session only (`storage.session`). |
 | `webNavigation` | Notices when the connected tab moves to the next page of an application, to scan it again, and to drop the connection when the tab is reused for something else. |
-| Host: BenchQ's address | Signs in and calls BenchQ's own API with the user's session. |
+| Host: BenchQ's address (`https://app.benchq.io`) | Signs in and calls BenchQ's own API with the user's session. |
 | Host: job boards and application systems | Where the forms to fill are. Listed by name in `extension/hosts.json`: no all-sites access is requested. |
 | Optional host: `https://*/*` | An employer's own careers page can be any site. BenchQ never reads one until the user clicks Allow for that site, after a notice that says why. Each site can be removed in `chrome://extensions`. |
 
 **Remote code:** No. All code is in the package; nothing is fetched and run. (Checked 2026-11-10: no `eval` or
 `new Function` in the build, no external scripts, fonts are bundled.)
 
+**Licences:** the third-party notices ship in the package under `licenses/`, from `extension/public/licenses/`, where
+`THIRD-PARTY-NOTICES.txt` lists each one. The MPL-2.0 files (form autofill heuristics ported from Mozilla) also ship as
+source, in `licenses/mpl-2.0-source/`, which the build adds (`vite.config.ts`).
+
 ## 3. Data use (the dashboard's privacy tab)
 
 Draft answers, to be confirmed by the owner:
 
 - **Collects:** *Personally identifiable information* (the candidate's details from their BenchQ résumé: name, email,
-  phone, address, work history and saved answers, which Autofill puts into the form). That includes answers a candidate
-  has saved to self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay
-  questions (salary or rate expectations). It also collects *website content* (the text of the form fields on a
-  connected application page, to fill them and to record what was submitted) and *authentication information* (the
-  user's BenchQ session, kept by the browser as a cookie and sent only to BenchQ). Answers to questions the extension
-  recognises as self-identification (gender, race or ethnicity, veteran status, disability, sexual orientation) are
-  filled into the form but left out of the form recorded with the application. Everything else filled or typed on the
-  page is recorded, including salary and rate answers, accommodation questions, and any self-identification question
-  worded in a way the extension does not recognise, so **health-related answers can be recorded** when a question like
-  that is filled.
-- **Not collected:** financial account details, location, web history (beyond the address of the connected tab), user
-  activity such as keystrokes or clicks, or personal communications.
+  phone, address, work history and saved answers, which Autofill puts into the form, and the résumé file it attaches,
+  or a file the user picks from their own computer instead). That includes answers a candidate has saved to
+  self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions (salary or
+  rate expectations). It also collects *website content* (the text of the form fields on a connected application page,
+  to fill them and to record what was submitted, and a job posting's title, company, location, description, pay and
+  address when the user adds that job to BenchQ) and *authentication information* (the user's BenchQ session, kept by
+  the browser as a cookie and sent only to BenchQ). An answer the user types and chooses to keep for next time is saved
+  with the candidate's answers in BenchQ. Answers to questions the extension recognises as self-identification (gender,
+  race or ethnicity, veteran status, disability, sexual orientation) are filled into the form but left out of the form
+  recorded with the application, and a Social Security or card number is never recorded. Everything else filled or
+  typed on the page is recorded (for a file, its name, not the file), including salary and rate answers, accommodation
+  questions, and any self-identification question worded in a way the extension does not recognise, so
+  **health-related answers can be recorded** when a question like that is filled.
+- **Not collected:** financial account details, location, web history (beyond the address of the connected tab, or of
+  a job page the user adds), user activity such as keystrokes or clicks, or personal communications.
 - **Certify:** data is not sold; not used for anything unrelated to the single purpose; not used for creditworthiness or
   lending.
-- **Where it goes:** to the user's own BenchQ account (www.benchq.io), and, when the user presses Autofill, picks a
-  different résumé for the job (which fills the form again from that résumé, and attaches its file), or uses a field's
-  Replace, Replace all or Use button (which writes a saved answer into that field), into the employer's application page
-  in the connected tab. That page can read the filled answers and any attached résumé file,
-  and may save or upload them before the user submits. Nothing is sent anywhere else.
-- **Privacy policy URL:** required. It must be a public page. Draft in section 4.
+- **Where it goes:** to the user's own BenchQ account (app.benchq.io), and, when the user presses Autofill, picks a
+  different résumé for the job (which fills the form again from that résumé, and attaches its file), picks a file of
+  their own to attach instead, or uses a field's Replace, Replace all or Use button (which writes a saved answer into
+  that field), into the employer's application page in the connected tab. That page can read the filled answers and
+  any attached file, and may save or upload them before the user submits. A file the user picks goes only into that
+  page: it is never sent to BenchQ, and the panel holds it in memory only, never in storage. Nothing is sent anywhere
+  else.
+- **Privacy policy URL:** `https://app.benchq.io/privacy` (section 4).
 
-## 4. Privacy policy (draft; needs a public page and a responsible person's approval)
+## 4. Privacy policy
 
-> **BenchQ Apply privacy policy.** BenchQ Apply is a browser extension for people who use BenchQ. It acts only on the tab
-> you connect to a BenchQ job, and, after you allow it, on sites you approve.
->
-> *What it reads.* The form fields on the connected job application page, so it can fill them and so BenchQ can record
-> what was filled when you mark the application applied. The address of the connected tab, to check it is the job you meant.
->
-> *What it sends, and where.* The résumé answers it uses to fill a form come from your BenchQ account, and the recorded
-> form goes back to your BenchQ account, both over HTTPS to www.benchq.io. Your sign-in is the BenchQ session cookie, which
-> the browser keeps and the extension never reads. When you press Autofill, pick a different résumé for the job (which
-> fills the form again from that résumé), or use a field's Replace, Replace all or Use button (which writes a saved answer
-> into that field), the candidate's answers (and the résumé file, if attached) are written into the employer's application page in that tab: the page can read them and may save or
-> upload them before you submit, as with anything typed into a form. That can include answers a candidate has saved to
-> self-identification questions (gender, race or ethnicity, veteran status, disability) and to pay questions. When you
-> mark the application applied, BenchQ records the form as filled. Answers to questions BenchQ recognises as
-> self-identification are left out of that record; everything else is kept, including salary and rate answers,
-> accommodation questions, and any self-identification question worded in a way BenchQ does not recognise. Nothing is
-> sent anywhere else, sold, or used for advertising.
->
-> *What it keeps.* For the current browser session: which tab is connected to which job, erased when the browser
-> closes. In the extension's own storage on this device, until you uninstall it: your light or dark theme, the last
-> candidate you picked (an ID, not their details), and when it last reloaded itself after an update. Nothing else is
-> stored, and none of it leaves the device.
->
-> *Your control.* Filling starts only when you press Autofill, pick a résumé for the job, or use a field's Replace or Use button, and you submit every form yourself. You can remove BenchQ's access to any site in
-> chrome://extensions, and uninstall at any time. For BenchQ account data, contact **[support email]**.
-
-Fill in the support email, and publish it at a stable public address, for example `https://www.benchq.io/privacy`. (A page
-in the BenchQ app is a product decision and needs a registry entry; a plain page on the marketing site is simpler.)
+Published at `https://app.benchq.io/privacy` (`src/app/privacy/page.tsx`), open to everyone, signed in or not. That
+page is the policy, and it goes out with the website. When the extension starts reading, sending or keeping something
+new, change the page and section 3 together, and move the page's date. Until BenchQ has a support address, the page's
+contact line sends people to their firm's owner; once the address is chosen, add it there.
 
 ## 5. Instructions for the reviewer
 
 The extension needs a BenchQ sign-in, so a reviewer who cannot sign in will reject it. Put this in "Test instructions",
-with a **demo account on an environment Google can reach** (www.benchq.io with its backend connected):
+with a **demo account on an environment Google can reach** (app.benchq.io, with the backend up to date as in section 0):
 
-> Sign in at https://www.benchq.io/sign-in with **[demo email]** / **[demo password]**. Open the extension's side panel
+> Sign in at https://app.benchq.io/sign-in with **[demo email]** / **[demo password]**. Open the extension's side panel
 > (toolbar icon). Pick a saved job and open it. On a Greenhouse or Lever job the panel reads the form straight away.
 > Press Autofill to fill it from the demo candidate's answers. Nothing is submitted. On any other site, such as
 > usijobs.deloitte.com, the panel first explains why it needs access and shows an Allow button; Chrome then asks once.

@@ -180,6 +180,16 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 | Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
 
+## The extension's store release: a public privacy page (`feat/resume-files-coverage-ux`)
+
+The user's call (2026-11-21): the Chrome Web Store needs a public privacy policy for BenchQ Apply's listing. A record,
+not a request.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Route registry and 07 (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `src/app/privacy/page.tsx` (new), `docs/07-ROUTES-AND-RBAC.md` §2.1 | A public route, `/privacy`: BenchQ Apply's privacy policy, open signed in or not, in the sign-in page's card style. | The store listing links to it (`docs/extension-store.md` §4). |
+| Tenancy (Abdul) | `src/lib/schemas/tenancy.ts` and `backend/auth/invites.py` (`RESERVED_SLUGS`), `docs/07-ROUTES-AND-RBAC.md` §2.4 | `privacy` is a reserved firm slug, at the end of both lists, which `test_admin_firms.py` compares. | A firm with that slug would shadow the page: every top-level route is reserved (07 §2.4). |
+
 ## Résumé files on demand — a file for every version (`feat/resume-files-coverage-ux`)
 
 The user's call (2026-11-18): BenchQ makes the file itself, on request, without waiting on Zuhair. A record, not a request.
