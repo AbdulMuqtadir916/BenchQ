@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 
+from backend.tests.problem_support import assert_problem
 from backend.auth.access import ROUTE_ACCESS, Access
 from backend.tests.auth_support import make_admin, make_firm, make_plan, make_user
 
@@ -73,7 +74,7 @@ def test_signed_out_is_401(anonymous_client, access):
     method, path = SAMPLE[access]
     r = anonymous_client.request(method, path)
     assert r.status_code == 401
-    assert r.json() == {"detail": "Sign in to continue."}
+    assert assert_problem(r)["detail"] == "Sign in to continue."
 
 
 def test_an_unknown_cookie_is_401_and_cleared(anonymous_client):
@@ -101,7 +102,7 @@ def test_a_firm_user_reaches_firm_routes_but_not_platform_ones(anonymous_client,
     assert anonymous_client.get("/api/jobs", headers=_cookie(accounts.firm_token)).status_code == 200
     r = anonymous_client.get("/api/settings", headers=_cookie(accounts.firm_token))
     assert r.status_code == 403
-    assert r.json() == {"detail": "Platform admins only."}
+    assert assert_problem(r)["detail"] == "Platform admins only."
 
 
 def test_a_super_admin_reaches_platform_routes_but_not_firm_data(anonymous_client, accounts):
@@ -110,7 +111,7 @@ def test_a_super_admin_reaches_platform_routes_but_not_firm_data(anonymous_clien
     assert anonymous_client.get("/api/settings", headers=_cookie(accounts.admin_token)).status_code == 200
     r = anonymous_client.get("/api/jobs", headers=_cookie(accounts.admin_token))
     assert r.status_code == 403
-    assert r.json() == {"detail": "A platform admin can't act inside a firm."}
+    assert assert_problem(r)["detail"] == "A platform admin can't act inside a firm."
 
 
 @pytest.mark.parametrize("who", ["firm_token", "admin_token"])
@@ -124,7 +125,7 @@ def test_a_suspended_firm_is_refused_firm_routes_but_still_sees_its_session(anon
     test_db.commit()
     r = anonymous_client.get("/api/jobs", headers=_cookie(accounts.firm_token))
     assert r.status_code == 403
-    assert r.json() == {"detail": "This workspace is suspended."}
+    assert assert_problem(r)["detail"] == "This workspace is suspended."
     # /me still answers, so the app can show the suspended screen.
     me = anonymous_client.get("/api/auth/me", headers=_cookie(accounts.firm_token))
     assert me.status_code == 200
@@ -187,7 +188,7 @@ def test_a_cross_origin_post_is_refused_even_signed_in(anonymous_client, account
     r = anonymous_client.post("/api/jobs/manual", json={},
                               headers={**_cookie(accounts.firm_token), "Origin": "https://evil.example"})
     assert r.status_code == 403
-    assert r.json() == {"detail": "Cross-origin request refused"}
+    assert assert_problem(r)["detail"] == "Cross-origin request refused"
 
 
 def test_a_cross_origin_sign_in_is_refused(anonymous_client):

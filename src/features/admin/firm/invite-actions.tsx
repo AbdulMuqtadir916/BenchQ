@@ -8,6 +8,7 @@ import { useInviteLink, useResendInvite, useRevokeInvite } from "@/lib/hooks/use
 import { hrefFor } from "@/lib/routes/registry";
 import type { Invite } from "@/lib/schemas/tenancy";
 import { AdminDialog, errorMessage } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 /**
  * Resend an invite (A9: same row, new token, +7 days; Q24). Resending an *expired* firm invite takes
@@ -30,7 +31,7 @@ export function ResendInviteButton({ invite, blockedReason }: { invite: Invite; 
         <Send size={13} aria-hidden /> {resend.isPending ? "Resending…" : "Resend"}
       </Button>
       {blockedReason ? <span id={`resend-${invite.id}-reason`} className="text-caption text-[var(--color-warning-fg)]">{blockedReason}</span> : null}
-      {resend.isError ? <span role="alert" className="text-caption text-[var(--color-danger-fg)]">{errorMessage(resend.error)}</span> : null}
+      {resend.isError ? <ErrorNote as="span" text={errorMessage(resend.error)} className="text-caption" /> : null}
       {isDone && !resend.isError ? <span role="status" className="text-caption text-[var(--color-success-fg)]">Sent. Expires in 7 days.</span> : null}
     </span>
   );
@@ -65,7 +66,7 @@ export function CopyInviteLinkButton({ invite }: { invite: Invite }) {
       </Button>
       {copied ? <span role="status" className="text-caption text-[var(--color-success-fg)]">Link copied</span> : null}
       {manual ? <input readOnly value={manual} aria-label={`Invite link for ${invite.email}`} onFocus={(event) => event.currentTarget.select()} className="bq-input h-7 w-64 text-mono-sm" /> : null}
-      {link.isError ? <span role="alert" className="text-caption text-[var(--color-danger-fg)]">{errorMessage(link.error)}</span> : null}
+      {link.isError ? <ErrorNote as="span" text={errorMessage(link.error)} className="text-caption" /> : null}
     </span>
   );
 }

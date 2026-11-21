@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.models.db as db_mod
 from backend import logging_setup
+from backend.tests.problem_support import assert_problem
 from backend.logging_setup import REDACTED, installed_handler, redact
 
 
@@ -270,7 +271,7 @@ def test_a_super_admin_in_a_support_view_is_logged_with_the_firm_it_reads():
     assert _who({"state": {}}) == {}
 
 
-def test_an_unexpected_error_is_logged_once_with_its_id_and_answers_plain_500(api_client, accounts, log):
+def test_an_unexpected_error_is_logged_once_with_its_id_and_answers_internal(api_client, accounts, log):
     from backend.main import app
 
     def _broken():
@@ -279,8 +280,9 @@ def test_an_unexpected_error_is_logged_once_with_its_id_and_answers_plain_500(ap
 
     with TestClient(app, raise_server_exceptions=False) as client, _route_session(_broken):
         r = client.get("/api/auth/me", headers={"cookie": f"bq_session={accounts.firm_token}"})
-    assert (r.status_code, r.text) == (500, "Internal Server Error")
     rid = r.headers["X-Request-ID"]
+    body = assert_problem(r)               # INTERNAL, the request id in the body as in the header; never the error
+    assert (body["code"], body["request_id"]) == ("INTERNAL", rid) and "skills" not in r.text
     errors = [line for line in _lines(log) if "Unhandled error" in line]
     assert len(errors) == 1 and f"req={rid}" in errors[0]
     assert "KeyError: 'skills'" in log.getvalue()

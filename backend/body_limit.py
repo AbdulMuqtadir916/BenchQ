@@ -8,10 +8,10 @@ A request that declares its length (`Content-Length`, what browsers send) is jud
 anything. One that doesn't (chunked) is read up to the cap and then handed on, or refused once it passes the cap.
 """
 from starlette.requests import Request
-from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.auth.access import route_key
+from backend.problem import problem_response
 
 MB = 1024 * 1024
 LIMIT = 1 * MB
@@ -35,7 +35,7 @@ class BodySizeLimit:
             return
         is_upload = "app" in scope and route_key(scope["app"], Request(scope)) in UPLOAD_ROUTES
         limit, detail = (UPLOAD_LIMIT, FILE_TOO_LARGE) if is_upload else (LIMIT, TOO_LARGE)
-        refuse = JSONResponse(status_code=413, content={"detail": detail})
+        refuse = problem_response(413, detail)
 
         declared = Request(scope).headers.get("content-length")
         if declared is not None:

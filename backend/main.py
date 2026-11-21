@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun, engine
-from backend import statement_timeout
+from backend import problem, statement_timeout
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access, route_key
 from backend.auth import throttle
@@ -144,7 +144,7 @@ async def limit_per_user(request: Request, call_next):
         try:
             throttle.check_user(principal)
         except HTTPException as exc:
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+            return problem.from_http_exception(exc, request)
     return await call_next(request)
 
 
@@ -218,6 +218,8 @@ app.include_router(llm_router, prefix="/api")
 # A malformed UUID in a path (/api/jobs/abc) makes Postgres raise DataError deep in
 # the query; without this every id route answers 500 instead of 404.
 from sqlalchemy.exc import DataError as _SADataError
+from fastapi.exceptions import RequestValidationError as _RequestValidationError
+from starlette.exceptions import HTTPException as _StarletteHTTPException
 
 
 def _route(request: Request) -> str:
@@ -229,12 +231,27 @@ def _route(request: Request) -> str:
         return NO_ROUTE
 
 
+# ── One error body (docs/team/uzair.md step 4b; docs/02-DATA-CONTRACTS.md §12) ──
+# FastAPI's HTTPException is Starlette's, so one handler takes both, and the unknown paths and wrong methods Starlette
+# raises itself. `exc.headers` (Retry-After, Allow) are kept.
+@app.exception_handler(_StarletteHTTPException)
+async def _http_error(request: Request, exc: _StarletteHTTPException):
+    return problem.from_http_exception(exc, request)
+
+
+@app.exception_handler(_RequestValidationError)
+async def _validation_error(request: Request, exc: _RequestValidationError):
+    """Where and what, never the submitted value (docs/02 §12.2, rule 3); the detail is the advice to act on."""
+    return problem.problem_response(422, problem.VALIDATION_DETAIL, errors=problem.validation_errors(exc.errors()),
+                                    request=request)
+
+
 @app.exception_handler(_SADataError)
 async def _bad_uuid_to_404(request: Request, exc: _SADataError):
     if "invalid input syntax for type uuid" in str(exc.orig or exc):
-        return JSONResponse(status_code=404, content={"detail": "Not found"})
+        return problem.problem_response(404, "Not found", request=request)
     logger.exception("Database DataError on %s %s", request.method, _route(request))
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    return problem.problem_response(500, problem.INTERNAL_DETAIL, request=request)
 
 
 @app.exception_handler(_PoolTimeout)
@@ -255,12 +272,12 @@ async def _statement_timeout_to_503(request: Request, exc: _OperationalError):
 
 @app.exception_handler(Exception)
 async def _unexpected_error(request: Request, exc: Exception):
-    """An error nothing else handled: the plain 500 Starlette sends, plus the request id to find it in the log
-    (backend/request_log.py logged it with its traceback)."""
-    from fastapi.responses import PlainTextResponse
-    rid = getattr(request.state, "request_id", None)
-    return PlainTextResponse("Internal Server Error", status_code=500,
-                             headers={REQUEST_ID_HEADER: rid} if rid else None)
+    """An error nothing else handled: `INTERNAL`, never the exception's text, with the request id in the body and the
+    header to find it in the log (backend/request_log.py logged it with its traceback). This handler runs outside
+    the request log, so the header is set here."""
+    response = problem.problem_response(500, problem.INTERNAL_DETAIL, request=request)
+    response.headers[REQUEST_ID_HEADER] = problem.current_request_id(request)
+    return response
 
 
 @app.get("/health", tags=["system"], summary="Health check")

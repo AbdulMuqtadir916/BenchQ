@@ -23,7 +23,9 @@ from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate as visible_candidate
 from backend.inbox.google_oauth import (build_authorization, encrypt_secret, exchange_code, state_digest,
                                         validate_return_to, decrypt_content, decrypt_secret, revoke_token, OAuthGrantError, identify_refresh_token)
+from backend.inbox import google_oauth
 from backend.inbox.sync_jobs import run_import
+from backend.problem import NOT_CONFIGURED, Problem
 from backend.inbox.import_progress import finish_import
 from backend.inbox.grant_locks import account_lock, exchange_barrier, revoke_barrier
 from backend.inbox.gmail_sync import ReconnectRequired, sync_mailbox, record_sync_error
@@ -36,6 +38,8 @@ from backend.models.db import ApplicationReview, EmailClassification, Applicatio
 
 router = APIRouter(tags=["candidate-inbox"])
 logger = logging.getLogger("jobnavigator.inbox")
+GMAIL_OFF = "Connecting Gmail isn't turned on in BenchQ yet."
+GMAIL_NOT_SET_UP = "Connecting Gmail isn't set up on this server yet. Ask BenchQ support."
 
 
 def _audit(db, principal, *, firm_id, candidate_id, entity_id, summary):
@@ -297,7 +301,11 @@ def start_candidate_google_oauth(candidate_id: uuid.UUID, body: OAuthStartBody,
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        # Not set up on this server (backend/inbox/google_oauth.py). The admin reads which setting in the log (its
+        # RuntimeErrors are fixed sentences, no values); the answer never carries an exception's text (§12.2, rule 2).
+        logger.warning("mailbox connect unavailable: %s", exc)
+        raise Problem(503, GMAIL_OFF if not google_oauth.CANDIDATE_GMAIL_ENABLED else GMAIL_NOT_SET_UP,
+                      NOT_CONFIGURED) from None
     db.add(attempt)
     db.commit()
     return {"authorization_url": auth.url}
@@ -474,7 +482,7 @@ def confirm_mailbox(candidate_id: uuid.UUID, attempt_id: uuid.UUID, background_t
     with _attempt_lock(db, firm_id, candidate_id, attempt_id, principal.user_id):
         from backend.config import CANDIDATE_GMAIL_ENABLED
         if not CANDIDATE_GMAIL_ENABLED:
-            raise HTTPException(503, "Candidate Gmail is disabled pending rollout approval.")
+            raise Problem(503, GMAIL_OFF, NOT_CONFIGURED)
         principal = _authorize_oauth_write(db, principal, firm_id, candidate_id)
         attempt = scoped(db, CandidateGoogleOAuthAttempt, firm_id).filter_by(
             id=attempt_id, candidate_id=candidate_id, initiated_by_user_id=principal.user_id).with_for_update().first()

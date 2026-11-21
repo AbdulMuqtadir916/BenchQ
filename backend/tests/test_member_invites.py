@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 
+from backend.tests.problem_support import assert_problem
 from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_user
 
 
@@ -78,7 +79,7 @@ def test_the_owner_invites_each_member_role(anonymous_client, accounts, owner, r
 def test_never_an_owner_or_anything_else(anonymous_client, accounts, owner, role):
     r = _invite(anonymous_client, accounts, owner, role=role)
     assert r.status_code == 400
-    assert r.json() == {"detail": "Choose Manager, BDE or Viewer."}
+    assert assert_problem(r)["detail"] == "Choose Manager, BDE or Viewer."
 
 
 @pytest.mark.parametrize("who", ["MANAGER", "BDE", "VIEWER"])
@@ -120,7 +121,7 @@ def test_a_bde_invite_is_blocked_at_the_seat_limit(anonymous_client, accounts, o
     assert _invite(anonymous_client, accounts, owner).status_code == 201
     r = _invite(anonymous_client, accounts, owner, email="cal@acme.test")
     assert r.status_code == 409
-    assert r.json() == {"detail": "Your plan allows 1 BDE seat; 1 is in use."}
+    assert assert_problem(r)["detail"] == "Your plan allows 1 BDE seat; 1 is in use."
 
 
 @pytest.mark.parametrize("role", ["MANAGER", "VIEWER"])
@@ -159,7 +160,7 @@ def test_a_suspended_firm_cant_invite_and_its_pending_invites_keep_their_seats(a
     test_db.commit()
     r = _invite(anonymous_client, accounts, owner, email="cal@acme.test")
     assert r.status_code == 403
-    assert r.json() == {"detail": "This workspace is suspended."}
+    assert assert_problem(r)["detail"] == "This workspace is suspended."
     test_db.expire_all()
     assert [i.status for i in test_db.query(Invite)] == ["PENDING"]
     assert anonymous_client.get(f"/api/invites/{token}").json()["status"] == "SUSPENDED"

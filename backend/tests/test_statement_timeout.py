@@ -10,9 +10,10 @@ from sqlalchemy.exc import OperationalError, TimeoutError as PoolTimeout
 import backend.main  # noqa: F401  installs the web limit on the engine, as the running app does
 import backend.models.db as db_mod
 from backend import statement_timeout
+from backend.tests.problem_support import body_of, expected
 from backend.statement_timeout import BUSY
 
-BUSY_BODY = {"detail": BUSY}
+BUSY_BODY = expected(503, BUSY, "UNAVAILABLE")
 
 
 def _limit(db):
@@ -127,7 +128,7 @@ def test_a_route_query_past_the_limit_answers_503(api_client, monkeypatch):
         r = api_client.get("/api/auth/me")
     assert r.status_code == 503
     assert r.headers.get("Retry-After") == "5"
-    assert r.json() == BUSY_BODY                           # no SQL, no "database"
+    assert body_of(r) == BUSY_BODY                           # no SQL, no "database"
 
 
 def test_a_session_check_past_the_limit_answers_503(api_client, monkeypatch):
@@ -139,7 +140,7 @@ def test_a_session_check_past_the_limit_answers_503(api_client, monkeypatch):
     monkeypatch.setattr(statement_timeout, "WEB_STATEMENT_TIMEOUT", "200ms")
     monkeypatch.setattr(access_mod, "resolve", _slow_resolve)
     r = api_client.get("/api/auth/me")
-    assert (r.status_code, r.headers.get("Retry-After"), r.json()) == (503, "5", BUSY_BODY)
+    assert (r.status_code, r.headers.get("Retry-After"), body_of(r)) == (503, "5", BUSY_BODY)
 
 
 def test_any_other_database_error_is_not_answered_as_busy(api_client):
@@ -157,4 +158,4 @@ def test_a_drained_pool_answers_in_the_same_words(api_client):
 
     with _route_session(_drained):
         r = api_client.get("/api/auth/me")
-    assert (r.status_code, r.headers.get("Retry-After"), r.json()) == (503, "5", BUSY_BODY)
+    assert (r.status_code, r.headers.get("Retry-After"), body_of(r)) == (503, "5", BUSY_BODY)
