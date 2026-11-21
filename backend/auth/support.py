@@ -35,7 +35,7 @@ def _log(db: DbSession, view: SupportView, action: str, summary: str, at: dateti
     admin = db.get(PlatformUser, view.platform_user_id)
     firm = db.get(Firm, view.firm_id)
     ledger.record(db, actor=admin, action=action, entity_type="support_view", entity_id=view.id,
-                  entity_label=firm.name, summary=summary, firm_id=view.firm_id, at=at)
+                  entity_label=firm.name, summary=summary, firm_id=view.firm_id, at=at, candidate_id=None)
 
 
 def _end(db: DbSession, view: SupportView, reason: str, now: datetime) -> None:

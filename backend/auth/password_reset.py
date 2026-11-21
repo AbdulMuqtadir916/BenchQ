@@ -186,7 +186,7 @@ def decide_request(db: Session, row: PasswordResetRequest, *, actor_user: User |
     actor = actor_user or actor_platform
     ledger.record(db, actor=actor, action="STATE_CHANGE", entity_type=LEDGER_ENTITY, entity_id=row.id,
                   entity_label=user.name, firm_id=row.firm_id,
-                  summary=f"{actor.name} {'approved' if approve else 'denied'} {user.name}'s password reset request")
+                  summary=f"{actor.name} {'approved' if approve else 'denied'} {user.name}'s password reset request", candidate_id=None)
     link = None
     if approve:
         link = make_reset_link(db, row, actor)
