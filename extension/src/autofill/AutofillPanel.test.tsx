@@ -635,6 +635,17 @@ describe("the résumé the answers come from", () => {
     expect(autofill).toHaveBeenCalledTimes(1);
   });
 
+  it("says a picked file was refused though BenchQ's is on the form, which stays, with one chooser (#148's review)", async () => {
+    const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
+    const onForm = { ...generated, fillCount: 0, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" };
+    show(onForm);
+    await pickOwn({ ...onForm, attachmentSource: "picked", refusedAccept: ".pdf" }, new File(["PK"], "mine.docx", { lastModified: 5 }));
+    expect(host.querySelector("[data-slot='resume-file-refused']")!.textContent)
+      .toBe("Your file, mine.docx, isn't a kind this form's upload takes (.pdf). The file already on the form stays. Use another file, or attach one by hand.");
+    expect(named("Remove")).toBeTruthy();
+    expect(host.querySelectorAll("[data-document='resume'] [data-slot='own-file-pick']")).toHaveLength(1);
+  });
+
   it("shows why a file wasn't taken, though a file is already on the form (#148's review)", async () => {
     const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
     show({ ...generated, fillCount: 0, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" });

@@ -458,7 +458,12 @@ describe("filling", () => {
   });
 
   it("writes a phone number again its other ways when the form won't take or pass it as written", async () => {
-    const write = (value: string) => ({ type: "text" as const, value });
+    // The ways a phone number's row sends along with it (`phoneWays`): only those are tried.
+    const OTHER_WAYS: Record<string, string[]> = {
+      "98765 43210": ["9876543210", "+91 98765 43210", "+919876543210", "919876543210"],
+      "+91 98765 43210": ["+919876543210", "919876543210", "98765 43210", "9876543210"],
+    };
+    const write = (value: string) => ({ type: "text" as const, value, also: OTHER_WAYS[value] });
     // A number box drops "98765 43210" whole: its digits go in.
     const numbers = setup(`<input id="a" type="number" aria-label="WhatsApp number">`);
     let scanned = numbers.rescan();
@@ -489,6 +494,15 @@ describe("filling", () => {
     scanned = plain.rescan();
     expect(await plain.filler.fill({ scanId: scanned.scanId, fieldId: scanned.fields[0]!.id, write: write("+91 98765 43210"), current: "" }))
       .toEqual({ status: "filled", current: "+91 98765 43210" });
+  });
+
+  it("never rewrites a value no other ways came with: a salary keeps its point (#148's review)", async () => {
+    // A number box with the default whole-number step fails "85000.5": it stays as written, never "850005".
+    const { filler, rescan } = setup(`<input id="a" type="number" aria-label="Expected salary">`);
+    const { scanId, fields } = rescan();
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: "85000.5" }, current: "" });
+    expect(element<HTMLInputElement>("#a").value).toBe("85000.5");
+    expect(result.current).toBe("85000.5");
   });
 
   it("writes past a framework's value tracker", async () => {

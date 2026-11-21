@@ -153,13 +153,15 @@ type ResumeFileProps = Pick<DocumentSectionsProps, "fileProblem" | "onRetryFile"
   isFilling: boolean;
   /** A file is on the form already: only the BDE's own file says so, with Remove to stop using it. */
   isOnForm?: boolean;
+  /** The card of the file BenchQ attached offers Use a different file itself, so this line needn't. */
+  isPickOnCard?: boolean;
 };
 
 /** What the Resume section says about the picked résumé's file: the file Autofill attaches and where it came from (made
  * from the version, as uploaded, or the BDE's own), with a way to use a file from their computer instead (Q5); that it
  * couldn't be made, with Try again; that the form's upload doesn't take its kind; or that it's the BDE's to attach. The
  * BDE's own file keeps Remove in every case, on the form or not, taken or not, so they can always stop using it. */
-function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, onRetryFile, onOwnFile, onRemoveOwnFile,
+function ResumeFile({ picked, isFilling, isOnForm = false, isPickOnCard = false, fileProblem = false, onRetryFile, onOwnFile, onRemoveOwnFile,
   ownFile = null, refusedAccept = null }: ResumeFileProps) {
   const input = useRef<HTMLInputElement>(null);
   const remove = ownFile && onRemoveOwnFile && <button type="button" data-slot="own-file-remove" className={button("secondary", "compact")}
@@ -176,17 +178,19 @@ function ResumeFile({ picked, isFilling, isOnForm = false, fileProblem = false, 
     </button>
   </>;
   const ownTag = ownFile && <span data-slot="resume-file-source" className={SOURCE_TAG.picked}>Your file</span>;
-  if (isOnForm) {
-    return ownFile ? <div data-slot="resume-file" className="flex flex-wrap items-center gap-2">{ownTag}{remove}</div> : null;
-  }
+  // A refused file says so first, though an older one is on the form: that one stays there (#148's review).
   if (refusedAccept !== null) {
     const what = ownFile ? `Your file, ${ownFile.name}, isn't` : "The resume's file isn't";
+    const stays = isOnForm ? " The file already on the form stays." : "";
     return <div data-slot="resume-file" className="grid gap-1.5">
       <p data-slot="resume-file-refused" className={WARNING} role="status">
-        {what} a kind this form&apos;s upload takes{refusedAccept ? ` (${refusedAccept})` : ""}. Use another file, or attach one by hand.
+        {what} a kind this form&apos;s upload takes{refusedAccept ? ` (${refusedAccept})` : ""}.{stays} Use another file, or attach one by hand.
       </p>
-      <div className="flex flex-wrap items-center gap-2">{ownTag}{choose(ownFile ? "Use a different file" : "Use a file")}{remove}</div>
+      <div className="flex flex-wrap items-center gap-2">{ownTag}{!isPickOnCard && choose(ownFile ? "Use a different file" : "Use a file")}{remove}</div>
     </div>;
+  }
+  if (isOnForm) {
+    return ownFile ? <div data-slot="resume-file" className="flex flex-wrap items-center gap-2">{ownTag}{remove}</div> : null;
   }
   if (fileProblem && !ownFile) {
     return <div data-slot="resume-file" className="grid gap-1.5">
@@ -227,7 +231,9 @@ export default function DocumentSections({ rows, details, resumesUrl, isFilling,
   // The line says what goes on the form's upload; once a file is on it, or the form has none (any more), it stays only
   // for the BDE's own file, so they can always stop using it.
   const hasUpload = resumes.length > 0;
-  const fileLine = picked && (hasUpload ? !hasFile || ownFile : ownFile) ? <ResumeFile picked={picked} isOnForm={hasFile || !hasUpload}
+  // The card of the file BenchQ attached has its own Use a different file: the line below it doesn't offer a second.
+  const isPickOnCard = Boolean(onOwnFile && benchQFile) && (resumes.some((row) => filledValue(row) === benchQFile) || (resumes.length === 0 && Boolean(attached)));
+  const fileLine = picked && (hasUpload ? !hasFile || ownFile : ownFile) ? <ResumeFile picked={picked} isOnForm={hasFile || !hasUpload} isPickOnCard={isPickOnCard}
     isFilling={isFilling} fileProblem={fileProblem}
     onRetryFile={onRetryFile} onOwnFile={onOwnFile} onRemoveOwnFile={onRemoveOwnFile} ownFile={ownFile}
     refusedAccept={refusedAccept} /> : null;

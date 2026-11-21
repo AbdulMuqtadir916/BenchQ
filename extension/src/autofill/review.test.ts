@@ -131,6 +131,11 @@ describe("answers the bank holds inside another", () => {
     expect(named("Ludwig van Beethoven", "Last name").proposed).toBe("van Beethoven");
     expect(named("Juan Carlos de la Cruz", "Last name").proposed).toBe("de la Cruz");
     expect(named("Juan Carlos de la Cruz", "Preferred name").proposed).toBe("Juan");
+    // A label that asks for the whole preferred name gets the whole name (#148's review).
+    expect(named("Meera Devi Krishnan", "Preferred full name").proposed).toBe("Meera Devi Krishnan");
+    expect(named("Meera Devi Krishnan", "Preferred first and last name").proposed).toBe("Meera Devi Krishnan");
+    expect(named("Meera Devi Krishnan", "Preferred first name").proposed).toBe("Meera");
+    expect(named("Meera Devi Krishnan", "Preferred last name").proposed).toBe("Krishnan");
   });
 
   it("reads a phone number's calling code however the résumé writes it, for any country", () => {
@@ -157,6 +162,10 @@ describe("answers the bank holds inside another", () => {
     const brazil = [entry("Current location", "Porto Alegre, Brazil")];
     expect(number("55 99999 1234", brazil)).toBe("55 99999 1234");
     expect([code("55 55 99999 1234", brazil), number("55 55 99999 1234", brazil)]).toEqual(["+55", "55 99999 1234"]);
+    // German numbers run to 13 digits: "4921 12345678" is one of them; written with "+49" the code is plain.
+    const germany = [entry("Current location", "Berlin, Germany")];
+    expect(number("4921 12345678", germany)).toBe("4921 12345678");
+    expect([code("+49 30 12345678", germany), number("+49 30 12345678", germany)]).toEqual(["+49", "30 12345678"]);
     // "61912345678" is a Brasília mobile, never Australia's +61; "212 555 0167" a New York number, never Morocco's +212.
     expect(number("61912345678")).toBe("61912345678");
     expect(review(field("Phone country code"), [entry("Phone", "61912345678")]).status).toBe("manual");

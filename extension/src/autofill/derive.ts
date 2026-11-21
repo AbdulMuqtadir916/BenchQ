@@ -22,9 +22,10 @@ const INTERNATIONAL = /^\(?\s*(?:\+|00)/;
  * Vatican and Côte d'Ivoire. Elsewhere a leading 0 is the trunk prefix, dialled only at home, and goes. */
 const KEEPS_LEADING_ZERO = new Set(["39", "378", "379", "225"]);
 /** How long a country's own numbers run, where it's past ten digits: Brazil's area code and mobile ("55 99999 1234", a
- * Porto Alegre number whose area code is also Brazil's calling code), China's mobiles, Germany's, Italy's, Indonesia's,
- * Finland's and Austria's longest. Ten elsewhere. */
-const LONGEST_NATIONAL: Record<string, number> = { "55": 11, "86": 11, "49": 11, "39": 11, "62": 12, "358": 12, "43": 13 };
+ * Porto Alegre number whose area code is also Brazil's calling code), China's mobiles, Italy's, Indonesia's and
+ * Finland's longest, and Germany's and Austria's, which may run to 13 ("4921 12345678" is a German number, not +49).
+ * Ten elsewhere. */
+const LONGEST_NATIONAL: Record<string, number> = { "55": 11, "86": 11, "49": 13, "39": 11, "62": 12, "358": 12, "43": 13 };
 const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** A US ZIP code, with or without its four extra digits, a six-digit PIN code or a Canadian postal code ("M5H 2N2"),
@@ -432,10 +433,21 @@ function countryOf(saved: Saved): { country: string; source: BankEntry } | null 
   return null;
 }
 
-/** A preferred name, when none is saved: the first name, saved or in the full name. */
-function preferredName(saved: Saved): Derived | null {
-  const first = saved("first-name");
-  return first ? { answer: first.answer.trim(), source: first } : namePart("first-name", saved);
+/** A label that asks for a whole preferred name: "Preferred full name", "Preferred first and last name". */
+const WHOLE_NAME = /\b(full name|first and last)\b/;
+
+/** A preferred name, when none is saved, in the shape the label asks for (#148's review): the whole name ("Preferred
+ * full name"), saved or built from its parts; the last name ("Preferred last name"); else the first name, saved or in
+ * the full name. */
+function preferredName(label: string, saved: Saved): Derived | null {
+  const asks = normalize(label);
+  if (WHOLE_NAME.test(asks)) {
+    const full = saved("full-name");
+    return full ? { answer: full.answer.trim(), source: full } : fullName(saved);
+  }
+  const part = /\blast name\b/.test(asks) ? "last-name" : "first-name";
+  const own = saved(part);
+  return own ? { answer: own.answer.trim(), source: own } : namePart(part, saved);
 }
 
 export function derivedAnswer(type: EngineFieldType, { label, kind }: Asked, saved: Saved): Derived | null {
@@ -447,7 +459,7 @@ export function derivedAnswer(type: EngineFieldType, { label, kind }: Asked, sav
     case "last-name": return namePart(type, saved);
     case "middle-name": return middleName(saved);
     case "full-name": return fullName(saved);
-    case "preferred-name": return preferredName(saved);
+    case "preferred-name": return preferredName(label, saved);
     // A city lookup lists every Springfield: the state is what picks one.
     case "address-city": return fromPlace(found && kind === "combobox" && found.place.region ? `${found.place.city}, ${found.place.region}` : found?.place.city ?? "");
     case "address-region": return fromPlace(found?.place.region ?? "");

@@ -151,15 +151,6 @@ function sameValue(shown: string, wanted: string) {
   return plain(shown) !== "" && plain(shown) === plain(wanted);
 }
 
-/** A phone number's other ways in, for a form that won't take it as written or whose own rule fails it ("98765 43210"
- * where only digits pass): its digits alone, then with its "+". */
-function phoneRetries(value: string): string[] {
-  const wanted = value.trim();
-  if (!PHONE_LIKE.test(wanted)) return [];
-  const digits = wanted.replace(/\D/g, "");
-  return [digits, wanted.startsWith("+") ? `+${digits}` : ""].filter((retry) => retry && retry !== wanted);
-}
-
 /** The form fails what the control holds: its own checks (a pattern or a type the value doesn't fit), or the page's,
  * which mark it invalid. */
 const isInvalid = (entry: Entry) => {
@@ -167,11 +158,12 @@ const isInvalid = (entry: Entry) => {
   return control.getAttribute("aria-invalid") === "true" || control.validity?.valid === false;
 };
 
-/** A value the form didn't take, or holds but fails, written again its other ways (#148): the ones the panel sent (a
- * phone number with and without its code, spaced or not), then a phone number's digits. The first the form takes and
- * passes stays. With none, the value goes back as first written, for the form's verdict as before. */
+/** A value the form didn't take, or holds but fails, written again the other ways the panel sent with it (#148): only a
+ * phone number's row sends them (with and without its code, spaced or not). The page never invents a way of its own,
+ * as it can't tell a phone number from a salary: "85000.50" with its point taken out is another amount (#148's review).
+ * The first the form takes and passes stays. With none, the value goes back as first written, for the form's verdict. */
 async function refit(entry: Entry, write: FieldWrite & { type: "text" }): Promise<FieldWrite & { type: "text" }> {
-  const retries = [...new Set([...(write.also ?? []), ...phoneRetries(write.value)])].filter((value) => value !== write.value);
+  const retries = [...new Set(write.also ?? [])].filter((value) => value !== write.value);
   if (retries.length === 0) return write;
   const control = entry.controls[0] as HTMLInputElement;
   for (const value of retries) {
