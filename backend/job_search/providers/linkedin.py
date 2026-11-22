@@ -191,7 +191,7 @@ class LinkedIn:
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     level=None, firm_id=None) -> SearchResult:
+                     level=None, search_level=None, firm_id=None) -> SearchResult:
         if country not in COUNTRIES:
             raise ProviderError("internal")     # the route admits us, ca and in only
         place = place if place == REMOTE else (_line(place, 100) or None)

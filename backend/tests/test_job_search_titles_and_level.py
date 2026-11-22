@@ -42,10 +42,11 @@ def test_indeed_gets_the_titles_in_quotes_joined_by_or(indeed):
     assert 'what: "\\"GenAI Engineer\\" OR \\"LLM Engineer\\" OR \\"Python Backend Engineer\\""' in fake.query()
 
 
-def test_freehire_gets_title_alternatives_and_one_title_as_it_is():
+def test_freehire_gets_every_title_as_a_title_alternative():
     assert quoted_or(TITLES) == '"GenAI Engineer" OR "LLM Engineer" OR "Python Backend Engineer"'
     assert title_query(ROLE, TITLES) == 'title:"GenAI Engineer" OR title:"LLM Engineer" OR title:"Python Backend Engineer"'
-    assert title_query(ROLE, ["Java Developer"]) == "Java Developer" and quoted_or(["Java Developer"]) is None
+    assert title_query(ROLE, ["Java Developer"]) == 'title:"Java Developer" OR title:"Java Engineer"'
+    assert quoted_or(["Java Developer"]) is None
 
 
 def test_the_most_years_a_job_may_ask():

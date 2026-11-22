@@ -28,7 +28,7 @@ class FakeProvider:
         self.metadata: dict = {}                    # more of the source's metadata (a count it left out itself)
 
     async def search(self, query, country, limit, cursor=None, *, place=None, posted_within_days=None, titles=(),
-                     years=None, level=None, firm_id=None):
+                     years=None, level=None, search_level=None, firm_id=None):
         self.calls.append((query, country, limit))
         self.cursors.append(cursor)
         self.asks.append({"place": place, "posted_within_days": posted_within_days, "titles": list(titles or ()),

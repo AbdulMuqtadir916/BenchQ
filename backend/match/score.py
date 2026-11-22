@@ -43,6 +43,8 @@ class Who:
     needs_sponsorship: bool
     needs_transfer: bool
     employment_types: tuple[str, ...]
+    target_titles: tuple[str, ...] = ()   # the target roles alone, for the job search's level (`search_level_of`)
+    marketed_as: str = ""
 
     def fields(self) -> dict:
         return {"country": self.country, "work_auth": self.work_auth, "needs_sponsorship": self.needs_sponsorship,
@@ -67,7 +69,9 @@ def who(candidate, country: str | None) -> Who:
                years=float(years) if years is not None else None,
                country=country.upper() if country else None, work_auth=candidate.work_auth,
                needs_sponsorship=bool(candidate.needs_sponsorship), needs_transfer=bool(candidate.needs_transfer),
-               employment_types=tuple(candidate.employment_types or ()))
+               employment_types=tuple(candidate.employment_types or ()),
+               target_titles=tuple(t for t in (str(t).strip() for t in candidate.target_roles or []) if t),
+               marketed_as=str(candidate.primary_role or "").strip())
 
 
 def read_resume(content: dict) -> ResumeFacts:
@@ -99,6 +103,16 @@ def level_of(resume: ResumeFacts | None, candidate: Who) -> str | None:
     if level is None:
         return None
     return "entry" if level.lo <= seniority.ENTRY else "mid" if level.lo == seniority.MID else "senior"
+
+
+def search_level_of(resume: ResumeFacts | None, candidate: Who) -> str | None:
+    """The level freehire.me's search asks for: "intern", "entry", "mid", "senior", "lead" or "principal"; None when
+    nothing says (`seniority.for_job_search`)."""
+    from backend.match import seniority
+    level = seniority.for_job_search(candidate.target_titles, candidate.marketed_as, candidate.years,
+                                     resume.latest_role if resume is not None else "",
+                                     resume.years if resume is not None else None)
+    return seniority.NAMES[level.lo] if level is not None else None
 
 
 def most_years_asked(resume: ResumeFacts | None, candidate: Who) -> int | None:

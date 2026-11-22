@@ -273,7 +273,7 @@ def _finish(click: _Click) -> str:
 
 
 async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: str, place: str | None, titles,
-              request: dict, scorer, years, level) -> str:
+              request: dict, scorer, years, level, search_level=None) -> str:
     """The click's legs, saved as they answer; the batch finished with every leg's counts. Returns the summary."""
     legs = plan(place)
     start = request.get("legs") or {}
@@ -289,7 +289,7 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
             return await REGISTRY[leg.provider].search(
                 query, country, leg.ask, state.get("cursor"), place=leg.place,
                 posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years, level=level,
-                firm_id=firm_id), None
+                search_level=search_level, firm_id=firm_id), None
         except ProviderError as error:
             return None, error.code
         except Exception as error:      # a provider's own bug: its message may hold a URL, so only its type

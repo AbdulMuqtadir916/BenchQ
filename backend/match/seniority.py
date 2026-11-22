@@ -172,11 +172,28 @@ def of_candidate(target_titles, latest_role_title: str = "", years_experience: f
     latest = from_title(latest_role_title)
     if latest is not None:
         return Level(latest.lo, latest.hi, management=latest.management, source="latest role")
-    if years_experience is None:
+    return _from_years_held(years_experience)
+
+
+def _from_years_held(years: float | None) -> Level | None:
+    """A candidate is one rung, not the span a posting's years cover."""
+    if years is None:
         return None
-    # A candidate is one rung, not the span a posting's years cover.
-    rung = ENTRY if years_experience < 2 else MID if years_experience < 5 else SENIOR if years_experience < 10 else LEAD
+    rung = ENTRY if years < 2 else MID if years < 5 else SENIOR if years < 10 else LEAD
     return Level(rung, rung, source="years of experience")
+
+
+def for_job_search(target_titles, marketed_as: str = "", years_recorded: float | None = None,
+                   latest_role_title: str = "", resume_years: float | None = None) -> Level | None:
+    """The level a job search asks a source for (decided by Zuhair 2026-11-21), the first that says: the target titles'
+    level words, "Marketed as", the recorded years, the latest role's title, the résumé's years. Match keeps its own
+    order (`of_candidate`), so no score changes."""
+    levels = [level for level in (from_title(t) for t in target_titles or []) if level is not None]
+    if levels:
+        return Level(*_join([(level.lo, level.hi) for level in levels]),
+                     management=any(level.management for level in levels), source="target titles")
+    return from_title(marketed_as) or _from_years_held(years_recorded) or from_title(latest_role_title) \
+        or _from_years_held(resume_years)
 
 
 def gap(job: Level | None, candidate: Level | None) -> tuple:

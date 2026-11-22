@@ -197,7 +197,7 @@ class Indeed:
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     level=None, firm_id=None) -> SearchResult:
+                     level=None, search_level=None, firm_id=None) -> SearchResult:
         # `years` and `level` aren't sent: Indeed takes one filter type per search (the date), and words left out in the
         # query apply to the whole posting (live 2026-11-17: 3 jobs instead of ~35). The level check at save covers it.
         if country not in COUNTRIES:

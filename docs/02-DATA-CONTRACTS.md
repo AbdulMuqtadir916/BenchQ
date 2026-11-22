@@ -1481,9 +1481,17 @@ years asked, or two rungs away), counted as `skipped_level`. freehire.me also as
 candidate's years (`experience_years_max`, the most Match accepts: their years + max(2, 40%)) and those that state
 none. Since 2026-11-17 (Q96–Q99) the search also gets the candidate's level (`score.level_of`: entry, mid or senior):
 LinkedIn leaves the other levels out with NOT words (its own level filter is ignored by its public search),
-freehire.me asks for those seniorities (`seniority`, with the unstated ones), Indeed takes nothing more (one filter
-type per search; excluded words apply to the whole posting); a job without its text gets the level check from its
-title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too.
+Indeed takes nothing more (one filter type per search; excluded words apply to the whole posting); a job without its
+text gets the level check from its title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too.
+
+**freehire.me's titles and level (decided by Zuhair 2026-11-21, `job_search/freehire_titles.py`).** freehire.me has no
+synonyms, so "Sr" never found "Senior". Senior, Sr, Snr, Mid-Level, Middle, Intermediate, Junior, Jr, Intern and
+Internship leave the title for its `seniority` filter. A title with Lead, Staff or Principal stays as typed. A
+Developer title also searches Engineer, never the reverse. With no level word, the level is the first that says:
+target role, "Marketed as", `years_experience`, latest résumé role, the résumé's years (`score.search_level_of`; under
+2 entry, under 5 mid, under 10 senior, then lead). Match keeps its own order. Jobs tagged with the level come first;
+jobs stating none are added only when those run out. freehire.me drops symbols, so for C#, C++, C, F#, R and Go a job
+is kept only if its own title names the technology.
 
 **LinkedIn postings (2026-11-17, Q106–Q115; replaces the first-open fetch of Q83–Q86).** BenchQ never fetches a
 LinkedIn posting and never scores a LinkedIn job (`match.store.UNSCORED_SOURCES`). The job pane shows LinkedIn's own

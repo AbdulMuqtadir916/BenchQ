@@ -381,12 +381,13 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
         scorer = None                   # scored and filtered without it: the save reads it again
     years = match.most_years_asked(scorer.resume, scorer.who) if scorer is not None else None
     level = match.level_of(scorer.resume, scorer.who) if scorer is not None else None
+    search_level = match.search_level_of(scorer.resume, scorer.who) if scorer is not None else None
     if provider_name == ALL_SOURCES:
         from backend.job_search import fanout
         try:
             summary = await fanout.run(firm_id=firm_id, candidate_id=candidate_id, user_id=user_id, batch_id=batch_id,
                                        query=query, country=country, place=place, titles=titles, request=request,
-                                       scorer=scorer, years=years, level=level)
+                                       scorer=scorer, years=years, level=level, search_level=search_level)
         except Exception as error:      # the save failed: the batch ends as an error, not `running` for 15 minutes
             logger.error("job search batch=%s candidate=%s all sources failed %s", batch_id, candidate_id,
                          type(error).__name__)
@@ -404,7 +405,7 @@ async def run_search(*, firm_id: uuid.UUID, candidate_id: uuid.UUID, user_id: uu
         result = SearchResult(jobs=[], metadata={"exhausted": True}) if exhausted else \
             await provider.search(query, country, limits.JOBS_PER_SEARCH, cursor, place=place,
                                   posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years,
-                                  level=level, firm_id=firm_id)
+                                  level=level, search_level=search_level, firm_id=firm_id)
     except ProviderError as error:
         code = error.code
     except Exception as error:          # the provider's own bug: its message may hold a URL, so only its type is logged

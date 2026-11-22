@@ -55,7 +55,8 @@ def test_a_city_search_sends_its_metro_alone_and_asks_for_the_whole_posting(serv
     monkeypatch.delenv("FREEHIRE_API_KEY", raising=False)
     result = _search("Austin, TX")
     params = served["searches"][0]["params"]
-    assert params == {"q": "Java Developer", "q_fields": "title", "limit": "100", "offset": "0",
+    assert params == {"q": 'title:"Java Developer" OR title:"Java Engineer"', "q_fields": "title", "limit": "100",
+                      "offset": "0",
                       "description_format": "text", "source_exclude": "adzuna", "metros": "Austin (US)",
                       "posted_within_days": "14"}
     assert "authorization" not in served["searches"][0]["headers"]                # no key: none sent
@@ -184,9 +185,43 @@ def test_newest_is_by_the_posted_date_not_the_moment_a_search_saved_them(anonymo
 
 
 def test_a_search_asks_only_for_the_candidates_seniority(served):
-    """Q99: an entry-level candidate's search asks for intern and junior jobs, and those that state none."""
+    """An entry-level candidate's search asks for intern and junior jobs; those that state none only come second."""
     asyncio.run(fh.Freehire().search("AI Engineer", "us", 100, None, place=REMOTE, posted_within_days=14,
                                      level="entry"))
-    request = served["searches"][0]
-    assert request["params"]["seniority_include_unspecified"] == "true"
-    assert request["query"].count("seniority=") == 2 and "seniority=intern" in request["query"]
+    first, second = served["searches"][:2]
+    assert "seniority_include_unspecified" not in first["params"]
+    assert first["query"].count("seniority=") == 2 and "seniority=intern" in first["query"]
+    assert second["params"]["seniority_include_unspecified"] == "true" and second["params"]["offset"] == "0"
+
+
+def test_a_level_word_goes_to_seniority_and_a_developer_title_also_searches_engineer(served):
+    served["jobs"], served["total"] = [_made_up(n) for n in range(20)], 50
+    result = asyncio.run(fh.Freehire().search("Sr Java Developer", "us", 20, None, place=REMOTE, posted_within_days=14,
+                                              titles=["Sr Java Developer"], search_level="mid"))
+    params = served["searches"][0]["params"]
+    assert params["q"] == 'title:"Java Developer" OR title:"Java Engineer"' and params["seniority"] == "senior"
+    assert len(served["searches"]) == 1 and result.next_cursor == "tagged:20"
+
+
+def test_the_second_stage_fills_what_is_left_without_repeating_a_job(served):
+    served["jobs"], served["total"] = [_made_up(1), _made_up(2)], 2
+    result = asyncio.run(fh.Freehire().search("Sr Java Developer", "us", 20, None, place=REMOTE, posted_within_days=14,
+                                              titles=["Sr Java Developer"]))
+    assert [s["params"].get("seniority_include_unspecified") for s in served["searches"]] == [None, "true"]
+    assert len(result.jobs) == 2 and result.next_cursor is None
+
+
+def test_a_cursor_from_before_the_two_stages_reads_as_the_first():
+    assert fh._read_cursor("40", True) == ("tagged", 40) and fh._read_cursor("all:20", True) == ("all", 20)
+    assert fh._read_cursor("tagged:40", False) == ("all", 40) and fh._read_cursor(None, True) == ("tagged", 0)
+
+
+def test_a_symbol_technology_keeps_only_jobs_that_name_it(served):
+    served["jobs"], served["total"] = [
+        _made_up(1, title="Senior C++ Engineer"), _made_up(2, title="Senior C# Developer"),
+        _made_up(3, title="C-BRAIN Senior Software Developer"), _made_up(4, title="C++ Developer")], 4
+    result = asyncio.run(fh.Freehire().search("Sr C++ Developer", "us", 20, None, place=REMOTE, posted_within_days=14,
+                                              titles=["Sr C++ Developer"]))
+    assert served["searches"][0]["params"]["limit"] == "100"
+    assert [job["title"] for job in result.jobs] == ["Senior C++ Engineer", "C++ Developer"]
+    assert result.metadata["skipped_other_title"] > 0

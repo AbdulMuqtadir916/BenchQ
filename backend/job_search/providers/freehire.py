@@ -4,7 +4,10 @@ through freehire.me's agent search, which sends the whole posting.
 
 One search (Q55), the same inputs as Indeed's:
 - `q` the target role, matched on job titles only (`q_fields=title`); a role of several titles searches them all as
-  alternatives (`title:"A" OR title:"B"`, decided 2026-11-16, Q69);
+  alternatives (`title:"A" OR title:"B"`, decided 2026-11-16, Q69). Level words go to `seniority`, a Developer title
+  also searches Engineer, and six technologies get a check of each job's title (`freehire_titles`, 2026-11-21);
+- `seniority`: the level the titles name, else the candidate's. Jobs tagged with it come first; only when they run
+  out does the same search add the jobs that state no level (`cursor` is then "tagged:40" or "all:20");
 - `experience_years_max` with `experience_include_unspecified` (Q74): only jobs asking no more years than the
   candidate can take (Match's rule, `score.most_years_asked`), and those that state none; not sent when the
   candidate's years aren't known;
@@ -35,6 +38,7 @@ import os
 import re
 import time
 
+from backend.job_search import freehire_titles
 from backend.job_search.providers.base import REMOTE, JobFields, ProviderError, SearchResult
 from backend.job_search.text import clean_str, html_to_text, safe_url
 
@@ -47,8 +51,8 @@ METROS_KEPT_FOR_SECONDS = 6 * 3600      # how long a fetched list of metro names
 FACETS_TIMEOUT_SECONDS = 10.0           # the metro list's call; failing it searches the country instead
 TEXT = "text"                           # `_description_format` of a job saved by the agent search
 LEFT_OUT_ORIGINS = ("adzuna",)          # freehire.me's `source` values the search leaves out (Q64)
-# freehire.me's seniority values asked for each candidate level (decided 2026-11-17, Q99).
-SENIORITY = {"entry": ("intern", "junior"), "mid": ("junior", "middle"), "senior": ("middle", "senior", "lead")}
+MOST_REQUESTS = 4                       # one search, both stages and the title check's extra pages included
+TAGGED, ALL = "tagged", "all"           # jobs tagged with the level; then those too that state none
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 _SPACES = re.compile(r"\s+")
 
@@ -103,10 +107,18 @@ async def metro_for(place: str | None, country: str) -> str | None:
 
 
 def title_query(query: str, titles=()) -> str:
-    """freehire.me's words: several titles as alternatives, each matched in the job title (`title:"A" OR title:"B"`,
-    at most 5: its limit; decided 2026-11-16, Q69); one title, or none, the query as it is."""
-    clean = [t for t in (" ".join(str(t).replace('"', " ").split())[:100] for t in titles or ()) if t][:5]
-    return " OR ".join(f'title:"{t}"' for t in clean) if len(clean) > 1 else _line(clean[0] if clean else query, 200)
+    """freehire.me's words: every title as an alternative matched in the job title (`title:"A" OR title:"B"`, at most 5:
+    its limit), without its level words (`freehire_titles`)."""
+    return freehire_titles.plan(titles or (_line(query, 200),)).query
+
+
+def _read_cursor(cursor: str | None, staged: bool) -> tuple[str, int]:
+    """Where a search continues. A cursor from before the two stages (a bare offset) reads as the first stage."""
+    stage, _, number = (cursor or "").rpartition(":")
+    offset = int(number) if number.isdigit() else 0
+    if not staged:
+        return ALL, offset
+    return (stage, offset) if stage in (TAGGED, ALL) else (TAGGED, offset)
 
 
 class Freehire:
@@ -115,16 +127,13 @@ class Freehire:
 
     async def search(self, query: str, country: str, limit: int, cursor: str | None = None, *,
                      place: str | None = None, posted_within_days: int | None = None, titles=(), years=None,
-                     level=None, firm_id=None) -> SearchResult:
-        offset = int(cursor) if cursor and cursor.isdigit() else 0
-        size = max(1, min(limit, MOST_PER_PAGE))
-        params: dict = {"q": title_query(query, titles), "q_fields": "title", "limit": size, "offset": offset,
-                        "description_format": TEXT, "source_exclude": list(LEFT_OUT_ORIGINS)}
-        if level in SENIORITY:
-            # Only the candidate's levels, and jobs that state none (decided 2026-11-17, Q99; live: 52 → 21 jobs, senior
-            # titles 26 → 1 for an entry-level candidate).
-            params["seniority"] = list(SENIORITY[level])
-            params["seniority_include_unspecified"] = "true"
+                     level=None, search_level=None, firm_id=None) -> SearchResult:
+        asked = freehire_titles.plan(titles or (_line(query, 200),))
+        seniority = asked.seniority(search_level or level)
+        stage, offset = _read_cursor(cursor, bool(seniority))
+        wanted = max(1, min(limit, MOST_PER_PAGE))
+        params: dict = {"q": asked.query, "q_fields": "title", "description_format": TEXT,
+                        "source_exclude": list(LEFT_OUT_ORIGINS)}
         if years is not None:
             # Only jobs the candidate's years can take, and those that state none (decided 2026-11-16, Q74).
             params["experience_years_max"] = int(years)
@@ -139,24 +148,82 @@ class Freehire:
         if posted_within_days:
             params["posted_within_days"] = posted_within_days
         from backend.job_search.http import get_json
-        payload = await get_json(SEARCH_URL, params, headers=_headers(), source="freehire")
-        data = payload.get("data")
-        if not isinstance(data, list):
-            raise ProviderError("bad_response")
-        meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
-        total = meta.get("total") if isinstance(meta.get("total"), int) else None
-        ignored = meta.get("ignored_params")
-        if isinstance(ignored, (list, dict)) and "source_exclude" in ignored:
-            logger.warning("job search source=freehire code=source_exclude_ignored")
-        jobs = [{**job, "_description_format": TEXT} for job in data if isinstance(job, dict)
-                and str(job.get("source") or "").lower() not in LEFT_OUT_ORIGINS]
-        skipped = sum(1 for job in data if isinstance(job, dict)) - len(jobs)
-        following = offset + len(data)
-        more = len(data) >= size and (total is None or following < total)
-        logger.info("job search source=freehire jobs=%d skipped_adzuna=%d by_metro=%s more=%s", len(jobs), skipped,
-                    bool(metro), more)
-        return SearchResult(jobs=jobs, metadata={"total": total, "by_metro": bool(metro), "skipped_adzuna": skipped},
-                            next_cursor=str(following) if more else None)
+
+        def place_in(at_stage: str, at: int) -> str:
+            return f"{at_stage}:{at}" if seniority else str(at)
+
+        jobs: list[dict] = []
+        seen: set = set()
+        skipped = other_title = 0
+        first_total = None
+        next_cursor = None
+        for request_number in range(MOST_REQUESTS):
+            # The title check and the second stage drop jobs after they arrive, so they ask for a whole page.
+            size = MOST_PER_PAGE if asked.checked or (seniority and stage == ALL) else wanted - len(jobs)
+            page_params = {**params, "limit": size, "offset": offset}
+            if seniority:
+                page_params["seniority"] = list(seniority)
+                if stage == ALL:
+                    page_params["seniority_include_unspecified"] = "true"
+            try:
+                payload = await get_json(SEARCH_URL, page_params, headers=_headers(), source="freehire")
+                data = payload.get("data")
+                if not isinstance(data, list):
+                    raise ProviderError("bad_response")
+            except ProviderError:
+                if not jobs:
+                    raise
+                next_cursor = place_in(stage, offset)   # keep what came; the next search asks this page again
+                break
+            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+            total = meta.get("total") if isinstance(meta.get("total"), int) else None
+            if request_number == 0:
+                first_total = total
+            ignored = meta.get("ignored_params")
+            if isinstance(ignored, (list, dict)) and "source_exclude" in ignored:
+                logger.warning("job search source=freehire code=source_exclude_ignored")
+            read, full = 0, False
+            for job in data:
+                read += 1
+                if not isinstance(job, dict):
+                    continue
+                if str(job.get("source") or "").lower() in LEFT_OUT_ORIGINS:
+                    skipped += 1
+                    continue
+                if not asked.keeps(str(job.get("title") or "")):
+                    other_title += 1
+                    continue
+                key = job.get("id") or job.get("url") or id(job)
+                if key in seen:                         # the second stage brings the first stage's jobs again
+                    continue
+                seen.add(key)
+                jobs.append({**job, "_description_format": TEXT})
+                if len(jobs) >= wanted:
+                    full = True
+                    break
+            page_has_more = len(data) >= size and (total is None or offset + len(data) < total)
+            if full:
+                if read < len(data) or page_has_more:
+                    next_cursor = place_in(stage, offset + read)
+                elif seniority and stage == TAGGED:
+                    next_cursor = place_in(ALL, 0)
+                else:
+                    next_cursor = None
+                break
+            if page_has_more:
+                offset += len(data)
+            elif seniority and stage == TAGGED:
+                stage, offset = ALL, 0
+            else:
+                next_cursor = None
+                break
+            next_cursor = place_in(stage, offset)
+        metadata = {"total": first_total, "by_metro": bool(metro), "skipped_adzuna": skipped}
+        if asked.checked:
+            metadata["skipped_other_title"] = other_title
+        logger.info("job search source=freehire jobs=%d skipped_adzuna=%d skipped_other_title=%d by_metro=%s more=%s",
+                    len(jobs), skipped, other_title, bool(metro), next_cursor is not None)
+        return SearchResult(jobs=jobs, metadata=metadata, next_cursor=next_cursor)
 
     def read(self, content: dict) -> JobFields:
         enrichment = content.get("enrichment") if isinstance(content.get("enrichment"), dict) else {}
