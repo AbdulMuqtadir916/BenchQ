@@ -388,6 +388,9 @@ def offline(monkeypatch):
     monkeypatch.setattr("backend.scraper._shared.url_safety.assert_public_http_url", lambda *args, **kwargs: None)
     if hasattr(routes_cover_letters, "_get_browser"):
         monkeypatch.setattr(routes_cover_letters, "_get_browser", browser)
+    from backend.api import routes_candidate_resumes   # a résumé version's file (docs/02 §8.2)
+
+    monkeypatch.setattr(routes_candidate_resumes, "_get_browser", browser)
     # The new-candidate parser (onboarding 06 PR 3): no text extraction, no model.
     from backend.api import routes_candidates
     from backend.candidates.base_resume import clean_reply

@@ -32,6 +32,8 @@ declare const chrome: {
   tabs: {
     create(options: { url: string }): Promise<ChromeTab>;
     query(info: { active: boolean; currentWindow: boolean }): Promise<ChromeTab[]>;
+    /** The tab this extension page runs in; undefined in the side panel. */
+    getCurrent(): Promise<ChromeTab | undefined>;
     update(tabId: number, options: { active: boolean }): Promise<ChromeTab>;
     onActivated: ChromeEvent<(info: { tabId: number; windowId: number }) => void>;
     onUpdated: ChromeEvent<(tabId: number, change: { url?: string }) => void>;

@@ -48,7 +48,7 @@ describe("the extension's manifest", () => {
   });
 
   it("takes a bare origin for a store build: a path, query, fragment or login would put /api in the wrong place", () => {
-    for (const url of [`${hosts.storeOrigin}/sign-in`, `${hosts.storeOrigin}/app/`, `${hosts.storeOrigin}?x=1`, `${hosts.storeOrigin}/#top`, "https://user:pw@www.benchq.io"]) {
+    for (const url of [`${hosts.storeOrigin}/sign-in`, `${hosts.storeOrigin}/app/`, `${hosts.storeOrigin}?x=1`, `${hosts.storeOrigin}/#top`, `https://user:pw@${new URL(hosts.storeOrigin).host}`]) {
       expect(() => buildManifest({ benchqUrl: url, isStore: true }), url).toThrow(/bare origin|production origin/);
     }
     expect(() => buildManifest({ benchqUrl: `${hosts.storeOrigin}/`, isStore: true })).not.toThrow();
@@ -56,7 +56,9 @@ describe("the extension's manifest", () => {
 
   it("builds a store manifest only for the production origin, so no other address or spelling gets through", () => {
     for (const url of ["https://127.0.0.2", "https://localhost.", "https://[::ffff:127.0.0.1]", "https://[::ffff:7f00:1]", "https://10.0.0.5",
-      "https://staging.benchq.io", "https://www.benchq.io.evil.test", "https://app.benchq.test", "http://www.benchq.io"]) {
+      "https://staging.benchq.io", `${hosts.storeOrigin}.evil.test`, "https://app.benchq.test", hosts.storeOrigin.replace("https:", "http:"),
+      // The marketing site: it has no sign-in and no /api, so a build for it could never sign anyone in.
+      "https://www.benchq.io"]) {
       expect(() => buildManifest({ benchqUrl: url, isStore: true }), url).toThrow(/Not a store manifest/);
     }
     expect(() => buildManifest(STORE)).not.toThrow();

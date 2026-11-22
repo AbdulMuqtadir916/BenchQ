@@ -127,6 +127,7 @@ created or acted on) · **read** (view, no actions rendered) · **—** (Forbidd
 | `/forgot-password`        | Request password-reset approval                                         | Always shows the same generic acknowledgement; eligible firm accounts are frozen pending approval                         |
 | `/reset-password`         | Set a new password                                                      | Token arrives in URL fragment; invalid/expired state; reset only after approver manually shares the link                    |
 | `/invite/[token]`         | Accept an invite: shows firm name and offered role, set name + password | **new** (open in v1 Phase A); invalid, expired, already-accepted states                                                   |
+| `/privacy`                | BenchQ Apply's privacy policy                                           | Static; open signed in or not, because the Chrome Web Store listing links to it (`docs/extension-store.md` §4)           |
 | `/sign-up`                | —                                                                       | **Removed** (Q11 invite-only); the sign-in page's sign-up link goes too                                                   |
 
 ### 2.2 Firm tier — `/[firm]/…`
@@ -188,7 +189,7 @@ Admin URLs use `firmId` (stable), firm URLs use `slug` (readable).
 - **Reserved slugs** (rejected at firm creation; checked by a registry test against every
   top-level segment): `admin, api, health, sign-in, sign-up, forgot-password, reset-password,
 invite, dev, _next, static, assets, favicon.ico, robots.txt, sitemap.xml, www, app, support,
-help, status, settings, new`.
+help, status, settings, new, privacy`.
 - **Dev routes** live under `/dev/…` (`/dev/design-system`), `devOnly: true`, not-found unless
   `devRoutesEnabled()`: `NEXT_PUBLIC_SHOW_DEV_ROUTES=true`, in `pnpm dev` and a build alike (2026-11-02; it no longer
   follows `NODE_ENV=development`). The design system is **Super Admin only** (`access: PLATFORM`; the `/dev` layout

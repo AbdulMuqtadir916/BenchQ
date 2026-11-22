@@ -23,7 +23,7 @@ INVITE_LIFETIME = timedelta(days=7)          # A9: created or resent + 7 days
 RESERVED_SLUGS = (
     "admin", "api", "health", "sign-in", "sign-up", "forgot-password", "reset-password", "invite", "dev",
     "_next", "static", "assets", "favicon.ico", "robots.txt", "sitemap.xml", "www", "app", "support",
-    "help", "status", "settings", "new",
+    "help", "status", "settings", "new", "privacy",
 )
 
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
