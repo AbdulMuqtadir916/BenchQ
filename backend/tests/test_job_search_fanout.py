@@ -60,11 +60,17 @@ def _saved(test_db, candidate):
     return out
 
 
-def test_each_mode_asks_its_sources_for_their_shares_of_30():
-    """07 Q71 (2026-11-18): (source, place, asked, kept, filler)."""
+@pytest.fixture
+def day_of_30(monkeypatch):
+    """The sharing rules at a day that fills before freehire.me (they don't depend on the day's number)."""
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 30)
+
+
+def test_each_mode_asks_its_sources_for_their_shares():
+    """07 Q71: (source, place, asked, kept, filler); 50 a day since 2026-11-21."""
     def legs(place):
         return [(leg.provider, leg.place, leg.ask, leg.keep, leg.filler) for leg in fanout.plan(place)]
-    assert limits.JOBS_PER_CANDIDATE_PER_DAY == 30
+    assert limits.JOBS_PER_CANDIDATE_PER_DAY == 50
     assert legs(REMOTE) == [("indeed", REMOTE, 33, 30, False), ("freehire", REMOTE, 20, 20, True)]   # no LinkedIn
     assert legs("hybrid:Austin, TX") == [("linkedin", "Austin, TX", 25, 20, False), ("indeed", "Austin, TX", 10, 5, False),
                                          ("indeed", REMOTE, 10, 5, False), ("freehire", REMOTE, 20, 20, True)]
@@ -72,6 +78,22 @@ def test_each_mode_asks_its_sources_for_their_shares_of_30():
                                   ("freehire", "Austin, TX", 20, 20, True)]
 
 
+def test_a_full_click_reaches_the_days_50(world, adnans, sources, test_db):
+    sources["linkedin"].jobs = _jobs("Li", 25)
+    sources["indeed"].jobs = _jobs("In", 13)
+    sources["freehire"].jobs = _jobs("Fh", 20)
+    _click(world, adnans, "Austin, TX")
+    assert _saved(test_db, adnans) == {"linkedin": 25, "indeed": 13, "freehire": 12}
+
+
+def test_a_full_remote_click_reaches_the_days_50(world, adnans, sources, test_db):
+    sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 33)]
+    sources["freehire"].jobs = [{**job, "remote": True} for job in _jobs("Fh", 20)]
+    _click(world, adnans, REMOTE)
+    assert _saved(test_db, adnans) == {"indeed": 33, "freehire": 17}
+
+
+@pytest.mark.usefixtures("day_of_30")
 def test_a_full_hybrid_click_is_linkedin_20_and_indeed_5_and_5_and_never_asks_freehire(world, adnans, sources, test_db):
     sources["linkedin"].jobs = _jobs("Li", 25)
     sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 10)]      # fit the remote half too
@@ -88,6 +110,7 @@ def test_a_full_hybrid_click_is_linkedin_20_and_indeed_5_and_5_and_never_asks_fr
     assert summary.startswith("LinkedIn 20 · Indeed 10 new")
 
 
+@pytest.mark.usefixtures("day_of_30")
 def test_linkedins_short_share_takes_indeeds_extras_then_freehire_fills_the_rest(world, adnans, sources, test_db):
     """07 Q71: LinkedIn brings 12 of its 20; Indeed's 3 beyond its 10 go first, then freehire.me is asked for 20."""
     sources["linkedin"].jobs = _jobs("Li", 12)
@@ -109,6 +132,7 @@ def test_linkedins_share_is_held_however_fast_indeed_answers(world, adnans, sour
     assert sources["freehire"].calls == []
 
 
+@pytest.mark.usefixtures("day_of_30")
 def test_remote_is_indeed_first_freehire_only_fills(world, adnans, sources, test_db):
     """07 Q71: no race on Remote: Indeed keeps up to 30 and freehire.me is asked only for the rest."""
     sources["indeed"].jobs = [{**job, "remote": True} for job in _jobs("In", 33)]
@@ -144,6 +168,7 @@ def test_a_failing_source_does_not_fail_the_click_and_all_failing_does(world, ad
     assert summary == "failed: timeout" and _batch(test_db, batch_id).state == "error"
 
 
+@pytest.mark.usefixtures("day_of_30")
 def test_a_source_whose_jobs_did_not_fit_is_read_again_next_time(world, adnans, sources, test_db):
     """Q92: LinkedIn brings 25 and Indeed 13 → the day's 30 is full, 8 don't fit, so both keep their place; freehire.me
     wasn't asked."""

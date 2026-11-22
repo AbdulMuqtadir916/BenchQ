@@ -495,7 +495,7 @@ def test_the_history_shows_the_running_search_the_finished_ones_and_todays_usage
         ("Spring Developer", "error", "timeout"), ("Java Developer", "success", None)]
     usage = body["usage"]
     assert (usage["jobs_saved_today"], usage["jobs_cap"], usage["attempts_today"], usage["attempts_cap"]) == (
-        1, 30, 3, 20)                                                     # 30 new jobs a day since 07 Q71
+        1, 50, 3, 20)                                                     # 50 new jobs a day since 2026-11-21
     assert usage["resets_at"]
 
 

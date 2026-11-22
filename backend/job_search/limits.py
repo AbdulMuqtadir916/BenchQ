@@ -27,7 +27,7 @@ from backend.job_search.providers.capture import CAPTURE_SOURCES
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
-JOBS_PER_CANDIDATE_PER_DAY = 30        # 07 Q71 (2026-11-18); 200 from 2026-11-17 (Q145), 100 before
+JOBS_PER_CANDIDATE_PER_DAY = 50        # 07 Q71, changed by Zuhair 2026-11-21; 30 from 2026-11-18, 200 from 2026-11-17
 ATTEMPTS_PER_BDE_PER_DAY = 20
 CAPTURES_PER_BDE_PER_DAY = 20
 JOBS_PER_SEARCH = 100            # a one-source search's ask (Q28); a click asks each source its leg's own (fanout.py)

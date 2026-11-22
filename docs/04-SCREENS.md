@@ -328,7 +328,7 @@ target rate, availability and relocation. The owning BDE shows to managers and o
 looking at their own candidate doesn't need it. Actions: `Find jobs` (runs the matching
 sequence inside the Jobs tab — never navigates away) and `Build resume`. Since job search PR 3 (docs/02 §6.z) `Find
 jobs` is the candidate's BDE's only and really searches, for the candidate's main role (else the first target role):
-under it, the work day's usage only ("17/30 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST", the
+under it, the work day's usage only ("17/50 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST", the
 reset in the firm's time zone; since 2026-11-17 no per-source, seen-again, over-limit or left-out counts), plus a note
 only when the last search failed or a source didn't answer ("LinkedIn didn't answer: try again"); disabled with the reason when there is no role, no résumé country, or the
 day's searches are used. Below it, the derived

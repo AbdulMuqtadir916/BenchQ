@@ -2,7 +2,7 @@
 
 The BDE no longer picks a source. The place's mode (`places.mode_of`) says which sources one click asks, each a
 "leg" (a source and a place) with how many jobs it **asks** for and how many it **keeps**, in priority order; the
-day's 30 (`limits.JOBS_PER_CANDIDATE_PER_DAY`) is shared out like this:
+day's 50 (`limits.JOBS_PER_CANDIDATE_PER_DAY`) is shared out like this:
 
     On-site (city)  LinkedIn, the city 25 → 20 · Indeed, the city 13 → 10              · then freehire.me, the city 20
     Hybrid (city)   LinkedIn, the city 25 → 20 · Indeed, the city 10 → 5 · Indeed, Remote 10 → 5 · then freehire.me, remote 20
@@ -14,14 +14,15 @@ as soon as it answers, within today's room less LinkedIn's share, which is held 
 when it answers or after `linkedin.TIME_LIMIT_SECONDS`. Then room left over goes to the jobs they brought beyond what
 they keep, in priority order (Q123): LinkedIn's short share is filled by Indeed's extras first. Only if the day still
 isn't full is freehire.me asked (a **filler** leg), and it fills what's left. So a higher source always comes first,
-whichever answers first.
+whichever answers first. With every source full, one click saves: on-site LinkedIn 25, Indeed 13, freehire.me 12;
+hybrid LinkedIn 25, Indeed 10 and 10, freehire.me 5; remote Indeed 33, freehire.me 17.
 
 - **Same job, two sources (Q91):** a job whose company and title the candidate already has from another source, or that
   an earlier leg of this click saved, isn't saved again (`skipped_duplicate_source`).
 - **Jobs that didn't fit (Q92):** a leg some of whose jobs weren't saved keeps its place, so the next click reads that
   page again; a leg whose jobs were all saved moves on. Jobs that didn't fit are dropped (Q145).
 - **A leg that fails (Q93)** doesn't fail the click; the search fails only when every leg failed.
-- **The daily limit** is `limits.JOBS_PER_CANDIDATE_PER_DAY` new jobs per candidate (30 since 2026-11-18, 07 Q71).
+- **The daily limit** is `limits.JOBS_PER_CANDIDATE_PER_DAY` new jobs per candidate (50 since 2026-11-21, 07 Q71).
 
 The batch keeps each leg's place (`request.legs`: cursor, exhausted), its counts by source (`counts.by_source`) and any
 leg's error code (`errors`). Logs carry ids, codes, counts and timings only.

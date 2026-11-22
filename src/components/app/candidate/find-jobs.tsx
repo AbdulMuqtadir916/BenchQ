@@ -54,7 +54,7 @@ export function resetTime(iso: string, timeZone = "Asia/Kolkata"): string {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" }).format(new Date(iso));
 }
 
-/** "17/30 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST": every number the backend's count, for
+/** "17/50 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST": every number the backend's count, for
  * the firm's current work day. "Added manually" is a job the BDE added through Add job or the extension (a capture). */
 export function usageLine({ usage, workday }: JobSearches): string {
   return [
