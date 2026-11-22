@@ -24,7 +24,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   company data (H-1B filings, client vs vendor) is a later feature.
 - **Only the candidate's BDE searches or captures** (`canSearchJobs`, `job.search`). Owners, managers and viewers
   read; a support view reads only.
-- **Daily limits** (since the firm's work-day start): 30 new jobs per candidate (07 Q71), 20 searches and 20 captures per BDE. The same role
+- **Daily limits** (since the firm's work-day start): 50 new jobs per candidate (07 Q71, since 2026-11-21), 20 searches and 20 captures per BDE. The same role
   searched again continues where the last search stopped.
 - **The whole posting:** Indeed and freehire.me's agent search (since 2026-11-16) send whole postings. Jobs saved by
   freehire.me's old search keep the ~1,000 characters it sent. freehire.me only has a preview of Adzuna's listings
@@ -41,7 +41,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   out the candidate's work authorization; it says how many.
 - **The Match** replaces the title-only placeholder score ([docs/team/ats-score.md](../team/ats-score.md)): plain
   code, stored per candidate and job, held at 40 with a reason when a recruiter would screen the candidate out.
-- **Every job, 100 at a time.** The job list is sorted and filtered by the backend, with "Load more"; a candidate's
+- **Every job, 50 first and then 10 at a time (since 2026-11-22).** The job list is sorted and filtered by the backend, with "Load more"; a candidate's
   list opens at "Any score", best Match first. ⌘K searches jobs on the backend.
 - **A search's job is labelled "Indeed"**, with no legal-basis text.
 
@@ -56,7 +56,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   allow non-commercial use only, so the licence is settled before production.
 - **The job list shows only jobs posted in the last 14 days**, any source (by the job's date; a job without one
   counts from the day it was saved). Older jobs stay saved; their job pages and applications still open.
-- **The job list's source filter opens at Indeed**; freehire.me's jobs and captures show when picked.
+- **The job list opens on All days (2026-11-22), one source at a time:** freehire.me, else Indeed, else LinkedIn, else the first other source with jobs (2026-11-21).
 
 ## Decisions (2026-11-16): the role's titles, the level, LinkedIn (Q68–Q86)
 
@@ -97,11 +97,11 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
   25 → 20, Indeed 13 → 10) when they don't include hybrid; Hybrid (city: LinkedIn 25 → 20, Indeed 10 → 5; remote:
   Indeed 10 → 5) when they do or are empty; Remote (Indeed 33 → 30). freehire.me (20) is asked only if the day isn't
   full after them, and fills the rest.
-- **30 new jobs a day per candidate** (200 until 2026-11-18). Indeed shows first; LinkedIn's 20 is kept for it; a short
+- **50 new jobs a day per candidate** since 2026-11-21 (30 from 2026-11-18, 200 before). Indeed shows first; LinkedIn's 20 is kept for it; a short
   LinkedIn share takes Indeed's extras, then freehire.me. Extra jobs that don't fit are dropped, and that source starts
   from the same place next click.
 - **Same job on two sources: saved once.** One source failing doesn't fail the click.
-- **Batches:** each click is a batch; the Jobs list opens at the newest, with All days, and each source's count.
+- **Batches:** each click is a batch; the Jobs list opens on All days and can narrow to a Day or batch, with each source's count.
 - **Days (2026-11-17, Q152–Q174):** the firm's required work hours (`firms.work_start`/`work_end`, migration 0031; the
   OWNER changes them) make a work day, from one start to the next. A candidate's Days count from their assignment to
   their BDE; batches sit under their Day, numbered on; the OWNER and MANAGER also see the empty Days. Each search stamps
@@ -121,7 +121,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 |---|---|
 | Screens | `/[firm]/jobs` (the explorer), `/[firm]/jobs/[id]`, `/[firm]/jobs/capture` (BDE only); the candidate's Jobs tab, "Find jobs" in the candidate header, Best new matches; the BDE dashboard queue, Focus, the ⌘K job search |
 | Adapter | `src/lib/api/jobs.ts`: `list`, `page` (a page with the total), `byId`, `capture`, `searches`, `startSearch`; the mapper `src/lib/api/dto/jobs.ts` |
-| Hooks | `src/lib/hooks/use-jobs.ts`: `useJobs`, `useJobPages` (100 at a time, "Load more"), `useJob`, `useCaptureJob`, `useJobSearches` (polls while a search runs), `useStartJobSearch` |
+| Hooks | `src/lib/hooks/use-jobs.ts`: `useJobs`, `useJobPages` (50 first, then 10 with each "Load more"), `useJob`, `useCaptureJob`, `useJobSearches` (polls while a search runs), `useStartJobSearch` |
 | Types | `JobSchema` (+ `candidateIds`, `matches`), `JobMatchSchema`, `CaptureJobSchema` (per candidate) in `src/lib/schemas/job.ts`; `JobSearch*` in `src/lib/schemas/job-search.ts`; `matchFor` in `src/lib/derive/match.ts` |
 | Layout of a posting | `src/lib/format/job-description.ts` (facts, headings, bullets from plain paragraphs), `src/components/app/jobs/job-description.tsx` |
 
@@ -129,7 +129,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 
 | Call | Endpoint |
 |---|---|
-| the firm's jobs (one per job, the visible `candidate_ids` and their `matches`), sorted, filtered, 100 at a time with the total | `GET /api/firms/{firm}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&exclude_applied=&offset=&limit=` |
+| the firm's jobs (one per job, the visible `candidate_ids` and their `matches`), sorted, filtered, a page at a time (the Jobs list: 50, then 10) with the total | `GET /api/firms/{firm}/job-postings?candidate_id=&sort=&min_score=&source=&remote=&q=&exclude_applied=&offset=&limit=` |
 | one job (with the whole posting) | `GET /api/firms/{firm}/job-postings/{id}` |
 | a candidate's jobs / one | `GET …/candidates/{id}/job-postings`, `…/job-postings/{posting_id}` |
 | start a search (BDE) | `POST …/candidates/{id}/job-searches` `{place?, source?}` (one of the candidate's places; `indeed`, `freehire` or `linkedin`) → 202 `{batch_id, run_id}` |
@@ -141,7 +141,7 @@ answer 410 and nothing on the screens reads it. It is deleted in the clean-up PR
 - [x] The job screens show the backend's jobs: company, location, remote / hybrid / on-site, source, posted date
 - [x] A job opens from its id; a missing or malformed id is "Job not found"
 - [x] A screen asking for up to 400 jobs gets them (the adapter never asks for more than the backend gives)
-- [x] The job list shows every job a candidate has, 100 at a time, sorted and filtered by the backend (2026-11-14)
+- [x] The job list shows every job a candidate has, 50 first and then 10 at a time, sorted and filtered by the backend (2026-11-14, paging 2026-11-22)
 - [x] Every score shown is the stored Match; a score held at 40 says why on hover (2026-11-14)
 - [x] Skeleton, empty and error-with-Retry states on the job list, the candidate's Jobs tab, Best new matches, "Find
       jobs" and the capture form; no `SCHEMA_MISMATCH`

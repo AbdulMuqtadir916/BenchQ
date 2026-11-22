@@ -45,7 +45,7 @@ Live sources right now: **Indeed**, **freehire.me** and **LinkedIn**, all asked 
 behind one contract, freehire.me first; `content` is the provider's job as sent, read through its `read()`), the
 background search (`POST …/candidates/{id}/job-searches`, the candidate's BDE only; its `scrape_jobs` row is
 `running` until it finishes), the caps (100 new jobs per
-candidate, 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **PR 2**
+candidate then, **50 since 2026-11-21**, 07 Q71; 20 attempts per BDE, per 6:30 PM IST day) and the reads (`GET …/job-searches`, `…/job-postings`). **PR 2**
 (`feat/job-postings-repoint`, migration 0023): tailored résumés, cover letters and the two logs point at
 `job_postings`; captures (`POST …/job-postings`, manual and extension); a repeated search continues; the old pool's
 scheduled scrape and write routes retired (410). **PR 3** (`integrate/jobs`, docs/02 §6.z; opened after PR 1 and 2
@@ -59,7 +59,7 @@ Remote search and ones whose text rules out the candidate's work authorization. 
 needs a place; the candidate's details have their own tab (07 Q66). Since 2026-11-18 (07 Q68) the name, email,
 target role and extra search titles are fixed once the candidate is added: every résumé write takes the candidate's
 name and email (`versions.fixed_identity`), and only the OWNER and a MANAGER see the extra titles. The **Match** ([ats-score.md](./ats-score.md),
-migration 0028) replaces the title-only placeholder everywhere, and the job list shows every job, 100 at a time,
+migration 0028) replaces the title-only placeholder everywhere, and the job list shows every job (50 first, then 10 with each Load more, since 2026-11-22),
 sorted and filtered by the backend. The old pool's freehire scraper is removed.
 The flow described below (steps 1–5) is the old pool's: its scheduled scrape and write routes are retired (PR 2), its
 reads still answer until the clean-up.
@@ -104,6 +104,22 @@ candidate (`searches.candidate_id`) and what it finds is recorded per candidate 
    (resume-versioning.md §8).
 6. Frontend live: the Tailor control (job pane, job page for a candidate, dashboard queue, Focus mode's T) and the
    tailoring panel on every firm page (tailoring.md §8).
+
+## 4. Where your work stands (2026-11-22, `feat/job-search-indeed-and-candidate-details`)
+
+| Requirement | Status | The rule now |
+|---|---|---|
+| Candidate restrictions | **Met** | Name, email and target roles are fixed after onboarding (07 Q68). A later résumé must hold the candidate's name and email (07 Q69) |
+| Candidates per BDE | **Met** | **3 assigned candidates per BDE, every firm** (07 Q70). This replaces the earlier brief of 2, or 3 for the recent client |
+| Jobs per candidate | **Met** | **50 new jobs per candidate per firm work day** (07 Q71). This replaces the earlier brief of 30. It is a maximum: a job seen again doesn't count |
+| Later résumé uploads | **Built** | 5 saved uploads per existing candidate per firm work day (07 Q72) |
+| Jobs list | **Built** | Opens on All days, one source at a time: freehire.me, else Indeed, else LinkedIn, else another source with jobs. 50 jobs first, then 10 with each Load more. Jobs over 14 days old, closed, applied to or hidden stay out |
+| freehire.me search | **Built** | The level goes in `seniority`, not the title; a Developer title also searches Engineer, never the reverse (docs/02, `freehire_titles.py`) |
+| Super Admin AI setup | **Built** | One provider and encrypted key, approved models, one active preset per use case, editable prompts ([08-ai-presets.md](../integration/08-ai-presets.md), 07 Q73) |
+| **AI workflow costing** | **Open** | Every AI call is logged with tokens, cost, firm and preset, and `GET /api/stats/llm-costs` totals spend by purpose and model. Still to build: cost per workflow, firm, candidate and day, and a Super Admin screen (its contract is 07 Q29) |
+
+Open for the PR: Abdul reviews the rows in [cross-area-changes.md](./cross-area-changes.md). Indeed's exact-phrase title
+query can return few jobs; a looser query is proposed and not tested.
 
 ## Rules for you
 

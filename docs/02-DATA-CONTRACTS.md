@@ -854,9 +854,13 @@ case), `ai_preset_versions` (never edited). `llm_call_log` gains `preset_id` and
 | `PUT /provider` | Tests, then saves the provider and key. 422 rejected; 409 unreachable, unless `force` |
 | `POST /models`, `DELETE /models/{id}` | Approves a model from the live list; hides one no active preset uses |
 | `POST /presets`, `PATCH /presets/{id}` | Creates or edits a preset; a model, effort or prompt change is a new version |
-| `POST /presets/{id}/activate`, `/archive` | Makes it active after testing it; archives one that isn't active |
+| `POST /presets/{id}/activate`, `/archive`, `/restore` | Makes it active after testing it (refused if its model is no longer approved); archives one that isn't active; brings an archived one back, not active |
 | `POST /presets/{id}/test-run` | Runs a pasted sample; nothing is saved |
 | `PATCH /limits` | Sets the tailoring and parser limits, applied without a restart |
+
+Email classification's `prompts` are `state` and `question`, each JSON text. A save is refused unless `state` uses
+`{subject}` and `{body}` and `question` keeps its key, `choice` type and the 10 category names. A version from before
+they were editable holds only `instructions` and is shown and run as the same State and Question.
 
 ## 4. Candidate
 
@@ -1361,9 +1365,9 @@ export const JobMarkSchema = z.object({
     time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
     is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
     different candidates count the 20 attempts in turn (Abdul's review, P2).
-  - **Caps (per day from 6:30 PM IST):** 100 **new** jobs per candidate (a job seen again only refreshes its row);
+  - **Caps (per firm work day):** **50 new** jobs per candidate since 2026-11-21 (07 Q71; 100 when built; a job seen again only refreshes its row);
     20 attempts per BDE, any outcome. Over either is 429 up front, nothing written. A search that reaches the
-    candidate's 100 keeps the provider's order and drops the rest (`skipped_over_cap`).
+    candidate's daily limit keeps the provider's order and drops the rest (`skipped_over_cap`).
   - **Saving:** closed and unreadable jobs (no title, company or description) and repeats within the reply are
     dropped. One transaction with the candidate row locked: the `scrape_jobs` row, then each job — one the candidate
     has gets `batch_id`, `last_seen_at`, `content` and `source` replaced (`discovered_at` kept); a new one is inserted
@@ -1550,7 +1554,7 @@ include hybrid or are empty; it reads "City, ST"; `remote` = Indeed 33 → 30, r
 for remote). LinkedIn and Indeed start together, Indeed's two searches one after the other; Indeed saves as it answers
 within today's room less LinkedIn's 20, held for it; room left then goes to the jobs over a source's share, LinkedIn's
 first, then Indeed's; only if the day still isn't full is **freehire.me** asked (20, the city on-site, remote
-otherwise) to fill the rest. The daily limit is **30** new jobs per candidate (200 from Q145 until 2026-11-18). The
+otherwise) to fill the rest. The daily limit is **50** new jobs per candidate since 2026-11-21 (30 from 2026-11-18, 200 from Q145 before that). The
 same job (company and title) from another source isn't saved again (`skipped_duplicate_source`); a source whose jobs
 didn't all fit is read again from the same place next click (`request.legs[provider|place]`: cursor, exhausted); one
 failing source doesn't fail the click (`errors`), all failing does. `counts.by_source` holds each source's counts;
@@ -1618,13 +1622,13 @@ export const JobMatchSchema = z.object({
 // ResumeVersion.atsScore is a tailored version's Match against its job (the "Resume sent" tag says "Match").
 ```
 
-**The list, 100 at a time** (Q28, Q29, Q36, Q47): `GET /api/firms/{firm}/job-postings` sorts and filters the whole
+**The list, 50 first and then 10 at a time** (decided 2026-11-22; replaces Q29's 100; Q28, Q36, Q47): `GET /api/firms/{firm}/job-postings` sorts and filters the whole
 list on the backend and answers `{items, total, next_offset}`:
 
 | Parameter | |
 |---|---|
 | `candidate_id` | one candidate's jobs (one the person sees; another is 404); none: every visible candidate's |
-| `limit`, `offset` | 1–400 (default 100) from `offset`; `next_offset` is null at the end |
+| `limit`, `offset` | 1–400 (default 100) from `offset`; `next_offset` is null at the end. The Jobs list asks for 50, then 10 with each Load more |
 | `sort` | `match` (one candidate's best first, unscored last), `newest` (default; by the job's posted date, else the day it was saved: 2026-11-16, Q87), `company` |
 | `min_score` | one candidate's; above 0 leaves out unscored jobs |
 | `source` | `indeed`, `freehire`, `linkedin`, `manual`, `extension`, `other` |
@@ -1634,7 +1638,7 @@ list on the backend and answers `{items, total, next_offset}`:
 
 A closed job is never listed, nor one posted more than 14 days ago (by its own date; one without a date counts from
 the day it was first saved; decided 2026-11-16, Q56, any source): it stays saved, and its job page, application and
-tailored résumés still open. The job list's source filter opens at Indeed (Q53). Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
+tailored résumés still open. The Jobs list opens on All days (2026-11-22) and on freehire.me, else Indeed, else LinkedIn, else the first other source with jobs (2026-11-21). Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
 `remote_mode`; a candidate's own posting (`…/candidates/{id}/job-postings/{id}`, a capture's answer) adds `match`.
 The job list reads it a page at a time with "Load more"; a candidate's list opens at "Any score", best Match first.
 ⌘K asks it for the jobs matching what is typed (`q`, 20).

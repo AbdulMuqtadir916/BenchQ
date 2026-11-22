@@ -404,12 +404,12 @@ The profile-locked job explorer: the candidate's own jobs (job search PR 3). `Fi
 work authorization → score → rank) with real counts, then the ranked list staggers in. While the candidate's search
 runs, the last step holds on "Searching for new jobs…" until it ends; Skip opens the list and the search goes on.
 A job whose work authorization is unknown (a searched job's) is shown, never filtered out.
-**Since 2026-11-14 (docs/02 §6.w):** the list holds every job the candidate has, 100 at a time with **Load more**,
+**Since 2026-11-14 (docs/02 §6.w):** the list holds every job the candidate has, 50 first and 10 more with each **Load more**,
 sorted and filtered by the backend; it opens at "Any score", best Match first, and a score held at 40 says why on
 hover ("Held at 40: no C2C…"). Beside **Find jobs**, the BDE picks where to search: the résumé's city and state, a
 preferred location, or Remote.
 **Since 2026-11-16 (docs/02 §6.w, Q53, Q56):** beside the place, the BDE also picks the source, Indeed (first) or
-freehire.me. The job lists show only jobs posted in the last 14 days, and the source filter opens at Indeed.
+freehire.me. The job lists show only jobs posted in the last 14 days. (The source filter's opening order changed on 2026-11-21, below.)
 **Since 2026-11-16 (Q75–Q86):** LinkedIn is the third source in both lists. A LinkedIn job shows "—" for its Match until
 its posting arrives on the first open (a loading bar, then the text); "Open on LinkedIn" is there at once. The
 result line also counts "N left out: level".
@@ -420,7 +420,7 @@ answer (each source's count shows on the Jobs list's source filter). The Jobs li
 batch** picker (2026-11-17, Q152–Q174): the candidate's Days, newest first ("Day 3 · Nov 17–18", counted from their
 assignment to their BDE in the firm's work days; picking a Day lists all its batches), each Day's batches under it
 ("Batch 4 · 7:42 PM", numbered on across Days), "Earlier searches" (before this assignment, by date and time), then
-"All days"; it opens at the newest batch. The OWNER and MANAGER also see the empty Days, folded ("Days 2–39 · no
+"All days"; it opens on **All days** (decided 2026-11-22), and changing the candidate returns to it. The OWNER and MANAGER also see the empty Days, folded ("Days 2–39 · no
 searches"), never pickable; a BDE sees only Days with work. The source filter shows each source's count and one source
 at a time (2026-11-21; a search still asks every source). It opens on freehire.me, else Indeed, else LinkedIn, else the
 first other source with jobs, and opens that way again when the candidate or Day changes. A pick is kept in the URL
@@ -476,7 +476,7 @@ leaving the list — the BDE evaluates most jobs without ever navigating.
 Virtualise past 100 rows. 500 rows must scroll at 60fps.
 
 > **Built 2026-11-14 (docs/02 §6.w):** the toolbar's search, candidate, source, work mode and score filters and the
-> sort are the backend's request, so the list is every job they match, 100 at a time with **Load more**, and the
+> sort are the backend's request, so the list is every job they match, 50 first and 10 more with each **Load more**, and the
 > header counts all of them. With a candidate picked, each job shows their **Match** (docs/team/ats-score.md), best
 > first, starting at "Any score"; a score held at 40 says why on hover. The single job page's picker lists only the
 > candidates who have the job, and a search's job is labelled "Indeed".
@@ -1025,8 +1025,9 @@ Super Admin only; `g i`. Rules: [integration/08-ai-presets.md](./integration/08-
 - **Running at once:** résumé tailoring and parser limits, per backend process.
 - **Approved models:** the catalog, with **Add model** searching OpenRouter's live list. A model in use can't be removed.
 - **One card per use case** (parser, tailoring, search titles, email classification): its presets with version, model and
-  an **Active** tag; **Make active**, **Test**, **Edit**, **Archive**, **New preset**. A use case with none active shows
-  "Needs setup". The edit dialog shows each prompt's required placeholders.
+  an **Active** tag; **Make active**, **Test**, **Edit**, **Archive**, **New preset**, and an **Archived** list with **Restore**. A use case with none active shows
+  "Needs setup". The dialog shows each prompt in its own box, locked until that box's pencil is clicked, with its required
+  placeholders. One box is open at a time: opening another locks the last and keeps its unsaved text until Save or Cancel. Email classification's boxes are **State** and **Question**, as JSON.
 - States: skeleton while loading, an error with retry, and an empty state if no use case exists.
 
 ## 14.10 Support view

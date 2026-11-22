@@ -94,7 +94,7 @@ A score that can't be worked out never fails a save: the job stays unscored ("â€
 ## On the screens
 
 - A candidate's job list opens at "Any score", best Match first; the score filter offers 70+, 85+ and 95+. The list
-  is sorted and filtered by the backend, 100 at a time with "Load more".
+  is sorted and filtered by the backend, 50 first and then 10 with each "Load more".
 - "All candidates" has no Match (there is no one candidate); picking a candidate shows theirs.
 - The job page's candidate picker lists the candidates who have the job; each has their own Match.
 - The job page's "Run full analysis" is a placeholder kept for later (its Have / Missing / Adjacent list compares

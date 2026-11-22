@@ -50,7 +50,7 @@ These replace the decisions above where they differ.
   parser, tailor and search titles need is sent only on OpenRouter. The key is encrypted with the server secret
   `AI_SETTINGS_ENCRYPTION_KEY`, never returned (the panel shows "ending 1234"), and only its change is logged.
 - **Saving tests first.** A provider or key save tests the key and every active model; making a preset active, or
-  changing an active preset's model or effort, tests that model. A rejected key or model blocks the save. If OpenRouter
+  changing an active preset's model, effort or (for email) State or Question, tests that setup. A rejected key or model blocks the save. If OpenRouter
   is only unreachable, a Super Admin can "save anyway", so a leaked key can be replaced during an outage.
 - **Four use cases have presets:** résumé parser, résumé tailoring, search titles, email classification. Cover letters,
   the old AI autofill route, old LLM job scoring and the old Gmail monitor have no panel row: they stay on the
@@ -66,6 +66,12 @@ These replace the decisions above where they differ.
 - **Output formats are in code (Q2, Q12):** the six `*_format` rows are gone.
 - **The email fingerprint** is the model and prompts, not the preset's id or version, so moving an unchanged setup into
   a preset doesn't force re-evaluation. A real model or prompt change still does.
+- **The classifier's State and Question are editable** in its preset, as JSON. A save is refused unless State uses
+  `{subject}` and `{body}` and Question keeps its key, `choice` type and the 10 category names, which the code depends
+  on. Instructions and category descriptions can change. Masking and the length limits stay in code. Activating a
+  classifier preset, or changing the active one's State or Question, sends that exact setup to OpenRouter first.
+- **A removed model can't go live:** a preset on it can't be made active until it's edited to an approved model.
+- **Archiving can be undone:** Restore brings a preset back, not active. Its name stays reserved while archived.
 - **Limits:** résumé tailoring 40 and the parser 10 at once **per backend process**, editable on the panel, applied
   without a restart; extra runs wait. Each existing candidate takes **5 saved résumé uploads per firm work day**; the
   next is refused with "Upload limit reached. Next upload at <the firm's next shift start>." The résumé a candidate was
