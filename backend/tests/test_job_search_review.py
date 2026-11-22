@@ -168,7 +168,8 @@ def test_ordinary_text_in_any_script_still_searches(anonymous_client, world, adn
                                                     place):
     _set(test_db, adnans, target_roles=[role], preferred_locations=[place])
     assert _post(anonymous_client, world, adnans, place=place).status_code == 202
-    assert (launched[0]["kwargs"]["query"], launched[0]["kwargs"]["place"]) == (role, place)
+    # A candidate who says nothing about how they work searches the city as hybrid (Q122).
+    assert (launched[0]["kwargs"]["query"], launched[0]["kwargs"]["place"]) == (role, f"hybrid:{place}")
 
 
 def test_the_search_is_committed_before_it_is_launched(anonymous_client, world, adnans, fake, monkeypatch):

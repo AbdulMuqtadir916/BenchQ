@@ -11,9 +11,25 @@ from functools import lru_cache
 import uuid
 
 import httpx
+from sqlalchemy import event, text
+from sqlalchemy.orm import Session as OrmSession, defer
 from starlette.requests import Request
 
 TEST_PASSWORD = "correct-horse-battery"
+
+
+def has_work_hours(db) -> bool:
+    """False on a scratch database a migration test holds below 0031, whose `firms` has no work hours yet."""
+    return db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() "
+                           "AND table_name = 'firms' AND column_name = 'work_start'")).first() is not None
+
+
+@event.listens_for(OrmSession, "do_orm_execute")
+def _read_firms_without_missing_work_hours(state) -> None:
+    """The `Firm` model has the newest columns; a migration test still reads firms at an older revision."""
+    from backend.models.tenancy import Firm
+    if state.is_select and state.bind_mapper is Firm.__mapper__ and not has_work_hours(state.session):
+        state.statement = state.statement.options(defer(Firm.work_start), defer(Firm.work_end))
 
 
 @lru_cache(maxsize=1)
@@ -44,9 +60,13 @@ def make_plan(db, name="Test plan", seat_limit=10, candidate_limit=100):
 def make_firm(db, plan, slug="acme", status="ACTIVE", name=None, id=None, work_start=time(18, 30),
               work_end=time(4, 0)):
     from backend.models.tenancy import Firm
-    firm = Firm(id=id, name=name or slug.title(), slug=slug, status=status, plan_id=plan.id,
-                seat_limit=plan.seat_limit, candidate_limit=plan.candidate_limit, work_start=work_start,
-                work_end=work_end)
+    fields = {"name": name or slug.title(), "slug": slug, "status": status, "plan_id": plan.id,
+              "seat_limit": plan.seat_limit, "candidate_limit": plan.candidate_limit}
+    if not has_work_hours(db):              # below 0031: the model's INSERT would name the missing columns
+        firm_id = id or uuid.uuid4()
+        db.execute(Firm.__table__.insert().values(id=firm_id, **fields))
+        return db.get(Firm, firm_id)
+    firm = Firm(id=id, work_start=work_start, work_end=work_end, **fields)
     db.add(firm)
     db.flush()
     return firm
@@ -91,8 +111,10 @@ def seed_accounts(db) -> Accounts:
     admin = make_admin(db)
     firm_token, _ = start_session(db, user)
     admin_token, _ = start_session(db, admin)
+    # Read before the commit expires them: a migration test's older `firms` can't be reloaded through the model.
+    accounts = Accounts(plan.id, firm.id, user.id, admin.id, firm_token, admin_token)
     db.commit()
-    return Accounts(plan.id, firm.id, user.id, admin.id, firm_token, admin_token)
+    return accounts
 
 
 def send_sessions(client, app, accounts: Accounts) -> None:
