@@ -1,7 +1,8 @@
 "use client";
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
-import { JOBS_PAGE, jobsApi, type JobListParams } from "@/lib/api/jobs";
+import { jobsApi, type JobListParams } from "@/lib/api/jobs";
+import { jobPageSize } from "@/lib/derive/job-pages";
 import { queryKeys } from "@/lib/query/keys";
 import type { CaptureJob } from "@/lib/schemas/job";
 import type { JobSearches } from "@/lib/schemas/job-search";
@@ -34,7 +35,7 @@ export function useJobPages(params: Omit<JobListParams, "offset" | "limit">, { i
   const firmId = useFirmId();
   return useInfiniteQuery({
     queryKey: queryKeys.jobs.list(firmId, { ...params, paged: true }),
-    queryFn: ({ pageParam }) => jobsApi.page(firmId, { ...params, limit: JOBS_PAGE, offset: pageParam }),
+    queryFn: ({ pageParam }) => jobsApi.page(firmId, { ...params, limit: jobPageSize(pageParam), offset: pageParam }),
     initialPageParam: 0,
     getNextPageParam: (last) => last.nextOffset ?? undefined,
     enabled: isEnabled,

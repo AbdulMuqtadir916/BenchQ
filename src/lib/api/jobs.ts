@@ -9,7 +9,6 @@ import { http } from "./http";
 /** The most jobs one list read returns (the backend's FIRM_LIST_MAX). */
 export const JOBS_LIST_MAX = 400;
 /** A job list's page (decided 2026-11-14, Q29): "Load more" reads the next one. */
-export const JOBS_PAGE = 100;
 
 export type JobSort = "match" | "newest" | "company";
 /** The backend's source names for the list's source filter (portal-logo.tsx `PortalKey`). */

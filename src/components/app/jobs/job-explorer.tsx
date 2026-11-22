@@ -23,7 +23,7 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
 import { matchFor } from "@/lib/derive";
 import { useJobPages, useJobSearches } from "@/lib/hooks/use-jobs";
-import { NEWEST, dayOptions, readPick } from "@/lib/derive/job-days";
+import { ALL_DAYS, dayOptions, readPick } from "@/lib/derive/job-days";
 import { SOURCE_FILTER, defaultJobSource, readJobSource, type JobSourceKey } from "@/lib/derive/job-source";
 import type { JobSort } from "@/lib/api/jobs";
 import { ErrorState } from "@/components/app/error-state";
@@ -117,8 +117,8 @@ export function JobExplorer({
   // on the first source with jobs for this candidate and Day (`defaultJobSource`).
   const pickedSource = readJobSource(searchParams.get("source"));
   const [openedSource, setOpenedSource] = useState<{ scope: string; source: JobSourceKey } | null>(null);
-  // A candidate's jobs open at their newest batch (one Find jobs click, Q109), grouped by Day (2026-11-17, Q166).
-  const [batchChoice, setBatchChoice] = useState(NEWEST);
+  // A candidate's jobs open on All days (decided 2026-11-22); the picker narrows to a Day or a batch (Q109, Q166).
+  const [batchChoice, setBatchChoice] = useState(ALL_DAYS);
   const [remote, setRemote] = useState("ALL");
   // Every job a candidate has, best Match first (decided 2026-11-14, Q36): no score floor to start with.
   const [scoreFloor, setScoreFloor] = useState("0");
@@ -186,7 +186,7 @@ export function JobExplorer({
     writeSource(null);
   }
 
-  // Every job, 100 at a time, sorted and filtered by the backend over the whole list (decided 2026-11-14, Q28, Q29,
+  // Every job, 50 first and then 10 at a time, sorted and filtered by the backend over the whole list (decided 2026-11-14, Q28, Q29,
   // Q47): the filters are the request, so "Load more" brings the next part of the same list and the total is real.
   const pages = useJobPages({
     candidateId: context?.id,
@@ -299,7 +299,7 @@ export function JobExplorer({
               <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--color-text-3)]" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company, location…" className="pl-8" />
             </label>
-            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); writeSource(null); }} aria-label="Candidate context" /> : <Select value={portal} options={sourceOptions} onValueChange={pickSource} aria-label="Job source" />}
+            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); setBatchChoice(ALL_DAYS); writeSource(null); }} aria-label="Candidate context" /> : <Select value={portal} options={sourceOptions} onValueChange={pickSource} aria-label="Job source" />}
             {!lockedCandidate ? <Select value={portal} options={sourceOptions} onValueChange={pickSource} aria-label="Job source" /> : null}
             {context && hasBatches ? <Select value={batchChoice} options={days.options} onValueChange={pickDay} aria-label="Day and batch" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
