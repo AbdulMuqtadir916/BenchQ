@@ -421,8 +421,10 @@ batch** picker (2026-11-17, Q152–Q174): the candidate's Days, newest first ("D
 assignment to their BDE in the firm's work days; picking a Day lists all its batches), each Day's batches under it
 ("Batch 4 · 7:42 PM", numbered on across Days), "Earlier searches" (before this assignment, by date and time), then
 "All days"; it opens at the newest batch. The OWNER and MANAGER also see the empty Days, folded ("Days 2–39 · no
-searches"), never pickable; a BDE sees only Days with work. The source filter shows each source's count; it opens at
-All sources.
+searches"), never pickable; a BDE sees only Days with work. The source filter shows each source's count and one source
+at a time (2026-11-21; a search still asks every source). It opens on freehire.me, else Indeed, else LinkedIn, else the
+first other source with jobs, and opens that way again when the candidate or Day changes. A pick is kept in the URL
+(`?source=`).
 LinkedIn jobs show LinkedIn's own page in the pane (the extension), and tailoring one asks for its posting.
 
 #### Resumes

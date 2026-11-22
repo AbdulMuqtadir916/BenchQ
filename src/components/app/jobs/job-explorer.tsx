@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import {
   ArrowUpRight,
@@ -23,7 +24,8 @@ import type { Job } from "@/lib/schemas/job";
 import { matchFor } from "@/lib/derive";
 import { useJobPages, useJobSearches } from "@/lib/hooks/use-jobs";
 import { NEWEST, dayOptions, readPick } from "@/lib/derive/job-days";
-import type { JobSort, JobSourceFilter } from "@/lib/api/jobs";
+import { SOURCE_FILTER, defaultJobSource, readJobSource, type JobSourceKey } from "@/lib/derive/job-source";
+import type { JobSort } from "@/lib/api/jobs";
 import { ErrorState } from "@/components/app/error-state";
 import { formatRelative } from "@/lib/format/timezone";
 import { cn } from "@/lib/cn";
@@ -54,19 +56,12 @@ const REMOTE_OPTIONS: SelectOption[] = [
   { value: "ONSITE", label: "On-site" },
 ];
 
-const SOURCE_OPTIONS: SelectOption[] = [
-  { value: "ALL", label: "All sources" },
-  ...SOURCE_KEYS.map((portal) => ({
-    value: portal,
-    label: PORTALS[portal].label,
-    icon: <PortalLogo portal={portal} size={18} />,
-  })),
-];
+const SOURCE_OPTIONS: Array<SelectOption & { value: JobSourceKey }> = SOURCE_KEYS.map((portal) => ({
+  value: portal,
+  label: PORTALS[portal].label,
+  icon: <PortalLogo portal={portal} size={18} />,
+}));
 
-/** The source filter's backend names (backend/api/routes_job_search.py `list_firm_jobs`). */
-const SOURCE_FILTER: Record<string, JobSourceFilter> = {
-  INDEED: "indeed", FREEHIRE: "freehire", LINKEDIN: "linkedin", MANUAL: "manual", EXTENSION: "extension", OTHER_SOURCE: "other",
-};
 const SORT_PARAM: Record<string, JobSort> = { MATCH: "match", NEWEST: "newest", COMPANY: "company" };
 
 const SCORE_OPTIONS: SelectOption[] = [
@@ -115,8 +110,13 @@ export function JobExplorer({
   const [renderedAt] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  // Every source, each with its count (decided 2026-11-17, Q109: one click asks every source; replaces Q53's Indeed).
-  const [portal, setPortal] = useState("ALL");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // One source at a time, each with its count (decided 2026-11-21). A pick lives in the URL; without one the list opens
+  // on the first source with jobs for this candidate and Day (`defaultJobSource`).
+  const pickedSource = readJobSource(searchParams.get("source"));
+  const [openedSource, setOpenedSource] = useState<{ scope: string; source: JobSourceKey } | null>(null);
   // A candidate's jobs open at their newest batch (one Find jobs click, Q109), grouped by Day (2026-11-17, Q166).
   const [batchChoice, setBatchChoice] = useState(NEWEST);
   const [remote, setRemote] = useState("ALL");
@@ -163,6 +163,28 @@ export function JobExplorer({
     : { options: [], newestBatchId: undefined }), [searchesQuery.data, showEmptyDays]);
   const hasBatches = days.newestBatchId !== undefined;
   const pick = context ? readPick(batchChoice, days.newestBatchId) : {};
+  const sourceScope = JSON.stringify([context?.id ?? "", pick]);
+  const isSourceSettled = pickedSource !== null || openedSource?.scope === sourceScope;
+  const portal = pickedSource ?? (openedSource?.scope === sourceScope ? openedSource.source : "FREEHIRE");
+
+  /** The source in the URL; null clears it, so the list opens on its default again. */
+  function writeSource(source: JobSourceKey | null) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (source) next.set("source", source);
+    else next.delete("source");
+    const search = next.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+  }
+
+  function pickSource(value: string) {
+    const source = readJobSource(value);
+    if (source) writeSource(source);
+  }
+
+  function pickDay(value: string) {
+    setBatchChoice(value);
+    writeSource(null);
+  }
 
   // Every job, 100 at a time, sorted and filtered by the backend over the whole list (decided 2026-11-14, Q28, Q29,
   // Q47): the filters are the request, so "Load more" brings the next part of the same list and the total is real.
@@ -170,7 +192,7 @@ export function JobExplorer({
     candidateId: context?.id,
     sort: SORT_PARAM[sort === "MATCH" && !context ? "NEWEST" : sort],
     minScore: context ? Number(scoreFloor) : 0,
-    source: portal === "ALL" ? undefined : SOURCE_FILTER[portal],
+    source: SOURCE_FILTER[portal],
     remote: remote === "ALL" ? undefined : (remote as "REMOTE" | "HYBRID" | "ONSITE"),
     q: deferredQuery.trim() || undefined,
     excludeApplied: Boolean(context),
@@ -179,12 +201,12 @@ export function JobExplorer({
   });
   // Each source's count in this list before the source filter (the source tabs, Q109).
   const sourceCounts = pages.data?.pages[0]?.sourceCounts;
+  if (!isSourceSettled && sourceCounts && !searchesQuery.isLoading) {
+    setOpenedSource({ scope: sourceScope, source: defaultJobSource(sourceCounts) });
+  }
   const sourceOptions: SelectOption[] = useMemo(() => SOURCE_OPTIONS.map((option) => {
     if (!sourceCounts) return option;
-    const count = option.value === "ALL"
-      ? Object.values(sourceCounts).reduce((sum, n) => sum + n, 0)
-      : sourceCounts[SOURCE_FILTER[option.value]] ?? 0;
-    return { ...option, label: `${option.label} (${count})` };
+    return { ...option, label: `${option.label} (${sourceCounts[SOURCE_FILTER[option.value]] ?? 0})` };
   }), [sourceCounts]);
   const total = pages.data?.pages[0]?.total ?? 0;
   const rows = useMemo(() => (pages.data?.pages.flatMap((page) => page.jobs) ?? [])
@@ -194,7 +216,7 @@ export function JobExplorer({
       const match = matchFor(job, context?.id);
       return { job, score: match?.score ?? null, note: match?.note ?? null, portal: portalForJob(job) };
     }), [pages.data, hiddenIds, showHidden, context, appliedIds]);
-  const isListLoading = loading || pages.isLoading;
+  const isListLoading = loading || pages.isLoading || (!isSourceSettled && !pages.error);
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
@@ -205,7 +227,7 @@ export function JobExplorer({
       ? `This job is not in ${context?.fullName ?? "this candidate"}'s job list, so it can't be saved for them yet.`
       : toggleSavedJob.error.message
     : null;
-  const activeFilterCount = [portal !== "ALL", remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
+  const activeFilterCount = [remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
 
   /** Heart: save the job for the candidate in context, or remove the untouched Saved draft again. */
   function toggleSaved(job: Job) {
@@ -277,9 +299,9 @@ export function JobExplorer({
               <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--color-text-3)]" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company, location…" className="pl-8" />
             </label>
-            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); }} aria-label="Candidate context" /> : <Select value={portal} options={sourceOptions} onValueChange={setPortal} aria-label="Job source" />}
-            {!lockedCandidate ? <Select value={portal} options={sourceOptions} onValueChange={setPortal} aria-label="Job source" /> : null}
-            {context && hasBatches ? <Select value={batchChoice} options={days.options} onValueChange={setBatchChoice} aria-label="Day and batch" /> : null}
+            {!lockedCandidate ? <Select value={candidateId} options={candidateOptions} onValueChange={(value) => { setCandidateId(value); onCandidateChange?.(value); setSelectedId(""); setScoreFloor("0"); setSort(value ? "MATCH" : "NEWEST"); writeSource(null); }} aria-label="Candidate context" /> : <Select value={portal} options={sourceOptions} onValueChange={pickSource} aria-label="Job source" />}
+            {!lockedCandidate ? <Select value={portal} options={sourceOptions} onValueChange={pickSource} aria-label="Job source" /> : null}
+            {context && hasBatches ? <Select value={batchChoice} options={days.options} onValueChange={pickDay} aria-label="Day and batch" /> : null}
             <Select value={remote} options={REMOTE_OPTIONS} onValueChange={setRemote} aria-label="Work mode" />
             <Select value={scoreFloor} options={SCORE_OPTIONS} onValueChange={setScoreFloor} aria-label="Minimum match score" disabled={!context} />
           </div>
