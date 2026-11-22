@@ -26,16 +26,17 @@ Switching on classifies only mail imported after that point. Existing and disabl
 
 ## PR 4 additions (2026-11-06, branch codex/pr4-code-correction)
 
-### Setup checklist (platform settings, AI preset scope)
+### Setup checklist (the `email_classification` AI preset, since 2026-11-22)
 
-| Setting | Value |
+Set these at `/admin/ai-presets` (`docs/integration/08-ai-presets.md`):
+
+| Part | Value |
 |---|---|
-| `candidate_email_llm_provider` | `openrouter` (the only accepted provider) |
-| `candidate_email_llm_model` | the Perplexity Decider model on OpenRouter Decisions (used in testing: `perplexity/pplx-decider-v1.2`; confirm the id in OpenRouter) |
-| `candidate_email_llm_api_key` | the OpenRouter key; never in code, logs or docs |
-| `candidate_email_llm_effort`, `candidate_email_instructions` | optional |
+| Provider and key | OpenRouter and the one shared key; never in code, logs or docs |
+| Model | The active preset: a Perplexity Decider model on OpenRouter Decisions (default `perplexity/pplx-decider-v1.2`; the save tests it) |
+| Instructions | Optional, on the preset |
 
-- The classifier **never borrows the primary model's settings** (`llm_*`). If any of the three required settings is empty,
+- The classifier **never borrows the older `llm_*` settings**. With no key or no active preset,
   classification is "not configured": mail stays `PENDING`, no attempt is spent, and the log says so once per sweep.
 - A key the provider refuses (401/403) **pauses** this configuration: mail stays `PENDING`, no attempt is spent, retry and
   reclassify answer 409 "Classifier paused". Changing the key or model resumes at once; otherwise one probe email is sent

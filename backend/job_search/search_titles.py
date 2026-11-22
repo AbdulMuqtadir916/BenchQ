@@ -10,8 +10,8 @@ the "Additional candidate details" tab shows them read-only to the owner and man
 The search asks for the target role's own titles and these, 5 at most (`for_search`); the Match counts them as wanted
 titles. None made (an older candidate, or a failed call): the target role alone (Q135).
 
-The call: the parser's OpenRouter key (`resume_parse_llm_api_key`), this module's own model and prompt rows
-(`search_titles_llm_model`, `search_titles_prompt`, `search_titles_response_format`), thinking off, a strict reply.
+The call: the active AI preset's model and prompt and the one shared key (`ai_config("search_titles")`), thinking off
+unless the preset sets an effort, a strict reply whose format stays in this file.
 Guards on what the AI says: no seniority words, nothing a title the candidate already has, and never a generic title
 (Match's `names_no_subject`: "Software Engineer", "Developer" alone). A failure never fails anything: it logs a code.
 Logs carry ids, codes and timings, never a title.
@@ -23,8 +23,6 @@ import re
 
 logger = logging.getLogger("benchq.job_search")
 
-MODEL_ROW, PROMPT_ROW, FORMAT_ROW = "search_titles_llm_model", "search_titles_prompt", "search_titles_response_format"
-KEY_ROW = "resume_parse_llm_api_key"
 MOST_SEARCHED = 5               # in one search, the target role's titles first (freehire.me takes 5 alternatives)
 AI_TITLES = 2
 ROLE = "{target_role}"
@@ -72,11 +70,11 @@ def for_search(target_titles, extra) -> list[str]:
 
 
 def _settings(db) -> dict:
-    from backend.models.db import Setting
-    rows = {row.key: (row.value or "").strip() for row in
-            db.query(Setting).filter(Setting.key.in_((MODEL_ROW, PROMPT_ROW, FORMAT_ROW, KEY_ROW)))}
-    return {"model": rows.get(MODEL_ROW) or DEFAULT_MODEL, "prompt": rows.get(PROMPT_ROW) or DEFAULT_PROMPT,
-            "format": rows.get(FORMAT_ROW) or DEFAULT_FORMAT, "key": rows.get(KEY_ROW) or ""}
+    from backend.ai.config import ai_config
+    cfg = ai_config("search_titles", db=db)
+    return {"model": cfg.model or DEFAULT_MODEL, "prompt": cfg.prompts.get("prompt") or DEFAULT_PROMPT,
+            "format": DEFAULT_FORMAT, "key": cfg.api_key, "effort": cfg.effort, "preset_id": cfg.preset_id,
+            "preset_version": cfg.preset_version}
 
 
 async def suggest(roles: list[str], setup: dict, firm_id=None) -> list[str]:
@@ -87,10 +85,13 @@ async def suggest(roles: list[str], setup: dict, firm_id=None) -> list[str]:
         return []
     prompt = setup["prompt"].replace(ROLE, " | ".join(roles))
     try:
-        async with track_llm_call("search_titles", "openrouter", setup["model"], firm_id=firm_id) as tracker:
+        async with track_llm_call("search_titles", "openrouter", setup["model"], firm_id=firm_id,
+                                  preset_id=setup.get("preset_id"),
+                                  preset_version=setup.get("preset_version")) as tracker:
             reply = await call_llm(prompt=prompt, system="You name job titles. Reply in JSON.", max_tokens=200,
-                                   provider="openrouter", model=setup["model"], api_key=setup["key"], effort="",
-                                   response_format=json.loads(setup["format"]), reasoning_off=True,
+                                   provider="openrouter", model=setup["model"], api_key=setup["key"],
+                                   effort=setup.get("effort", ""),
+                                   response_format=json.loads(setup["format"]), reasoning_off=not setup.get("effort"),
                                    use_fallback=False, attempt_timeout=30)
             tracker.record(reply)
         titles = json.loads(reply.get("text") or "{}").get("titles")

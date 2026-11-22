@@ -34,6 +34,7 @@ from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
 from backend.api.routes_auth import router as auth_router
 from backend.api.routes_admin import router as admin_router
+from backend.api.routes_ai_presets import router as ai_presets_router
 from backend.api.routes_firms import router as firms_router
 from backend.api.routes_invites import router as invites_router
 from backend.api.routes_team import router as team_router
@@ -51,6 +52,17 @@ configure_logging()
 logger = logging.getLogger("jobnavigator")
 
 
+def _require_ai_secret() -> None:
+    """A stored AI key the server can't read fails at startup, not on the first paid call."""
+    from backend.ai.secrets import decrypt_key
+    from backend.ai.store import provider_row
+    from backend.models.db import SessionLocal
+    with SessionLocal() as db:
+        row = provider_row(db)
+        if row is not None and row.api_key_encrypted:
+            decrypt_key(row.api_key_encrypted)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: check the schema, seed data. The schema itself is built by Alembic before this process starts
@@ -65,6 +77,7 @@ async def lifespan(app: FastAPI):
     from backend.auth.password_reset import require_reset_base_url
     require_reset_base_url()
     run_seeds()
+    _require_ai_secret()
     # The job search's scraping library, loaded once before any search can run: two sources loading it at once fail.
     from backend.job_search.providers.base import load_jobspy
     load_jobspy()
@@ -201,6 +214,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(ai_presets_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")
 app.include_router(invites_router, prefix="/api")
 app.include_router(team_router, prefix="/api")

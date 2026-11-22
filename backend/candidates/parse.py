@@ -17,7 +17,8 @@ import logging
 
 from fastapi import HTTPException
 
-from backend.candidates.parse_defaults import DOCX_INPUT_NOTE, INPUT_NOTE, PDF_INPUT_NOTE, RESUME
+from backend.candidates.parse_defaults import (DEFAULT_RESPONSE_FORMAT, DOCX_INPUT_NOTE, INPUT_NOTE, PDF_INPUT_NOTE,
+                                               RESUME)
 
 logger = logging.getLogger("jobnavigator.resume_parse")
 
@@ -31,10 +32,6 @@ OCR_RESOLUTION = 200                               # dots per inch the page is d
 # The parse call (resume-versioning.md §2.1): a long résumé needs about 8k output tokens; someone watches the spinner.
 MAX_OUTPUT_TOKENS = 16000
 ATTEMPT_SECONDS = 80
-# The parser's own model rows (§2.2), read straight from `settings`: ai_config may have filled an empty one from the
-# shared (Claude) rows, which would send an OpenRouter request with a Claude model or key.
-PROVIDER_ROW, MODEL_ROW, KEY_ROW = "resume_parse_llm_provider", "resume_parse_llm_model", "resume_parse_llm_api_key"
-FORMAT_ROW, PROMPT_ROW = "resume_parse_response_format", "resume_parse_prompt"
 # The top-level keys clean_reply reads; a format whose schema doesn't require all of them can't fill the parse.
 REPLY_KEYS = ("header", "professional_summary", "technical_skills", "work_experience", "projects", "education",
               "certifications", "awards", "languages")
@@ -163,63 +160,11 @@ def extract_text(kind: str, content: bytes) -> str:
     return text.rstrip() + _links_block(links, "PDF" if kind == "pdf" else "document")
 
 
-# ── The settings it runs on ──────────────────────────────────────────────────────────────────────────────────────
-
-def response_format_problem(value) -> str | None:
-    """Why `value` can't be the parser's response format, or None. A dict is accepted too: the settings page gets
-    JSON values back parsed and may send them so."""
-    if isinstance(value, str):
-        try:
-            value = json.loads(value)
-        except json.JSONDecodeError:
-            return "is not valid JSON"
-    if not isinstance(value, dict) or value.get("type") != "json_schema":
-        return 'needs "type": "json_schema"'
-    spec = value.get("json_schema") if isinstance(value.get("json_schema"), dict) else {}
-    if spec.get("strict") is not True:
-        return 'needs "json_schema.strict": true'
-    if not isinstance(spec.get("name"), str) or not spec["name"].strip():
-        return 'needs a "json_schema.name"'
-    schema = spec.get("schema") if isinstance(spec.get("schema"), dict) else {}
-    if schema.get("type") != "object":
-        return 'needs "json_schema.schema.type": "object"'
-    missing = [key for key in REPLY_KEYS if key not in (schema.get("required") or [])]
-    if missing:
-        return "has a schema that doesn't require " + ", ".join(missing)
-    return None
-
-
-def prompt_problem(value) -> str | None:
-    """Why `value` can't be the parser's user prompt, or None: without {resume} the résumé would never reach it."""
-    return None if isinstance(value, str) and RESUME in value else "needs the {resume} placeholder"
-
-
-def setting_problems(updates: dict) -> list[str]:
-    """The save check for the parser's rows (backend/seed.py invalid_setting_values)."""
-    problems = []
-    if FORMAT_ROW in updates and (why := response_format_problem(updates[FORMAT_ROW])):
-        problems.append(f"{FORMAT_ROW}: {why}")
-    if PROMPT_ROW in updates and (why := prompt_problem(updates[PROMPT_ROW])):
-        problems.append(f"{PROMPT_ROW}: {why}")
-    return problems
-
+# ── The setup it runs on ─────────────────────────────────────────────────────────────────────────────────────────
 
 def _setup_error(detail: str) -> HTTPException:
     logger.error("The résumé parser isn't set up: %s", detail)
     return HTTPException(status_code=500, detail=f"The résumé reader isn't set up: {detail}.")
-
-
-def _parser_model(db) -> tuple[str, str]:
-    """The parser's own model and key; 500 naming the row when one isn't set, so no other model is ever called."""
-    from backend.models.db import Setting
-    rows = {row.key: (row.value or "").strip()
-            for row in db.query(Setting).filter(Setting.key.in_((PROVIDER_ROW, MODEL_ROW, KEY_ROW)))}
-    if rows.get(PROVIDER_ROW) != "openrouter":
-        raise _setup_error(f"{PROVIDER_ROW} must be openrouter")
-    for row in (MODEL_ROW, KEY_ROW):
-        if not rows.get(row):
-            raise _setup_error(f"{row} is not set")
-    return rows[MODEL_ROW], rows[KEY_ROW]
 
 
 # ── Reading it ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -233,18 +178,22 @@ async def read_resume(text: str, kind: str, db, firm_id=None) -> dict:
     from backend.analyzer.model_json import parse_model_json
     from backend.analyzer.prompt_fence import fence
     from backend.candidates.base_resume import clean_reply, dropped_source_terms
+    from backend.job_monitor import get_limiter
 
-    model, api_key = _parser_model(db)
     cfg = ai_config("resume_parse", db=db)
+    if cfg.provider != "openrouter":
+        raise _setup_error("the AI provider must be openrouter")
+    if not cfg.model:
+        raise _setup_error("no active AI preset")
+    if not cfg.api_key:
+        raise _setup_error("the AI API key is not set")
     try:
-        system, template, response_format = cfg.prompt("system"), cfg.prompt("parse"), cfg.prompt("response_format")
+        system, template = cfg.prompt("system"), cfg.prompt("parse")
     except RuntimeError as e:
         raise _setup_error(str(e).rstrip("."))
-    if why := response_format_problem(response_format):
-        raise _setup_error(f"{FORMAT_ROW} {why}")
-    if why := prompt_problem(template):
-        raise _setup_error(f"{PROMPT_ROW} {why}")
-    # The settings are read; end the transaction so the connection goes back to the pool while the model works (up
+    if RESUME not in template:
+        raise _setup_error("the parse prompt needs the {resume} placeholder")
+    # The setup is read; end the transaction so the connection goes back to the pool while the model works (up
     # to minutes). Holding it would let some 30 parses at once drain the pool for every firm (backend/models/db.py).
     db.commit()
 
@@ -252,12 +201,16 @@ async def read_resume(text: str, kind: str, db, firm_id=None) -> dict:
     # Plain replace, never .format (the rules hold braces); {resume} last, so a résumé printing "{input_note}" stays.
     prompt = template.replace(INPUT_NOTE, note).replace(RESUME, fence(text, "RESUME", note=False))
     try:
-        async with track_llm_call("resume_parse", "openrouter", model, firm_id=firm_id) as tracker:
-            response = await call_llm(prompt=prompt, system=system, max_tokens=MAX_OUTPUT_TOKENS,
-                                      provider="openrouter", model=model, api_key=api_key, effort="",
-                                      response_format=json.loads(response_format), reasoning_off=True,
-                                      use_fallback=False, retry_cut_off=True, attempt_timeout=ATTEMPT_SECONDS)
-            tracker.record(response)
+        # At most `resume_parse_max_concurrent` parses at once per backend process; the rest wait here.
+        async with get_limiter("resume_parse"):
+            async with track_llm_call("resume_parse", "openrouter", cfg.model, firm_id=firm_id,
+                                      preset_id=cfg.preset_id, preset_version=cfg.preset_version) as tracker:
+                response = await call_llm(prompt=prompt, system=system, max_tokens=MAX_OUTPUT_TOKENS,
+                                          provider="openrouter", model=cfg.model, api_key=cfg.api_key,
+                                          effort=cfg.effort, response_format=json.loads(DEFAULT_RESPONSE_FORMAT),
+                                          reasoning_off=not cfg.effort, use_fallback=False, retry_cut_off=True,
+                                          attempt_timeout=ATTEMPT_SECONDS)
+                tracker.record(response)
     except LLMDeadlineError:
         logger.warning("Résumé parse timed out after %ss", ATTEMPT_SECONDS)
         raise HTTPException(status_code=504, detail="There was an issue while parsing your resume, please try again.")

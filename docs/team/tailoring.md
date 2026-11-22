@@ -56,23 +56,25 @@ Also in part 1: `without_fake_markers` in `backend/analyzer/prompt_fence.py` (no
 and `keyword_match.py` (at its last commit). Every difference is an import or a module prefix, and the documented
 `requirements_met: []`.
 
-## 3. Setup (`settings`)
+## 3. Setup (the `resume_tailor` AI preset)
 
-| Row | Value |
+Since 2026-11-22 the tailor runs on its active preset at `/admin/ai-presets` and the one shared key
+(`docs/integration/08-ai-presets.md`).
+
+| Part | Where |
 |---|---|
-| `resume_tailor_llm_provider` | `openrouter` (the only value accepted) |
-| `resume_tailor_llm_model` | `openai/gpt-6-luna` |
-| `resume_tailor_llm_api_key` | Seeded **empty**; set on the settings page, never in code or commits. Until it is set, every tailoring fails naming this row. |
-| `resume_tailor_system_prompt`, `resume_tailor_review_system_prompt`, `resume_tailor_writing_style`, `resume_tailor_cv_rules` | The two system prompts and the rules filled into `{writing_style}` and `{cv_rules}` |
-| `resume_tailor_{analyse,draft,review,revise,verify}_prompt` | The five step templates. Each must keep its placeholders (`settings.PLACEHOLDERS`). |
-| `resume_tailor_{analyse,draft,review,verify}_format` | The strict response formats, stored whole (`json_schema`, `strict: true`). Revise answers in the draft's, named `mads_revise`. Each schema must require the fields the code reads (`settings.READ_FIELDS`). |
+| Provider and key | The one OpenRouter key on the panel. Until it is set, every tailoring fails saying so. |
+| Model | The active preset (`openai/gpt-6-luna` by default) |
+| Two system prompts, writing style, CV rules, five step templates | The preset's prompts. Each step must keep its placeholders (`settings.PLACEHOLDERS`). |
+| The four strict response formats | In code (`schemas.py`). Revise answers in the draft's, named `mads_revise`. |
+| Running at once | `resume_tailor_max_concurrent`, 40 per backend process, editable on the panel |
 
 - **The request** (handoff §1) is BenchQ's `call_llm` with: the strict format and `provider.require_parameters`,
   `reasoning: {enabled: false}`, no temperature, `max_tokens` 12,000, no fallback model, a reply cut off at the cap
   retried. Four attempts with 2, 4 and 8 s between them. A reply that isn't JSON is asked for once more.
-- **The checks:** a save through `/api/settings` refuses a broken prompt or format (`invalid_setting_values`), and every
-  run reads the rows through `read_setup`, which raises `TailorSetupError` naming the row. part 2 answers that with a 500.
-- **A prompt or format change needs re-testing:** they were measured as written.
+- **The checks:** a preset save refuses a broken prompt (`backend/ai/modules.py`), and every run reads its setup through
+  `read_setup`, which raises `TailorSetupError` saying what's missing. part 2 answers that with a 500.
+- **A prompt change needs re-testing:** they were measured as written.
 
 ## 4. A version in and out (`stored.py`)
 

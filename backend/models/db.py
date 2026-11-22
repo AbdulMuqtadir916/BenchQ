@@ -575,6 +575,9 @@ class LlmCallLog(Base):
     duration_ms = Column(Integer, default=0, nullable=False)
     success = Column(Boolean, default=True, nullable=False)
     error = Column(Text, nullable=True)
+    # The AI preset and version the call ran with (08 Q5); null for code outside the presets and for older rows.
+    preset_id = Column(UUID(as_uuid=True), ForeignKey("ai_presets.id", ondelete="SET NULL"), nullable=True)
+    preset_version = Column(Integer, nullable=True)
 
 
 # ── Activity Log ────────────────────────────────────────────────────────────

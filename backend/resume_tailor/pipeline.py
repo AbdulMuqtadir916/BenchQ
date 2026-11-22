@@ -125,13 +125,14 @@ def _filled(template: str, fill: dict) -> str:
 
 async def call_model(setup: Setup, prompt: str, system: str, step: str, firm_id=None) -> dict:
     """One step's call, as the handoff's §1 sets it: the strict format (sent with provider.require_parameters),
-    reasoning off, no temperature, no fallback model; 4 attempts for a timeout, a 429 or 5xx, or a reply cut off at
+    reasoning off unless the preset sets an effort, no temperature, no fallback model; 4 attempts for a timeout, a 429 or 5xx, or a reply cut off at
     MAX_TOKENS (call_llm). Logged to llm_call_log under the firm. Returns {"text", "usage"}."""
-    async with track_llm_call(PURPOSE, PROVIDER, setup.model, firm_id=firm_id) as tracker:
+    async with track_llm_call(PURPOSE, PROVIDER, setup.model, firm_id=firm_id, preset_id=setup.preset_id,
+                              preset_version=setup.preset_version) as tracker:
         response = await call_llm(prompt=prompt, system=system, max_tokens=MAX_TOKENS, provider=PROVIDER,
-                                  model=setup.model, api_key=setup.api_key, effort="",
-                                  response_format=setup.format(step), reasoning_off=True, use_fallback=False,
-                                  retry_cut_off=True)
+                                  model=setup.model, api_key=setup.api_key, effort=setup.effort,
+                                  response_format=setup.format(step), reasoning_off=not setup.effort,
+                                  use_fallback=False, retry_cut_off=True)
         tracker.record(response)
     return response
 

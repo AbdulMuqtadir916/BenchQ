@@ -198,6 +198,18 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
+    # The Super Admin's AI setup (docs/integration/08-ai-presets.md).
+    "GET /api/admin/ai": A,
+    "GET /api/admin/ai/available-models": A,
+    "PUT /api/admin/ai/provider": A,
+    "POST /api/admin/ai/models": A,
+    "DELETE /api/admin/ai/models/{model_uuid}": A,
+    "POST /api/admin/ai/presets": A,
+    "PATCH /api/admin/ai/presets/{preset_id}": A,
+    "POST /api/admin/ai/presets/{preset_id}/activate": A,
+    "POST /api/admin/ai/presets/{preset_id}/archive": A,
+    "POST /api/admin/ai/presets/{preset_id}/test-run": A,
+    "PATCH /api/admin/ai/limits": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data

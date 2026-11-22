@@ -29,7 +29,9 @@ class Classification:
 
 
 def config_identity(cfg):
-    return hashlib.sha256(repr((cfg.provider, cfg.model, cfg.prompts, cfg.preset_id, cfg.preset_version,
+    """What the classifier actually runs with. A preset's id and version stay out, so moving an unchanged setup into a
+    preset keeps the evaluated fingerprint; a real model or prompt change still replaces it (decided 2026-11-22)."""
+    return hashlib.sha256(repr((cfg.provider, cfg.model, cfg.prompts,
                                 INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT,
                                 "minimization-2026-11-07.1", "gmail-auth-2026-11-04.1")).encode()).hexdigest()
 

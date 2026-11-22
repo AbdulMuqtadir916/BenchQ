@@ -823,6 +823,41 @@ handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
 
 ---
 
+### 3.5 AI setup — APPROVED 2026-11-22 (Zuhair with Abdul), BUILT (migration 0032)
+
+Platform data, Super Admin only (`ai.manage`), never shown to a firm. The rules are in
+[08-ai-presets.md](./integration/08-ai-presets.md).
+
+```ts
+AiSetup = {
+  provider: { provider: "openrouter", isKeySet: boolean, keyLast4: string | null, updatedAt: string | null },
+  providers: { id: string, label: string }[],
+  models: { id, modelId, label, isHidden: boolean, inUse: boolean }[],
+  limits: { resumeTailor: number, resumeParse: number },   // 1-200, per backend process
+  efforts: string[],
+  useCases: {
+    key: "resume_parse" | "resume_tailor" | "search_titles" | "email_classification",
+    label: string, takesEffort: boolean, modelIds: string[],
+    prompts: { name, label, placeholders: string[], optional: boolean }[],
+    presets: { id, module, name, notes, isActive, archivedAt: string | null,
+               current: { version, modelId, effort, prompts: Record<string, string>, createdAt } }[],
+  }[],
+}
+```
+
+Tables: `ai_provider` (one row; `api_key_encrypted`, `key_last4`), `ai_models`, `ai_presets` (at most one active per use
+case), `ai_preset_versions` (never edited). `llm_call_log` gains `preset_id` and `preset_version`.
+
+| Route under `/api/admin/ai` | What it does |
+|---|---|
+| `GET /`, `GET /available-models` | The setup; OpenRouter's live model list |
+| `PUT /provider` | Tests, then saves the provider and key. 422 rejected; 409 unreachable, unless `force` |
+| `POST /models`, `DELETE /models/{id}` | Approves a model from the live list; hides one no active preset uses |
+| `POST /presets`, `PATCH /presets/{id}` | Creates or edits a preset; a model, effort or prompt change is a new version |
+| `POST /presets/{id}/activate`, `/archive` | Makes it active after testing it; archives one that isn't active |
+| `POST /presets/{id}/test-run` | Runs a pasted sample; nothing is saved |
+| `PATCH /limits` | Sets the tailoring and parser limits, applied without a restart |
+
 ## 4. Candidate
 
 ```ts
@@ -1538,7 +1573,7 @@ firm's start and time zone.
 
 **The extra search titles (2026-11-17, Q131–Q144; migration 0030).** `Candidate.searchTitles: string[]` (backend
 `search_titles`, on the active base's version 1, `resumes.search_titles`, read like the résumé's city): after a candidate
-is added, one AI call (`job_search/search_titles.py`: the parser's OpenRouter key, `search_titles_llm_model`,
+is added, one AI call (`job_search/search_titles.py`: the shared AI key and the `search_titles` preset's model,
 `search_titles_prompt` with `{target_role}`, `search_titles_response_format`; thinking off) suggests 2 related titles
 for the target role, guarded (no seniority words, never a generic title, none the candidate has). **Since 2026-11-18
 (07 Q68) nobody edits them**, like the target role: the "Additional candidate details" tab shows them read-only to the

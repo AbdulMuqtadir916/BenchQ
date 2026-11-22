@@ -39,7 +39,7 @@ from backend.match import store as match_store
 from backend.auth.sessions import Principal
 from backend.candidates import autofill as autofill_answers
 from backend.candidates import identity_check
-from backend.candidates import resume_file, versions
+from backend.candidates import resume_file, upload_limit, versions
 from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.models.candidates import ResumeParse, file_sha256
@@ -364,6 +364,7 @@ def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         if (answer := versions.already_uploaded(db, candidate, kept)) is not None:
             raise answer
         return False
+    upload_limit.refuse_past_limit(db, candidate)      # before the paid parse, under the candidate's lock
     db.commit()                              # no lock, and no connection, held while the parser works
     return True
 
@@ -388,6 +389,7 @@ def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         if kept is not None:                 # the same file, uploaded meanwhile
             raise versions.already_uploaded(db, candidate, kept) or HTTPException(status_code=409,
                                                                                   detail="Upload it again.")
+        upload_limit.refuse_past_limit(db, candidate)  # two uploads may have passed the first check together
         parse_row = ResumeParse(firm_id=firm_id, uploaded_by_user_id=actor.id, candidate_id=candidate.id,
                                 file_name=file_name[:255], mime_type=PDF_MIME if kind == "pdf" else DOCX_MIME,
                                 size_bytes=len(content), content=content, parse=parse, expires_at=None)

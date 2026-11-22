@@ -18,7 +18,7 @@ FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
                 "candidate.assign", "notification.approve", "firm.editHours")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend",
-                    "invite.revoke", "platformTeam.manage", "platform.notification.approve")
+                    "invite.revoke", "platformTeam.manage", "platform.notification.approve", "ai.manage")
 # Not actions: what a person sees. The team (07 Q15), and a candidate's extra search titles (07 Q68): the OWNER and
 # MANAGER only, never the BDE.
 VISIBILITY = ("team.view", "candidate.viewSearchTitles")

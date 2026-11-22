@@ -3,6 +3,18 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## The Super Admin's AI setup (`feat/job-search-indeed-and-candidate-details`, Zuhair, 2026-11-22)
+
+Agreed with Abdul. Rules: [08-ai-presets.md](../integration/08-ai-presets.md).
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| AI presets and settings (Abdul) | `backend/ai/`, `backend/api/routes_ai_presets.py`, `backend/models/ai_presets.py`, migration `0032`, `backend/seed.py`, `backend/settings_scope.py` | One encrypted key, a model catalog and presets; every readable key row, the four use cases' model and prompt rows and the six format rows leave `settings` | One provider and key, updatable from the admin panel |
+| Permissions and routes (Abdul) | `backend/auth/access.py`, `backend/auth/policy.py`, `policy_table.json`, `src/lib/auth/policy.ts`, `src/lib/routes/registry.ts` | `ai.manage` (Super Admin) and `/admin/ai-presets` | The panel |
+| Email classification (Samad) | `backend/inbox/decider.py`, `classification_worker.py`, `pr3-email-classification/OPERATIONS.md` | The fingerprint is the model and prompts, not the preset's id; runs record their preset | An unchanged setup keeps its evaluated fingerprint |
+| Résumé uploads (Abdul approves `candidates` rules) | `backend/candidates/upload_limit.py`, `routes_candidate_resumes.py` | 5 saved later uploads per candidate per firm work day (07 Q72) | Limits repeat paid parses |
+| Production limits (Uzair) | `backend/job_monitor.py`, `routes_settings.py` | A parser gate of 10; the tailor's limit now applies without a restart | One key shares one rate limit |
+
 ## Job search on Indeed, its inputs, and the candidate's details (`feat/job-search-indeed-and-candidate-details`, Zuhair)
 
 Grilled and built 2026-11-14 (Zuhair), in parallel with Abdul's review: **the PR doesn't merge without Abdul's OK on

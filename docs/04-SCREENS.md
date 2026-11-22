@@ -1016,6 +1016,19 @@ are drafted for sign-off separately — `HealthCheck`, `ScraperRun`, `AiUsage` (
 cost, run reference, timestamp) — and the page is built after approval. The contracts are now
 approved, not built (`docs/02` §3.2, 07 Q33, Q34).
 
+## 14.9a `/admin/ai-presets` — AI presets (2026-11-22)
+
+Super Admin only; `g i`. Rules: [integration/08-ai-presets.md](./integration/08-ai-presets.md).
+
+- **Provider and API key:** the provider dropdown (OpenRouter), a write-only key field, "Key set · ending 1234", and
+  **Test and save**. A rejected key or model shows the reason; an unreachable OpenRouter offers **Save anyway**.
+- **Running at once:** résumé tailoring and parser limits, per backend process.
+- **Approved models:** the catalog, with **Add model** searching OpenRouter's live list. A model in use can't be removed.
+- **One card per use case** (parser, tailoring, search titles, email classification): its presets with version, model and
+  an **Active** tag; **Make active**, **Test**, **Edit**, **Archive**, **New preset**. A use case with none active shows
+  "Needs setup". The edit dialog shows each prompt's required placeholders.
+- States: skeleton while loading, an error with retry, and an empty state if no use case exists.
+
 ## 14.10 Support view
 
 **Start from the firm page:** "View workspace" opens a dialog: firm name, a required reason (min. 10

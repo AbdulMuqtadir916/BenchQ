@@ -35,7 +35,7 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > pdfplumber, `.docx` via python-docx (tables included), `.doc` refused; 413/415/422 with the frontend's wording. One
 > call to AI module `resume_parse`, logged to `llm_call_log` as `resume_parse`, and kept 60 minutes in `resume_parses`;
 > expired unused parses are cleared on the firm's next read. **Since versioning PR 2** the call is the base-résumé
-> parser ([resume-versioning.md](../team/resume-versioning.md) §2): its own model (`resume_parse_llm_*`, OpenRouter,
+> parser ([resume-versioning.md](../team/resume-versioning.md) §2): its own AI preset (`resume_parse`, `docs/integration/08-ai-presets.md`; was `resume_parse_llm_*`, OpenRouter,
 > never the primary's), a strict response format, and `clean_reply` (`backend/candidates/base_resume.py`) storing the
 > format's own keys.
 >

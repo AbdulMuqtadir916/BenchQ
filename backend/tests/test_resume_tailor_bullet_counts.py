@@ -51,18 +51,9 @@ def test_the_prompts_ask_for_the_counts():
     assert "exactly 6 for the most recent role" in prompts.VERIFY_PROMPT
 
 
-def test_a_database_seeded_with_the_ranges_gets_the_counts_but_an_edit_stays(test_db):
-    from backend.models.db import Setting
-    rules = settings.PROMPT_ROWS["cv_rules"]
-    revise = settings.PROMPT_ROWS["revise"]
-    for key in (rules, revise):
-        test_db.query(Setting).filter(Setting.key == key).delete()
-    test_db.add(Setting(key=rules, value=settings._as_before(settings.DEFAULT_SETTINGS[rules][0])))
-    test_db.add(Setting(key=revise, value="An owner's own revise prompt {writing_style} {cv_rules} {part_b} {draft} "
-                                          "{resume} {posting}"))
-    test_db.commit()
-    changed = settings.upgrade_stored_defaults(test_db)
-    test_db.commit()
-    assert rules in changed and revise not in changed
-    assert test_db.query(Setting).filter(Setting.key == rules).one().value == settings.DEFAULT_SETTINGS[rules][0]
-    assert settings.upgrade_stored_defaults(test_db) == []                         # idempotent
+def test_a_prompt_still_holding_the_ranges_gets_the_counts_but_an_edit_stays():
+    default = settings.DEFAULT_PROMPTS["cv_rules"]
+    assert settings.upgraded_prompt("cv_rules", settings.as_before(default)) == default
+    edited = "An owner's own revise prompt {writing_style} {cv_rules} {part_b} {draft} {resume} {posting}"
+    assert settings.upgraded_prompt("revise", edited) == edited
+    assert settings.upgraded_prompt("cv_rules", default) == default                # idempotent

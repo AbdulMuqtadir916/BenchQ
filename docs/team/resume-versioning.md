@@ -59,26 +59,17 @@ argument; every other caller behaves exactly as before.
 | Cut-off reply | `finish_reason == "length"` counts as a failed attempt and is retried | A reply cut off halfway is unusable |
 | Deadline and retries | 80 s per attempt; 4 attempts, 2/4/8 s apart; a timeout ends the call | Someone is watching the upload spinner |
 
-### 2.2 The parser's settings (decided 2026-11-01)
+### 2.2 The parser's setup (the `resume_parse` AI preset, since 2026-11-22)
 
-The parser gets its own rows in the `settings` table, each with its default in `backend/seed.py` and its entry in
-`backend/settings_scope.py`. Seeding only inserts a missing key, so an admin's edits are never overwritten.
+The parser runs on its active preset at `/admin/ai-presets` and the one shared OpenRouter key
+(`docs/integration/08-ai-presets.md`). Its model defaults to `openai/gpt-6-luna`; its system and user prompts are the
+preset's; its strict response format is in code (`parse_defaults.py`).
 
-| Key | Value |
-|---|---|
-| `resume_parse_system_prompt` | The system prompt |
-| `resume_parse_prompt` | The user prompt template (replaces today's default) |
-| `resume_parse_response_format` | The strict JSON schema (§2), as JSON text |
-| `resume_parse_llm_provider` | `openrouter` |
-| `resume_parse_llm_model` | `openai/gpt-6-luna` |
-| `resume_parse_llm_api_key` | Seeded **empty**; set on the settings page. Never in code, seed data or commits |
-
-- **Save check:** `/api/settings` refuses a broken `resume_parse_response_format` (not valid JSON, not `json_schema`,
-  not `strict: true`, no name, or missing a top-level key) and a `resume_parse_prompt` without `{resume}`, with a 400.
-- **The parser never borrows the shared settings:** if any of its provider, model or key rows is empty, the parse
-  stops with a 500 naming that row and makes no AI call.
-- Until `resume_parse_llm_api_key` is set, every parse fails with that error. This is expected; tell the team before
-  PR 2 merges.
+- **Save check:** a preset whose parse prompt has no `{resume}` is refused.
+- **It never borrows other settings:** with no key, no active preset or a broken prompt, the parse stops with a 500
+  saying what's missing and makes no AI call.
+- **Limits:** 10 parses at once per backend process (more wait), and 5 saved later uploads per candidate per firm work
+  day (07 Q72).
 
 ---
 

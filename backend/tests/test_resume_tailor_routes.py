@@ -24,9 +24,9 @@ def launched(monkeypatch, test_db):
     from backend import job_monitor
     from backend.api import routes_resume_tailoring
     from backend.seed import seed_settings
+    from backend.tests.ai_support import set_up_ai
     seed_settings(test_db)
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value="test-key"))
-    test_db.commit()
+    set_up_ai(test_db)
     calls = []
 
     def launch(job_type, coro_func, *, scope_key=None, meta=None, target_job_id=None, firm_id=None,
@@ -269,11 +269,11 @@ def test_a_bde_with_five_running_waits_for_one(anonymous_client, test_db, world,
     assert r.status_code == 429 and "5 tailorings running" in r.json()["detail"]
 
 
-def test_a_tailor_not_set_up_is_a_500_naming_the_row(anonymous_client, test_db, world, launched, setup):
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value=""))
-    test_db.commit()
+def test_a_tailor_not_set_up_is_a_500_naming_what_is_missing(anonymous_client, test_db, world, launched, setup):
+    from backend.tests.ai_support import set_up_ai
+    set_up_ai(test_db, key="")
     r = _start(anonymous_client, world, setup)
-    assert r.status_code == 500 and "resume_tailor_llm_api_key" in r.json()["detail"] and launched == []
+    assert r.status_code == 500 and "API key" in r.json()["detail"] and launched == []
 
 
 # ── Lost runs and the heartbeat ──────────────────────────────────────────────

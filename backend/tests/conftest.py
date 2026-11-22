@@ -14,6 +14,8 @@ TEST_DATABASE_URL = os.getenv(
 if not TEST_DATABASE_URL.split("?")[0].endswith("_test"):
     raise RuntimeError(f"TEST_DATABASE_URL must name a database ending in _test, got {TEST_DATABASE_URL!r}")
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+# A fixed test-only secret for the AI key (backend/ai/secrets.py); never a real one.
+os.environ.setdefault("AI_SETTINGS_ENCRYPTION_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 # Development settings (plain-http cookies, API docs on), as docker-compose runs the app locally. Tests that
 # need production behaviour patch backend.config / backend.auth.access themselves.
 os.environ["BENCHQ_ENV"] = "development"
