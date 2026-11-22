@@ -47,17 +47,22 @@ async def check_key(key: str) -> Check:
     return _answer(response.status_code, "The key")
 
 
-async def check_model(key: str, module: PresetModule, model: str, effort: str = "") -> Check:
+async def check_model(key: str, module: PresetModule, model: str, effort: str = "",
+                      prompts: dict | None = None) -> Check:
+    """`prompts`: the preset's own, so a classifier check sends the State and Question it would really run with."""
     headers = {"Authorization": f"Bearer {key}"}
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             if module.request == "decision":
                 from backend.ai.config import AiConfig
                 from backend.inbox.decider import ENDPOINT, build_request
+                from backend.inbox.decider_request import identity_prompts
                 cfg = AiConfig(module=module.key, provider="openrouter", model=model, api_key=key, effort="",
-                               prompts={})
+                               prompts=prompts or {})
                 body = build_request("Connection check", "This is a connection check, not a real email.", cfg)
                 response = await client.post(ENDPOINT, headers=headers, json=body)
+                if response.status_code in (400, 422) and identity_prompts(cfg.prompts) not in ({}, {"instructions": ""}):
+                    return Check(False, True, f"OpenRouter refused {model} with this State and Question.")
             else:
                 body = {"model": model, "messages": [{"role": "user", "content": 'Return {"ok": true}.'}],
                         "max_tokens": 64, "response_format": _CHECK_FORMAT, "provider": {"require_parameters": True},

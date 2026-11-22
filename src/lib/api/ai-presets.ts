@@ -40,6 +40,7 @@ export const aiPresetsApi = {
   })),
   activate: async (id: string, force = false) => setup(await http.post(`${BASE}/presets/${encodeURIComponent(id)}/activate`, AiSetupDto, { body: { force } })),
   archive: async (id: string) => setup(await http.post(`${BASE}/presets/${encodeURIComponent(id)}/archive`, AiSetupDto)),
+  restore: async (id: string) => setup(await http.post(`${BASE}/presets/${encodeURIComponent(id)}/restore`, AiSetupDto)),
   testRun: async (id: string, sample: TestSample) => (await http.post(`${BASE}/presets/${encodeURIComponent(id)}/test-run`, TestRunDto, {
     body: { resume: sample.resume, posting: sample.posting, target_role: sample.targetRole, subject: sample.subject, body: sample.body },
   })).output,

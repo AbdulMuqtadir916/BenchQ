@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { useCreateAiPreset, useEditAiPreset } from "@/lib/hooks/use-ai-presets";
 import type { AiPreset, AiUseCase } from "@/lib/schemas/ai-presets";
 import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
+import { PromptField } from "./prompt-field";
 import { promptProblem } from "./prompt-rules";
 
 /** Create a preset, or edit one: a change to its model, effort or prompts saves a new version (08 Q5). */
@@ -20,6 +21,7 @@ export function PresetDialog({ useCase, efforts, preset, onClose }: { useCase: A
   const [modelId, setModelId] = useState(starting?.current.modelId ?? useCase.modelIds[0] ?? "");
   const [effort, setEffort] = useState(starting?.current.effort ?? "");
   const [prompts, setPrompts] = useState<Record<string, string>>(() => ({ ...(starting?.current.prompts ?? {}) }));
+  const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const isUnreachable = preset !== null && edit.error instanceof ApiError && edit.error.status === 409 && edit.error.message.includes("Save anyway");
   const modelIds = useCase.modelIds.includes(modelId) || !modelId ? useCase.modelIds : [modelId, ...useCase.modelIds];
@@ -64,15 +66,17 @@ export function PresetDialog({ useCase, efforts, preset, onClose }: { useCase: A
       <Field id="preset-notes" label="Notes">
         <textarea {...fieldAria("preset-notes")} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} className="bq-input h-auto w-full py-2" />
       </Field>
-      {useCase.prompts.map((spec) => {
-        const id = `preset-prompt-${spec.name}`;
-        const problem = isSubmitted ? problems[spec.name] : null;
-        return (
-          <Field key={spec.name} id={id} label={spec.label} error={problem} hint={spec.placeholders.length ? `Must keep ${spec.placeholders.join(", ")}` : undefined}>
-            <textarea {...fieldAria(id, problem, spec.placeholders.length > 0)} rows={6} value={prompts[spec.name] ?? ""} onChange={(event) => setPrompts((current) => ({ ...current, [spec.name]: event.target.value }))} className="bq-input h-auto w-full py-2 font-mono text-caption" />
-          </Field>
-        );
-      })}
+      {useCase.prompts.map((spec) => (
+        <PromptField
+          key={spec.name}
+          spec={spec}
+          value={prompts[spec.name] ?? ""}
+          error={isSubmitted ? problems[spec.name] : null}
+          isEditing={editingPrompt === spec.name}
+          onEdit={() => setEditingPrompt(spec.name)}
+          onChange={(value) => setPrompts((current) => ({ ...current, [spec.name]: value }))}
+        />
+      ))}
     </AdminDialog>
   );
 }

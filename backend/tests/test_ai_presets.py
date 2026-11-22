@@ -30,8 +30,9 @@ def ai(test_db, monkeypatch):
     async def check_key(key):
         return state["key"]
 
-    async def check_model(key, module, model, effort=""):
+    async def check_model(key, module, model, effort="", prompts=None):
         state["models"].append((module.key, model))
+        state["prompts"] = prompts
         return state["model"]
 
     async def live_models():
@@ -288,3 +289,84 @@ def test_the_migration_stops_without_the_secret_when_a_key_must_move(scratch_db,
     with engine.connect() as conn:
         assert conn.execute(text("SELECT value FROM settings WHERE key = 'resume_parse_llm_api_key'")).scalar() == "sk-keep-me"
         assert conn.execute(text("SELECT to_regclass('ai_provider')")).scalar() is None
+
+
+def test_classifier_state_and_question_are_editable_and_keep_the_fingerprint():
+    import json
+    from types import SimpleNamespace
+
+    from backend.ai.modules import editable_prompts, prompt_problems
+    from backend.inbox.decider import build_request, config_identity
+    from backend.inbox.decider_categories import INSTRUCTIONS, QUESTION_KEY
+
+    module = PRESET_MODULES["email_classification"]
+    cfg = lambda prompts: SimpleNamespace(provider="openrouter", model="m", prompts=prompts)
+    old, new = {"instructions": ""}, editable_prompts(module, {"instructions": ""})
+    assert config_identity(cfg(old)) == config_identity(cfg(new))
+    assert build_request("S", "B", cfg(old)) == build_request("S", "B", cfg(new))
+
+    question = json.loads(new["question"])
+    question[QUESTION_KEY]["instructions"] = INSTRUCTIONS + " Be strict."
+    edited = {**new, "question": json.dumps(question)}
+    assert prompt_problems(module, edited) == []
+    assert config_identity(cfg(edited)) != config_identity(cfg(new))
+    assert build_request("S", "B", cfg(edited))["questions"] == question
+
+    template = {**new, "state": json.dumps([{"email": "Subject: {subject}\nBody: {body}"}])}
+    assert build_request("has {body}", "B", cfg(template))["state"] == [{"email": "Subject: has {body}\nBody: B"}]
+
+    del question[QUESTION_KEY]["criteria"]["offer"]
+    assert prompt_problems(module, {**new, "question": json.dumps(question)})
+    assert prompt_problems(module, {**new, "state": '[{"subject": "{subject}"}]'})
+    assert prompt_problems(module, {**new, "question": "not json"})
+
+
+def test_a_removed_model_cant_go_active_until_the_preset_moves_off_it(api_client, ai, test_db):
+    model = "anthropic/claude-sonnet-5"
+    api_client.post("/api/admin/ai/models", json={"model_id": model})
+    setup = api_client.post("/api/admin/ai/presets", json=_body(_setup(api_client), model=model)).json()
+    second = next(p for p in _module(setup, "search_titles")["presets"] if p["name"] == "Second")
+    row = test_db.query(AiModel).filter_by(model_id=model).one()
+    assert api_client.delete(f"/api/admin/ai/models/{row.id}").status_code == 200
+
+    for force in (False, True):
+        r = api_client.post(f"/api/admin/ai/presets/{second['id']}/activate", json={"force": force})
+        assert r.status_code == 409 and "no longer approved" in r.json()["detail"]
+    assert not next(p for p in _module(_setup(api_client), "search_titles")["presets"] if p["id"] == second["id"])["is_active"]
+
+    approved = _body(_setup(api_client))["model_id"]
+    assert api_client.patch(f"/api/admin/ai/presets/{second['id']}", json={"model_id": approved}).status_code == 200
+    assert api_client.post(f"/api/admin/ai/presets/{second['id']}/activate", json={}).status_code == 200
+
+
+def test_the_classifier_check_sends_the_edited_state_and_question(api_client, ai):
+    setup = _setup(api_client)
+    active = next(p for p in _module(setup, "email_classification")["presets"] if p["is_active"])
+    prompts = dict(active["current"]["prompts"])
+    prompts["state"] = '[{"email": "{subject} {body}"}]'
+
+    ai["model"] = Check(False, True, "OpenRouter refused this.")
+    r = api_client.patch(f"/api/admin/ai/presets/{active['id']}", json={"prompts": prompts})
+    assert r.status_code == 422 and ai["prompts"] == prompts
+    assert next(p for p in _module(_setup(api_client), "email_classification")["presets"]
+                if p["is_active"])["current"]["version"] == active["current"]["version"]
+
+    ai["model"] = OK
+    assert api_client.patch(f"/api/admin/ai/presets/{active['id']}", json={"prompts": prompts}).status_code == 200
+    ai["prompts"] = None
+    second = {**_body(_setup(api_client), "email_classification"), "name": "Second"}
+    created = api_client.post("/api/admin/ai/presets", json=second).json()
+    row = next(p for p in _module(created, "email_classification")["presets"] if p["name"] == "Second")
+    assert api_client.post(f"/api/admin/ai/presets/{row['id']}/activate", json={}).status_code == 200
+    assert ai["prompts"] == prompts
+
+
+def test_an_archived_preset_can_be_restored_not_active(api_client, ai):
+    created = api_client.post("/api/admin/ai/presets", json=_body(_setup(api_client))).json()
+    second = next(p for p in _module(created, "search_titles")["presets"] if p["name"] == "Second")
+    assert api_client.post(f"/api/admin/ai/presets/{second['id']}/archive").status_code == 200
+    r = api_client.post(f"/api/admin/ai/presets/{second['id']}/activate", json={})
+    assert r.status_code == 409 and "Restore" in r.json()["detail"]
+    r = api_client.post(f"/api/admin/ai/presets/{second['id']}/restore")
+    restored = next(p for p in _module(r.json(), "search_titles")["presets"] if p["id"] == second["id"])
+    assert r.status_code == 200 and restored["archived_at"] is None and not restored["is_active"]

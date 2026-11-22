@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.ai import connection, store
 from backend.ai.config import AiConfig
-from backend.ai.modules import PRESET_MODULES, PresetModule, prompt_problems
+from backend.ai.modules import PRESET_MODULES, PresetModule, editable_prompts, prompt_problems
 from backend.ai.secrets import AiSecretError
 from backend.ai.test_run import TestRunRefused, run_test
 from backend.analyzer.llm_client import REASONING_EFFORTS
@@ -101,16 +101,16 @@ def _limit(db: DbSession, name: str) -> int:
         return fallback
 
 
-def _version_json(version: AiPresetVersion) -> dict:
+def _version_json(module: PresetModule, version: AiPresetVersion) -> dict:
     return {"version": version.version, "model_id": version.model_id, "effort": version.effort or "",
-            "prompts": version.prompts or {}, "created_at": version.created_at.isoformat()}
+            "prompts": editable_prompts(module, version.prompts or {}), "created_at": version.created_at.isoformat()}
 
 
 def _preset_json(db: DbSession, preset: AiPreset) -> dict:
     version = store.latest_version(db, preset.id)
     return {"id": str(preset.id), "module": preset.module, "name": preset.name, "notes": preset.notes or "",
             "is_active": preset.is_active, "archived_at": preset.archived_at.isoformat() if preset.archived_at else None,
-            "current": _version_json(version)}
+            "current": _version_json(PRESET_MODULES[preset.module], version)}
 
 
 def _overview(db: DbSession) -> dict:
@@ -139,13 +139,13 @@ def _overview(db: DbSession) -> dict:
     }
 
 
-async def _check_all(key: str, targets: list[tuple[PresetModule, str, str]], force: bool) -> None:
+async def _check_all(key: str, targets: list[tuple[PresetModule, str, str, dict]], force: bool) -> None:
     """A rejected key or model stops the save. If OpenRouter is only unreachable, `force` lets it through (08, decided
     2026-11-22): a leaked key must be replaceable during an outage."""
     answers = [await connection.check_key(key)]
     if answers[0].ok or not answers[0].rejected:
-        answers += await asyncio.gather(*(connection.check_model(key, module, model, effort)
-                                          for module, model, effort in targets))
+        answers += await asyncio.gather(*(connection.check_model(key, module, model, effort, prompts)
+                                          for module, model, effort, prompts in targets))
     rejected = [answer.message for answer in answers if answer.rejected]
     if rejected:
         raise HTTPException(status_code=422, detail=" ".join(dict.fromkeys(rejected)))
@@ -153,12 +153,22 @@ async def _check_all(key: str, targets: list[tuple[PresetModule, str, str]], for
         raise HTTPException(status_code=409, detail="OpenRouter couldn't be reached. Save anyway?")
 
 
-def _active_targets(db: DbSession) -> list[tuple[PresetModule, str, str]]:
+def _active_targets(db: DbSession) -> list[tuple[PresetModule, str, str, dict]]:
     targets = []
     for key, module in PRESET_MODULES.items():
         if (found := store.active_preset(db, key)) is not None:
-            targets.append((module, found[1].model_id, found[1].effort or ""))
+            targets.append((module, found[1].model_id, found[1].effort or "", dict(found[1].prompts or {})))
     return targets
+
+
+def _is_approved(db: DbSession, module: PresetModule, model_id: str) -> bool:
+    model = db.query(AiModel).filter(AiModel.model_id == model_id, AiModel.is_hidden.is_(False)).first()
+    return model is not None and fits(module, model_id)
+
+
+def _refuse_removed_model(db: DbSession, module: PresetModule, model_id: str) -> None:
+    if not _is_approved(db, module, model_id):
+        raise HTTPException(status_code=409, detail="This preset's model is no longer approved. Edit it to pick another.")
 
 
 def _log(db: DbSession, principal: Principal, action: str, entity_type: str, entity_id, label: str, summary: str) -> None:
@@ -182,8 +192,7 @@ def _check_version(db: DbSession, module: PresetModule, model_id: str, effort: s
         raise HTTPException(status_code=422, detail=" ".join(problems))
     if model_id == before_model:
         return                      # a preset keeps a model that was hidden after it was chosen
-    model = db.query(AiModel).filter(AiModel.model_id == model_id, AiModel.is_hidden.is_(False)).first()
-    if model is None or not fits(module, model_id):
+    if not _is_approved(db, module, model_id):
         raise HTTPException(status_code=422, detail="Pick a model from the approved list that fits this use case.")
 
 
@@ -277,7 +286,7 @@ def hide_model(model_uuid: uuid.UUID, principal: Principal = Depends(require("ai
     row = db.get(AiModel, model_uuid)
     if row is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    if any(model == row.model_id for _module, model, _effort in _active_targets(db)):
+    if any(target[1] == row.model_id for target in _active_targets(db)):
         raise HTTPException(status_code=409, detail="An active preset uses this model. Switch it first.")
     row.is_hidden = True
     _log(db, principal, "DELETE", "ai_model", row.id, row.label, f"Removed AI model {row.model_id} from the list")
@@ -318,10 +327,12 @@ async def edit_preset(preset_id: uuid.UUID, body: PresetPatch, principal: Princi
         current = store.latest_version(db, preset.id)
         model = body.model_id if body.model_id is not None else current.model_id
         effort = body.effort if body.effort is not None else (current.effort or "")
-        prompts = body.prompts if body.prompts is not None else dict(current.prompts or {})
+        stored = editable_prompts(module, current.prompts or {})
+        prompts = body.prompts if body.prompts is not None else dict(stored)
         _check_version(db, module, model, effort, prompts, current.model_id)
-        changed = (model, effort, prompts) != (current.model_id, current.effort or "", current.prompts or {})
-        needs_check = preset.is_active and (model, effort) != (current.model_id, current.effort or "")
+        changed = (model, effort, prompts) != (current.model_id, current.effort or "", stored)
+        needs_check = preset.is_active and ((model, effort) != (current.model_id, current.effort or "")
+                                            or (module.request == "decision" and prompts != stored))
         key = _key_or_refuse(db) if needs_check else ""
         version_number = current.version
         db.commit()
@@ -329,7 +340,7 @@ async def edit_preset(preset_id: uuid.UUID, body: PresetPatch, principal: Princi
 
     module, model, effort, prompts, changed, needs_check, key, version_number = await asyncio.to_thread(prepare)
     if needs_check:
-        await _check_all(key, [(module, model, effort)], body.force)
+        await _check_all(key, [(module, model, effort, prompts)], body.force)
 
     def write() -> dict:
         preset = _preset(db, preset_id)
@@ -359,11 +370,12 @@ async def activate_preset(preset_id: uuid.UUID, body: ForceBody, principal: Prin
     def prepare():
         preset = _preset(db, preset_id)
         if preset.archived_at is not None:
-            raise HTTPException(status_code=409, detail="Bring this preset back before making it active.")
+            raise HTTPException(status_code=409, detail="Restore this preset before making it active.")
         version = store.latest_version(db, preset.id)
         module = _module(preset.module)
+        _refuse_removed_model(db, module, version.model_id)
         key = _key_or_refuse(db)
-        target = (module, version.model_id, version.effort or "")
+        target = (module, version.model_id, version.effort or "", dict(version.prompts or {}))
         db.commit()
         return module, key, target
 
@@ -374,6 +386,7 @@ async def activate_preset(preset_id: uuid.UUID, body: ForceBody, principal: Prin
         preset = _preset(db, preset_id)
         if preset.archived_at is not None:
             raise HTTPException(status_code=409, detail="This preset was archived meanwhile.")
+        _refuse_removed_model(db, module, target[1])     # it may have been removed while OpenRouter answered
         db.query(AiPreset).filter(AiPreset.module == preset.module, AiPreset.id != preset.id,
                                   AiPreset.is_active.is_(True)).update({"is_active": False})
         db.flush()
@@ -394,6 +407,17 @@ def archive_preset(preset_id: uuid.UUID, principal: Principal = Depends(require(
     if preset.archived_at is None:
         preset.archived_at = utcnow()
         _log(db, principal, "UPDATE", "ai_preset", preset.id, preset.name, f"Archived preset “{preset.name}”")
+        db.commit()
+    return _overview(db)
+
+
+@router.post("/presets/{preset_id}/restore", summary="Bring an archived preset back, not active")
+def restore_preset(preset_id: uuid.UUID, principal: Principal = Depends(require("ai.manage")),
+                   db: DbSession = Depends(get_db)):
+    preset = _preset(db, preset_id)
+    if preset.archived_at is not None:
+        preset.archived_at = None
+        _log(db, principal, "UPDATE", "ai_preset", preset.id, preset.name, f"Restored preset “{preset.name}”")
         db.commit()
     return _overview(db)
 

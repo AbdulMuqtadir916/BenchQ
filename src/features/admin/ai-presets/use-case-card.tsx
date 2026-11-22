@@ -1,12 +1,12 @@
 "use client";
 
-import { Archive, FlaskConical, Pencil, Plus, Sparkles } from "lucide-react";
+import { Archive, ArchiveRestore, FlaskConical, Pencil, Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/ui/section-card";
 import { Tag } from "@/components/ui/tag";
-import { useActivateAiPreset, useArchiveAiPreset } from "@/lib/hooks/use-ai-presets";
+import { useActivateAiPreset, useArchiveAiPreset, useRestoreAiPreset } from "@/lib/hooks/use-ai-presets";
 import type { AiPreset, AiUseCase } from "@/lib/schemas/ai-presets";
 import { errorMessage } from "../admin-dialog";
 import { PresetDialog } from "./preset-dialog";
@@ -18,12 +18,14 @@ type Open = { kind: "new" } | { kind: "edit"; preset: AiPreset } | { kind: "test
 export function UseCaseCard({ useCase, efforts, canEdit }: { useCase: AiUseCase; efforts: string[]; canEdit: boolean }) {
   const activate = useActivateAiPreset();
   const archive = useArchiveAiPreset();
+  const restore = useRestoreAiPreset();
   const [open, setOpen] = useState<Open>(null);
   const [lastActivated, setLastActivated] = useState("");
   const isUnreachable = activate.error instanceof ApiError && activate.error.status === 409 && Boolean(lastActivated);
   const presets = useCase.presets.filter((preset) => !preset.archivedAt);
+  const archived = useCase.presets.filter((preset) => preset.archivedAt);
   const hasActive = presets.some((preset) => preset.isActive);
-  const error = errorMessage(activate.error) ?? errorMessage(archive.error);
+  const error = errorMessage(activate.error) ?? errorMessage(archive.error) ?? errorMessage(restore.error);
 
   return (
     <SectionCard
@@ -57,6 +59,22 @@ export function UseCaseCard({ useCase, efforts, canEdit }: { useCase: AiUseCase;
             </li>
           ))}
         </ul>
+        {archived.length ? (
+          <details>
+            <summary className="cursor-pointer text-caption text-[var(--color-text-3)]">Archived ({archived.length})</summary>
+            <ul className="mt-1 divide-y divide-[var(--color-border)]">
+              {archived.map((preset) => (
+                <li key={preset.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="text-body text-[var(--color-text-2)]">{preset.name}</span>
+                    <Tag>v{preset.current.version}</Tag>
+                  </span>
+                  {canEdit ? <Button variant="ghost" size="sm" disabled={restore.isPending} onClick={() => restore.mutate(preset.id)}><ArchiveRestore size={13} aria-hidden /> Restore</Button> : null}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         {error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{error}</p> : null}
         {isUnreachable ? <Button variant="secondary" size="sm" disabled={activate.isPending} onClick={() => activate.mutate({ id: lastActivated, force: true })}>Make active anyway</Button> : null}
       </div>

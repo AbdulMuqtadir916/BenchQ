@@ -7,6 +7,7 @@ import httpx
 
 from backend.inbox.decider_categories import (CATEGORIES, INSTRUCTIONS, QUESTION_KEY, CATEGORY_VERSION,
                                               CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT)
+from backend.inbox.decider_request import filled_state, identity_prompts, request_parts
 from backend.inbox.masking import mask_for_classifier
 
 ENDPOINT = 'https://openrouter.ai/api/alpha/decisions'
@@ -31,7 +32,7 @@ class Classification:
 def config_identity(cfg):
     """What the classifier actually runs with. A preset's id and version stay out, so moving an unchanged setup into a
     preset keeps the evaluated fingerprint; a real model or prompt change still replaces it (decided 2026-11-22)."""
-    return hashlib.sha256(repr((cfg.provider, cfg.model, cfg.prompts,
+    return hashlib.sha256(repr((cfg.provider, cfg.model, identity_prompts(cfg.prompts),
                                 INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT,
                                 "minimization-2026-11-07.1", "gmail-auth-2026-11-04.1")).encode()).hexdigest()
 
@@ -39,12 +40,11 @@ def config_identity(cfg):
 def build_request(subject, body, cfg, known=None):
     # Caller content is data, not instructions. No tools, URL fetches or attachments.
     # known: the worker's KnownIdentity for this email (candidate, mailbox, sender), used only for masking.
-    instructions = cfg.prompts.get('instructions') or INSTRUCTIONS
+    state, questions = request_parts(cfg.prompts)
     return {'model': cfg.model,
-            'state': [{'subject': mask_for_classifier(subject[:1000], known),
-                       'body': mask_for_classifier(body[:24000], known)}],
-            'questions': {QUESTION_KEY: {'type': 'choice', 'instructions': instructions,
-                                        'criteria': dict(CATEGORIES)}}}
+            'state': filled_state(state, mask_for_classifier(subject[:1000], known),
+                                  mask_for_classifier(body[:24000], known)),
+            'questions': questions}
 
 
 def parse_response(payload):

@@ -33,5 +33,6 @@ export const useCreateAiPreset = () => useSetupMutation((input: PresetInput) => 
 export const useEditAiPreset = (id: string) => useSetupMutation((input: PresetEdit) => aiPresetsApi.editPreset(id, input));
 export const useActivateAiPreset = () => useSetupMutation(({ id, force }: { id: string; force?: boolean }) => aiPresetsApi.activate(id, force));
 export const useArchiveAiPreset = () => useSetupMutation((id: string) => aiPresetsApi.archive(id));
+export const useRestoreAiPreset = () => useSetupMutation((id: string) => aiPresetsApi.restore(id));
 export const useSaveAiLimits = () => useSetupMutation(aiPresetsApi.saveLimits);
 export const useAiTestRun = (id: string) => useMutation({ mutationFn: (sample: TestSample) => aiPresetsApi.testRun(id, sample) });

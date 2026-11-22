@@ -3,6 +3,7 @@ The output formats the code parses are not here: they stay in code beside their 
 from dataclasses import dataclass, field
 
 from backend.candidates.parse_defaults import DEFAULT_PROMPT, DEFAULT_SYSTEM_PROMPT
+from backend.inbox.decider_request import DEFAULT_QUESTION, DEFAULT_STATE, request_problems, shown_prompts
 from backend.job_search.search_titles import DEFAULT_MODEL as TITLES_MODEL, DEFAULT_PROMPT as TITLES_PROMPT, ROLE
 from backend.resume_tailor import settings as tailor
 
@@ -39,10 +40,15 @@ PRESET_MODULES: dict[str, PresetModule] = {
         "search_titles", "Search titles", TITLES_MODEL, {"prompt": TITLES_PROMPT}, {"prompt": "Prompt"},
         {"prompt": (ROLE,)}),
     "email_classification": PresetModule(
-        "email_classification", "Email classification", DECIDER_MODEL, {"instructions": ""},
-        {"instructions": "Extra instructions (optional)"}, optional_prompts=frozenset({"instructions"}),
-        takes_effort=False, request="decision"),
+        "email_classification", "Email classification", DECIDER_MODEL,
+        {"state": DEFAULT_STATE, "question": DEFAULT_QUESTION}, {"state": "State", "question": "Question"},
+        {"state": ("{subject}", "{body}")}, takes_effort=False, request="decision"),
 }
+
+
+def editable_prompts(module: PresetModule, prompts: dict) -> dict:
+    """A stored version's prompts as the panel edits them."""
+    return shown_prompts(prompts) if module.request == "decision" else prompts
 
 
 def prompt_problems(module: PresetModule, prompts: dict) -> list[str]:
@@ -61,4 +67,4 @@ def prompt_problems(module: PresetModule, prompts: dict) -> list[str]:
             missing = [p for p in module.placeholders.get(name, ()) if p not in value]
             if missing:
                 problems.append(f"{label} needs {', '.join(missing)}.")
-    return problems
+    return problems + request_problems(prompts) if module.request == "decision" else problems

@@ -63,7 +63,7 @@ def _prompt(module, name: str, rows: dict) -> str:
     from backend.candidates.parse_defaults import DEFAULT_PROMPT, OLD_DEFAULT_PROMPT
     from backend.resume_tailor.settings import upgraded_prompt
     row = _PROMPT_ROWS[module.key][name]
-    value = rows[row] if row in rows else module.prompts[name]
+    value = rows[row] if row in rows else module.prompts.get(name, "")
     if module.key == "resume_parse" and name == "parse" and (value or "").strip() == OLD_DEFAULT_PROMPT.strip():
         return DEFAULT_PROMPT
     return upgraded_prompt(name, value) if module.key == "resume_tailor" else value
@@ -94,7 +94,7 @@ def _copy_settings(conn) -> None:
         conn.execute(sa.text("INSERT INTO ai_presets (id, module, name, notes, is_active) "
                              "VALUES (:id, :module, 'Preset 1', 'The setup BenchQ ran before presets.', true)"),
                      {"id": preset_id, "module": module.key})
-        prompts = {name: _prompt(module, name, rows) for name in module.prompts}
+        prompts = {name: _prompt(module, name, rows) for name in _PROMPT_ROWS[module.key]}
         conn.execute(sa.text("INSERT INTO ai_preset_versions (id, preset_id, version, model_id, effort, prompts) "
                              "VALUES (:id, :preset, 1, :model, '', CAST(:prompts AS jsonb))"),
                      {"id": uuid.uuid4(), "preset": preset_id, "model": model, "prompts": json.dumps(prompts)})
@@ -179,6 +179,8 @@ def downgrade():
         "FROM ai_preset_versions WHERE preset_id = p.id ORDER BY version DESC LIMIT 1) v ON true WHERE p.is_active"
     )).fetchall()
     for module, model, prompts in active:
+        if module == "email_classification" and (prompts or {}).get("question"):      # edited on the panel since 0032
+            prompts = {"instructions": next(iter(json.loads(prompts["question"]).values()))["instructions"]}
         values = {_MODEL_ROWS[module]: model}
         if module in _PROVIDER_ROWS:
             values[_PROVIDER_ROWS[module]] = "openrouter"
