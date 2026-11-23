@@ -20,12 +20,13 @@ import uuid
 
 import pytest
 
+from backend.tests.problem_support import body_of, expected, without_request_id
 from backend.auth.access import ROUTE_ACCESS, Access
 from backend.tests.isolation_cases import (CASES, DEV_ONLY_REASONS, KNOWN_GAPS, PARAM, PUBLIC_REASONS,
                                            SHARED_JOB_GAPS, SIGNED_IN_CASES, SIGNED_IN_REASONS, Case)
 from backend.tests.isolation_support import CANARY, add_firm_b, make_world, offline, snapshot_of  # noqa: F401
 
-READ_ONLY = {"detail": "A support view is read-only."}
+READ_ONLY = expected(403, "A support view is read-only.")
 SUPPORT_REFUSED_GETS = {"GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}", "GET /api/cover-letters/{cl_id}/pdf",
                         "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file"}
 
@@ -70,8 +71,9 @@ def _has_ids(key: str, case: Case) -> bool:
 
 
 def _answer(resp, ids: dict) -> tuple:
-    """Status and body, with the request's own ids blanked (a bulk route echoes them in `not_found`)."""
-    text = resp.text
+    """Status and body, with the request's own ids blanked (a bulk route echoes them in `not_found`) and its request
+    id (every answer has its own)."""
+    text = without_request_id(resp.text)
     for value in ids.values():
         text = text.replace(str(value), "<id>")
     return resp.status_code, text
@@ -157,9 +159,9 @@ def test_firm_data_never_crosses_firms(key, anonymous_client, world):
     in_a = _call(client, key, case, b.ids, world.admin)
     _no_canary(world, in_a, "a support view of firm A", sent=b.ids if case.bulk else None)
     if method != "GET":
-        assert (in_a.status_code, in_a.json()) == (403, READ_ONLY)
+        assert (in_a.status_code, body_of(in_a)) == (403, READ_ONLY)
     elif key in SUPPORT_REFUSED_GETS:
-        assert (in_a.status_code, in_a.json()) == (403, READ_ONLY)
+        assert (in_a.status_code, body_of(in_a)) == (403, READ_ONLY)
     elif has_ids:
         assert _answer(in_a, b.ids) == _answer(_call(client, key, case, missing, world.admin), missing)
 
@@ -169,7 +171,7 @@ def test_firm_data_never_crosses_firms(key, anonymous_client, world):
     untouched = snapshot_of(world.db, b.firm_id)
     in_b = _call(client, key, case, b.ids, world.admin)
     if method != "GET" or key in SUPPORT_REFUSED_GETS:
-        assert (in_b.status_code, in_b.json()) == (403, READ_ONLY)
+        assert (in_b.status_code, body_of(in_b)) == (403, READ_ONLY)
     else:
         assert in_b.status_code < 400, in_b.text
     assert snapshot_of(world.db, b.firm_id) == untouched, "a support view changed firm B's rows"
@@ -213,7 +215,7 @@ def test_a_firm_user_never_reaches_a_platform_route(key, anonymous_client, accou
         path = path[:start] + str(uuid.uuid4()) + path[end + 1:]
     kwargs = {"json": {}} if method != "GET" else {}
     as_firm = anonymous_client.request(method, path, headers={"cookie": f"bq_session={accounts.firm_token}"}, **kwargs)
-    assert (as_firm.status_code, as_firm.json()) == (403, {"detail": "Platform admins only."})
+    assert (as_firm.status_code, body_of(as_firm)) == (403, expected(403, "Platform admins only."))
     assert anonymous_client.request(method, path, **kwargs).status_code == 401
 
 

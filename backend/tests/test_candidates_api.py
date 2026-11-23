@@ -166,14 +166,14 @@ def test_a_create_without_a_mandatory_field_is_refused_naming_the_field(anonymou
     r = anonymous_client.post(f"/api/firms/{world['firm'].id}/candidates", json=_without(world, field),
                               headers=world["as"]["owner"])
     assert r.status_code == 422
-    assert [e["loc"][-1] for e in r.json()["detail"]] == [field]
+    assert [e["loc"][-1] for e in r.json()["errors"]] == [field]
 
 
 @pytest.mark.parametrize("field,blank", [("full_name", "   "), ("primary_role", ""), ("phone", " "), ("country", ""),
                                          ("employment_types", []), ("target_roles", []), ("target_roles", ["  "])])
 def test_a_blank_or_empty_mandatory_field_is_refused(anonymous_client, world, field, blank):
     r = _create(anonymous_client, world, **{field: blank})
-    assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+    assert r.status_code == 422 and field in {part for e in r.json()["errors"] for part in e["loc"]}
 
 
 @pytest.mark.parametrize("field", ["needs_sponsorship", "needs_transfer", "years_experience"])

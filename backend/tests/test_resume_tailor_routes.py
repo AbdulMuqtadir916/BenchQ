@@ -259,11 +259,17 @@ def test_a_bde_with_five_running_waits_for_one(anonymous_client, test_db, world,
     assert r.status_code == 429 and "5 tailorings running" in r.json()["detail"]
 
 
-def test_a_tailor_not_set_up_is_a_500_naming_the_row(anonymous_client, test_db, world, launched, setup):
+NOT_SET_UP = "The résumé tailor isn't set up yet. Ask your admin."
+
+
+def test_a_tailor_not_set_up_is_a_500_naming_the_row_in_the_log(anonymous_client, test_db, world, launched, setup,
+                                                                 log):
     test_db.merge(Setting(key=tailor_settings.KEY_ROW, value=""))
     test_db.commit()
     r = _start(anonymous_client, world, setup)
-    assert r.status_code == 500 and "resume_tailor_llm_api_key" in r.json()["detail"] and launched == []
+    body = r.json()
+    assert (r.status_code, body["code"], body["detail"]) == (500, "NOT_CONFIGURED", NOT_SET_UP) and launched == []
+    assert "resume_tailor_llm_api_key" in log.getvalue()          # the row, for the admin; never in the answer
 
 
 # ── Lost runs and the heartbeat ──────────────────────────────────────────────

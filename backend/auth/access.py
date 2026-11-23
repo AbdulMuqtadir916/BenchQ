@@ -24,6 +24,7 @@ from starlette.routing import Match
 from backend.auth.sessions import COOKIE_NAME, clear_cookie_kwargs, cookie_kwargs, resolve
 from backend.config import ALLOWED_ORIGINS, IS_PRODUCTION
 from backend.models.db import SessionLocal
+from backend.problem import problem_response
 from backend.statement_timeout import busy_response, is_statement_timeout
 
 logger = logging.getLogger("jobnavigator")
@@ -284,7 +285,7 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def _refuse(status: int, detail: str, clear_cookie: bool = False) -> JSONResponse:
-    response = JSONResponse(status_code=status, content={"detail": detail})
+    response = problem_response(status, detail)
     if clear_cookie:
         response.delete_cookie(**clear_cookie_kwargs())
     return response

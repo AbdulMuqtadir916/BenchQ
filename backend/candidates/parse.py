@@ -15,6 +15,7 @@ import logging
 
 from fastapi import HTTPException
 
+from backend.problem import NOT_CONFIGURED, RESUME_READER_FAILED, RESUME_READER_TIMEOUT, Problem
 from backend.candidates.parse_defaults import DOCX_INPUT_NOTE, INPUT_NOTE, PDF_INPUT_NOTE, RESUME
 
 logger = logging.getLogger("jobnavigator.resume_parse")
@@ -154,11 +155,12 @@ def setting_problems(updates: dict) -> list[str]:
 
 def _setup_error(detail: str) -> HTTPException:
     logger.error("The résumé parser isn't set up: %s", detail)
-    return HTTPException(status_code=500, detail=f"The résumé reader isn't set up: {detail}.")
+    return Problem(500, "The résumé reader isn't set up yet. Ask your admin.", NOT_CONFIGURED)   # the row: logged
 
 
 def _parser_model(db) -> tuple[str, str]:
-    """The parser's own model and key; 500 naming the row when one isn't set, so no other model is ever called."""
+    """The parser's own model and key; 500 (the row named in the log) when one isn't set, so no other model is ever
+    called."""
     from backend.models.db import Setting
     rows = {row.key: (row.value or "").strip()
             for row in db.query(Setting).filter(Setting.key.in_((PROVIDER_ROW, MODEL_ROW, KEY_ROW)))}
@@ -208,11 +210,11 @@ async def read_resume(text: str, kind: str, db, firm_id=None) -> dict:
             tracker.record(response)
     except LLMDeadlineError:
         logger.warning("Résumé parse timed out after %ss", ATTEMPT_SECONDS)
-        raise HTTPException(status_code=504, detail="There was an issue while parsing your resume, please try again.")
+        raise Problem(504, "The résumé reader took too long. Try again in a minute.", RESUME_READER_TIMEOUT)
     except Exception as e:
         # The provider's error, never the prompt: it names the status ("502", "No endpoints found"), not the résumé.
         logger.warning("Résumé parse failed after every attempt: %s", str(e)[:300])
-        raise HTTPException(status_code=500, detail="The résumé reader didn't answer. Try again in a minute.")
+        raise Problem(500, "The résumé reader didn't answer. Try again in a minute.", RESUME_READER_FAILED)
     raw = response.get("text") if isinstance(response, dict) else None
     try:
         answer = parse_model_json(raw or "")

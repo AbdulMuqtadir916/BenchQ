@@ -3,6 +3,7 @@ import { stubCandidateReads } from "@/mocks/fixture-backend";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { candidatesApi } from "@/lib/api/candidates";
 import { useSession } from "@/lib/stores/session-store";
+import { useToastStore } from "@/lib/stores/toast-store";
 import { queryKeys } from "./keys";
 import { clearCacheOnPrincipalChange, principalKey } from "./principal-boundary";
 import { signInAs, signOutForTest } from "@/mocks/sign-in-as";
@@ -22,7 +23,58 @@ const firstRender = (client: QueryClient) => new QueryObserver(client, query).ge
 
 afterEach(async () => {
   useSession.getState().reset();
+  useToastStore.setState({ toasts: [] });
   signOutForTest();
+});
+
+describe("principal change clears toast data", () => {
+  it("clears persistent failures and confirmations on sign-out, before another firm signs in", async () => {
+    const client = newClient();
+    const unsubscribe = clearCacheOnPrincipalChange(client);
+    try {
+      useSession.getState().setSession(await signInAs("user_imran"));
+      useToastStore.getState().show("Firm A company didn't move to Interview", { tone: "danger", reference: "request-a" });
+      useToastStore.getState().show("Firm A company moved to Offer");
+
+      useSession.getState().signOut();
+      expect(useToastStore.getState().toasts).toEqual([]);
+      useSession.getState().setSession(await signInAs("user_lakshmi"));
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      unsubscribe();
+      client.clear();
+    }
+  });
+
+  it.each(["user_adnan", "user_lakshmi"])("clears on a direct account switch to %s", async (userId) => {
+    const client = newClient();
+    const unsubscribe = clearCacheOnPrincipalChange(client);
+    try {
+      useSession.getState().setSession(await signInAs("user_imran"));
+      useToastStore.getState().show("Owner's application failed", { tone: "danger", reference: "request-owner" });
+      useSession.getState().setSession(await signInAs(userId));
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      unsubscribe();
+      client.clear();
+    }
+  });
+
+  it("keeps toasts when the same principal's session is refreshed", async () => {
+    const client = newClient();
+    const unsubscribe = clearCacheOnPrincipalChange(client);
+    try {
+      const session = await signInAs("user_imran");
+      useSession.getState().setSession(session);
+      useToastStore.getState().show("Application failed", { tone: "danger", reference: "request-a" });
+      const toasts = useToastStore.getState().toasts;
+      useSession.getState().setSession(session);
+      expect(useToastStore.getState().toasts).toBe(toasts);
+    } finally {
+      unsubscribe();
+      client.clear();
+    }
+  });
 });
 
 describe("principal change clears the query cache (sign-in, sign-out, an account change in another tab)", () => {

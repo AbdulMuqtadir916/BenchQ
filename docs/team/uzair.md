@@ -286,12 +286,116 @@ Whether to run several API workers is decided from the §2 load test.
 **Open, carried from 2026-11-03:** "Q2/Q3 of #104's grilling still need Abdul." Not found in the docs; ask Abdul
 whether they were settled.
 
-### Step 4b, errors: one error shape (planned)
+### Step 4b, errors: one error shape (plan agreed 2026-11-20)
 
-The frontend shows the backend's `detail` text word for word (`src/components/app/error-state.tsx`), so backend wording reaches users. Step 4 gives every backend error a machine-readable code, RFC 9457 "Problem Details" style, next to the message. The frontend then shows its own plain-language message per code: busy, rate-limited, offline, unexpected. The wording is a product call (Abdul). Internal details (the database, a query) stay in the server logs (OWASP error handling).
+**The problem.** Backend errors come in four shapes: `{"detail": "text"}`, a 422's `{"detail": [{loc, msg}]}`, one
+object `detail` (the duplicate résumé, `backend/candidates/versions.py:466`) and a plain-text 500. The frontend shows
+`detail` word for word (`src/components/app/error-state.tsx` and about 20 components) and derives a code from the
+status alone (`src/lib/api/http.ts`), so it can't tell a busy database from a daily quota, and an unexpected 500 reads
+"Request failed with status 500.". A few messages carry exception text. Queries are retried after about 1 s and 2 s
+whatever the error, a 401 or 403 included, while a busy 503 asks for `Retry-After: 5`. The provider's own rate limits
+are not part of this: the backend already retries the AI provider (`backend/analyzer/llm_client.py`, 4 attempts,
+2/4/8 s), and the frontend never retries a mutation, so an AI job is never started twice.
 
-Also in 4b: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
-`src/lib/query/retry.ts`), while a 503 asks for `Retry-After: 5`. It should wait what the backend asks.
+**The shape** (RFC 9457 "Problem Details", `application/problem+json`):
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "This résumé is already Base 2.",
+  "code": "DUPLICATE_RESUME", "request_id": "…",
+  "base_resume_id": "…", "hidden": false }
+```
+
+- `detail` is always a string written for the user, never internal. Keeping it a string keeps the extension's reader
+  (`extension/src/api.ts:57`) and about 100 backend test assertions working.
+- A 422's `detail` is one actionable sentence, along the lines of "BenchQ couldn't take this as it was sent. Refresh
+  the page and try again." (confirmed 2026-11-20); the fields go in `errors: [{loc, msg, type}]`, never the
+  submitted value (Pydantic's `input` would echo an email or password back).
+- Extra fields sit at the top level (the duplicate résumé's `base_resume_id`, `hidden`).
+- `Retry-After` stays a header.
+
+**Decisions (Uzair, 2026-11-20):**
+
+1. **A contract first:** `docs/02-DATA-CONTRACTS.md` §12 (the body, the code registry, the rules below),
+   signed off by Abdul before the PR merges. It is built meanwhile. `docs/integration/00-foundation.md` points to it.
+2. **Codes by meaning, not status.** The default comes from the status (409 → `CONFLICT`). A specific code only where
+   the frontend acts differently. One registry table in the contract, keeping the names the frontend already uses
+   (`RATE_LIMITED`, `UNAVAILABLE`, `NETWORK`, `SCHEMA_MISMATCH`, `DUPLICATE_JOB`, …). A 429, 503 or 500 is not always
+   a system error:
+   - `RATE_LIMITED` only from the throttle (`backend/auth/throttle.py`); the business limits get their own codes and
+     keep their meaning and specifics (the limit, when it resets), worded by the `docs/02` §12.3 writing rules
+     (Uzair, 2026-11-20): the daily job-add quota (`routes_applications.py:411`), the job search quotas
+     (`routes_job_search.py:85`), "5 tailorings running" (`resume_tailor/runs.py:281`).
+   - The busy code only from `statement_timeout.busy_response()`; "the search couldn't start" and "not configured"
+     503s get their own.
+   - `INTERNAL` only for a crash; the deliberate 500s keep their own code: the tailor isn't set up
+     (`routes_resume_tailoring.py:48`), the résumé reader didn't answer (`candidates/parse.py:215`). The set-up 500s
+     say "…isn't set up yet. Ask your admin."; the setting's name goes to the log, not the answer (Uzair, 2026-11-20,
+     replacing "keep the setting name"; the writing rules are `docs/02` §12.3).
+   - **No specific code on a 404 or 403, ever:** one body for every not-found, so a code can't confirm a record exists
+     in another firm (CLAUDE.md, routes and access).
+3. **The frontend's own text only for system errors** (busy, rate-limited, offline, unexpected, data mismatch), chosen
+   by code, from one map beside `ApiError`. Every other error keeps the backend's text. The wording is Abdul's (the
+   proposal is the table in `docs/02` §12.3). Busy has one text everywhere: "BenchQ is handling a lot right now. Try
+   again in a few seconds." (a page's card shows only after its retries ran out). The sign-in page keeps its own
+   throttle line, "Too many sign-in attempts. Try again in 15 minutes.", with the real wait (Uzair, 2026-11-20).
+4. **"Reference: …" (the request id) on an unexpected 500 only.** No id (the Next proxy's own 500 when the backend is
+   down, which has no JSON body): no reference line.
+5. **Queries never retry a 4xx;** network errors and 5xx are retried, waiting what `Retry-After` asks (with a ceiling).
+   Mutations stay unretried.
+6. **The duplicate résumé's fields move to the top level;** the frontend reads both shapes during the switch.
+7. **The website's text changes only for the system codes, from one function** (decision 3); every other error shows
+   the backend's `detail` as today, and `http.ts` reads the body's code. A validation 422 shows the backend's sentence
+   ("BenchQ couldn't take this as it was sent. Refresh the page and try again."), not the field list (Uzair,
+   2026-11-20). The extension never uploads résumés, so
+   the duplicate-résumé 409 doesn't reach it. Its only visible change is a validation 422: today the list `detail` is
+   ignored and it shows its own "refresh" advice (`extension/src/api.ts:56`, `failureOf`); with the actionable 422
+   sentence it shows the same advice, so the extension needs no change. Samad is informed, not asked to change
+   anything.
+
+**One PR (decided by Uzair 2026-11-20), in two parts.** It merges after Abdul signs off both the contract
+(`docs/02` §12) and the wording (the frontend's own messages, §12.3's rules).
+
+- **Part 1, the shape (backend).** One `problem_response(...)` helper in the backend; handlers in `main.py` for FastAPI's and
+  Starlette's `HTTPException` (unknown paths and wrong methods raise Starlette's), validation errors, the existing
+  DataError / pool / timeout handlers and the unexpected 500; `exc.headers` kept. Every hand-built error response
+  BenchQ reaches goes through the helper: the sign-in refusal (`auth/access.py`, `_refuse`, its cookie delete kept),
+  the 413 (`body_limit.py`), the busy 503, the per-user 429 (`main.py`, `limit_per_user`). The exception text BenchQ
+  reaches is fixed: the mailbox-connect errors (`routes_inbox.py:298,300`; check 298 is written for users first).
+  `http.ts` reads the new shape (decision 7). Tests: a sweep that every route's error has the shape and a known code,
+  a 422 with a planted value that isn't echoed, a 405 and an unknown path, the content type, the extension's reader
+  against the new body, and the ~30 backend tests that assert the old shape exactly, updated (rows in
+  `cross-area-changes.md` for their owners).
+- **Part 2, what users see (frontend, `src/` only).** The frontend's text per system code, the reference line, the retry rule (decision 5,
+  `retry.ts` and `ApiError` carrying `Retry-After`), a test for a 500 with no JSON body. Agreed 2026-11-20: a
+  `Retry-After` wait is capped at 10 s; the system text comes from one function used by the page error cards and by
+  the inline and toast errors after a button press; the reference has a copy button. Wording: drafted, with Uzair to
+  take to Abdul.
+
+**Left out, JobNavigator leftovers no BenchQ screen or the extension calls:** the 11 "already running" trigger 409s in
+`main.py` (scrape, Telegram, H-1B, backup, auto-reject), the companies test-scrape 500 (`routes_companies.py:670`),
+the posting fetch (`routes_jobs.py:1199`), "Unsafe URL" (`routes_applications.py:1013`), the persona 500s
+(`routes_persona.py:49,62`), Autofill's old routes (`routes_autofill.py`: `/api/autofill/config`, `/answer`,
+`/answer/stream`), cover letters. Their raised
+errors get the shape from the central handler for free; the hand-built ones stay as they are, listed as exceptions in
+the sweep, for Abdul's clean-up track. The streamed autofill answer's own error event is out of scope too.
+
+**Found on the way, not in 4b:** a crash inside the Gmail connect callback (`/api/oauth/google/callback`) reaches the
+outermost 500 handler, so `_oauth_browser_result` (`main.py`) never redirects and the user lands on a raw error. A
+small fix of its own.
+
+**Follow-ups from 4b's QA (Uzair, 2026-11-21), each a PR of its own:**
+
+- **Named layers.** What sits on top of what is raw `z-*` numbers across the code (10–40 sticky, menus, banner; 50
+  drawer, palette, studio; 60 tailoring panel; 70 the studio's selection toolbar). 4b put toasts at `z-[80]`
+  (`src/components/app/toast-layer.ts`, guarded by `toast-layer.test.ts`). Name the layers in `design.md` and the
+  theme (e.g. overlay, panel, popover, toast) and move every overlay onto them (CLAUDE.md: no raw values).
+- **Errors inside popup windows.** A native modal `<dialog>` (`showModal()`: `ConfirmDialog`, upload résumé, use as base,
+  job capture, `admin-dialog`, the wizard's discard dialog…) sits above every layer and blocks the page, so a toast
+  raised while one is open can't be seen. Rule: while a popup is open, its failure shows inside it (`ErrorNote` with
+  the reference). Check each popup; existing behaviour, not caused by 4b.
+- **Pre-existing accessibility found by axe:** the not-found and Forbidden screens have no `h1`; the Forbidden screen's
+  description fails contrast on a hard load without the app shell (3.88:1); the sign-in page has no `<main>`.
 
 ## 2. Production testing (second)
 

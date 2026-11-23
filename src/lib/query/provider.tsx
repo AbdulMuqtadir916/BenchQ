@@ -7,12 +7,12 @@ import { useSession } from "@/lib/stores/session-store";
 import { useCommitPendingSession, useSessionSync } from "@/lib/hooks/use-session";
 import { useDemoDataSync } from "@/lib/hooks/use-demo-data";
 import { clearCacheOnPrincipalChange, principalKey } from "./principal-boundary";
-import { shouldRetryQuery } from "./retry";
+import { retryDelay, shouldRetryQuery } from "./retry";
 
 /**
  * TanStack Query provider — one QueryClient per mount, sensible defaults for
- * a data-dense console: never retry SCHEMA_MISMATCH (a schema drift bug), a 404 (it won't change) or a 429 (./retry.ts),
- * short-ish staleTime so switching roles refetches, no refetch on window focus
+ * a data-dense console: queries retry network errors and 5xx only, waiting what Retry-After asks (./retry.ts); mutations
+ * never retry; short-ish staleTime so switching roles refetches, no refetch on window focus
  * because the BDE will alt-tab constantly.
  */
 export function QueryProvider({ children }: { children: ReactNode }) {
@@ -25,6 +25,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             gcTime: 5 * 60_000,
             refetchOnWindowFocus: false,
             retry: shouldRetryQuery,
+            retryDelay,
           },
           mutations: {
             retry: false,

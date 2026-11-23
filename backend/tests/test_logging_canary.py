@@ -245,6 +245,6 @@ def test_unexpected_errors_carry_no_input(api_client, accounts, log):
         with _route_session(_invalid):
             r = client.post(f"/api/firms/{accounts.firm_id}/candidates", headers=_cookie(accounts.firm_token),
                             json={"full_name": NAME, "email": EMAIL, "phone": PHONE, "summary": RESUME})
-    assert (r.status_code, r.text) == (500, "Internal Server Error")
+    assert r.status_code == 500 and r.json()["code"] == "INTERNAL" and NAME.lower() not in r.text.lower()
     written = _assert_clean(log)
     assert "validation error(s) for Person" in written

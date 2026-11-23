@@ -79,7 +79,7 @@ export function JobMatchIntro({ candidate, jobs, applications, isReady, isSearch
   }, [isRunning, stage, isSearching, step, reduce, onDone]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onDone();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onDone();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onDone]);
