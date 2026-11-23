@@ -189,7 +189,7 @@ dependencies are live; only switching the adapter to live waits.
 | — | Gmail inbox per candidate (D8): OAuth, import/sync and retained-account identity | Candidates, 0009; design in docs/team/samad.md §1.0 | Samad | PR 2 on `codex/candidate-gmail-connection`; classification/status updates deferred to PR 3 |
 | — | Production layer (rate limits, timeouts, the scheduler out of the API process, logging), then production testing | F7 | Uzair | In progress: rate limits per IP and per email (#93), per user (#94); request body size cap (step 2a, #101); database statement and connect timeouts (2b, #103); AI-call timeouts (2c) handed to Zuhair for now; one logging setup with request ids and masking (step 4a); next the scheduler out of the API process (step 3, after Samad's #104), then one error shape (4b). Decisions and what's deferred: `docs/team/uzair.md` §1 |
 | — | Candidate core tables (migration 0007, `docs/team/00-candidate-core.md`), then billing, deployment, clean-up | Candidates | Abdul | 0007 first |
-| — | [AI presets](./08-ai-presets.md): per-module presets (model + prompts) a Super Admin creates and switches. Every AI track reads its setup through `ai_config()` now | Zuhair's AI tracks | Abdul | Decided, not built (`ai_config` seam only) |
+| — | [AI presets](./08-ai-presets.md): per-module presets (model + prompts) a Super Admin creates and switches. Every AI track reads its setup through `ai_config()` now | Zuhair's AI tracks | Abdul | Built 2026-11-22 (`ai_config` seam only) |
 | 06 | [Open decisions](./06-open-decisions.md) | Product decision | Product owner | D1–D4 recommended in 07 §2 |
 
 ### Team and order (agreed 2026-10-23)

@@ -58,3 +58,17 @@ export function useChangeManager() {
     },
   });
 }
+
+/** OWNER only (07 Q67): change the firm's work hours. The firm (read by its slug) and the Days are read again. */
+export function useUpdateWorkHours() {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ workStart, workEnd }: { workStart: string; workEnd: string }) => teamApi.workHours(firmId, workStart, workEnd),
+    onSettled: () => {
+      for (const key of [["session", "firmBySlug"], queryKeys.jobs.all(firmId), queryKeys.ledger.all(firmId)]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}

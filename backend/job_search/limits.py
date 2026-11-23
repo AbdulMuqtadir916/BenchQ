@@ -1,6 +1,6 @@
 """The job search's daily caps (decided 2026-11-10), counted from rows, never stored:
 
-- 100 **new** jobs per candidate per day: `job_postings` rows discovered since the day started, captures left out
+- 30 **new** jobs per candidate per day (07 Q71, 2026-11-18; was 100, then 200): `job_postings` rows discovered since the day started, captures left out
   by how they were first saved (`first_source` manual / extension). A job seen again only refreshes its row and
   doesn't count; a captured job a search later refreshes stays a capture (Abdul's comment on PR 2: counting the
   latest `source` let it take a search's place, 101).
@@ -14,42 +14,49 @@ the BDE next starts a search (`pipeline.expire_lost`); a read only shows it as t
 nothing (a support view reads too).
 It never blocks the candidate.
 
-The day starts at 6:30 PM IST, the start of the BDE's shift, so one night's work is one day."""
-from datetime import datetime, time, timedelta
+The day is the firm's work day (backend/job_search/workday.py; decided 2026-11-17, Q157): it starts at the firm's work
+start (6:30 PM IST for every firm until then), so one night's work is one day."""
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, text
 
 from backend.auth.scoping import scoped
+from backend.job_search import workday
 from backend.job_search.providers.capture import CAPTURE_SOURCES
 from backend.models.db import utcnow
 from backend.models.job_search import JobPosting, ScrapeJob
 
-JOBS_PER_CANDIDATE_PER_DAY = 100
+JOBS_PER_CANDIDATE_PER_DAY = 50        # 07 Q71, changed by Zuhair 2026-11-21; 30 from 2026-11-18, 200 from 2026-11-17
 ATTEMPTS_PER_BDE_PER_DAY = 20
 CAPTURES_PER_BDE_PER_DAY = 20
-JOBS_PER_SEARCH = 100            # always asked for, even with less room left (Q28)
+JOBS_PER_SEARCH = 100            # a one-source search's ask (Q28); a click asks each source its leg's own (fanout.py)
+POSTED_WITHIN_DAYS = 14          # only jobs posted in the last 14 days (decided 2026-11-14, Q7)
 JOB_TYPE = "job_search"          # job_runs.job_type (the background launcher's own record of the task)
 IST = ZoneInfo("Asia/Kolkata")
-DAY_STARTS = time(18, 30)
 # A search still `running` after this long was lost (a restart, a dead worker); it is marked `error` and stops blocking.
 RUNNING_FOR_AT_MOST = timedelta(minutes=15)
 
 
-def day_start(now: datetime | None = None) -> datetime:
-    """The last 6:30 PM IST at or before `now`."""
-    local = (now or utcnow()).astimezone(IST)
-    start = datetime.combine(local.date(), DAY_STARTS, tzinfo=IST)
-    return start if local >= start else start - timedelta(days=1)
+def day_start(now: datetime | None = None, hours: workday.Hours = workday.DEFAULT) -> datetime:
+    """The start of the firm's work day `now` falls in (the last work start at or before it)."""
+    return workday.day_start(now or utcnow(), hours)
 
 
-def next_reset(now: datetime | None = None) -> datetime:
-    return day_start(now) + timedelta(days=1)
+def next_reset(now: datetime | None = None, hours: workday.Hours = workday.DEFAULT) -> datetime:
+    return workday.next_start(now or utcnow(), hours)
+
+
+def resets_at_text(db, firm_id, now: datetime | None = None) -> str:
+    """When the firm's next work day starts, in its time zone: "6:30 PM IST"."""
+    hours = workday.for_firm(db, firm_id)
+    return f"{next_reset(now, hours).astimezone(hours.zone):%I:%M %p %Z}".lstrip("0")
 
 
 def jobs_saved_today(db, firm_id, candidate_id, now: datetime | None = None) -> int:
     return scoped(db, JobPosting, firm_id, func.count(JobPosting.id)).filter(
-        JobPosting.candidate_id == candidate_id, JobPosting.discovered_at >= day_start(now),
+        JobPosting.candidate_id == candidate_id,
+        JobPosting.discovered_at >= day_start(now, workday.for_firm(db, firm_id)),
         JobPosting.first_source.notin_(CAPTURE_SOURCES)).scalar()
 
 
@@ -81,7 +88,8 @@ def _lock_key(user_id) -> int:
 def _today(db, firm_id, user_id, kind: str, now: datetime | None = None) -> int:
     """The BDE's searches or captures started since the day started, whatever became of them: counted by start."""
     return scoped(db, ScrapeJob, firm_id, func.count(ScrapeJob.id)).filter(
-        ScrapeJob.user_id == user_id, ScrapeJob.kind == kind, ScrapeJob.created_at >= day_start(now)).scalar()
+        ScrapeJob.user_id == user_id, ScrapeJob.kind == kind,
+        ScrapeJob.created_at >= day_start(now, workday.for_firm(db, firm_id))).scalar()
 
 
 def attempts_today(db, firm_id, user_id, now: datetime | None = None) -> int:
@@ -101,5 +109,5 @@ def usage(db, firm_id, candidate_id, bde_id, now: datetime | None = None) -> dic
         "attempts_cap": ATTEMPTS_PER_BDE_PER_DAY,
         "captures_today": captures_today(db, firm_id, bde_id, now) if bde_id else None,
         "captures_cap": CAPTURES_PER_BDE_PER_DAY,
-        "resets_at": next_reset(now).isoformat(),
+        "resets_at": next_reset(now, workday.for_firm(db, firm_id)).isoformat(),
     }

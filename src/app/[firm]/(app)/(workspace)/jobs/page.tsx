@@ -26,7 +26,8 @@ function JobsContent() {
   // The candidate picked in the explorer: their own jobs are read (the firm's newest 400 can leave theirs out, bot
   // review on #135); none picked, the firm's.
   const [pickedId, setPickedId] = useState<string | null>(focusId);
-  const jobsQuery = useJobs({ limit: 400, candidateId: pickedId || undefined });
+  // For the matching sequence: the picked candidate's first page, best Match first. The list reads every job itself.
+  const jobsQuery = useJobs({ limit: 100, candidateId: pickedId || undefined, sort: pickedId ? "match" : "newest" });
   const candidatesQuery = useCandidates();
   const applicationsQuery = useApplications();
   const [introDoneFor, setIntroDoneFor] = useState<string | null>(null);
@@ -83,7 +84,6 @@ function JobsContent() {
               transition={{ duration: 0.32, ease: EASE_OUT }}
             >
               <JobExplorer
-                jobs={jobsQuery.data ?? []}
                 candidates={myCandidates}
                 applications={applicationsQuery.data ?? []}
                 loading={isLoading}

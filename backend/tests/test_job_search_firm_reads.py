@@ -103,6 +103,7 @@ def test_a_firm_with_no_jobs_lists_none(anonymous_client, world, adnans):
 class _FullPostings:
     """freehire.me's single-job read, made up: counts the calls; `fail` makes the next ones fail."""
     name = "freehire"
+    label = "freehire.me"
 
     def __init__(self):
         self.calls, self.fail = 0, False
@@ -234,3 +235,73 @@ def test_a_nul_in_the_whole_posting_is_cleaned_before_it_is_stored_or_shown(anon
     test_db.expire_all()
     stored = test_db.get(JobPosting, uuid_.UUID(posting_id)).content
     assert stored[FULL_POSTING_KEY] is True and "\x00" not in stored["description"]
+
+
+# ── 100 at a time, sorted and filtered here (decided 2026-11-14, Q28, Q29, Q36, Q47) ─────────────────────────────────
+
+def _set_scores(test_db, scores: dict):
+    """Each posting id's Match, as the calculator would have stored it."""
+    import uuid as _uuid
+    from backend.models.job_search import JobPosting
+    for posting_id, score in scores.items():
+        test_db.query(JobPosting).filter(JobPosting.id == _uuid.UUID(posting_id)).update(
+            {JobPosting.match_score: score, JobPosting.match_note: "held" if score == 40 else None})
+    test_db.commit()
+
+
+@pytest.fixture
+def five(anonymous_client, world, adnans, test_db):
+    """Five of one candidate's jobs, with stored scores 90, 40, 75, none and 60."""
+    made = {}
+    for title, location in (("Alpha Developer", "Remote"), ("Beta Developer", "Austin, TX"),
+                            ("Gamma Developer", "Hybrid in Dallas, TX"), ("Delta Developer", "Remote"),
+                            ("Epsilon Developer", "Austin, TX")):
+        body = {"source": "manual", "title": title, "company": f"{title[0]} Corp", "location": location,
+                "description": f"A made-up {title} job.", "url": "https://jobs.example.test/" + title.split()[0].lower()}
+        r = anonymous_client.post(_url(world, adnans, "job-postings"), json=body, headers=world["as"]["adnan"])
+        made[title] = r.json()["id"]
+    _set_scores(test_db, {made["Alpha Developer"]: 90, made["Beta Developer"]: 40, made["Gamma Developer"]: 75,
+                          made["Delta Developer"]: None, made["Epsilon Developer"]: 60})
+    return made
+
+
+def _titles(r):
+    assert r.status_code == 200, r.text
+    return [item["title"] for item in r.json()["items"]]
+
+
+def test_one_candidates_jobs_best_match_first_unscored_last_with_their_match(anonymous_client, world, adnans, five):
+    r = _list(anonymous_client, world, "adnan", candidate_id=adnans["id"], sort="match")
+    assert _titles(r) == ["Alpha Developer", "Gamma Developer", "Epsilon Developer", "Beta Developer", "Delta Developer"]
+    beta = next(item for item in r.json()["items"] if item["title"] == "Beta Developer")
+    assert beta["matches"] == {adnans["id"]: {"score": 40, "note": "held"}}
+
+
+def test_a_page_at_a_time_with_the_total(anonymous_client, world, adnans, five):
+    first = _list(anonymous_client, world, "adnan", candidate_id=adnans["id"], sort="match", limit=2).json()
+    assert (len(first["items"]), first["total"], first["next_offset"]) == (2, 5, 2)
+    last = _list(anonymous_client, world, "adnan", candidate_id=adnans["id"], sort="match", limit=2, offset=4).json()
+    assert ([i["title"] for i in last["items"]], last["next_offset"]) == (["Delta Developer"], None)
+
+
+def test_the_filters_apply_to_the_whole_list(anonymous_client, world, adnans, five):
+    mine = {"candidate_id": adnans["id"], "sort": "match"}
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, min_score=70)) == ["Alpha Developer", "Gamma Developer"]
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, remote="REMOTE")) == ["Alpha Developer", "Delta Developer"]
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, remote="HYBRID")) == ["Gamma Developer"]
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, q="dallas")) == ["Gamma Developer"]
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, q="e corp")) == ["Epsilon Developer"]
+    assert _titles(_list(anonymous_client, world, "adnan", **mine, source="indeed")) == []
+    assert len(_titles(_list(anonymous_client, world, "adnan", **mine, source="manual"))) == 5
+    assert _list(anonymous_client, world, "adnan", **mine, limit=401).status_code == 422
+
+
+def test_jobs_applied_for_past_saved_can_be_left_out(anonymous_client, world, adnans, five, test_db):
+    import uuid as _uuid
+    from backend.models.db import Application
+    for title, status in (("Alpha Developer", "applied"), ("Gamma Developer", "saved")):
+        test_db.add(Application(firm_id=world["firm"].id, candidate_id=_uuid.UUID(adnans["id"]),
+                                job_id=_uuid.UUID(five[title]), status=status))
+    test_db.commit()
+    titles = _titles(_list(anonymous_client, world, "adnan", candidate_id=adnans["id"], sort="match", exclude_applied=True))
+    assert "Alpha Developer" not in titles and "Gamma Developer" in titles

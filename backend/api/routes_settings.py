@@ -93,6 +93,12 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
             reset_tailoring_semaphore()
         _reconfigure("reset_tailoring_semaphore", _reset_tailoring)
 
+    for setting, name in (("resume_tailor_max_concurrent", "resume_tailor"),
+                          ("resume_parse_max_concurrent", "resume_parse")):
+        if setting in updated:
+            from backend.job_monitor import reset_limiter
+            _reconfigure(f"reset_{name}_limiter", lambda limiter=name: reset_limiter(limiter))
+
     if "dedup_tracking_params" in updated:
         _reconfigure("reload_tracking_params", reload_tracking_params)
 

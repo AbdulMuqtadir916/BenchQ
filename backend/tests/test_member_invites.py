@@ -237,7 +237,7 @@ def test_onboarding_end_to_end(test_db, accounts, api_client):
                           json={"email": "admin@benchq.test", "password": TEST_PASSWORD}).status_code == 200
         created = admin.post("/api/admin/firms", json={
             "name": "Northwind Staffing", "slug": "northwind", "plan_id": str(accounts.plan_id),
-            "owner_name": "Nora North", "owner_email": "nora@northwind.test"}).json()
+            "work_start": "18:30", "work_end": "04:00", "owner_name": "Nora North", "owner_email": "nora@northwind.test"}).json()
     firm_id = created["firm"]["id"]
     assert created["firm"]["status"] == "ONBOARDING"
 

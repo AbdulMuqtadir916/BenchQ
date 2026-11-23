@@ -163,12 +163,12 @@ def test_patch_settings_rejects_non_string_enum_values(client, bad):
 
 def test_patch_settings_skips_the_redaction_placeholder(client, test_db):
     """Re-saving the Settings form must not overwrite a secret with six bullets."""
-    set_setting(test_db, "llm_api_key", "real-key")
+    set_setting(test_db, "gmail_refresh_token", "real-key")
     r = assert_clean(client.patch("/api/settings",
-                                  json={"llm_api_key": "•" * 6}), 200)
+                                  json={"gmail_refresh_token": "•" * 6}), 200)
     assert r.json()["updated"] == []
     from backend.models.db import Setting
-    row = test_db.query(Setting).filter(Setting.key == "llm_api_key").first()
+    row = test_db.query(Setting).filter(Setting.key == "gmail_refresh_token").first()
     test_db.refresh(row)
     assert row.value == "real-key"
 

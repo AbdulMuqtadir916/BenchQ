@@ -1,6 +1,8 @@
 # 05 — Assign, done screen and reassigning
 
 > **Superseded in part (2026-11-11, 07 Q63):** BDE capacity (Q46) was removed: no `bdeCapacity`, no `firmSettings.edit`, no capacity form, no "At capacity" figure, no `deriveBdeLoad`. Read the capacity parts below as history.
+>
+> **A hard limit since 2026-11-18 (07 Q70):** a BDE holds at most **3** candidates at a time, every status counted (a placed one too) until a manager moves it. Each BDE row shows "{held} of 3"; a BDE who holds 3 is greyed out with "This BDE has 3 candidates." (except the BDE who already holds the candidate being reassigned), and the backend refuses the same (409). A BDE already above 3 keeps them. `BDE_CANDIDATE_LIMIT` and `heldByBde` in `src/lib/derive/assignment.ts`; `BDE_CANDIDATE_LIMIT` in `backend/api/routes_candidates.py`. The plan's firm-wide candidate limit (Q45) is unchanged.
 
 **Owner:** — · **Depends on:** 02, 03, 04 · **Branch:** `feat/onboarding-05-assign`
 

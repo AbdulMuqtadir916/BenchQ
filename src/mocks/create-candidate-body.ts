@@ -23,7 +23,7 @@ export const createCandidateBody = (overrides: Partial<CreateCandidate> = {}): C
   targetRoles: ["Data Engineer"],
   willingToRelocate: false,
   workSettings: [],
-  preferredLocations: [],
+  preferredLocations: ["Austin, TX"],
   contactNotes: null,
   summary: null,
   skills: [],

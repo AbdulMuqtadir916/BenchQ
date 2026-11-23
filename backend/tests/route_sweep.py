@@ -26,6 +26,8 @@ from backend.tests.test_log_lint import PEOPLE_MODELS, PERSONAL_HOSTS, _safe_att
 from backend.tests.test_logging_canary import EMAIL, NAME, PASSWORD, PHONE, RESUME, TOKEN
 
 PLANTED = f"{NAME}, {RESUME}"
+# The email the seed gives the candidate's résumé row (`_value` below), so the candidate's own email.
+SEEDED_RESUME_EMAIL = "zorvath.quillane+resumes@canary-mail.test"
 # Request fields that hold a job posting or a company, not a person: neutral, as a job board's reply is.
 NEUTRAL_FIELDS = re.compile(r"(^|_)(url|urls|link|href|domain|company|companies|title|job|jobs|keywords?|"
                             r"search_term|location|locations|provider|model|source|sources|board|ats|slug|timezone|"
@@ -34,6 +36,13 @@ NEUTRAL_FIELDS = re.compile(r"(^|_)(url|urls|link|href|domain|company|companies|
 LATER = datetime(2099, 1, 1, tzinfo=timezone.utc)
 SEED_BATCH = uuid.UUID("00000000-0000-4000-8000-000000000020")   # the seeded scrape_jobs batch, named by job_postings
 SEED_OVERRIDES = {
+    # The AI setup (migration 0032): one inactive preset the routes can edit, activate and archive.
+    "ai_provider": {"id": 1, "provider": "openrouter", "api_key_encrypted": None, "key_last4": None,
+                    "updated_by_id": None},
+    "ai_models": {"model_id": "openai/sweep-model", "label": "Sweep model", "is_hidden": False},
+    "ai_presets": {"module": "search_titles", "name": "Sweep preset", "is_active": False, "archived_at": None},
+    "ai_preset_versions": {"version": 1, "model_id": "openai/sweep-model", "effort": "",
+                           "prompts": {"prompt": "Titles for {target_role}"}, "created_by_id": None},
     "invites": {"invited_by_platform_user_id": None, "token_hash": "0" * 64, "email": "zorvath.invite@canary-mail.test",
                 "manager_id": None, "expires_at": LATER},
     "firm_jobs": {"origin": "CAPTURED"},
@@ -60,13 +69,19 @@ ID_ALIASES = {"app": "applications", "cl": "cover_letters", "base": "base_resume
               "attempt": "candidate_google_oauth_attempts", "interview": "interviews", "manager": "users",
               "bde": "users", "user": "users", "owner": "users", "firm": "firms", "plan": "plans",
               "resume": "resumes", "base_resume": "base_resumes", "notification": "notifications", "run": "job_runs",
-              "review": "application_reviews", "posting": "job_postings"}
+              "review": "application_reviews", "posting": "job_postings", "model_uuid": "ai_models",
+              "preset": "ai_presets"}
 JOB_URL = "https://jobs.example.test/posting/1"
 # Values the routes check in code, not in their schema, by field name.
 FIELD_VALUES = {"role": "MANAGER", "public_url": "https://benchq.example.test", "provider": "openrouter",
                 "country": "United States", "tiers": ["1"], "slug": "zorvath-firm", "template": "traditional",
                 # The Autofill save resets fixed questions by key, and refuses a key no question has: none reset.
-                "reset": []}
+                "reset": [],
+                # A firm's work hours are times, "HH:MM" (07 Q67); a planted string is refused before the route works.
+                "work_start": "19:00", "work_end": "04:00",
+                # An AI preset: an approved model, and the prompt its use case requires.
+                "model_id": "openai/sweep-model", "module": "search_titles", "effort": "",
+                "prompts": {"prompt": "Titles for {target_role}"}}
 
 
 # ── Seed ──────────────────────────────────────────────────────────────────
@@ -158,9 +173,9 @@ def seed_every_table(db, accounts) -> tuple[dict[str, uuid.UUID], dict[str, str]
     manager = make_user(db, firm, email="zorvath.manager@canary-mail.test", role="MANAGER", name=NAME + " Manager")
     bde = make_user(db, firm, email="zorvath.bde@canary-mail.test", role="BDE", name=NAME + " Bde")
     bde.manager_id = manager.id
-    # The app's settings as run_seeds() writes them (the api_client fixture skips it), with the keys filled in.
+    # The app's settings as run_seeds() writes them (the api_client fixture skips it), .
     for key, (value, *_rest) in DEFAULT_SETTINGS.items():
-        db.add(Setting(key=key, value="test-key" if key.endswith("api_key") and not value else value))
+        db.add(Setting(key=key, value=value))
     db.commit()
     ids = {"plans": accounts.plan_id, "firms": accounts.firm_id, "users": accounts.user_id,
            "platform_users": accounts.admin_id, "_manager": manager.id, "_bde": bde.id, "_slug": firm.slug}
@@ -194,6 +209,8 @@ def seed_every_table(db, accounts) -> tuple[dict[str, uuid.UUID], dict[str, str]
         except Exception as e:                                 # a constraint the generic row doesn't meet
             failed[table.name] = str(getattr(e, "orig", e)).splitlines()[0][:160]
     db.commit()
+    from backend.tests.ai_support import set_up_ai
+    set_up_ai(db)                       # the key and the other use cases' presets, so an AI route does its work
     return ids, failed
 
 
@@ -367,7 +384,10 @@ def build_request(app, method: str, path: str, ids: dict) -> dict:
             v = next((_resolve(o, spec) for o in v.get("anyOf", []) if o.get("type") != "null"), v)  # Optional[File]
             items = _resolve(v.get("items", {}), spec) if v.get("type") == "array" else v
             if items.get("format") == "binary" or items.get("contentMediaType") == "application/octet-stream":
-                files[k] = (f"{NAME}.pdf", _pdf(f"{NAME}\n{EMAIL} | {PHONE}\n{RESUME}"), "application/pdf")
+                # The seeded candidate's own email too (its résumé row's, `_value`): a later upload must hold the
+                # candidate's name and email or it is refused before its work runs (07 Q69).
+                files[k] = (f"{NAME}.pdf", _pdf(f"{NAME}\n{EMAIL} | {SEEDED_RESUME_EMAIL} | {PHONE}\n{RESUME}"),
+                            "application/pdf")
             else:
                 data[k] = example(v, spec, ids, k)
         out["files"], out["data"] = files or None, data or None

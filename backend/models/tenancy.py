@@ -13,7 +13,7 @@ These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.p
 import uuid
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint,
     text,
 )
 from sqlalchemy import event
@@ -103,10 +103,16 @@ class Firm(Base):
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
+    # The firm's work hours, in `primary_timezone` (migration 0031; decided 2026-11-17, Q152–Q174): required, no
+    # default (existing firms got 18:30–04:00). A work day runs from one start to the next
+    # (backend/job_search/workday.py); the end is only shown.
+    work_start = Column(Time, nullable=False)
+    work_end = Column(Time, nullable=False)
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
+        CheckConstraint("work_start <> work_end", name="ck_firms_work_hours"),
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
