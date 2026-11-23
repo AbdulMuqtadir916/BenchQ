@@ -25,6 +25,8 @@ interface ToastState {
   toasts: Toast[];
   show: (message: string, options?: { tone?: Toast["tone"]; reference?: string | null }) => void;
   dismiss: (id: number) => void;
+  /** Forget all messages when the principal changes: they can contain firm data. */
+  clear: () => void;
   /** Dismisses the newest failure (Esc); false when there is none, so the key is left to whoever else wants it. */
   dismissNewestError: () => boolean;
 }
@@ -51,6 +53,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     if (!reference) setTimeout(() => get().dismiss(id), LIFETIME_MS);
   },
   dismiss: (id) => set({ toasts: get().toasts.filter((toast) => toast.id !== id) }),
+  clear: () => set({ toasts: [] }),
   dismissNewestError: () => {
     const newest = get().toasts.findLast((toast) => toast.tone === "danger");
     if (!newest) return false;
