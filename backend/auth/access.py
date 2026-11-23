@@ -24,6 +24,7 @@ from starlette.routing import Match
 from backend.auth.sessions import COOKIE_NAME, clear_cookie_kwargs, cookie_kwargs, resolve
 from backend.config import ALLOWED_ORIGINS, IS_PRODUCTION
 from backend.models.db import SessionLocal
+from backend.problem import problem_response
 from backend.statement_timeout import busy_response, is_statement_timeout
 
 logger = logging.getLogger("jobnavigator")
@@ -75,11 +76,12 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": F,
     "POST /api/firms/{firm_id}/invites/{invite_id}/revoke": F,
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": F,   # OWNER only: member.changeManager (07 Q40)
+    "PATCH /api/firms/{firm_id}/work-hours": F,                  # OWNER only: firm.editHours (07 Q67)
     "POST /api/firms/{firm_id}/candidates/parse-resume": F,      # OWNER, MANAGER: candidate.create (07 Q41, Q49)
     "GET /api/firms/{firm_id}/candidates": F,                    # in the principal's scope (07 Q47)
     "POST /api/firms/{firm_id}/candidates": F,                   # OWNER, MANAGER: candidate.create + can_assign_to
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": F,
-    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # candidate.editProfile (07 Q56), in scope
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": F,   # can_edit_profile (2026-11-14, Q17), in scope
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": F,   # candidate.assign + can_assign_to (Q43)
     # A candidate's résumé versions and bases (résumé versioning PR 5): reads in the candidate's scope; writes by
     # can_change_resume / can_manage_resume (07 Q55)
@@ -109,6 +111,8 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": F,   # a capture (job search PR 2), the BDE's
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": F,
+    # A job's posting, pasted by the candidate's BDE for a job that came without it (LinkedIn, 2026-11-17, Q107).
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting": F,
     # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
     "GET /api/firms/{firm_id}/job-postings": F,
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,
@@ -197,6 +201,19 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
+    # The Super Admin's AI setup (docs/integration/08-ai-presets.md).
+    "GET /api/admin/ai": A,
+    "GET /api/admin/ai/available-models": A,
+    "PUT /api/admin/ai/provider": A,
+    "POST /api/admin/ai/models": A,
+    "DELETE /api/admin/ai/models/{model_uuid}": A,
+    "POST /api/admin/ai/presets": A,
+    "PATCH /api/admin/ai/presets/{preset_id}": A,
+    "POST /api/admin/ai/presets/{preset_id}/activate": A,
+    "POST /api/admin/ai/presets/{preset_id}/archive": A,
+    "POST /api/admin/ai/presets/{preset_id}/restore": A,
+    "POST /api/admin/ai/presets/{preset_id}/test-run": A,
+    "PATCH /api/admin/ai/limits": A,
     "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data
@@ -253,6 +270,7 @@ ROUTE_ACCESS: dict[str, Access] = {
 SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}",
     "GET /api/cover-letters/{cl_id}/pdf",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file",   # a résumé as a file (docs/02 §8.2)
 })
 SUPPORT_VIEW_READ_ONLY = "A support view is read-only."
 
@@ -285,7 +303,7 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def _refuse(status: int, detail: str, clear_cookie: bool = False) -> JSONResponse:
-    response = JSONResponse(status_code=status, content={"detail": detail})
+    response = problem_response(status, detail)
     if clear_cookie:
         response.delete_cookie(**clear_cookie_kwargs())
     return response

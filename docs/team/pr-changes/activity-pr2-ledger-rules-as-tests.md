@@ -115,3 +115,12 @@ The real backend passes all three as it is: no route depended on the old, looser
 - **Each dispatcher forwards keywords its own way.** `Thread` and `launch_background` pass the callback's keywords as one
   dict (`kwargs={...}`, `func_kwargs={...}`), so the candidate rule reads that dict for those two and their own
   keywords (`firm_id=` on the launcher) are not the callback's. The other dispatchers pass their keywords on as they are.
+
+## Up to date with main (2026-11-23)
+
+Main added the Super Admin's AI presets (#150) and the firm's work hours (#150), and the check found three things:
+
+- `test_preset` (`api/routes_ai_presets.py`) is a write route that logs nothing: it runs a preset on a pasted sample and
+  saves nothing, so it is in `NOT_LOGGED` with that reason.
+- The presets' `_log` and the work-hours change (`api/routes_team.py`) didn't state `candidate_id`. Neither is about a
+  candidate, so both now say `candidate_id=None`.

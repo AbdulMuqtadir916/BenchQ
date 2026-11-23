@@ -7,6 +7,8 @@ import { formatRelative } from "@/lib/format/timezone";
 import { reviewReasonLabel } from "@/components/app/inbox/review-reason";
 import { SkeletonList } from "@/components/app/skeleton-list";
 import { Button } from "@/components/ui/button";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 /**
  * The BDE review column: emails waiting for a person, newest first. Each card opens the exact email, where the
@@ -24,9 +26,9 @@ export function ReviewQueue({ ws, actions, inBoard = false }: { ws: CandidateWor
         <span className="bq-count">{ws.reviewTotal}</span>
       </div> : null}
       {query.isLoading ? <SkeletonList rows={2} /> : query.error ? (
-        <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-danger-fg)]">
-          <span>{query.error.message}</span>
-          <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>Retry</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ErrorNote as="span" text={describeError(query.error)} />
+          {describeError(query.error).canRetry ? <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>Retry</Button> : null}
         </div>
       ) : hidden ? (
         <p className="text-sm text-[var(--color-text-3)]">{ws.reviewTotal} emails are waiting for a BDE. Their content is not shown in a support view.</p>

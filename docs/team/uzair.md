@@ -15,7 +15,8 @@ every signed-in request, all in memory (`backend/auth/throttle.py`; the table be
 (`backend/body_limit.py`); database statement and connect timeouts (`backend/statement_timeout.py`, step 2b below);
 one logging setup with request ids and masking (`backend/logging_setup.py`, `backend/request_log.py`, step 4a below);
 per-scraper throttles
-(`backend/scraper/sources/*`); one uvicorn worker with the scheduler inside it.
+(`backend/scraper/sources/*`); one uvicorn worker for the API, and the scheduler in its own worker process
+(`backend/worker.py`, step 3 below).
 
 1. **Requests per second:** rate limits per IP for sign-in and invite acceptance (brute force), per user for the API,
    per firm for the AI routes (parse, tailor, score: they cost money). 429 with `Retry-After`; the frontend's
@@ -61,15 +62,13 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
   **From tailoring (2026-11-12, [tailoring.md](./tailoring.md) §7):** one tailoring is 5 model calls, about a minute.
   The tailor has its own gate, `resume_tailor`, 40 per worker (`resume_tailor_max_concurrent`), and at most 5 running
   per BDE; nothing yet stops one firm taking most of the gate. Your cap is that missing per-firm layer.
-- **More than one worker, for the tailor (2026-11-12):** each worker stamps the tailorings it holds every 30 s
-  (`backend/resume_tailor/runs.py`), so a run lost to a crash shows within 2 minutes on any number of workers. But
-  `job_monitor.cleanup_stale_runs()` at startup fails *every* running `job_runs` row: with several workers, one
-  restarting would fail the others' live runs. Before running more than one worker, it should fail only rows not
-  stamped recently (or its own).
+- **More than one worker, for the tailor (2026-11-12):** done in step 3. Every process stamps every run it holds
+  (`job_monitor.start_heartbeat`, generalising the tailor's stamp), and a run is failed only after 2 minutes without a
+  stamp, so a restart, a deploy's overlap or a second copy never fails a live copy's runs.
 - **AI quotas per plan,** with billing (Abdul). The cap above is not a quota.
 - **AI work started in the background** (scoring after a scrape, the score a tailor chains): a request limit doesn't see it. It is covered once AI spend is recorded per firm (07-auth issue 8).
 - **The IP-count fix.** A successful sign-in resets the IP's count as well as the email's, so someone with their own account can keep resetting the per-IP lock. The fix is to reset only the email's count (`throttle.clear()`).
-- **More than one backend process (step 3).** In-memory counts are per process, so N processes allow about N times each limit. Choose then:
+- **More than one API process (after step 3).** In-memory counts are per process, so N processes allow about N times each limit. Choose then:
   - stay at one process (likely enough at BenchQ's load; §2 measures it)
   - counters in Postgres, which is already paid for (needs a table: Abdul)
   - sticky sessions at the proxy (per-user only)
@@ -236,12 +235,167 @@ Python's `logging` sends every module's records up to one root logger. Each file
 - **Abdul (deployment):** the collector reads JSON lines from stdout. If the production proxy sets `X-Request-ID`, the
   backend keeps it, so the proxy's lines and ours share one id. Log retention is the deployment's.
 
-### Step 4b, errors: one error shape (planned)
+### Step 3, the scheduler out of the API (plan agreed 2026-11-14)
 
-The frontend shows the backend's `detail` text word for word (`src/components/app/error-state.tsx`), so backend wording reaches users. Step 4 gives every backend error a machine-readable code, RFC 9457 "Problem Details" style, next to the message. The frontend then shows its own plain-language message per code: busy, rate-limited, offline, unexpected. The wording is a product call (Abdul). Internal details (the database, a query) stay in the server logs (OWASP error handling).
+**Why.** The scheduler (APScheduler, `backend/scheduler.py`) keeps its job list in memory, so every process that starts
+one runs every job: two API workers, or the old and new API side by side during a zero-downtime deploy, would classify
+each email twice and run two backups at once. That is why the API had to run as exactly one worker (07 Q37). Moving
+the scheduler into its own process lifts that tie: the API may run as many copies as it needs, the scheduler exactly
+one. This is the standard web/worker split (Twelve-Factor process types; Celery beat, Sidekiq), in its light form: a
+separate scheduler process and Postgres for coordination, no Redis and no new table.
 
-Also in 4b: the frontend retries a failed query after about 1 s and 2 s (TanStack Query's default delay;
-`src/lib/query/retry.ts`), while a 503 asks for `Retry-After: 5`. It should wait what the backend asks.
+**What was built** (`feat/scheduler-worker`, one PR):
+- **The worker:** `python -m backend.worker` (`backend/worker.py`), started by `backend/scripts/start_worker.sh` as
+  the `worker` service in `docker-compose.yml`, from the same image. It runs the startup checks the jobs need (schema at
+  head, the statement timeout, the Gmail token key), cleans its own stale runs, then the scheduler. Run exactly one.
+  The API's `lifespan` no longer starts the scheduler; the tailor's heartbeat stays in the API (its runs live there).
+- **Settings reach the worker by polling** (decided): `scheduler.reload_schedule_if_changed` runs every minute and
+  reconfigures only when a schedule setting (`SCHEDULE_SETTING_KEYS`) changed. `PATCH /api/settings` no longer calls
+  the scheduler. Side fix: `candidate_gmail_sync_interval_minutes` was never in the API's reconfigure list, so a change
+  waited for a restart; it is reloaded like the rest now.
+- **`GET /api/scheduler/jobs` retired (410)** (decided): it read the in-process scheduler, and no BenchQ screen or the
+  extension called it. Run history stays at `/api/monitor/history`.
+- **Stale runs: a heartbeat, not "I just started"** (decided 2026-11-14, replacing a first per-process split). The
+  old start-up clean-up failed every `running` row, assuming whoever ran them was dead. That is wrong as soon as two
+  copies overlap: a zero-downtime deploy starts the new API before the old one stops, and a second copy for capacity
+  overlaps for good. A tailoring failed that way read as lost while its old copy went on to save it.
+  Now every process (each API copy and the worker) stamps `meta.seen_at` on the runs it holds every 30 s, from its own
+  thread (`job_monitor.start_heartbeat`; a run blocking the event loop can't silence it), and each beat fails any
+  `running` row not stamped for 2 minutes (`cleanup_stale_runs`; a row never stamped counts from its start). The same
+  rule and numbers as the tailor's (tailoring.md Q10b), which it generalises. A crashed process's runs read
+  `running` for up to 2 minutes before they fail. The inbox's rows recover on their own and are left alone: an import
+  (`recover_imports`), the classifier's pause (a state; failing it cleared the pause) and command rows. A
+  classification row is never stamped (it isn't held in `_running`) and is failed only once it is 10 minutes old,
+  well past its 2-minute claim lease. Fixes R4-T1-27 (its strict-xfail test now passes).
+  Fixed in #147 (CodeRabbit): the tailor's save (`runs.py`, `_Stop(LOST)`) also stops when its row is no longer
+  `running`, not only on an error code, so a run failed as silent can never come back as completed (a row for Zuhair
+  in cross-area-changes.md).
+- **`GET /api/monitor/active` reads `job_runs`**, so the worker's runs show: every `running` row, with this process's
+  own runs from memory (their scope and company), minus the classifier's pause row. `_running` stays per process.
+- **A manual trigger and a scheduled run never overlap:** the seven job types both processes start
+  (`job_monitor.SHARED_JOB_TYPES`: `scrape_all`, `email_check`, `daily_digest`, `h1b_refresh`, `auto_reject`,
+  `job_cleanup`, `db_backup`) are claimed in `job_runs`: a transaction-scoped advisory lock, then "is one running?",
+  then the insert. Neither process can see the other's `_running` dict. Other job types keep the in-memory check.
+- **Unchanged:** the API wakes the classifier from a route (`wake_worker`), in the API process. Emails are claimed
+  with `SKIP LOCKED` and a lease, so two processes never take the same one (Samad's design). Same for "sync now".
+
+**Not in step 3: more than one API worker.** Still per process: the rate-limit counters (deferred list above), the
+tailor's gate and the scoring/tailoring semaphores (each N per worker), and `_running` for the other job types.
+Whether to run several API workers is decided from the §2 load test.
+
+**Open, carried from 2026-11-03:** "Q2/Q3 of #104's grilling still need Abdul." Not found in the docs; ask Abdul
+whether they were settled.
+
+### Step 4b, errors: one error shape (plan agreed 2026-11-20)
+
+**The problem.** Backend errors come in four shapes: `{"detail": "text"}`, a 422's `{"detail": [{loc, msg}]}`, one
+object `detail` (the duplicate résumé, `backend/candidates/versions.py:466`) and a plain-text 500. The frontend shows
+`detail` word for word (`src/components/app/error-state.tsx` and about 20 components) and derives a code from the
+status alone (`src/lib/api/http.ts`), so it can't tell a busy database from a daily quota, and an unexpected 500 reads
+"Request failed with status 500.". A few messages carry exception text. Queries are retried after about 1 s and 2 s
+whatever the error, a 401 or 403 included, while a busy 503 asks for `Retry-After: 5`. The provider's own rate limits
+are not part of this: the backend already retries the AI provider (`backend/analyzer/llm_client.py`, 4 attempts,
+2/4/8 s), and the frontend never retries a mutation, so an AI job is never started twice.
+
+**The shape** (RFC 9457 "Problem Details", `application/problem+json`):
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "This résumé is already Base 2.",
+  "code": "DUPLICATE_RESUME", "request_id": "…",
+  "base_resume_id": "…", "hidden": false }
+```
+
+- `detail` is always a string written for the user, never internal. Keeping it a string keeps the extension's reader
+  (`extension/src/api.ts:57`) and about 100 backend test assertions working.
+- A 422's `detail` is one actionable sentence, along the lines of "BenchQ couldn't take this as it was sent. Refresh
+  the page and try again." (confirmed 2026-11-20); the fields go in `errors: [{loc, msg, type}]`, never the
+  submitted value (Pydantic's `input` would echo an email or password back).
+- Extra fields sit at the top level (the duplicate résumé's `base_resume_id`, `hidden`).
+- `Retry-After` stays a header.
+
+**Decisions (Uzair, 2026-11-20):**
+
+1. **A contract first:** `docs/02-DATA-CONTRACTS.md` §12 (the body, the code registry, the rules below),
+   signed off by Abdul before the PR merges. It is built meanwhile. `docs/integration/00-foundation.md` points to it.
+2. **Codes by meaning, not status.** The default comes from the status (409 → `CONFLICT`). A specific code only where
+   the frontend acts differently. One registry table in the contract, keeping the names the frontend already uses
+   (`RATE_LIMITED`, `UNAVAILABLE`, `NETWORK`, `SCHEMA_MISMATCH`, `DUPLICATE_JOB`, …). A 429, 503 or 500 is not always
+   a system error:
+   - `RATE_LIMITED` only from the throttle (`backend/auth/throttle.py`); the business limits get their own codes and
+     keep their meaning and specifics (the limit, when it resets), worded by the `docs/02` §12.3 writing rules
+     (Uzair, 2026-11-20): the daily job-add quota (`routes_applications.py:411`), the job search quotas
+     (`routes_job_search.py:85`), "5 tailorings running" (`resume_tailor/runs.py:281`).
+   - The busy code only from `statement_timeout.busy_response()`; "the search couldn't start" and "not configured"
+     503s get their own.
+   - `INTERNAL` only for a crash; the deliberate 500s keep their own code: the tailor isn't set up
+     (`routes_resume_tailoring.py:48`), the résumé reader didn't answer (`candidates/parse.py:215`). The set-up 500s
+     say "…isn't set up yet. Ask your admin."; the setting's name goes to the log, not the answer (Uzair, 2026-11-20,
+     replacing "keep the setting name"; the writing rules are `docs/02` §12.3).
+   - **No specific code on a 404 or 403, ever:** one body for every not-found, so a code can't confirm a record exists
+     in another firm (CLAUDE.md, routes and access).
+3. **The frontend's own text only for system errors** (busy, rate-limited, offline, unexpected, data mismatch), chosen
+   by code, from one map beside `ApiError`. Every other error keeps the backend's text. The wording is Abdul's (the
+   proposal is the table in `docs/02` §12.3). Busy has one text everywhere: "BenchQ is handling a lot right now. Try
+   again in a few seconds." (a page's card shows only after its retries ran out). The sign-in page keeps its own
+   throttle line, "Too many sign-in attempts. Try again in 15 minutes.", with the real wait (Uzair, 2026-11-20).
+4. **"Reference: …" (the request id) on an unexpected 500 only.** No id (the Next proxy's own 500 when the backend is
+   down, which has no JSON body): no reference line.
+5. **Queries never retry a 4xx;** network errors and 5xx are retried, waiting what `Retry-After` asks (with a ceiling).
+   Mutations stay unretried.
+6. **The duplicate résumé's fields move to the top level;** the frontend reads both shapes during the switch.
+7. **The website's text changes only for the system codes, from one function** (decision 3); every other error shows
+   the backend's `detail` as today, and `http.ts` reads the body's code. A validation 422 shows the backend's sentence
+   ("BenchQ couldn't take this as it was sent. Refresh the page and try again."), not the field list (Uzair,
+   2026-11-20). The extension never uploads résumés, so
+   the duplicate-résumé 409 doesn't reach it. Its only visible change is a validation 422: today the list `detail` is
+   ignored and it shows its own "refresh" advice (`extension/src/api.ts:56`, `failureOf`); with the actionable 422
+   sentence it shows the same advice, so the extension needs no change. Samad is informed, not asked to change
+   anything.
+
+**One PR (decided by Uzair 2026-11-20), in two parts.** It merges after Abdul signs off both the contract
+(`docs/02` §12) and the wording (the frontend's own messages, §12.3's rules).
+
+- **Part 1, the shape (backend).** One `problem_response(...)` helper in the backend; handlers in `main.py` for FastAPI's and
+  Starlette's `HTTPException` (unknown paths and wrong methods raise Starlette's), validation errors, the existing
+  DataError / pool / timeout handlers and the unexpected 500; `exc.headers` kept. Every hand-built error response
+  BenchQ reaches goes through the helper: the sign-in refusal (`auth/access.py`, `_refuse`, its cookie delete kept),
+  the 413 (`body_limit.py`), the busy 503, the per-user 429 (`main.py`, `limit_per_user`). The exception text BenchQ
+  reaches is fixed: the mailbox-connect errors (`routes_inbox.py:298,300`; check 298 is written for users first).
+  `http.ts` reads the new shape (decision 7). Tests: a sweep that every route's error has the shape and a known code,
+  a 422 with a planted value that isn't echoed, a 405 and an unknown path, the content type, the extension's reader
+  against the new body, and the ~30 backend tests that assert the old shape exactly, updated (rows in
+  `cross-area-changes.md` for their owners).
+- **Part 2, what users see (frontend, `src/` only).** The frontend's text per system code, the reference line, the retry rule (decision 5,
+  `retry.ts` and `ApiError` carrying `Retry-After`), a test for a 500 with no JSON body. Agreed 2026-11-20: a
+  `Retry-After` wait is capped at 10 s; the system text comes from one function used by the page error cards and by
+  the inline and toast errors after a button press; the reference has a copy button. Wording: drafted, with Uzair to
+  take to Abdul.
+
+**Left out, JobNavigator leftovers no BenchQ screen or the extension calls:** the 11 "already running" trigger 409s in
+`main.py` (scrape, Telegram, H-1B, backup, auto-reject), the companies test-scrape 500 (`routes_companies.py:670`),
+the posting fetch (`routes_jobs.py:1199`), "Unsafe URL" (`routes_applications.py:1013`), the persona 500s
+(`routes_persona.py:49,62`), Autofill's old routes (`routes_autofill.py`: `/api/autofill/config`, `/answer`,
+`/answer/stream`), cover letters. Their raised
+errors get the shape from the central handler for free; the hand-built ones stay as they are, listed as exceptions in
+the sweep, for Abdul's clean-up track. The streamed autofill answer's own error event is out of scope too.
+
+**Found on the way, not in 4b:** a crash inside the Gmail connect callback (`/api/oauth/google/callback`) reaches the
+outermost 500 handler, so `_oauth_browser_result` (`main.py`) never redirects and the user lands on a raw error. A
+small fix of its own.
+
+**Follow-ups from 4b's QA (Uzair, 2026-11-21), each a PR of its own:**
+
+- **Named layers.** What sits on top of what is raw `z-*` numbers across the code (10–40 sticky, menus, banner; 50
+  drawer, palette, studio; 60 tailoring panel; 70 the studio's selection toolbar). 4b put toasts at `z-[80]`
+  (`src/components/app/toast-layer.ts`, guarded by `toast-layer.test.ts`). Name the layers in `design.md` and the
+  theme (e.g. overlay, panel, popover, toast) and move every overlay onto them (CLAUDE.md: no raw values).
+- **Errors inside popup windows.** A native modal `<dialog>` (`showModal()`: `ConfirmDialog`, upload résumé, use as base,
+  job capture, `admin-dialog`, the wizard's discard dialog…) sits above every layer and blocks the page, so a toast
+  raised while one is open can't be seen. Rule: while a popup is open, its failure shows inside it (`ErrorNote` with
+  the reference). Check each popup; existing behaviour, not caused by 4b.
+- **Pre-existing accessibility found by axe:** the not-found and Forbidden screens have no `h1`; the Forbidden screen's
+  description fails contrast on a hard load without the app shell (3.88:1); the sign-in page has no `<main>`.
 
 ## 2. Production testing (second)
 

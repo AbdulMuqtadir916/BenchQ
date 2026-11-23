@@ -2,7 +2,7 @@ import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
-import { derivedAnswer, inTheUs, isoDate, shaped } from "./derive";
+import { asksForCode, derivedAnswer, inTheUs, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
 import { asksForSelfRating, fieldTypeFor, matchBank, sameAsk } from "./match";
 import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
 import { authorizedIn, sponsorshipIn, sponsorshipWordsIn, statusAnswer, statusOptionFor } from "./authorization";
@@ -25,6 +25,9 @@ const YES_OR_NO = /^(yes|no)\.?$/i;
 const OPEN_TEXT = /^(how|what|which|where|when|why|who|whom|describe|explain|list|tell us|please (describe|explain|list|specify|provide|share))\b/;
 /** Sections about someone else: a reference's, a referrer's or an emergency contact's name isn't the candidate's. */
 const SOMEONE_ELSES_SECTION = /\b(emergency contact|next of kin|references?|referee|referred by|referrer|referral (details|information|contact)|(manager|supervisor)s? (name|contact|details|information)|spouse|guardian)\b/;
+/** A field whose own label is about someone else, with no section to say so: "Next of kin mobile", "Emergency contact
+ * phone", "Reference's email", "Spouse name" (#148's review). */
+const SOMEONE_ELSES_LABEL = /\b(emergency|next of kin|kin|references?|referee|referred by|referrer|spouse|guardian|parent|father|mother|(manager|supervisor|recruiter)s?)\b/;
 const PERSON_KINDS = new Set<EngineFieldType>([
   "full-name", "first-name", "last-name", "middle-name", "preferred-name", "email", "phone", "phone-country-code",
   "address-line1", "address-line2", "address-city", "address-region", "address-postal", "address-country", "city-state",
@@ -34,7 +37,8 @@ const PERSON_KINDS = new Set<EngineFieldType>([
  * candidate's own question, and no slot among the candidate's schools or jobs (PR #140's review). */
 const isSomeoneElses = (field: TabField) => {
   const type = typeOf(field);
-  return Boolean(type && PERSON_KINDS.has(type)) && SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading));
+  return Boolean(type && PERSON_KINDS.has(type))
+    && (SOMEONE_ELSES_SECTION.test(normalize(field.clues.sectionHeading)) || SOMEONE_ELSES_LABEL.test(normalize(questionOf(field.label))));
 };
 /** A block of work or education history, where a start date is that entry's, not when the candidate can start. */
 const HISTORY_SECTION = /\b(experience|education|employment|work history)\b/;
@@ -118,10 +122,16 @@ function dropdownHolds(current: string, proposed: string): boolean {
   return optionFor(proposed, [{ id: "shown", label: current }]) !== null;
 }
 
-function holdsAnswer({ current, kind }: TabField, proposed: string): boolean {
+/** Whether a field holds a phone number with every digit of `proposed`'s, its calling code too: a field whose label
+ * asks for the code isn't done while it holds the number without it (#148's review). */
+const holdsWholeNumber = (current: string, proposed: string) => current.replace(/\D/g, "").endsWith(proposed.replace(/\D/g, ""));
+
+function holdsAnswer({ current, kind, label }: TabField, proposed: string): boolean {
   if (kind === "combobox" && current && dropdownHolds(current, proposed)) return true;
-  return current.trim() === proposed.trim() || (proposed === UNCHECKED && current === "")
-    || (PHONE_LIKE.test(proposed) && samePhone(current, proposed));
+  if (current.trim() === proposed.trim() || (proposed === UNCHECKED && current === "")) return true;
+  if (!PHONE_LIKE.test(proposed) || !samePhone(current, proposed)) return false;
+  // With or without its "+": a digits-only "919876543210" is the code and the number too (#148's review).
+  return !asksForCode(label) || holdsWholeNumber(current, proposed);
 }
 
 function rowFor(base: Base, answer: string, source?: BankEntry): ReviewRow {
@@ -131,7 +141,27 @@ function rowFor(base: Base, answer: string, source?: BankEntry): ReviewRow {
   return { ...base, status, write: fitted.write, proposed: fitted.proposed, source };
 }
 
+/** A label that wants the number with its code, for a number saved without one and no home country to give it. */
+const NEEDS_CODE = "This field wants the number with its country code, and the saved number has none.";
+
+/** A phone number's row: written the way the field wants it (`phoneWays`), with the other ways along, which the page
+ * tries in turn when the form refuses the first (#148). The number as saved goes last when `answer` rewrote it (a home
+ * code added, its trunk 0 dropped), unless the label wants the code: a form may take only the number it knows. A label
+ * that wants the code, for a number that has none, is the BDE's (#148's review). */
+function phoneRow(base: Base, entry: BankEntry, answer: string): ReviewRow {
+  const ways = phoneWays(answer, base.field);
+  if (ways.length === 0) return { ...base, status: "manual", reason: NEEDS_CODE, proposed: entry.answer, source: entry };
+  const row = rowFor(base, ways[0]!, entry);
+  if (row.write?.type !== "text") return row;
+  const written = row.write.value;
+  const saved = entry.answer.trim();
+  const asSaved = asksForCode(base.field.label) || saved === answer.trim() ? [] : [saved];
+  const also = [...new Set([...ways, ...asSaved])].filter((way) => way !== written);
+  return also.length > 0 ? { ...row, write: { ...row.write, also } } : row;
+}
+
 function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, answer = entry.answer): ReviewRow {
+  if (type === "phone") return phoneRow(base, entry, answer);
   const row = rowFor(base, shaped(type, answer, base.field), entry);
   // A "location" dropdown can be a list of countries.
   const isCountryList = type === "city-state" && row.status === "manual" && base.field.options.length > 0 && inTheUs(entry.answer);
@@ -352,6 +382,8 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   // and a repeat's reason would let `withHistory` give them the candidate's (the PR 129 review, finding 1).
   const section = normalize(field.clues.sectionHeading);
   if (type && PERSON_KINDS.has(type) && SOMEONE_ELSES_SECTION.test(section)) return manual("This section asks about someone else, so it's yours to fill.");
+  // The question itself, without its examples: "Job title (e.g. Engineering Manager)" is the candidate's.
+  if (type && PERSON_KINDS.has(type) && SOMEONE_ELSES_LABEL.test(normalize(asked.label))) return manual("This asks about someone else, so it's yours to fill.");
   if (type === "start-date" && HISTORY_SECTION.test(section)) return manual("This date belongs to an entry in the candidate's history.");
   // Forms often ask a self-ID question twice, in their own survey and the EEO section. The answer is the same.
   if (repeated && !type?.startsWith("eeo-")) return manual("This question appears more than once on the form.");
@@ -359,8 +391,10 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (type === "job-applied") return job?.title ? rowFor(base, job.title) : manual(NO_ANSWER);
 
   const answers = (entry: BankEntry) => answersField(type, field, asked.label, entry, job);
-  // A race answer brings the saved Hispanic one along, for forms that ask both in one list.
-  const answerOf = (entry: BankEntry) => (type === "eeo-race" ? raceAnswer(field, entry.answer, saved) : entry.answer);
+  // A race answer brings the saved Hispanic one along, for forms that ask both in one list. A phone number saved without
+  // its code gets the home country's where the field wants the whole number.
+  const answerOf = (entry: BankEntry) => (type === "eeo-race" ? raceAnswer(field, entry.answer, saved)
+    : type === "phone" ? withHomeCode(entry.answer, field, saved) : entry.answer);
   const fromSaved = (entry: BankEntry) => fromBank(base, entry, type, answerOf(entry));
   const match = matchBank(asked.label, bank);
   // The same words can still want another kind of answer: "Do you live in the US?" isn't "Where do you live?". Then the

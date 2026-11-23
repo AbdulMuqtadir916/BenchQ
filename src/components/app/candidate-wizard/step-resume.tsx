@@ -9,7 +9,7 @@ import { useParseResume } from "@/lib/hooks/use-resume-parse";
 import type { Wizard } from "./use-wizard";
 
 /**
- * Step 1 (docs/candidate-onboarding/04-wizard-steps.md §3): a PDF or Word résumé, read by the backend's parser into a
+ * Step 1 (docs/candidate-onboarding/04-wizard-steps.md §3): a PDF or DOCX résumé, read by the backend's parser into a
  * draft that fills steps 2–4. Nothing is saved until the candidate is created (07 Q49). The file is checked here
  * first (type, 10 MB), so a wrong file never leaves the browser.
  */
@@ -69,7 +69,7 @@ export function StepResume({ wizard }: { wizard: Wizard }) {
       >
         <span className="bq-card inline-flex h-11 w-11 items-center justify-center text-[var(--color-primary)]"><CloudUpload size={20} aria-hidden /></span>
         <span className="text-body-strong text-[var(--color-text)]">Drag a resume here, or click to browse</span>
-        <span id="resume-drop-hint" className="text-caption text-[var(--color-text-3)]">PDF or Word · up to 10 MB</span>
+        <span id="resume-drop-hint" className="text-caption text-[var(--color-text-3)]">PDF or DOCX · up to 10 MB</span>
       </button>
       <input
         ref={inputRef}

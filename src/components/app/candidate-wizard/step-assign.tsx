@@ -34,7 +34,7 @@ export function StepAssign({ wizard, errors }: { wizard: Wizard; errors: Errors 
         blockReason={block.reason} errors={{ managerId: errors.managerId, bdeId: errors.bdeId }} />
       <WizardField id="cw-handoff" label={isToManager ? `Note to ${managerName}` : "Note to the BDE"} hint="Context that isn't on the résumé.">
         <textarea {...fieldAria("cw-handoff", undefined, true)} rows={3} maxLength={NOTE_MAX_LENGTH} value={values.handoffNote} onChange={(event) => set("handoffNote", event.target.value)}
-          placeholder="Strong in banking domains. Avoid roles that need onsite in NYC." className="bq-input h-auto w-full py-2" />
+          placeholder="Strong in healthcare domains. Avoid roles that need onsite in NYC." className="bq-input h-auto w-full py-2" />
       </WizardField>
     </div>
   );

@@ -15,7 +15,7 @@ import { BaseResumeCard, TopMatches } from "./side-cards";
  * Overview: attention first (what to do now), then the pipeline and recruiter
  * news (where things stand), with the submission facts always to hand.
  */
-export function OverviewTab({ ws, actions, canAct, canEditProfile, onNotify }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; /** 07 Q56: the OWNER and MANAGER edit the profile. */ canEditProfile: boolean; onNotify: (message: string) => void }) {
+export function OverviewTab({ ws, actions, canAct, canEditDetails }: { ws: CandidateWorkspace; actions: CandidateActions; canAct: boolean; /** `canEditProfile`: the facts are edited on the details tab (decided 2026-11-14, Q19). */ canEditDetails: boolean }) {
   const candidate = ws.candidate!;
   const matches = useMemo(
     () => rankJobsForCandidate(candidate, ws.jobsQuery.data ?? [], new Set(ws.applications.map((a) => a.jobId)), 3),
@@ -34,7 +34,7 @@ export function OverviewTab({ ws, actions, canAct, canEditProfile, onNotify }: {
       <div className="space-y-5">
         <HandoffNote candidateId={candidate.id} />
         <TopMatches candidateId={candidate.id} matches={matches} onFindJobs={actions.findJobs} failed={Boolean(ws.jobsQuery.error)} onRetry={() => void ws.jobsQuery.refetch()} />
-        <SubmissionFacts candidate={candidate} canEdit={canEditProfile} onSaved={() => onNotify("Submission facts updated")} />
+        <SubmissionFacts candidate={candidate} onEdit={canEditDetails ? () => actions.openTab("details") : undefined} />
         <BaseResumeCard base={ws.base} onOpenResumes={() => actions.openTab("resumes")} />
       </div>
     </div>

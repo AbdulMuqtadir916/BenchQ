@@ -11,11 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { slugProblem, suggestSlug } from "@/lib/derive/platform";
+import { workHoursProblem } from "@/lib/derive/work-hours";
 import { useCreateFirm, usePlans, usePlatformFirms } from "@/lib/hooks/use-platform";
 import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
 import { useShowToast } from "@/lib/stores/toast-store";
 import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 import { SlugField } from "../slug-field";
 import { TIMEZONES } from "../timezones";
 
@@ -27,12 +29,15 @@ interface Form {
   planId: string;
   primaryTimezone: string;
   clientTimezone: string;
+  workStart: string;
+  workEnd: string;
   contactPhone: string;
   ownerName: string;
   ownerEmail: string;
 }
 
-const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", contactPhone: "", ownerName: "", ownerEmail: "" };
+// The work hours start empty: they are required and have no default (07 Q67, decided 2026-11-17, Q152).
+const EMPTY: Form = { name: "", slug: "", planId: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", workStart: "", workEnd: "", contactPhone: "", ownerName: "", ownerEmail: "" };
 
 /**
  * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with the plan's limits copied, and
@@ -63,6 +68,7 @@ export function CreateFirm() {
     name: form.name.trim() ? null : "Enter the firm's name.",
     slug: slugProblem(form.slug, taken),
     planId: plan ? null : "Choose a plan.",
+    workHours: workHoursProblem(form.workStart, form.workEnd),
     ownerName: form.ownerName.trim() ? null : "Enter the owner's name.",
     ownerEmail: EMAIL.test(form.ownerEmail.trim()) ? null : "Enter a valid email address.",
   };
@@ -76,7 +82,7 @@ export function CreateFirm() {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !document.querySelector("dialog[open]") && !create.isPending) cancel();
+      if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]") && !create.isPending) cancel();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -155,6 +161,14 @@ export function CreateFirm() {
                 </select>
               </Field>
             </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="firm-work-start" label="Work hours start" error={shown("workHours")} hint="In the primary timezone. A work day runs from one start to the next.">
+                <Input {...fieldAria("firm-work-start", shown("workHours"), true)} type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
+              </Field>
+              <Field id="firm-work-end" label="Work hours end" hint="May be past midnight, e.g. 4:00 AM.">
+                <Input {...fieldAria("firm-work-end", null, true)} aria-invalid={shown("workHours") ? true : undefined} type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
+              </Field>
+            </div>
             <Field id="firm-phone" label="Contact phone (optional)">
               <Input id="firm-phone" type="tel" value={form.contactPhone} onChange={(event) => set("contactPhone", event.target.value)} autoComplete="off" />
             </Field>
@@ -175,7 +189,7 @@ export function CreateFirm() {
             </div>
           </Card>
 
-          {create.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(create.error)}</p> : null}
+          {create.isError ? <ErrorNote text={errorMessage(create.error)} /> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={cancel} disabled={create.isPending}>Cancel</Button>
             <Button type="submit" disabled={create.isPending || create.isSuccess || activePlans.length === 0}>{create.isPending || create.isSuccess ? "Creating…" : "Create firm and send invite"}</Button>

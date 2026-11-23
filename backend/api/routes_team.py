@@ -19,8 +19,9 @@ from backend.auth.invites import (bad_request, check_email_free, check_seat, con
                                   normal_email, resend_invite, revoke_invite, send_invite)
 from backend.auth.policy import require
 from backend.auth.scoping import scoped
-from backend.auth.serialize import user_json
+from backend.auth.serialize import firm_json, user_json
 from backend.auth.sessions import Principal
+from backend.job_search import workday
 from backend.models.candidates import Candidate
 from backend.models.db import get_db, utcnow
 from backend.models.tenancy import Invite, User
@@ -180,3 +181,32 @@ def change_manager(firm_id: uuid.UUID, user_id: uuid.UUID, body: ChangeManagerBo
                   changes=ledger.diff({"manager_id": previous.id if previous else None}, {"manager_id": manager.id}))
     db.commit()
     return user_json(bde)
+
+
+class WorkHoursBody(BaseModel):
+    """"HH:MM" in the firm's primary_timezone; the end may be past midnight."""
+    work_start: str = Field(max_length=5)
+    work_end: str = Field(max_length=5)
+
+
+@router.patch("/work-hours", summary="Change the firm's work hours")
+def change_work_hours(firm_id: uuid.UUID, body: WorkHoursBody,
+                      principal: Principal = Depends(require("firm.editHours")), db: DbSession = Depends(get_db)):
+    """OWNER only (07 Q67, decided 2026-11-17, Q159): the one firm setting the OWNER edits. Searches already made
+    keep their work days, and an assignment its Day 1 (Q170); the daily limits reset at the new start from now on.
+    One UPDATE entry in the firm's ledger, with the hours before."""
+    _member_of(firm_id, principal)
+    firm = lock_firm(db, firm_id)
+    try:
+        start, end = workday.entered_hours(body.work_start, body.work_end)
+    except ValueError as error:
+        raise bad_request(str(error))
+    if (firm.work_start, firm.work_end) == (start, end):
+        return firm_json(firm)
+    was = workday.of(firm).label()
+    firm.work_start, firm.work_end = start, end
+    ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="firm", entity_id=firm.id,
+                  entity_label=firm.name, firm_id=firm_id,
+                  summary=f"Work hours {workday.of(firm).label()} (was {was})", candidate_id=None)
+    db.commit()
+    return firm_json(firm)

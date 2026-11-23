@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GoogleLogo } from "@/components/brand/google-logo";
 import { InfoTip } from "@/components/app/info-tip";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 export function InboxConnect({ candidate, compact = false }: { candidate: Candidate; compact?: boolean }) {
   const connect = useConnectMailbox(candidate.id);
@@ -37,7 +39,7 @@ export function InboxConnect({ candidate, compact = false }: { candidate: Candid
           </p>
         </div>
       </div>
-      {connect.error ? <p role="alert" className="w-full text-sm text-[var(--color-danger-fg)]">{connect.error.message}</p> : null}
+      {connect.error ? <ErrorNote text={describeError(connect.error)} className="w-full" /> : null}
       <Button onClick={startConnection} disabled={connect.isPending} className={compact ? "shrink-0" : "mt-5 w-full"}>
         {connect.isPending ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <span className="inline-flex h-5 w-5 items-center justify-center rounded-[var(--radius-sm)] bg-white"><GoogleLogo size={14} /></span>}
         {/* In its own element: page translation or an extension rewriting bare text crashes React (insertBefore) on the swap. */}

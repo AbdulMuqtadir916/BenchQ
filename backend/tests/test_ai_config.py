@@ -2,7 +2,7 @@
 docs/integration/08-ai-presets.md)."""
 import pytest
 
-from backend.ai.config import AI_MODULES, ai_config
+from backend.ai.config import LEGACY_MODULES, ai_config
 from backend.models.db import Setting
 from backend.settings_scope import SETTING_SCOPES, Scope
 
@@ -41,6 +41,6 @@ def test_an_unknown_module_raises(test_db):
 
 def test_every_prompt_setting_is_an_ai_preset_setting():
     """The prompts ai_config reads are the ones F2c marked as moving to the AI presets."""
-    for module in AI_MODULES.values():
+    for module in LEGACY_MODULES.values():
         for key in module.prompts.values():
             assert SETTING_SCOPES[key][0] is Scope.AI_PRESET, key

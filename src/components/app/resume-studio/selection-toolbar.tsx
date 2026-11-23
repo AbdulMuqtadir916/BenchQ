@@ -8,6 +8,7 @@ import type { RewriteAction } from "@/lib/schemas/resume-document";
 import { useRewrite } from "@/lib/hooks/use-agents";
 import { cn } from "@/lib/cn";
 import { POPOVER_TRANSITION } from "@/lib/motion";
+import { describeError } from "@/lib/api/error-text";
 import { useStudio } from "./studio-store";
 
 const AI_ACTIONS: Array<{ action: RewriteAction; label: string; hint: string }> = [
@@ -125,7 +126,8 @@ export function SelectionToolbar({ scopeRef }: { scopeRef: RefObject<HTMLElement
       if (fieldId) flash(fieldId);
       notify("AI rewrite applied. Read it over before you send.", "ai");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "AI rewrite is unavailable. Edit the text manually.", "danger");
+      const text = describeError(error, { fallback: "AI rewrite is unavailable. Edit the text manually." });
+      notify(text.message, "danger", text.reference);
     } finally {
       if ("highlights" in CSS) CSS.highlights.delete(HIGHLIGHT);
       setBusy(null);

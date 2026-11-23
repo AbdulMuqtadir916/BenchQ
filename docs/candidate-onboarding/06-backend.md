@@ -35,7 +35,7 @@ Read first: [README](./README.md) §2 and §6, `docs/integration/README.md` (the
 > pdfplumber, `.docx` via python-docx (tables included), `.doc` refused; 413/415/422 with the frontend's wording. One
 > call to AI module `resume_parse`, logged to `llm_call_log` as `resume_parse`, and kept 60 minutes in `resume_parses`;
 > expired unused parses are cleared on the firm's next read. **Since versioning PR 2** the call is the base-résumé
-> parser ([resume-versioning.md](../team/resume-versioning.md) §2): its own model (`resume_parse_llm_*`, OpenRouter,
+> parser ([resume-versioning.md](../team/resume-versioning.md) §2): its own AI preset (`resume_parse`, `docs/integration/08-ai-presets.md`; was `resume_parse_llm_*`, OpenRouter,
 > never the primary's), a strict response format, and `clean_reply` (`backend/candidates/base_resume.py`) storing the
 > format's own keys.
 >
@@ -107,8 +107,11 @@ table).
 
 `POST /api/firms/{firm_id}/candidates/parse-resume`, multipart `file` — `require("candidate.create")`.
 
-- PDF, DOC, DOCX up to 10 MB (415 "PDF or Word only." / 413 "Up to 10 MB."; the frontend checks both before
-  uploading, with its own wording).
+- PDF or DOCX up to 10 MB (415 "PDF or DOCX only." / 413 "Up to 10 MB."; the frontend checks both before
+  uploading, with its own wording). A `.doc` gets "Save it as .docx or PDF, then try again." (2026-11-17, Q108).
+- A PDF with no text (a scan, a picture of a résumé) is read by RapidOCR (`rapidocr-onnxruntime`, models inside the
+  package), its first 4 pages at 200 dpi, on the server; still under 50 characters → 422 "This résumé has no readable
+  text, even read as an image." Logs carry pages, characters and seconds, never the text.
 - Runs your parser through `ai_config(...)` (AI purpose `RESUME_PARSE`, docs/02 §3.2), and logs usage the way the AI
   presets doc says.
 - **Saves nothing to the candidate tables** (Q49). Keep the file and its parse in temporary storage for 60 minutes under

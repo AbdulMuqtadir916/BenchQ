@@ -7,7 +7,7 @@ built to be copied: every firm-scoped module takes the same steps, in the same f
 you start your own track, and point to the step you're on in your PR.
 
 The ledger is the `activity_logs` table (model `ActivityEntry`; the contract's `LedgerEntry`, docs/02 §10), which
-took over from `ledger_entries` in migration 0028. Every old row was copied, stamped from today's assignments, and
+took over from `ledger_entries` in migration 0033. Every old row was copied, stamped from today's assignments, and
 `ledger_entries` is left as it was. It is **not** `activity_log_v2`: that's the platform's system log (scrapes, scoring runs), with no actor, firm or action,
 and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
@@ -17,7 +17,7 @@ and it stays Super Admin only for `/admin/system` (07-auth §6.6).
 
 | Step | File | What it does |
 |---|---|---|
-| 1. Table | `backend/models/tenancy.py` `ActivityEntry`, migration 0028 (a trigger refuses UPDATE and DELETE) | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
+| 1. Table | `backend/models/tenancy.py` `ActivityEntry`, migration 0033 (a trigger refuses UPDATE and DELETE) | `firm_id` (null only for platform events, A13), actor, entity, action, summary. CHECK constraints, not enums; RESTRICT foreign keys (Q38) |
 | 2. Write | `backend/auth/ledger.py` `record()` | Every write a person makes calls it **in the same transaction** as the change; the caller commits |
 | 3. Read route | `backend/api/routes_ledger.py` | `GET /api/firms/{firm_id}/ledger?limit&offset` |
 | 4. Access class | `backend/auth/access.py` `ROUTE_ACCESS` | `F`: firm users, and a Super Admin inside a support view of the firm for GET only; a Super Admin without one and a suspended firm's users are refused before the route runs |

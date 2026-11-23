@@ -17,7 +17,7 @@ const supportOf = (firmId: string): Principal => ({ ...admin, support: { id: "sv
 const READY = { isHydrated: true, isSettling: false };
 
 const firm = (status: "ACTIVE" | "SUSPENDED" | "ONBOARDING") => ({
-  id: "firm_a", name: "Firm A", slug: "firm-a", logoUrl: null, primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York",
+  id: "firm_a", name: "Firm A", slug: "firm-a", logoUrl: null, primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", workStart: "18:30", workEnd: "04:00",
   applicationExpiryDays: 30, status, planId: "plan_starter", seatLimit: 4, candidateLimit: 25, contactPhone: null,
   createdAt: "2026-10-01T00:00:00.000Z",
 });

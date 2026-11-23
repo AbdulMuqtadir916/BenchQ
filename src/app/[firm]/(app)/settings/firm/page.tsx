@@ -3,11 +3,13 @@
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlanUsageCard } from "@/components/app/settings/plan-usage-card";
 import { SettingRow } from "@/components/app/settings/setting-row";
+import { WorkHoursCard } from "@/components/app/settings/work-hours-card";
 import { useFirm } from "@/lib/tenancy/firm-context";
 
 /**
  * Read-only (07 Q59, Q60): the firm's name and timezones are changed by a Super Admin, and the plan's limits (BDE
- * seats, candidates) are the only caps. There is no per-BDE capacity to set.
+ * seats, candidates) are the only caps. There is no per-BDE capacity to set. The one exception: the OWNER changes the
+ * firm's work hours (07 Q67).
  */
 export default function FirmSettingsPage() {
   const firm = useFirm();
@@ -23,6 +25,7 @@ export default function FirmSettingsPage() {
         </dl>
         <p className="mt-3 text-caption text-[var(--color-text-3)]">Ask BenchQ to change the firm name or timezones.</p>
       </Card>
+      <WorkHoursCard firm={firm} />
       <PlanUsageCard />
     </div>
   );

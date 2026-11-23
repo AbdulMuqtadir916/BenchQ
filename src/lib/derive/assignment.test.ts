@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureCandidates as allCandidates } from "@/test/fixtures/candidates";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
-import { deriveNewAssignments, isWaitingForBde, latestHandoff, queueByManager } from "./assignment";
+import { BDE_CANDIDATE_LIMIT, BDE_FULL, deriveNewAssignments, heldByBde, isWaitingForBde, latestHandoff, queueByManager } from "./assignment";
 
 const NOW = new Date("2026-10-27T18:00:00.000Z");
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString();
@@ -54,5 +54,14 @@ describe("the handoff note on the candidate page (05 §6)", () => {
     expect(latestHandoff("c1", [assign("c1", daysAgo(3), "First"), assign("c1", daysAgo(1), "Second")])?.note).toBe("Second");
     expect(latestHandoff("c1", [assign("c1", daysAgo(3), "First"), assign("c1", daysAgo(1))])).toBeNull();
     expect(latestHandoff("c1", [assign("c2", daysAgo(1), "Other")])).toBeNull();
+  });
+});
+
+describe("what a BDE holds (07 Q70, 2026-11-18)", () => {
+  it("counts every candidate assigned to the BDE, a placed one too", () => {
+    const held = [{ bdeId: "u_bde" }, { bdeId: "u_bde" }, { bdeId: "u_other" }, { bdeId: null }];
+    expect(heldByBde("u_bde", held)).toBe(2);
+    expect(BDE_CANDIDATE_LIMIT).toBe(3);
+    expect(BDE_FULL).toBe("This BDE has 3 candidates.");
   });
 });

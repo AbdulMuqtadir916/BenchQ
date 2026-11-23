@@ -1,6 +1,6 @@
 """0025 (renumbered from 0016, 0022, 0026; follows main's 0024) adds the AUTO_APPLIED outcome; downgrade refuses to discard automatic status evidence.
 
-The Activity logs migrations (0028 and later) sit on top of it, so "the newest migration" is `head_revision()`, not 0025."""
+The Activity logs migrations (0033 and later) sit on top of it, so "the newest migration" is `head_revision()`, not 0025."""
 from sqlalchemy import text
 from backend.db_schema import head_revision
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401 (fixture)

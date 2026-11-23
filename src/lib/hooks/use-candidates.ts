@@ -34,6 +34,8 @@ export function useUpdateCandidate(id: string) {
       queryClient.setQueryData(queryKeys.candidates.detail(firmId, id), candidate);
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidates.list(firmId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+      // The job search's role and places come from these details (decided 2026-11-14).
+      void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.searches(firmId, id) });
     },
   });
 }
