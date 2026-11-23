@@ -18,18 +18,34 @@ from starlette.requests import Request
 TEST_PASSWORD = "correct-horse-battery"
 
 
+def _has_column(db, table: str, column: str) -> bool:
+    return db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() "
+                           "AND table_name = :t AND column_name = :c"), {"t": table, "c": column}).first() is not None
+
+
 def has_work_hours(db) -> bool:
     """False on a scratch database a migration test holds below 0031, whose `firms` has no work hours yet."""
-    return db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() "
-                           "AND table_name = 'firms' AND column_name = 'work_start'")).first() is not None
+    return _has_column(db, "firms", "work_start")
+
+
+def has_billing_prices(db) -> bool:
+    """False below 0033, whose `plans` and `firms` have no price per BDE yet."""
+    return _has_column(db, "plans", "price_cents_per_seat")
 
 
 @event.listens_for(OrmSession, "do_orm_execute")
 def _read_firms_without_missing_work_hours(state) -> None:
     """The `Firm` model has the newest columns; a migration test still reads firms at an older revision."""
-    from backend.models.tenancy import Firm
-    if state.is_select and state.bind_mapper is Firm.__mapper__ and not has_work_hours(state.session):
-        state.statement = state.statement.options(defer(Firm.work_start), defer(Firm.work_end))
+    from backend.models.tenancy import Firm, Plan
+    if not state.is_select:
+        return
+    if state.bind_mapper is Firm.__mapper__:
+        if not has_work_hours(state.session):
+            state.statement = state.statement.options(defer(Firm.work_start), defer(Firm.work_end))
+        if not has_billing_prices(state.session):
+            state.statement = state.statement.options(defer(Firm.price_cents_per_seat))
+    elif state.bind_mapper is Plan.__mapper__ and not has_billing_prices(state.session):
+        state.statement = state.statement.options(defer(Plan.price_cents_per_seat))
 
 
 @lru_cache(maxsize=1)
@@ -51,6 +67,11 @@ class Accounts:
 
 def make_plan(db, name="Test plan", seat_limit=10, candidate_limit=100):
     from backend.models.tenancy import Plan
+    if not has_billing_prices(db):          # below 0033: the model's INSERT would name the missing price column
+        plan_id = uuid.uuid4()
+        db.execute(Plan.__table__.insert().values(id=plan_id, name=name, seat_limit=seat_limit,
+                                                  candidate_limit=candidate_limit))
+        return db.get(Plan, plan_id)
     plan = Plan(name=name, seat_limit=seat_limit, candidate_limit=candidate_limit)
     db.add(plan)
     db.flush()
@@ -62,9 +83,10 @@ def make_firm(db, plan, slug="acme", status="ACTIVE", name=None, id=None, work_s
     from backend.models.tenancy import Firm
     fields = {"name": name or slug.title(), "slug": slug, "status": status, "plan_id": plan.id,
               "seat_limit": plan.seat_limit, "candidate_limit": plan.candidate_limit}
-    if not has_work_hours(db):              # below 0031: the model's INSERT would name the missing columns
+    if not has_work_hours(db) or not has_billing_prices(db):   # below 0031 / 0033: the INSERT names missing columns
         firm_id = id or uuid.uuid4()
-        db.execute(Firm.__table__.insert().values(id=firm_id, **fields))
+        columns = {"work_start": work_start, "work_end": work_end} if has_work_hours(db) else {}
+        db.execute(Firm.__table__.insert().values(id=firm_id, **fields, **columns))
         return db.get(Firm, firm_id)
     firm = Firm(id=id, work_start=work_start, work_end=work_end, **fields)
     db.add(firm)
