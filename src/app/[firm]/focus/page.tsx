@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/app/empty-state";
 import { ErrorState } from "@/components/app/error-state";
+import { ErrorReference } from "@/components/app/error-reference";
+import type { ErrorText } from "@/lib/api/error-text";
 import { useHref } from "@/lib/routes/use-href";
 import { jobLocation } from "@/lib/format/job";
 
@@ -53,7 +55,7 @@ export default function FocusModePage() {
   const { tailored, running: stillTailoring } = startedOutcomes(myTailorings.data ?? [], startedRuns);
   // T starts the real tailoring from the active base and moves on at once; it runs in the panel (part 3 Q1, Q4).
   const startTailoring = useStartTailoring();
-  const [refused, setRefused] = useState<string | null>(null);
+  const [refused, setRefused] = useState<ErrorText | null>(null);
   const [isLastPending, setLastPending] = useState(false);
   const [reviewed, setReviewed] = useState(0);
   const [finished, setFinished] = useState(false);
@@ -96,7 +98,10 @@ export default function FocusModePage() {
         setStartedRuns((runs) => [...runs, runId]);
         if (isLast) next();
       },
-      (error: unknown) => setRefused(`${isLast ? "" : `${title}: `}${startRefusal(error).message}`),
+      (error: unknown) => {
+        const why = startRefusal(error);
+        setRefused({ ...why, message: `${isLast ? "" : `${title}: `}${why.message}` });
+      },
     ).finally(() => { if (isLast) setLastPending(false); });
     if (!isLast) next();
   }
@@ -182,7 +187,12 @@ export default function FocusModePage() {
                 <FocusAction k="S" label="Skip" Icon={SkipForward} onClick={next} />
               </div>
               <p className="mt-4 text-center text-caption text-[var(--color-text-3)]">One keystroke per job — T tailor · A applied · O outreach · S skip</p>
-              {refused ? <p role="alert" className="mt-2 text-center text-caption text-[var(--color-danger-fg)]">Not tailored — {refused}</p> : null}
+              {refused ? (
+                <p role="alert" className="mt-2 text-center text-caption text-[var(--color-danger-fg)]">
+                  Not tailored — {refused.message}
+                  {refused.reference ? <> <ErrorReference reference={refused.reference} /></> : null}
+                </p>
+              ) : null}
             </motion.div>
           </AnimatePresence>
         )}

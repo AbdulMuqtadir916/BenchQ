@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import { ApiError } from "./client";
+import { fromErrorBody } from "./dto/problem";
 
 /**
  * The only place the frontend talks to the network. Paths are relative
@@ -47,29 +48,57 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   return qs ? `${path}?${qs}` : path;
 }
 
+/** Longest wait `Retry-After` can ask of us, so a far-off date can't overflow a timer. Callers cap it lower. */
+const MAX_RETRY_AFTER_MS = 24 * 60 * 60_000;
+
+/** The HTTP date a server sends (RFC 9110 §5.6.7, IMF-fixdate): "Wed, 21 Oct 2026 07:28:00 GMT". */
+const IMF_FIXDATE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
 /**
- * FastAPI errors are `{"detail": "..."}`, `{"detail": [{loc, msg}]}` for 422s, or `{"detail": {message, …}}` when the
- * backend names what the request clashed with (kept as `ApiError.details`).
+ * The `Retry-After` header (RFC 9110 §10.2.3) → ms to wait: delay-seconds ("5") or an IMF-fixdate. null when absent or
+ * anything else (`Date.parse` would read "foo 1" or "-5" as a date); a date in the past is 0. A wait too long to count
+ * (an all-digit string past `Number`'s range) is the longest wait.
+ */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number | null {
+  const text = value?.trim();
+  if (!text) return null;
+  if (/^\d+$/.test(text)) {
+    const ms = Number(text) * 1000;
+    return Number.isFinite(ms) ? Math.min(ms, MAX_RETRY_AFTER_MS) : MAX_RETRY_AFTER_MS;
+  }
+  const at = IMF_FIXDATE.test(text) ? Date.parse(text) : Number.NaN;
+  if (Number.isNaN(at)) return null;
+  return Math.min(Math.max(0, at - now), MAX_RETRY_AFTER_MS);
+}
+
+/**
+ * An error response → `ApiError`. The body is read by `fromErrorBody` (src/lib/api/dto/problem.ts): the problem
+ * body (docs/02 §12) or the old `{"detail": …}` shape. `code` is the status-derived one; the body's own code, its
+ * request id and the `Retry-After` wait are stored beside it, and the text the user reads is chosen from them
+ * (src/lib/api/error-text.ts). A 5xx with nothing in it (not JSON, no code, no detail: the Next proxy's own 500 when
+ * the backend is down) is the frontend's `INTERNAL`: an unexpected failure, with no reference to quote.
  */
 async function toApiError(response: Response): Promise<ApiError> {
-  let message = `Request failed with status ${response.status}.`;
-  let details: Record<string, unknown> | null = null;
+  let payload: unknown = null;
   try {
-    const payload: unknown = await response.json();
-    const detail = (payload as { detail?: unknown }).detail;
-    if (typeof detail === "string") message = detail;
-    else if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-      details = detail as Record<string, unknown>;
-      if (typeof details.message === "string") message = details.message;
-    } else if (Array.isArray(detail)) {
-      message = detail
-        .map((item: { loc?: unknown[]; msg?: string }) => `${(item.loc ?? []).join(".")}: ${item.msg ?? "invalid"}`)
-        .join("; ");
-    }
+    payload = await response.json();
   } catch {
     // Non-JSON error body; keep the status message.
   }
-  return new ApiError(message, STATUS_CODES[response.status] ?? `HTTP_${response.status}`, response.status, details);
+  const body = fromErrorBody(payload);
+  const isEmptyFailure = response.status >= 500 && body.backendCode === null && body.message === null;
+  return new ApiError(
+    body.message ?? `Request failed with status ${response.status}.`,
+    isEmptyFailure ? "INTERNAL" : (STATUS_CODES[response.status] ?? `HTTP_${response.status}`),
+    response.status,
+    body.details,
+    {
+      backendCode: body.backendCode,
+      requestId: body.requestId,
+      retryAfterMs: parseRetryAfter(response.headers.get("Retry-After")),
+      fieldErrors: body.fieldErrors,
+    },
+  );
 }
 
 async function request<T>(target: HttpTarget, method: string, path: string, schema: ZodType<T>, options: RequestOptions = {}): Promise<T> {
@@ -90,6 +119,7 @@ async function request<T>(target: HttpTarget, method: string, path: string, sche
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
+    // Shown as the NETWORK text (src/lib/api/error-text.ts); this message is for logs and tests.
     throw new ApiError("Can't reach the BenchQ backend. Check that it is running.", "NETWORK", 0);
   }
 

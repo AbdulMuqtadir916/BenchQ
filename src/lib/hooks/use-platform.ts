@@ -15,7 +15,7 @@ import { queryKeys } from "@/lib/query/keys";
 const k = queryKeys.platform;
 
 export const usePlatformFirms = (options: { enabled?: boolean } = {}) => useQuery({ queryKey: k.firms(), queryFn: () => platformApi.firms.list(), enabled: options.enabled ?? true });
-export const usePlatformFirm = (firmId: string) => useQuery({ queryKey: k.firm(firmId), queryFn: () => platformApi.firms.get(firmId), retry: (count, error) => !isNotFound(error) && count < 2 });
+export const usePlatformFirm = (firmId: string) => useQuery({ queryKey: k.firm(firmId), queryFn: () => platformApi.firms.get(firmId) });
 export const usePlatformUsers = (firmId?: string) => useQuery({ queryKey: k.users(firmId), queryFn: () => platformApi.users.list(firmId) });
 export const usePlatformInvites = (firmId?: string | null) => useQuery({ queryKey: k.invites(firmId), queryFn: () => platformApi.invites.list(firmId) });
 export const usePlans = () => useQuery({ queryKey: k.plans(), queryFn: () => platformApi.plans.list() });
@@ -23,10 +23,6 @@ export const useBillingPeriods = (firmId?: string) => useQuery({ queryKey: k.bil
 export const useAudit = () => useQuery({ queryKey: k.audit(), queryFn: () => platformApi.audit.list() });
 export const usePlatformTeam = () => useQuery({ queryKey: k.team(), queryFn: () => platformApi.team.list() });
 export const useCandidateUsage = () => useQuery({ queryKey: k.candidateUsage(), queryFn: () => platformApi.candidates.usage() });
-
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "status" in error && (error as { status: unknown }).status === 404;
-}
 
 function usePlatformMutation<TInput, TResult>(mutationFn: (input: TInput) => Promise<TResult>) {
   const queryClient = useQueryClient();

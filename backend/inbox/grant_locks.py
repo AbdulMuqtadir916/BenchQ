@@ -10,15 +10,17 @@ from contextvars import ContextVar
 import hashlib
 from time import monotonic
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from backend.problem import MAILBOX_BUSY, Problem
 from backend.models.db import engine
 
 _held = ContextVar('candidate_google_locks', default=frozenset())
 _deadline = ContextVar('candidate_google_lock_deadline', default=None)
 _phase_keys = {'entry': 104, 'exchange': 105, 'revoke': 106}
+
+BUSY = 'This Google account is busy. Try again shortly.'
 
 
 @contextmanager
@@ -34,7 +36,7 @@ def _lock(key, *, shared=False):
         try:
             remaining = 5000 if _deadline.get() is None else int((_deadline.get() - monotonic()) * 1000)
             if remaining <= 0:
-                raise HTTPException(503, 'This Google account is busy. Try again shortly.')
+                raise Problem(503, BUSY, MAILBOX_BUSY, headers={'Retry-After': '5'})
             conn.execute(text("SELECT set_config('lock_timeout', :value, false)"), {'value': f'{remaining}ms'})
             conn.commit()
             suffix = '_shared' if shared else ''
@@ -45,7 +47,7 @@ def _lock(key, *, shared=False):
             except DBAPIError as exc:
                 if getattr(exc.orig, 'pgcode', None) != '55P03':
                     raise
-                raise HTTPException(503, 'This Google account is busy. Try again shortly.') from exc
+                raise Problem(503, BUSY, MAILBOX_BUSY, headers={'Retry-After': '5'}) from exc
             acquired = True
             _held.set(_held.get() | {identity})
             registered = True

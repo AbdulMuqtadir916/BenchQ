@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { ResumeShelf } from "@/lib/schemas/resume";
@@ -14,6 +14,8 @@ import { useHref } from "@/lib/routes/use-href";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
+import { describeError, screenErrorText, type ErrorText } from "@/lib/api/error-text";
+import { ErrorReference } from "@/components/app/error-reference";
 import { startRefusal } from "./messages";
 
 interface TailorButtonProps {
@@ -22,6 +24,18 @@ interface TailorButtonProps {
   job: { id: string; title: string };
   /** "icon": a row's sparkle (the dashboard queue), the same picker beside it. */
   variant?: "button" | "icon";
+  /**
+   * Which side the controls and the note line up on. Default: "end" for the button variant (a header's actions),
+   * "start" for the icon variant.
+   */
+  align?: "start" | "end";
+  /** The caller's actions before the Tailor control, in its group (so they line up with it and wrap with it). */
+  leading?: ReactNode;
+  /**
+   * The caller's actions after the Tailor control, in its group. They come before the note in the DOM, so focus order
+   * matches what the eye sees: the actions, then the note's links and Copy (WCAG 2.4.3).
+   */
+  trailing?: ReactNode;
   className?: string;
 }
 
@@ -33,8 +47,22 @@ interface TailorButtonProps {
  */
 export function TailorButton(props: TailorButtonProps) {
   const principal = useSignedInPrincipal();
-  if (!canManageResume(principal, props.candidate)) return null;
+  if (!canManageResume(principal, props.candidate)) {
+    // No Tailor for this user: the caller's own actions still render, in the same group.
+    if (!props.leading && !props.trailing) return null;
+    const isIcon = props.variant === "icon";
+    return <div className={cn(groupClass(isIcon, isStartAligned(props)), props.className)}>{props.leading}{props.trailing}</div>;
+  }
   return <TailorControl {...props} />;
+}
+
+function isStartAligned({ align, variant }: Pick<TailorButtonProps, "align" | "variant">): boolean {
+  return (align ?? (variant === "icon" ? "start" : "end")) === "start";
+}
+
+/** The actions' group: wraps onto a second line rather than overflow a narrow card. */
+function groupClass(isIcon: boolean, isStart: boolean): string {
+  return cn("flex flex-wrap items-center", isIcon ? "shrink-0 gap-1" : "min-w-0 max-w-full gap-2", isStart ? "justify-start" : "justify-end");
 }
 
 interface Source extends SelectOption {
@@ -67,7 +95,7 @@ export function tailorSources(shelf: ResumeShelf, candidateId: string): { source
   return { sources, defaultId };
 }
 
-function TailorControl({ candidate, job, variant = "button", className }: TailorButtonProps) {
+function TailorControl({ candidate, job, variant = "button", align, leading, trailing, className }: TailorButtonProps) {
   const toHref = useHref();
   const shelfQuery = useResumeShelf(candidate.id);
   const runsQuery = useMyTailorings();
@@ -96,37 +124,56 @@ function TailorControl({ candidate, job, variant = "button", className }: Tailor
   }
 
   const Icon = isRunning || start.isPending ? LoaderCircle : Sparkles;
-  const problem = shelfQuery.error
-    ? "Résumés didn't load."
-    : shelfQuery.data && !defaultId
-      ? "No active base résumé."
-      : refusal?.message ?? null;
+  const hasNoBase = Boolean(shelfQuery.data && !defaultId);
+  // The shelf's failure first (a system error reads as everywhere else; any other keeps this screen's words), then a
+  // missing base, then the start's refusal.
+  const shelfFailure = shelfQuery.error ? describeError(shelfQuery.error, { screenText: () => "Résumés didn't load." }) : null;
+  const notice: ErrorText | null = shelfFailure ?? (hasNoBase ? screenErrorText("No active base résumé.") : refusal);
+  const problem = notice?.message ?? null;
 
+  const isIcon = variant === "icon";
+  const isStart = isStartAligned({ align, variant });
+  const noteId = `tailor-${candidate.id}-${job.id}`;
   return (
-    <div className={cn("flex flex-col items-end gap-1", className)}>
-      <div className="flex items-center gap-1.5">
-        {variant === "icon" ? (
-          <Button variant="ghost" size="icon" aria-label={`Tailor resume for ${job.title}`} title={label} onClick={tailor} disabled={!isReady}>
+    // DOM order is the visual order: the group (leading, Tailor, picker, Open tailored, trailing), then the note.
+    // The icon variant's wrapper is `contents`: the group and the note become items of the row it sits in, so the note
+    // takes a line of its own below the row instead of squeezing the row's title (the row must wrap: see the dashboard
+    // queue). The button variant is a column: the group, the note under it.
+    <div className={cn(isIcon ? "contents" : cn("flex min-w-0 max-w-full flex-col gap-1", isStart ? "items-start" : "items-end"), className)}>
+      <div className={groupClass(isIcon, isStart)}>
+        {leading}
+        {isIcon ? (
+          <Button variant="ghost" size="icon" aria-label={`Tailor resume for ${job.title}`} title={label} onClick={tailor} disabled={!isReady}
+            aria-describedby={problem ? noteId : undefined}>
             <Icon size={15} aria-hidden className={cn((isRunning || start.isPending) && "animate-spin")} />
           </Button>
         ) : (
-          <Button size="sm" onClick={tailor} disabled={!isReady} aria-describedby={problem ? `tailor-${candidate.id}-${job.id}` : undefined}>
+          <Button size="sm" onClick={tailor} disabled={!isReady} aria-describedby={problem ? noteId : undefined}>
             <Icon size={13} aria-hidden className={cn((isRunning || start.isPending) && "animate-spin")} />{label}
           </Button>
         )}
         {sources.length > 1 ? (
           <Select value={sourceId ?? ""} options={sources} onValueChange={(value) => { setPicked(value); start.reset(); }}
-            aria-label="Tailor from" className={variant === "icon" ? "w-28" : "w-40"} />
+            aria-label="Tailor from" className={isIcon ? "w-28" : "w-40"} />
         ) : null}
-        {copy && variant === "button" ? (
+        {copy && !isIcon ? (
           <Button asChild variant="ghost" size="sm"><Link href={toHref("resumes.studio", { id: copy.latestVersionId })}>Open tailored</Link></Button>
         ) : null}
+        {trailing}
       </div>
       {problem ? (
-        <p id={`tailor-${candidate.id}-${job.id}`} role="alert" className="max-w-xs text-right text-caption text-[var(--color-danger-fg)]">
+        // `@container` (inline-size containment): the note adds nothing to its parent's intrinsic width, so a long
+        // message or request id never widens the actions; it takes the width they have and wraps in it.
+        <p id={noteId} role="alert" className={cn(
+          "@container min-w-0 text-caption text-[var(--color-danger-fg)]",
+          // Icon: the row's last line, full width. Button: the group's width, under it.
+          isIcon ? "basis-full" : "self-stretch",
+          isStart ? "text-left" : "text-right",
+        )}>
           {problem}
-          {(refusal?.needsBase || (shelfQuery.data && !defaultId)) ? <> <Link className="underline" href={toHref("candidates.detail", { id: candidate.id }, { tab: "resumes" })}>Résumés</Link></> : null}
-          {shelfQuery.error ? <> <button type="button" className="underline" onClick={() => void shelfQuery.refetch()}>Retry</button></> : null}
+          {notice?.reference ? <> <ErrorReference reference={notice.reference} /></> : null}
+          {!shelfFailure && (hasNoBase || refusal?.needsBase) ? <> <Link className="underline" href={toHref("candidates.detail", { id: candidate.id }, { tab: "resumes" })}>Résumés</Link></> : null}
+          {shelfFailure?.canRetry ? <> <button type="button" className="underline" onClick={() => void shelfQuery.refetch()}>Retry</button></> : null}
         </p>
       ) : null}
     </div>

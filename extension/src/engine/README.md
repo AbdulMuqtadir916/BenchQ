@@ -11,7 +11,8 @@ fill loop. This folder only adds recognition, behind those rules.
 | `universal-ai-autofill/` | [universal-ai-autofill](https://github.com/Vikhyat24/universal-ai-autofill) `e7f3d50`: weighted fuzzy field matching | MIT, declared in its `package.json` |
 | `*.ts` here | BenchQ: the merged taxonomy, the classifier that joins them, QA bank lookups | |
 
-Licence texts ship with the extension in `public/licenses/`.
+Licence texts ship with the extension in `public/licenses/` (each one listed in `THIRD-PARTY-NOTICES.txt`), and the build
+adds the MPL-2.0 files' source as `licenses/mpl-2.0-source/` (`vite.config.ts`).
 
 ## Rules for this folder
 

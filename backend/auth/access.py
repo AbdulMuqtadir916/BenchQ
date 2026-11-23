@@ -24,6 +24,7 @@ from starlette.routing import Match
 from backend.auth.sessions import COOKIE_NAME, clear_cookie_kwargs, cookie_kwargs, resolve
 from backend.config import ALLOWED_ORIGINS, IS_PRODUCTION
 from backend.models.db import SessionLocal
+from backend.problem import problem_response
 from backend.statement_timeout import busy_response, is_statement_timeout
 
 logger = logging.getLogger("jobnavigator")
@@ -258,6 +259,7 @@ ROUTE_ACCESS: dict[str, Access] = {
 SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}",
     "GET /api/cover-letters/{cl_id}/pdf",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file",   # a résumé as a file (docs/02 §8.2)
 })
 SUPPORT_VIEW_READ_ONLY = "A support view is read-only."
 
@@ -290,7 +292,7 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def _refuse(status: int, detail: str, clear_cookie: bool = False) -> JSONResponse:
-    response = JSONResponse(status_code=status, content={"detail": detail})
+    response = problem_response(status, detail)
     if clear_cookie:
         response.delete_cookie(**clear_cookie_kwargs())
     return response

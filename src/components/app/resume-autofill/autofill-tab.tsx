@@ -8,6 +8,7 @@ import { NotFoundState } from "@/components/app/not-found-state";
 import { Button } from "@/components/ui/button";
 import { useStudio } from "@/components/app/resume-studio/studio-store";
 import { ApiError, isNotFoundError } from "@/lib/api/client";
+import { describeError } from "@/lib/api/error-text";
 import { autofillSections, reloadRows, summarize, type AutofillShow } from "@/lib/derive/autofill-view";
 import { useResumeAutofill, useSaveResumeAutofill } from "@/lib/hooks/use-resume-autofill";
 import { useHref } from "@/lib/routes/use-href";
@@ -108,7 +109,8 @@ export function AutofillTab({ versionId, canEdit, onEditInBuilder }: AutofillTab
         setIsStale(true);
         if (row) setRefused((current) => new Set(current).add(row));
       }
-      notify(error instanceof Error ? error.message : "The save didn't go through. Try again.", "danger");
+      const text = describeError(error, { fallback: "The save didn't go through. Try again." });
+      notify(text.message, "danger", text.reference);
       return false;
     }
   }, [candidateId, notify, saving]);
