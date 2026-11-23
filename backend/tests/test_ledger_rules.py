@@ -332,27 +332,44 @@ def _dispatched(call: ast.Call):
     return []
 
 
-def _names_read(owner: ast.AST) -> set[str]:
-    """The names `owner`'s own code reads, and those read by the functions defined in it that it uses by name, and so
-    on down. A nested function nobody names is not run, so what it reads doesn't count."""
-    read, nested = set(), {}
-    for node in _own_nodes(owner):
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
-            read.add(node.id)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+# What may be done to a built thread or partial that runs it. Anything else on it (`worker.is_alive()`, `send.args`)
+# only looks at it.
+RUN_METHODS = {"start", "run"}
+
+
+def _names_run(owner: ast.AST) -> set[str]:
+    """The names `owner`'s own code runs or hands on: called (`send()`), started (`worker.start()`, `.run()`), or
+    passed somewhere (an argument, returned, put in a list). A name only inspected (`worker.is_alive()`, `send.args`)
+    is not run. The same for the functions defined in it that it uses by name, and so on down: a nested function nobody
+    names is not run, so what it runs doesn't count."""
+    nodes = list(_own_nodes(owner))
+    parent = {id(child): node for node in [owner, *nodes] for child in ast.iter_child_nodes(node)}
+    run, named, nested = set(), set(), {}
+    for node in nodes:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             nested[node.name] = node
-    for name in sorted(read & set(nested)):
-        read |= _names_read(nested[name])
-    return read
+        if not (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)):
+            continue
+        named.add(node.id)
+        above = parent.get(id(node))
+        if isinstance(above, ast.Attribute):
+            call = parent.get(id(above))
+            if not (above.attr in RUN_METHODS and isinstance(call, ast.Call) and call.func is above):
+                continue                                                     # worker.is_alive(): only a look
+        run.add(node.id)
+    for name in sorted(named & set(nested)):
+        run |= _names_run(nested[name])
+    return run
 
 
 def _never_run(owner: ast.AST) -> set[int]:
     """The `Thread(...)` and `partial(...)` calls in `owner` (by `id`) that are built and dropped, so their function
-    never runs: one left as a statement of its own, or given a name nothing reads afterwards. Any other use counts as
-    running it: `.start()`, a call, or handing it on (returned, passed along, or queued for later, as
-    `logs_platform_action` queues its partial for the middleware). A name read inside a nested function counts when
-    that function is itself used here (`send = partial(...)`, then `flush()` whose body calls `send()`)."""
-    read = _names_read(owner)
+    never runs: one left as a statement of its own, or given a name that is never run or handed on afterwards (only
+    looked at, as `worker.is_alive()`, or not used at all). Running it is `.start()` or `.run()`, a call, or handing it
+    on (returned, passed along, or queued for later, as `logs_platform_action` queues its partial for the middleware).
+    A use inside a nested function counts when that function is itself used here (`send = partial(...)`, then
+    `flush()` whose body calls `send()`)."""
+    read = _names_run(owner)
     idle = set()
     for node in _own_nodes(owner):
         value = getattr(node, "value", None)
@@ -667,6 +684,9 @@ def test_a_thread_or_partial_that_is_built_and_dropped_does_not_count():
               "def queued(db, pending):\n    pending.append(partial(write_audit, db))\n"
               "def through_helper(db):\n    send = partial(write_audit, db)\n    def flush():\n        send()\n    flush()\n"
               "def helper_unused(db):\n    send = partial(write_audit, db)\n    def flush():\n        send()\n    return 1\n"
+              "def only_inspected(db):\n    worker = Thread(target=write_audit, args=(db,))\n    worker.is_alive()\n    db.commit()\n"
+              "def only_looked_at(db):\n    send = partial(write_audit, db)\n    print(send.args)\n"
+              "def started_by_run(db):\n    worker = Thread(target=write_audit)\n    worker.run()\n"
               "def started(db):\n    Thread(target=write_audit).start()\n"
               "def named_started(db):\n    worker = threading.Thread(target=write_audit, args=(db,))\n    worker.start()\n"
               "def never_called(db):\n    send = partial(write_audit, db)\n    return 1\n"
@@ -677,7 +697,7 @@ def test_a_thread_or_partial_that_is_built_and_dropped_does_not_count():
     file = "api/routes_example.py"
     logging = {name for found, name in _logging_functions(_snippet(source, file)) if found == file} - {"write_audit"}
     assert logging == {"started", "named_started", "called", "called_at_once", "handed_on", "named_handed_on",
-                       "handed_back", "queued", "through_helper"}
+                       "handed_back", "queued", "through_helper", "started_by_run"}
 
 
 def test_a_writer_handed_to_a_task_must_state_its_candidate():
