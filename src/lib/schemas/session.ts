@@ -2,6 +2,9 @@ import { z } from "zod";
 import { FirmRole } from "./enums";
 import { FirmPrincipalSchema, FirmStatus, PlatformPrincipalSchema, PlatformUserSchema, SlugSchema } from "./tenancy";
 
+/** A time of day, "HH:MM", 24-hour. */
+export const WorkClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
 export const FirmSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -10,6 +13,10 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default("Asia/Kolkata"),
   clientTimezone: z.string().default("America/New_York"),
+  /** The firm's work hours, "HH:MM" in `primaryTimezone`; the end may be past midnight (07 Q67, decided 2026-11-17). A
+   * work day runs from one start to the next: the candidate's Days and the daily limits follow it. */
+  workStart: WorkClockSchema,
+  workEnd: WorkClockSchema,
   applicationExpiryDays: z.number().int().default(30),
   status: FirmStatus,
   /** Required in every status, ONBOARDING included (A16). */

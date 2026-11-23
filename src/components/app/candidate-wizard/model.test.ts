@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { CreateCandidateSchema } from "@/lib/schemas/candidate";
 import type { WorkAuth } from "@/lib/schemas/enums";
 import type { ResumeDraft } from "@/lib/schemas/resume-draft";
-import { applyDraft, EMPTY_VALUES, firstOpenStep, isDirty, toCreateCandidate, validateStep, type WizardValues } from "./model";
+import { applyDraft, EMPTY_VALUES, firstOpenStep, hasPlace, isDirty, PLACE_ERROR, toCreateCandidate, validateStep, type WizardValues } from "./model";
 
 const draft: ResumeDraft = {
   parseId: "parse_1", fileName: "Ravi.pdf", fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com",
   phone: null, linkedinUrl: null, city: "Irving", state: "TX", country: null, yearsExperience: 9, workAuth: "H1B", workAuthText: null,
   summary: "Nine years of Java.", skills: [{ name: "Java", family: "Languages" }, { name: "AWS", family: "Cloud" }],
 };
-const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", country: "US", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRoles: ["Java Developer"] };
+const valid: WizardValues = { ...EMPTY_VALUES, resume: { parseId: "parse_1", fileName: "Ravi.pdf" }, fullName: "Ravi Teja", primaryRole: "Java Developer", email: "ravi@example.com", phone: "(469) 555-0182", country: "US", yearsExperience: "9", workAuth: "H1B", employmentTypes: ["C2C"], targetRole: "Java Developer", city: "Irving", state: "TX" };
 
 describe("applyDraft (07 Q49)", () => {
   it("fills empty fields and marks them drafted; null fields stay empty", () => {
@@ -95,11 +95,25 @@ describe("validateStep", () => {
     expect(isDirty({ ...EMPTY_VALUES, managerId: "m", bdeId: "b" })).toBe(false);
   });
 
-  it("the résumé is required (07 Q58); preferences need one target role", () => {
+  it("the résumé is required (07 Q58); preferences need the target role and a place for the job search", () => {
     expect(validateStep("resume", EMPTY_VALUES)).toEqual({ resume: "Upload the candidate's résumé." });
     expect(validateStep("resume", valid)).toEqual({});
-    expect(validateStep("preferences", EMPTY_VALUES)).toEqual({ targetRoles: "Add at least one role they are looking for." });
+    expect(validateStep("preferences", EMPTY_VALUES)).toEqual({ targetRole: "Enter the role they are looking for.", preferredLocations: PLACE_ERROR });
+    expect(validateStep("preferences", { ...valid, targetRole: "   " })).toEqual({ targetRole: "Enter the role they are looking for." });
     expect(validateStep("preferences", valid)).toEqual({});
+  });
+
+  it("a place is the city and state together, or a preferred location (decided 2026-11-14)", () => {
+    const none = { city: "", state: "", preferredLocations: [] as string[] };
+    expect(hasPlace(none)).toBe(false);
+    expect(hasPlace({ ...none, city: "Irving" })).toBe(false);             // a city alone is ambiguous
+    expect(hasPlace({ ...none, state: "TX" })).toBe(false);
+    expect(hasPlace({ ...none, preferredLocations: ["  "] })).toBe(false);
+    expect(hasPlace({ ...none, city: " Irving ", state: "TX" })).toBe(true);
+    expect(hasPlace({ ...none, preferredLocations: ["Dallas, TX"] })).toBe(true);
+    expect(hasPlace({ ...none, preferredLocations: ["Remote"] })).toBe(true);
+    expect(validateStep("preferences", { ...valid, city: "", preferredLocations: ["Dallas, TX"] })).toEqual({});
+    expect(validateStep("preferences", { ...valid, state: "" })).toEqual({ preferredLocations: PLACE_ERROR });
   });
 });
 
@@ -125,13 +139,13 @@ describe("the flow", () => {
 describe("toCreateCandidate", () => {
   it("builds a valid payload: trimmed text, numbers, ISO dates, sponsorship from the work authorization (A3)", () => {
     const values: WizardValues = {
-      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", country: "USA", targetRoles: ["Java Developer"], rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
+      ...applyDraft(EMPTY_VALUES, draft).values, phone: " (469) 555-0182 ", country: "USA", targetRole: " Java Developer ", rateTarget: "85", rateMin: "70", workAuthExpiry: "2027-03-01",
       employmentTypes: ["C2C", "W2"], workSettings: ["REMOTE"], contactNotes: "Prefers WhatsApp.",
     };
     const body = toCreateCandidate({ ...values, managerId: "user_fatima", bdeId: "user_adnan", handoffNote: "  Push banking.  " });
     expect(CreateCandidateSchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({
-      phone: "(469) 555-0182", country: "US", needsSponsorship: true, needsTransfer: true, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
+      phone: "(469) 555-0182", country: "US", targetRoles: ["Java Developer"], needsSponsorship: true, needsTransfer: true, yearsExperience: 9, rateTarget: 85, rateMin: 70, workAuthExpiry: "2027-03-01T00:00:00.000Z",
       resumeParseId: "parse_1", managerId: "user_fatima", bdeId: "user_adnan",
       handoffNote: "Push banking.",
     });

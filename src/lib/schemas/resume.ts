@@ -61,6 +61,7 @@ export const ResumeVersionSchema = z.object({
   includedBulletIds: z.array(z.string()),
   bulletOverrides: z.record(z.string(), z.string()),
 
+  /** A tailored version's Match against its job (decided 2026-11-14, Q39; backend `resumes.match_score`), or null. */
   atsScore: z.number().int().min(0).max(100).nullable(),
   atsGrade: z.enum(["A", "B", "C", "D", "F"]).nullable(),
   atsIssues: z.array(AtsIssueSchema),

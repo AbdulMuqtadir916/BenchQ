@@ -22,7 +22,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   // firm work
   ["candidate.create", "Y Y - - - -"],   // 07 Q41: a BDE no longer adds candidates
   ["candidate.edit", "Y Y Y - - -"],
-  ["candidate.editProfile", "Y Y - - - -"],
+  ["candidate.editProfile", "Y Y Y - - -"],   // then canEditProfile: the résumé rule (2026-11-14, Q17)
   ["email.retry", "Y Y Y - - -"],
   ["email.reclassify", "Y Y - - - -"],
   ["job.capture", "Y Y Y - - -"],
@@ -39,13 +39,16 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["member.changeManager", "Y - - - - -"],   // 07 Q40
   ["candidate.assign", "Y Y - - - -"],
   ["notification.approve", "Y Y - - - -"],  // 07 Q54; only the routed approver acts
+  ["firm.editHours", "Y - - - - -"],        // 07 Q67: the firm's work hours, the one firm setting the OWNER edits
   ["team.view", "Y Y - - - Y"],
+  ["candidate.viewSearchTitles", "Y Y - - - -"],   // 07 Q68: read-only, never the BDE
   // platform (07 §2.3)
   ["firm.create", "- - - - Y Y"],
   ["firm.edit", "- - - - Y Y"],
   ["firm.suspend", "- - - - Y Y"],
   ["firm.viewWorkspace", "- - - - Y Y"],
   ["plan.edit", "- - - - Y Y"],
+  ["ai.manage", "- - - - Y Y"],
   ["invite.resend", "- - - - Y Y"],
   ["invite.revoke", "- - - - Y Y"],
   ["platformTeam.manage", "- - - - Y Y"],

@@ -64,6 +64,9 @@ export const CandidateSchema = z.object({
   /** What the candidate prefers and refuses (wizard step 4). The summary is the active base résumé's, not here. */
   preferredIndustries: z.array(z.string()),
   dealBreakers: z.array(z.string()),
+  /** The extra titles the job search asks for besides the target role (decided 2026-11-17, Q131–Q144): made by AI when
+   * the candidate is added, edited by hand on the details tab (up to 4). Kept on the active résumé. */
+  searchTitles: z.array(z.string()).default([]),
   qaBank: z.array(QaBankEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -92,16 +95,23 @@ export type CandidateStats = z.infer<typeof CandidateStatsSchema>;
 
 /** The submission facts the owner or the candidate's manager edits from the candidate Overview (07 Q56). A new `workAuth` comes with the sponsorship and transfer it implies. */
 export const UpdateCandidateSchema = CandidateSchema.pick({
+  primaryRole: true,
+  yearsExperience: true,
   workAuth: true,
   needsSponsorship: true,
   needsTransfer: true,
   workAuthExpiry: true,
+  employmentTypes: true,
   rateTarget: true,
   rateMin: true,
   availableFrom: true,
   noticePeriodDays: true,
+  workSettings: true,
+  preferredLocations: true,
   willingToRelocate: true,
-  employmentTypes: true,
+  preferredIndustries: true,
+  dealBreakers: true,
+  contactNotes: true,
 }).partial();
 export type UpdateCandidate = z.infer<typeof UpdateCandidateSchema>;
 
@@ -135,7 +145,8 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   country: z.string().trim().min(1, "Enter the country."),
   yearsExperience: z.number().min(0).max(60),
   employmentTypes: z.array(EmploymentType).min(1, "Choose at least one engagement type."),
-  targetRoles: z.array(z.string().trim().min(1)).min(1, "Add at least one role they are looking for."),
+  /** One target role (decided 2026-11-14): the job search looks for it. */
+  targetRoles: z.array(z.string().trim().min(1)).length(1, "Enter the one role they are looking for."),
   fullName: z.string().trim().min(1, "Enter the candidate's name."),
   primaryRole: z.string().trim().min(1, "Enter the title they're marketed as."),
   email: z.string().trim().email("Enter a valid email."),
@@ -149,6 +160,10 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   managerId: z.string().min(1, "Choose a manager."),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),
+}).refine((body) => (Boolean(body.city?.trim()) && Boolean(body.state?.trim())) || body.preferredLocations.some((place) => place.trim() !== ""), {
+  // The job search needs a place (decided 2026-11-14, Q3, Q14); the backend refuses the same.
+  message: "Add a preferred location, or the candidate's city and state: the job search needs a place.",
+  path: ["preferredLocations"],
 });
 export type CreateCandidate = z.infer<typeof CreateCandidateSchema>;
 

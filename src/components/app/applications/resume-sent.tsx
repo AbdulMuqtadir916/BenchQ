@@ -54,7 +54,8 @@ export function ResumeSent({ application, resumes, isLoading = false, className 
             <Tag tone={sent.resume.isMaster ? "blue" : "teal"}>{sent.resume.isMaster ? "Base" : "Tailored"}</Tag>
             <Tag>v{sent.version.versionNumber}</Tag>
             <Tag>{template}</Tag>
-            {sent.version.atsScore !== null ? <Tag tone={sent.version.atsScore >= 75 ? "green" : "amber"}>ATS {sent.version.atsScore}</Tag> : null}
+            {/* The tailored version's Match against this job (decided 2026-11-14, Q33, Q39), stored in `atsScore`. */}
+            {sent.version.atsScore !== null ? <Tag tone={sent.version.atsScore >= 75 ? "green" : "amber"}>Match {sent.version.atsScore}</Tag> : null}
           </div>
           {application.appliedAt ? <p className="mt-1.5 text-caption text-[var(--color-text-3)]">Sent {formatIst(application.appliedAt, "MMM d, yyyy")}</p> : null}
         </div>

@@ -3,51 +3,37 @@
 
 Every LLM call of an AI module reads its setup here, never from `settings` directly:
 
-    cfg = ai_config("scoring")
+    cfg = ai_config("resume_parse")
     resp = await call_llm(prompt, system, provider=cfg.provider, model=cfg.model, api_key=cfg.api_key,
                           effort=cfg.effort)
 
-Today `ai_config` reads the platform settings (backend/settings_scope.py, scope AI_PRESET). When the AI presets
-module ships, it reads the module's active preset instead, and `preset_id` / `preset_version` say which one ran;
-callers don't change. Firms never choose a model or a prompt (08 Q4).
+The four live use cases (`backend/ai/modules.py`) read their active preset and the one shared key; `preset_id` and
+`preset_version` say which one ran. The older code outside the panel reads its model from the settings and, on
+OpenRouter, the same key. Firms never choose a model or a prompt (08 Q4).
 """
 from dataclasses import dataclass, field
 
+from backend.ai import store
+from backend.ai.modules import PRESET_MODULES
 from backend.analyzer.llm_client import resolve_llm_config
 from backend.models.db import SessionLocal, Setting
-from backend.resume_tailor import settings as tailor_settings
 
 
 @dataclass(frozen=True)
 class AiModule:
-    """`feature` is the settings prefix of the module's own model (`<feature>_llm_*`; "" = the primary model);
-    `prompts` maps each prompt the module uses to the setting that holds it today."""
+    """Older code outside the presets: `feature` is the settings prefix of its model (`<feature>_llm_*`; "" = the
+    primary model); `prompts` maps each prompt it uses to the setting that holds it."""
     feature: str
     prompts: dict[str, str] = field(default_factory=dict)
-    # False: the module runs only on its own `<feature>_llm_*` settings and never borrows the primary model's
-    # provider/model/key (candidate email classification is OpenRouter Decisions only, OPERATIONS.md).
-    fallback: bool = True
 
 
-# The AI modules that get presets first (08 Q3). Email classification and autofill join when their tracks are live.
-AI_MODULES: dict[str, AiModule] = {
-    "email_classification": AiModule("candidate_email", {"instructions": "candidate_email_instructions"},
-                                     fallback=False),
+LEGACY_MODULES: dict[str, AiModule] = {
     "scoring": AiModule("scoring", {"rubric": "scoring_rubric"}),
-    # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it; the
-    # résumé parser is `resume_parse` below. Kept so the AI presets' module list doesn't change.
+    # Résumé building: JobNavigator's PDF -> résumé parser, removed in résumé versioning PR 6. Nothing calls it.
     "resume_building": AiModule(""),
     "cover_letter": AiModule("cover_letter", {"letter": "cover_letter_prompt"}),
-    # The new-candidate parser (docs/team/resume-versioning.md §2): its own model (resume_parse_llm_*, never the
-    # primary's; candidates/parse.py checks them), its two prompts and its strict response format.
-    "resume_parse": AiModule("resume_parse", {"system": "resume_parse_system_prompt", "parse": "resume_parse_prompt",
-                                              "response_format": "resume_parse_response_format"}),
-    # The résumé tailor (docs/team/tailoring.md): its own model (resume_tailor_llm_*, never the primary's;
-    # resume_tailor/settings.py read_setup checks them), nine prompts and four strict response formats.
-    "resume_tailor": AiModule("resume_tailor", {**tailor_settings.PROMPT_ROWS,
-                                                **{f"{step}_format": row
-                                                   for step, row in tailor_settings.FORMAT_ROWS.items()}}),
 }
+AI_MODULES = (*PRESET_MODULES, *LEGACY_MODULES)
 
 
 @dataclass(frozen=True)
@@ -58,8 +44,8 @@ class AiConfig:
     api_key: str
     effort: str
     prompts: dict[str, str]
-    # Set once presets exist; a run records them (the ledger's modelId / promptVersion, 08 Q5).
-    preset_id: str | None = None
+    # The preset and version this setup came from: a run records them (08 Q5).
+    preset_id: object = None
     preset_version: int | None = None
 
     def prompt(self, name: str) -> str:
@@ -70,24 +56,30 @@ class AiConfig:
         return text
 
 
-def _setting(db, key: str) -> str:
-    row = db.query(Setting).filter(Setting.key == key).first()
-    return row.value if row and row.value else ""
+def _preset_config(module: str, db) -> AiConfig:
+    row = store.provider_row(db)
+    provider = row.provider if row is not None else "openrouter"
+    found = store.active_preset(db, module)
+    if found is None:
+        return AiConfig(module=module, provider=provider, model="", api_key=store.shared_key(db), effort="", prompts={})
+    preset, version = found
+    return AiConfig(module=module, provider=provider, model=version.model_id, api_key=store.shared_key(db),
+                    effort=version.effort or "", prompts=dict(version.prompts or {}), preset_id=preset.id,
+                    preset_version=version.version)
 
 
 def ai_config(module: str, db=None) -> AiConfig:
     """The setup `module` runs with now. An unknown module is a bug, so it raises."""
     if module not in AI_MODULES:
-        raise ValueError(f"unknown AI module {module!r}; add it to backend/ai/config.py AI_MODULES")
-    spec = AI_MODULES[module]
+        raise ValueError(f"unknown AI module {module!r}; add it to backend/ai/modules.py")
     own_db = db is None
     if own_db:
         db = SessionLocal()
     try:
-        if spec.fallback:
-            llm = resolve_llm_config(spec.feature, db=db)
-        else:
-            llm = {name: _setting(db, f"{spec.feature}_llm_{name}") for name in ("provider", "model", "api_key", "effort")}
+        if module in PRESET_MODULES:
+            return _preset_config(module, db)
+        spec = LEGACY_MODULES[module]
+        llm = resolve_llm_config(spec.feature, db=db)
         prompts = {}
         for name, key in spec.prompts.items():
             row = db.query(Setting).filter(Setting.key == key).first()

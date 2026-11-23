@@ -25,6 +25,7 @@ from backend.analyzer.llm_client import call_llm
 from backend.analyzer.llm_logger import track_llm_call
 from backend.analyzer.model_json import parse_model_json
 from backend.analyzer.prompt_fence import fence
+from backend.resume_tailor import bullet_counts
 from backend.resume_tailor import copy_builder as cb
 from backend.resume_tailor import fact_gate
 from backend.resume_tailor import resume_bits as rs
@@ -85,6 +86,9 @@ async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup:
     if gated:
         logger.warning(f"Mads tailor: {len(gated)} bullet(s) named what their role does not state: "
                        + "; ".join(sorted({entry['action'] for entry in gated})))
+    # 6, 4, then 3 bullets a role (Zuhair 2026-11-17): a short role gets its own unused résumé bullets.
+    draft, topped_up = bullet_counts.to_count(
+        draft, base, [row.get("keyword") for row in analysis.get("keywords") or [] if isinstance(row, dict)])
 
     copy = cb.assemble_v2_resume(as_v2_reply(draft, analysis), base, jd_text, title_of_the_job)
     copy[REPORT_KEY].update({
@@ -95,6 +99,7 @@ async def tailor(base: dict, jd_text: str, title_of_the_job: str = "", *, setup:
         "review_edits_applied": applied, "verify_edits_applied": verified,
         "review_edits_missed": review_missed, "verify_edits_missed": verify_missed,
         "fact_gate_changes": gated,
+        "bullets_added": topped_up,
         "keyword_coverage": verification.get("keyword_coverage") or [],
         "checklist": verification.get("checklist") or [],
         "steps": steps, "seconds": seconds, "usage": usage,
@@ -120,13 +125,14 @@ def _filled(template: str, fill: dict) -> str:
 
 async def call_model(setup: Setup, prompt: str, system: str, step: str, firm_id=None) -> dict:
     """One step's call, as the handoff's §1 sets it: the strict format (sent with provider.require_parameters),
-    reasoning off, no temperature, no fallback model; 4 attempts for a timeout, a 429 or 5xx, or a reply cut off at
+    reasoning off unless the preset sets an effort, no temperature, no fallback model; 4 attempts for a timeout, a 429 or 5xx, or a reply cut off at
     MAX_TOKENS (call_llm). Logged to llm_call_log under the firm. Returns {"text", "usage"}."""
-    async with track_llm_call(PURPOSE, PROVIDER, setup.model, firm_id=firm_id) as tracker:
+    async with track_llm_call(PURPOSE, PROVIDER, setup.model, firm_id=firm_id, preset_id=setup.preset_id,
+                              preset_version=setup.preset_version) as tracker:
         response = await call_llm(prompt=prompt, system=system, max_tokens=MAX_TOKENS, provider=PROVIDER,
-                                  model=setup.model, api_key=setup.api_key, effort="",
-                                  response_format=setup.format(step), reasoning_off=True, use_fallback=False,
-                                  retry_cut_off=True)
+                                  model=setup.model, api_key=setup.api_key, effort=setup.effort,
+                                  response_format=setup.format(step), reasoning_off=not setup.effort,
+                                  use_fallback=False, retry_cut_off=True)
         tracker.record(response)
     return response
 

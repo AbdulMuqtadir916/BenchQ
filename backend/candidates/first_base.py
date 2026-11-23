@@ -67,10 +67,11 @@ def _parsed_link(header: dict, field: str) -> str | None:
 
 
 def _parse_header(candidate, parse, header) -> dict:
-    """The parse alone (a later upload has no form). The name falls back to the candidate's, which is never blank."""
+    """The parse alone (a later upload has no form), but for the name and email: the candidate's, fixed once the
+    candidate is added (07 Q68). The upload's text was checked to hold them before the parser ran (07 Q69)."""
     return dict(
-        full_name=_text(header.get("name")) or candidate.full_name, title=_text(header.get("title")) or None,
-        email=_text(header.get("email")) or None, phone=_text(header.get("phone")) or None,
+        full_name=candidate.full_name, title=_text(header.get("title")) or None,
+        email=candidate.email, phone=_text(header.get("phone")) or None,
         linkedin=_parsed_link(header, "linkedin"), city=_text(header.get("city")) or None,
         state=_text(header.get("state")) or None, country=_text(header.get("country")) or None,
         work_authorization=_text(header.get("work_authorization")) or None,

@@ -48,7 +48,7 @@ export function ReassignDialog({ candidate, onClose }: { candidate: Candidate; o
       onConfirm={() => reassign.mutate({ ...target, note: note.trim() || null }, { onSuccess: onClose })}
     >
       <div className="space-y-6">
-        <AssignPicker idPrefix="reassign" value={target} onChange={onChange} primaryRole={candidate.primaryRole ?? ""} blockReason={blockReason} />
+        <AssignPicker idPrefix="reassign" value={target} onChange={onChange} primaryRole={candidate.primaryRole ?? ""} blockReason={blockReason} currentBdeId={candidate.bdeId} />
         <Field id="reassign-note" label={target.bdeId === null && !hasTeamScope(principal) ? `Note to ${nameOf(target.managerId) ?? "the manager"}` : "Note to the BDE"}>
           <textarea {...fieldAria("reassign-note")} rows={3} maxLength={NOTE_MAX_LENGTH} value={note} onChange={(event) => setNote(event.target.value)}
             placeholder="Why the move, and anything they should know." className="bq-input h-auto w-full py-2" />

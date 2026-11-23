@@ -104,8 +104,11 @@ def test_the_saves_id_rule_settles_the_copy(monkeypatch):
     settled = _with_ids(CONTENT, _tailored(monkeypatch).content)
     jobs = {job["company"]: job for job in settled["experiences"]}
     assert jobs["Gamma"]["id"] == "job-2"                                            # unchanged
-    assert jobs["Acme"]["id"] != "job-1"                                             # its bullets changed
-    assert [b["id"] for b in jobs["Acme"]["bullets"]] == ["job-1-b1", "job-1-b2"]    # the same text keeps its id
+    # Acme: the draft kept 2 of its 3 bullets and the count step (6, 4, then 3) put the third back from its own
+    # résumé lines, so it is unchanged and keeps its ids (2026-11-17).
+    assert jobs["Acme"]["id"] == "job-1"
+    assert [b["id"] for b in jobs["Acme"]["bullets"]][:2] == ["job-1-b1", "job-1-b2"]   # the same text keeps its id
+    assert jobs["Beta"]["id"] != "job-3"                                             # its bullet was rewritten
     assert jobs["Beta"]["bullets"][0]["id"] != "job-3-b1"                            # rewritten
     assert settled["educations"][0]["id"] == "edu-1" and settled["certifications"][0]["id"] == "cert-1"
     assert settled["awards"][0]["id"] == "award-1" and settled["languages"][0]["id"] == "lang-1"
@@ -135,7 +138,7 @@ def test_the_posting_loses_its_fake_markers_and_is_cut_to_20000_characters():
 def test_the_report_is_kept_as_counts_only(monkeypatch):
     counts = _tailored(monkeypatch).counts
     assert counts == {
-        "gaps": 1, "fact_gate_changes": 0, "review_edits_applied": 1, "review_edits_missed": 1,
+        "gaps": 1, "fact_gate_changes": 0, "bullets_added": 1, "review_edits_applied": 1, "review_edits_missed": 1,
         "verify_edits_applied": 1, "verify_edits_missed": 0,
         "keywords": {"covered": 1, "synonym_only": 0, "missing_have_it": 0, "missing_gap": 0},
         "seconds": counts["seconds"],

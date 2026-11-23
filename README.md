@@ -20,6 +20,7 @@ candidate by onboarding one with a real résumé); every other module runs on mo
    `lightningcss-darwin-arm64` and no `x64`.
 3. **Copy the env files** (both are git-ignored; the defaults work locally).
    `cp .env.example .env.local && cp backend/.env.example backend/.env`
+   Set `AI_SETTINGS_ENCRYPTION_KEY` in `backend/.env` (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`). The AI provider key itself is entered at `/admin/ai-presets`.
    *Done when* both files exist. AI-provider and Gmail keys are only for the features that call them.
 4. **Start the backend and database.** The first build takes several minutes.
    `docker compose up -d --build db backend`

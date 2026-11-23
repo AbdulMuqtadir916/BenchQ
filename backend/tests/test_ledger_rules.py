@@ -54,6 +54,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_jobs.py", "cache_applied_jobs"): "keeps a copy of job pages; changes no firm record",
     ("api/routes_inbox.py", "start_candidate_google_oauth"): "only starts Google's consent; confirm_mailbox logs the connection",
     ("api/routes_inbox.py", "cancel_mailbox"): "drops an unconfirmed attempt; nothing was connected",
+    ("api/routes_ai_presets.py", "test_preset"): "runs a preset on a pasted sample; nothing is saved",
 
     ("api/routes_companies.py", "create_company"): REFERENCE_DATA,
     ("api/routes_companies.py", "update_company"): REFERENCE_DATA,
@@ -505,7 +506,7 @@ def test_a_ledger_entry_is_built_only_by_the_writer():
 
 
 def test_the_old_ledger_table_is_only_cleared_by_the_demo_reset():
-    """`activity_logs` replaced `ledger_entries` (migration 0028); an entry written there would never be seen."""
+    """`activity_logs` replaced `ledger_entries` (migration 0033); an entry written there would never be seen."""
     used = _enclosing_calls(lambda call, names: any(_is_ledger_model(node, names, "LedgerEntry") for node in ast.walk(call)),
                             model="LedgerEntry")
     assert used <= {("scripts/seed_demo.py", "reset")}, f"Use ActivityEntry instead: {sorted(used)}"
