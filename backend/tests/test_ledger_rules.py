@@ -57,6 +57,7 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_jobs.py", "cache_applied_jobs"): "keeps a copy of job pages; changes no firm record",
     ("api/routes_inbox.py", "start_candidate_google_oauth"): "only starts Google's consent; confirm_mailbox logs the connection",
     ("api/routes_inbox.py", "cancel_mailbox"): "drops an unconfirmed attempt; nothing was connected",
+    ("api/routes_ai_presets.py", "test_preset"): "runs a preset on a pasted sample; nothing is saved",
 
 
     ("main.py", "telegram_webhook"): NOT_FIRM_ACTIVITY,

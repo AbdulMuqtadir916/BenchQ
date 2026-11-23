@@ -28,6 +28,8 @@ const VersionDto = z.object({
   template: z.string().nullable(),
   created_by_user_id: z.string().nullable(),
   created_at: z.string(),
+  /** A tailored version's Match against its job (decided 2026-11-14, Q39). Older backends don't send it. */
+  match_score: z.number().int().nullable().optional(),
   made_by_lead: z.boolean().optional(),
 });
 type VersionDto = z.infer<typeof VersionDto>;
@@ -88,7 +90,7 @@ function toVersions(rows: VersionDto[], resumeId: string): ResumeVersion[] {
     id: fromBackendId(row.id), resumeId, versionNumber: row.version,
     parentVersionId: i > 0 ? fromBackendId(sorted[i - 1]!.id) : null, madeByLead: row.made_by_lead ?? false,
     templateId: row.template ?? DEFAULT_TEMPLATE, includedSectionIds: [], includedBulletIds: [], bulletOverrides: {},
-    atsScore: null, atsGrade: null, atsIssues: [], keywordScore: null, keywordsMatched: [], keywordsMissing: [],
+    atsScore: row.match_score ?? null, atsGrade: null, atsIssues: [], keywordScore: null, keywordsMatched: [], keywordsMissing: [],
     lines: [], tailoring: null, tracer: null, pdfUrl: null, docxUrl: null, renderedAt: null, changeSummary: null,
     createdByUserId: row.created_by_user_id ? fromBackendId(row.created_by_user_id) : "", createdAt: toIso(row.created_at),
   }));

@@ -4,6 +4,7 @@ The DataError -> 404 handler is exercised directly here (SQLite raises a
 different exception class for a malformed UUID, so the live pin lives in
 test_r4_live_contract.py).
 """
+import json
 import uuid
 
 import pytest
@@ -38,7 +39,8 @@ async def test_data_error_handler_hides_every_other_data_error():
     exc = DataError("SELECT ...", {}, Exception("LIMIT must not be negative"))
     resp = await _bad_uuid_to_404(_FakeRequest(), exc)
     assert resp.status_code == 500
-    assert resp.body == b'{"detail":"Internal server error"}'
+    body = json.loads(resp.body)                  # the one error body (docs/02 §12): INTERNAL, never the error's text
+    assert (body["code"], body["detail"]) == ("INTERNAL", "Something went wrong on BenchQ's side.")
     assert b"LIMIT" not in resp.body
 
 
@@ -183,8 +185,9 @@ def test_monitor_run_detail_missing_id_is_404(client):
     assert_clean(client.get(f"/api/monitor/run/{MISSING_UUID}"), 404)
 
 
-def test_scheduler_jobs_is_a_list(client):
-    assert isinstance(assert_clean(client.get("/api/scheduler/jobs"), 200).json(), list)
+def test_scheduler_jobs_is_retired(client):
+    """The scheduler runs in the worker process (production layer step 3); the API can't list its jobs."""
+    assert assert_clean(client.get("/api/scheduler/jobs"), 410).status_code == 410
 
 
 # ══ Stats ════════════════════════════════════════════════════════════════════

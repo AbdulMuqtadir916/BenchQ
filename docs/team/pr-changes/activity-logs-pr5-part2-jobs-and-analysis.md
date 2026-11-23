@@ -69,3 +69,10 @@ has no firm, so a firm reader never gets one.
   was counted, but a message the AI could not classify (or an auto-reply) is still marked handled and never looked at
   again. The row now depends on whether this check handled any new message, not on the replies count.
   `test_an_email_check_that_could_not_classify_a_new_message_still_leaves_a_row` drives `check_emails` with a fake Gmail.
+
+## Up to date with main (2026-11-23)
+
+Main's #147 to #151 merged in. Main deleted the old pool's freehire.me scraper (`backend/scraper/sources/freehire.py`),
+so this part's one-line change there goes with it. Main's #147 moved the scheduler into its own worker process and
+replaced the start-up clean-up with a heartbeat (`job_monitor.py`); a scheduled run that did something or failed still
+writes its one Scheduler row when it finishes (`_log_run`), now from the worker.

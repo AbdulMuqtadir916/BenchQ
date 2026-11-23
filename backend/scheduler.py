@@ -1,4 +1,7 @@
-"""APScheduler — reads all timing config from settings DB table. No hardcoded schedules."""
+"""APScheduler — reads all timing config from settings DB table. No hardcoded schedules.
+
+The scheduler runs only in the worker process (`python -m backend.worker`, production layer step 3), never in the API:
+its job list lives in memory, so every process that started one would run every job."""
 import logging
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -36,10 +39,45 @@ def _int_setting(db, key: str, default: str = "0") -> int:
     return value
 
 
+# The settings that decide the schedule. The scheduler runs in its own process (backend/worker.py, production layer
+# step 3), so a change saved through PATCH /api/settings reaches it by the worker re-reading these every minute
+# (`reload_schedule_if_changed`), not by the API calling into it (decided 2026-11-14).
+SCHEDULE_SETTING_KEYS = (
+    "scrape_interval_minutes", "email_check_interval_minutes", "candidate_gmail_sync_interval_minutes",
+    "backup_cron", "digest_cron", "h1b_cron", "cleanup_cron", "reject_cron",
+)
+SCHEDULE_RELOAD_JOB_ID = "schedule_settings_reload"
+
+# The schedule settings as the running scheduler last applied them; None until configure_scheduler() first runs.
+_applied_schedule: dict | None = None
+
+
+def _read_schedule_settings() -> dict:
+    """The stored values of SCHEDULE_SETTING_KEYS, as text (a missing row reads as None)."""
+    db = SessionLocal()
+    try:
+        rows = db.query(Setting.key, Setting.value).filter(Setting.key.in_(SCHEDULE_SETTING_KEYS)).all()
+    finally:
+        db.close()
+    stored = dict(rows)
+    return {key: stored.get(key) for key in SCHEDULE_SETTING_KEYS}
+
+
+def reload_schedule_if_changed() -> bool:
+    """Reconfigure the scheduler when a schedule setting changed since it was last applied; True when it did."""
+    if _read_schedule_settings() == _applied_schedule:
+        return False
+    logger.info("Schedule settings changed; reconfiguring the scheduler")
+    configure_scheduler()
+    return True
+
+
 def configure_scheduler():
-    """Read all intervals/crons from settings and (re)configure scheduler jobs; called at startup
-    and after any settings update. Each value is read defensively so one bad row only skips its
-    own job, never the rest of the schedule."""
+    """Read all intervals/crons from settings and (re)configure scheduler jobs; called at the worker's start and by
+    `reload_schedule_if_changed` after a setting changes. Each value is read defensively so one bad row only skips
+    its own job, never the rest of the schedule."""
+    global _applied_schedule
+    applied = _read_schedule_settings()
     db = SessionLocal()
     try:
         scrape_interval = _int_setting(db, "scrape_interval_minutes")
@@ -102,6 +140,10 @@ def configure_scheduler():
     scheduler.add_job(_cleanup_candidate_grants, IntervalTrigger(minutes=5),
                       id="candidate_google_grant_cleanup", replace_existing=True, max_instances=1, coalesce=True)
 
+    # Picks up a schedule setting saved through the API (the API process has no scheduler to tell).
+    scheduler.add_job(reload_schedule_if_changed, IntervalTrigger(minutes=1), id=SCHEDULE_RELOAD_JOB_ID,
+                      replace_existing=True, max_instances=1, coalesce=True)
+
     # Cron-based jobs (empty = disabled)
     _add_cron_job(run_db_backup, "db_backup", backup_cron)
     _add_cron_job(send_daily_digest, "daily_digest", digest_cron)
@@ -109,6 +151,7 @@ def configure_scheduler():
     _add_cron_job(run_job_cleanup_auto, "job_cleanup", cleanup_cron)
     _add_cron_job(run_auto_reject, "auto_reject", reject_cron)
 
+    _applied_schedule = applied
     logger.info(
         f"Scheduler configured: scrape every {scrape_interval}m, "
         f"email every {email_interval}m, {len(scheduler.get_jobs())} total jobs"

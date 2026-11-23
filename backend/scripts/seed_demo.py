@@ -25,6 +25,7 @@ import uuid
 
 from sqlalchemy import or_, text
 
+from backend.job_search import workday
 from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
 from backend.config import IS_PRODUCTION
@@ -142,7 +143,8 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
             db, Firm, demo_id(f["id"]), name=f["name"], slug=f["slug"], status=f["status"],
             plan_id=demo_id(f["planId"]), seat_limit=f["seatLimit"], candidate_limit=f["candidateLimit"],
             contact_phone=f["contactPhone"], logo_url=f["logoUrl"], primary_timezone=f["primaryTimezone"],
-            client_timezone=f["clientTimezone"],
+            client_timezone=f["clientTimezone"], work_start=workday.parse_clock(f["workStart"]),
+            work_end=workday.parse_clock(f["workEnd"]),
             application_expiry_days=f["applicationExpiryDays"],
             created_at=_when(f["createdAt"]))
     # Managers before the BDEs who point at them (07 Q40).

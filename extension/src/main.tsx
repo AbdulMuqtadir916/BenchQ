@@ -25,6 +25,7 @@ import AddJobCard from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
+import { PREVIEW_KEY } from "./frame-rules";
 import "./style.css";
 import {
   ALERT,
@@ -55,6 +56,16 @@ const TOPBAR =
   "sticky top-0 z-2 -mx-3 flex min-h-[var(--topbar-height)] items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2";
 const CANDIDATE_SELECT = `h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] bg-[image:var(--gradient-neutral)] pr-[var(--control-sm)] pl-2.5 text-sm text-[var(--color-text)] shadow-[var(--shadow-control)] transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-text-3)] enabled:hover:bg-[image:var(--gradient-neutral-hover)] focus-visible:border-[var(--color-focus-ring)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)] disabled:bg-none disabled:text-[var(--color-text-3)] disabled:shadow-none [&_option]:bg-[var(--color-surface)] [&_option]:text-[var(--color-text)]`;
 const CANDIDATE_LOCK = "candidate-lock";
+/** The panel opened as a tab of its own: the background answers only Chrome's side panel, so say how to get there. */
+const PANEL_IN_A_TAB = "BenchQ runs in Chrome's side panel. Go to the job's tab and click the BenchQ icon in the toolbar.";
+
+async function isInATab(): Promise<boolean> {
+  try {
+    return Boolean(await chrome.tabs.getCurrent?.());
+  } catch {
+    return false;
+  }
+}
 const TOOLTIP = `invisible absolute inset-x-0 top-full z-10 mt-1 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 py-1 text-caption text-[var(--color-text-2)] opacity-0 shadow-[var(--shadow-sm)] transition-[opacity,visibility] ${MOTION} group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100`;
 const NOTICE = `mt-3 p-3 ${CARD}`;
 const NOTICE_TITLE = "mb-1 text-h3";
@@ -67,6 +78,16 @@ const isConnectable = (job: Application) =>
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+  // "Posting preview": LinkedIn postings shown inside BenchQ (frame-rules.ts). On unless turned off.
+  const [isPreviewOn, setPreviewOn] = useState(true);
+  useEffect(() => {
+    void chrome.storage.sync.get([PREVIEW_KEY]).then((stored) => setPreviewOn(stored[PREVIEW_KEY] !== false));
+  }, []);
+  const togglePreview = () => {
+    const next = !isPreviewOn;
+    setPreviewOn(next);
+    void chrome.storage.sync.set({ [PREVIEW_KEY]: next });
+  };
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState(
     () => localStorage.getItem("benchq-selected-candidate") || "",
@@ -85,6 +106,9 @@ function App() {
   const appliedJobs = jobs.filter((job) => job.status === "applied");
   const visibleJobs = activeTab === "saved" ? savedJobs : appliedJobs;
   const { tab: activeBrowserTab, connection } = useTabConnection(session?.principal.user_id ?? null);
+  // The tab the BDE is on now, for an add that finishes after they moved on (Q10).
+  const latestTab = useRef(activeBrowserTab);
+  useEffect(() => { latestTab.current = activeBrowserTab; }, [activeBrowserTab]);
   const tabCandidateId = connection?.candidateId ?? null;
   const linkedJob =
     jobs.find((job) => job.id === connection?.applicationId && job.candidate_id === connection?.candidateId) ?? null;
@@ -292,7 +316,7 @@ function App() {
       type: "open-job",
       connection: details,
     }).catch(() => null);
-    if (!reply?.ok) setError("Could not open this job. Try again.");
+    if (!reply?.ok) setError(await isInATab() ? PANEL_IN_A_TAB : "Could not open this job. Try again.");
   };
   const apply = async (job: Application, form: AppliedForm, resumeId: string | null) => {
     setBusy(job.id);
@@ -329,7 +353,7 @@ function App() {
     const details = session && connectionFor(job, session.principal.user_id);
     if (!details || !activeBrowserTab) return;
     const reply = await sendToBackground({ type: "connect-tab", connection: details, tabId: activeBrowserTab.id }).catch(() => null);
-    if (!reply?.ok) setError("Could not use this tab. Try Open job.");
+    if (!reply?.ok) setError(await isInATab() ? PANEL_IN_A_TAB : "Could not use this tab. Try Open job.");
   };
   const openJobLink = (job: Application) => {
     if (isConnectable(job)) {
@@ -362,14 +386,19 @@ function App() {
     );
   };
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null;
-  // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then the tab connects.
+  // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then this tab connects, as
+  // the BDE is already on the form (Q10), with no tab of its own.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
     <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         loadJobs(selectedCandidate.id).catch(() => undefined);
-        void openJob(application);
+        // This tab, while it still shows the page the job was added from; if it moved on meanwhile, the job opens in
+        // a tab of its own, so no other page is connected to it.
+        const now = latestTab.current;
+        const isSamePage = Boolean(now && activeBrowserTab && now.id === activeBrowserTab.id && now.url === activeBrowserTab.url);
+        void (isSamePage ? connectThisTab(application) : openJob(application));
       }} />
   ) : null;
   const jobsArea = (
@@ -479,6 +508,14 @@ function App() {
           </button>
           <button
             className={button("secondary", "small")}
+            onClick={togglePreview}
+            aria-pressed={isPreviewOn}
+            title="Show LinkedIn postings inside BenchQ"
+          >
+            <span>Posting preview: {isPreviewOn ? "On" : "Off"}</span>
+          </button>
+          <button
+            className={ICON_BUTTON_RAISED}
             onClick={() => void refresh()}
             aria-label="Refresh saved jobs"
             title="Refresh saved jobs"
@@ -489,7 +526,6 @@ function App() {
               <path d="M3 22v-6h6" />
               <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
             </svg>
-            <span>Refresh</span>
           </button>
         </div>
       </header>
@@ -520,7 +556,8 @@ function App() {
         </section>
       ) : (
         <>
-          <div
+          {/* Who's signed in and whose jobs show: while a tab is connected to a job, its card says whose job it is. */}
+          {!connection && <div
             className={`flex min-w-0 items-center gap-1.5 pt-3 pb-2 ${MUTED_TEXT}`}
           >
             <svg
@@ -537,7 +574,7 @@ function App() {
             <span className="min-w-0 flex-[1_1_0] truncate">
               · BDE · {session.firm?.name || session.firm?.slug || "BenchQ"}
             </span>
-          </div>
+          </div>}
           {error && (
             <p data-slot="error" className={`mb-2.5 ${ALERT}`}>
               {error}
@@ -550,7 +587,7 @@ function App() {
               Apply.
             </p>
           )}
-          <div className="mb-3 grid gap-1">
+          {!connection && <div className="mb-3 grid gap-1">
             <label
               className="text-label text-[var(--color-text-2)]"
               htmlFor="candidate-select"
@@ -588,7 +625,7 @@ function App() {
                 </span>
               )}
             </div>
-          </div>
+          </div>}
           {connection ? (
             <AutofillPanel
               // One panel per tab and job: a tab connected to another job starts afresh (its own form memory, next pages

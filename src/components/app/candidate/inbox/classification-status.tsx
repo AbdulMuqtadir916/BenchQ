@@ -2,16 +2,22 @@
 
 import { RotateCw } from "lucide-react";
 import { ApiError } from "@/lib/api/client";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import type { InboxMessage } from "@/lib/schemas/inbox";
 import { useCan } from "@/lib/auth/permissions";
 import { useRetryClassification } from "@/lib/hooks/use-email-reviews";
 import { SETUP_ERRORS, classificationFailureReason } from "@/components/app/inbox/signal-meta";
 import { Button } from "@/components/ui/button";
 
-function retryFailure(error: Error): string {
-  if (error instanceof ApiError && error.status === 409) return error.message || "This email changed or the classifier is paused. Reload and try again.";
-  if (error instanceof ApiError && error.status === 403) return "You don't have permission to retry classification.";
-  return error.message;
+/** The screen's words for a 403, and for a 409 that came without the backend's own; a system error reads as
+ * everywhere else (src/lib/api/error-text.ts). */
+function retryFailure(error: Error): ErrorText {
+  const isConflict = error instanceof ApiError && error.status === 409;
+  return describeError(error, {
+    fallback: isConflict ? "This email changed or the classifier is paused. Reload and try again." : undefined,
+    screenText: (e) => (e instanceof ApiError && e.status === 403 ? "You don't have permission to retry classification." : null),
+  });
 }
 
 /** What is happening with this email's classification, in words, with Retry where the role allows it (D-28). */
@@ -46,7 +52,7 @@ function StatusBody({ message }: { message: InboxMessage }) {
         </Button>
       ) : null}
       {retry.isSuccess ? <p>Queued again.</p> : null}
-      {retry.error ? <p role="alert">{retryFailure(retry.error)}</p> : null}
+      {retry.error ? <ErrorNote text={retryFailure(retry.error)} className="text-inherit" /> : null}
     </div>
   );
 }

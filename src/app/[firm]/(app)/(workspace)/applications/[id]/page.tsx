@@ -11,7 +11,7 @@ import { useTeam } from "@/lib/hooks/use-team";
 import { useCandidateInbox } from "@/lib/hooks/use-inbox";
 import { can } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
-import { deriveMatchScore } from "@/lib/derive";
+import { matchFor } from "@/lib/derive";
 import { formatRelative } from "@/lib/format/timezone";
 import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
@@ -153,7 +153,10 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                 {job ? <Link href={toHref("jobs.detail", { id: app.jobId })} className="hover:underline">{app.jobTitleAtApply}</Link> : <span>{app.jobTitleAtApply}</span>}
                 <span className="block text-sm text-[var(--color-text-3)]">{app.companyNameAtApply}</span>
               </Detail>
-              <Detail label="Match score">{candidate && job ? <MatchScore score={deriveMatchScore(candidate, job)} /> : "—"}</Detail>
+              <Detail label="Match score">{(() => {
+                const match = candidate && job ? matchFor(job, candidate.id) : null;
+                return match?.score != null ? <MatchScore score={match.score} note={match.note} /> : "—";
+              })()}</Detail>
               <Detail label="Applied">{app.appliedAt ? <DualTimestamp iso={app.appliedAt} format="absolute" /> : "Not yet"}</Detail>
               <Detail label="Submitted by">{actorName(app.submittedByUserId) ?? "—"}</Detail>
             </dl>

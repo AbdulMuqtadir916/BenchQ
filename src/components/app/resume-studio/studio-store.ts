@@ -30,7 +30,8 @@ interface StudioState {
   fitOnePage: boolean;
   /** With fitOnePage on and still more than a page at the minimums: about how many lines to trim. */
   fitOverflowLines: number | null;
-  notice: { text: string; tone: "info" | "ai" | "danger" } | null;
+  /** `reference`: an unexpected error's request id, shown with a copy button; such a notice stays until the next one. */
+  notice: { text: string; tone: "info" | "ai" | "danger"; reference?: string | null } | null;
   /** Field that just changed under AI — the paper and the field flash it once. */
   flashId: string | null;
   /** Ask whichever view is showing to scroll to and focus a field. Nonce re-triggers the same id. */
@@ -52,7 +53,7 @@ interface StudioState {
   setPageCount: (pages: number) => void;
   setFitOnePage: (fit: boolean) => void;
   setFitOverflowLines: (lines: number | null) => void;
-  notify: (text: string, tone?: "info" | "ai" | "danger") => void;
+  notify: (text: string, tone?: "info" | "ai" | "danger", reference?: string | null) => void;
 }
 
 export const useStudio = create<StudioState>((set) => ({
@@ -91,9 +92,10 @@ export const useStudio = create<StudioState>((set) => ({
   setPageCount: (pageCount) => set({ pageCount }),
   setFitOnePage: (fitOnePage) => set({ fitOnePage }),
   setFitOverflowLines: (fitOverflowLines) => set({ fitOverflowLines }),
-  notify: (text, tone = "info") => {
-    const notice = { text, tone };
+  notify: (text, tone = "info", reference = null) => {
+    const notice = { text, tone, reference };
     set({ notice });
-    setTimeout(() => set((s) => (s.notice === notice ? { notice: null } : s)), 4500);
+    // A reference to copy stays until the next notice or the next document: 4.5 s is too short to copy it.
+    if (!reference) setTimeout(() => set((s) => (s.notice === notice ? { notice: null } : s)), 4500);
   },
 }));

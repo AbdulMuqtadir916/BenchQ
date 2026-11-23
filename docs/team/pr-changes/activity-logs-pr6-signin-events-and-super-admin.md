@@ -121,7 +121,7 @@ log. 51 routes pass; 30 can't be reached with the generic request and have their
 - **The sweep test fails on a server error** instead of skipping it. Two routes that went through and changed nothing
   are listed in `NO_ENTRY` with why: a settings PATCH that changes no setting, and an inbox sync that imports no new email
   (an import that does logs "Imported N candidate emails").
-- **0029 keeps 0028's TRUNCATE rule** when it rewrites the trigger function.
+- **0034 keeps 0033's TRUNCATE rule** when it rewrites the trigger function.
 
 ## Review fixes (CodeRabbit, third round, 2026-11-15)
 
@@ -142,3 +142,14 @@ log. 51 routes pass; 30 can't be reached with the generic request and have their
   the ending, and a password shaped like an address (`p@x.supersecretpassword`) has most of itself in the ending. The
   entry now says "Email not shown" and keeps no part of the typed text; `mask_email` is gone. The Super Admin still sees
   the time, the address (IP) and the number of tries. An entry on a real account is unchanged: it names that account.
+
+## Up to date with main (2026-11-23)
+
+Main's #147 to #151 merged in.
+
+- **Migration 0034** (was 0029), on top of this stack's 0033; main took 0028 to 0032.
+- **Main's AI presets (#150)** are Super Admin routes under `/api/admin/ai`. They sit beside this PR's
+  `/api/admin/activity` routes in `access.py` and `main.py`. They write their own entries with no firm, so the Super
+  Admin's Activity page shows them and no firm reader does. The one that saves nothing, the test run, is in
+  `NOT_LOGGED` (PR 2), so the sweep leaves it out. The sidebar keeps Activity at 4; main's AI presets item is 7.
+- `test_activity_logs.py`'s copy test still upgrades to `head`, as this PR set it.

@@ -53,7 +53,10 @@ export function startRefusal(error: unknown): { message: string; canRetry: boole
   const said = error instanceof Error ? error.message : "";
   if (status === 422) return { message: "This job has no description in BenchQ to tailor the resume to.", canRetry: false };
   if (status === 404) return { message: "BenchQ couldn't find this job or resume for the candidate. Reload jobs, then try again.", canRetry: false };
-  if (status >= 500) return { message: "Tailoring isn't set up yet, or BenchQ had a problem. Try again, or tell your admin.", canRetry: true };
+  // "Not set up" only when BenchQ says so (its 500 names the missing setting); any other 500, 502 or 503 is BenchQ not
+  // answering (a restart), and trying again helps (found 2026-11-17).
+  if (status === 500 && /isn't set up/i.test(said)) return { message: "Tailoring isn't set up yet. Tell your admin.", canRetry: false };
+  if (status >= 500) return { message: "BenchQ didn't answer. Try again in a moment.", canRetry: true };
   return { message: said || "Tailoring didn't start. Try again.", canRetry: status === 0 || status === 429 };
 }
 

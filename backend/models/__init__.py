@@ -3,3 +3,4 @@ from backend.models import tenancy  # noqa: F401
 from backend.models import candidates  # noqa: F401
 from backend.models import notifications  # noqa: F401
 from backend.models import job_search  # noqa: F401
+from backend.models import ai_presets  # noqa: F401

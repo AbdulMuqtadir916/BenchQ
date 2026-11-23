@@ -15,14 +15,17 @@ export class FakeEvent {
 /** The parts of `chrome.*` the extension uses, with real session storage and tabs a test can open and close. */
 export function fakeChrome() {
   const session = new Map<string, unknown>();
+  const sync = new Map<string, unknown>();
   const tabs = new Set<number>();
   let nextTab = 100;
 
   return {
     session,
+    sync,
     tabs_open: tabs,
+    declarativeNetRequest: { updateSessionRules: vi.fn(async () => undefined) },
     runtime: {
-      id: "extension-id", onInstalled: new FakeEvent(), onMessage: new FakeEvent(),
+      id: "extension-id", onInstalled: new FakeEvent(), onStartup: new FakeEvent(), onMessage: new FakeEvent(),
       sendMessage: vi.fn(async () => ({ ok: true })), reload: vi.fn(),
     },
     sidePanel: { setPanelBehavior: vi.fn(async () => undefined), open: vi.fn(async () => undefined) },
@@ -57,6 +60,14 @@ export function fakeChrome() {
         }),
         remove: vi.fn(async (keys: string | string[]) => {
           [keys].flat().forEach((key) => session.delete(key));
+        }),
+      },
+      sync: {
+        get: vi.fn(async (keys: string | string[] | null) => (keys === null
+          ? Object.fromEntries(sync)
+          : Object.fromEntries([keys].flat().filter((key) => sync.has(key)).map((key) => [key, sync.get(key)])))),
+        set: vi.fn(async (items: Record<string, unknown>) => {
+          Object.entries(items).forEach(([key, value]) => sync.set(key, value));
         }),
       },
       onChanged: new FakeEvent(),

@@ -3,6 +3,8 @@
 import type { Candidate } from "@/lib/schemas/candidate";
 import { useMailboxConfirmation } from "@/lib/hooks/use-inbox";
 import { Button } from "@/components/ui/button";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 export function MailboxConfirmation({candidate, attempt, onClose}: {
   candidate: Candidate; attempt: string; onClose: (cleanupPending?: boolean) => void;
@@ -17,7 +19,7 @@ export function MailboxConfirmation({candidate, attempt, onClose}: {
     {details.isPending ? <p role="status">Loading Google address…</p> : null}
     {details.data ? <p>Selected Google address: {details.data.address}</p> : null}
     <p>Confirm this is the intended mailbox for this candidate. The profile email may differ. You confirm the account owner authorized this connection.</p>
-    {details.error || confirm.error || cancel.error ? <p role="alert">{(cancel.error ?? confirm.error ?? details.error)?.message}</p> : null}
+    {details.error || confirm.error || cancel.error ? <ErrorNote text={describeError(cancel.error ?? confirm.error ?? details.error)} /> : null}
     <div className="flex flex-wrap gap-2">
       {expired ? <Button disabled={pending} onClick={abandon}>Return to Inbox</Button> : <Button disabled={!details.data || pending} onClick={() => confirm.mutate(undefined, {onSuccess: () => onClose()})}>Confirm mailbox</Button>}
       <Button variant="secondary" disabled={pending} onClick={abandon}>{cancel.isPending ? "Cancelling…" : "Cancel"}</Button>

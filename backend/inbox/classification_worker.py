@@ -114,7 +114,8 @@ def _account(db, cfg, job, firm_id, *, success, duration_ms):
         quality, cost = 'UNKNOWN', None
     meta['usage'] = {**usage, 'cost_quality': quality}
     row_id = log_llm_call('email_classification', 'openrouter', cfg.model, tokens, duration_ms=duration_ms,
-                          success=success, error=meta.get('error_code'), firm_id=firm_id, cost_usd=cost, db=db)
+                          success=success, error=meta.get('error_code'), firm_id=firm_id, cost_usd=cost, db=db,
+                          preset_id=cfg.preset_id, preset_version=cfg.preset_version)
     if row_id:
         meta['llm_call_log_id'] = str(row_id)
     job.meta = meta

@@ -18,7 +18,9 @@ import { DualTimestamp } from "@/components/app/dual-timestamp";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { ApplicationBoard } from "@/components/app/applications/application-board";
 import { STATUS_LABEL, STATUS_TONE } from "@/components/app/applications/status-meta";
+import { ErrorNote } from "@/components/app/error-note";
 import { ErrorState } from "@/components/app/error-state";
+import type { ErrorText } from "@/lib/api/error-text";
 import { EmptyState } from "@/components/app/empty-state";
 import { Button } from "@/components/ui/button";
 import { FilterChips, type FilterChip } from "@/components/app/filter-chips";
@@ -67,7 +69,7 @@ function ApplicationsList() {
   // A move on the board is a real status change (it persists, docs/03 §3.3), shown at once (optimistic).
   const updateStatus = useUpdateApplicationStatus();
   // A failed move snaps back, so the page says which one and why, one line per application, until it moves.
-  const [moveErrors, setMoveErrors] = useState<Record<string, string>>({});
+  const [moveErrors, setMoveErrors] = useState<Record<string, ErrorText>>({});
   const router = useRouter();
   const toHref = useHref();
 
@@ -102,7 +104,10 @@ function ApplicationsList() {
     const name = apps.find((a) => a.id === id)?.companyNameAtApply || "This application";
     return updateStatus.mutate({ id, status: to, note: null }, {
       onSuccess: () => setMoveErrors((errors) => withoutKey(errors, id)),
-      onError: (error) => setMoveErrors((errors) => ({ ...errors, [id]: `${name} didn't move to ${STATUS_LABEL[to]}: ${moveFailure(error)}` })),
+      onError: (error) => {
+        const why = moveFailure(error);
+        setMoveErrors((errors) => ({ ...errors, [id]: { ...why, message: `${name} didn't move to ${STATUS_LABEL[to]}: ${why.message}` } }));
+      },
     });
   }
 
@@ -125,7 +130,7 @@ function ApplicationsList() {
       ) : view === "kanban" ? (
         <>
           {Object.entries(moveErrors).map(([id, text]) => (
-            <p key={id} role="alert" className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-danger-bg)] px-3 py-2 text-caption text-[var(--color-danger-fg)]">{text}</p>
+            <ErrorNote key={id} text={text} className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-danger-bg)] px-3 py-2 text-caption" />
           ))}
           <ApplicationBoard apps={shown} saving={saving} candidateName={candidateName} onMove={moveTo} canAct={can(principal, "application.move")}
             onOpen={(id) => router.push(toHref("applications.detail", { id }))} />
@@ -139,7 +144,7 @@ function ApplicationsList() {
   );
 }
 
-function withoutKey(errors: Record<string, string>, id: string): Record<string, string> {
+function withoutKey(errors: Record<string, ErrorText>, id: string): Record<string, ErrorText> {
   const next = { ...errors };
   delete next[id];
   return next;

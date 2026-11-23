@@ -3,11 +3,14 @@ import asyncio
 import contextvars
 import logging
 import re
+import threading
 import uuid
 from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from sqlalchemy import text
 
 from backend.analyzer.llm_logger import one_row_per_run
 from backend.auth import ledger
@@ -85,6 +88,8 @@ _LIMIT_SOURCES: dict[str, tuple[Optional[str], int]] = {
     # A résumé tailoring (backend/resume_tailor/): five model calls, about a minute, waiting on the model. It holds no
     # database connection while it waits, so the limit is the model account's (decided 2026-11-12: 40 per worker).
     "resume_tailor": ("resume_tailor_max_concurrent", 40),
+    # One résumé parse: one model call. Ten at once per backend process; the rest wait (decided 2026-11-22).
+    "resume_parse": ("resume_parse_max_concurrent", 10),
 }
 
 # Which gate a launch_background job_type belongs to. Anything absent runs
@@ -250,6 +255,41 @@ def get_all_running() -> list[dict]:
     ]
 
 
+def get_all_active() -> list[dict]:
+    """Every process's running jobs, for /api/monitor/active: this process's own (`get_all_running`, with its
+    in-memory detail), then the `running` rows in `job_runs` it doesn't hold: the worker's scheduled runs, another
+    API copy's (production layer step 3). Such a row has no scope_key or company_id (they aren't stored). The
+    classifier's pause row is left out: it stays `running` while paused, a state, not a job. `get_all_running` stays
+    this process's only: the tailor's stamp reads it to know which runs it holds."""
+    own = get_all_running()
+    held = {r["run_id"] for r in own}
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        rows = (db.query(JobRun)
+                .filter(JobRun.status == "running", JobRun.job_type != "candidate_email_classifier_pause")
+                .order_by(JobRun.started_at).all())
+        others = []
+        for row in rows:
+            if str(row.id) in held:
+                continue
+            started = row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=timezone.utc)
+            others.append({
+                "run_id": str(row.id),
+                "job_type": row.job_type,
+                "trigger": row.trigger,
+                "started_at": started.isoformat(),
+                "elapsed_seconds": round((now - started).total_seconds(), 1),
+                "scope_key": None,
+                "target_job_id": str(row.target_job_id) if row.target_job_id else None,
+                "company_id": None,
+            })
+        db.commit()
+    finally:
+        db.close()
+    return own + others
+
+
 def _get_running_by_job_type(job_type: str) -> Optional[dict]:
     """Check if any job with the given job_type is running (ignoring scope_key)."""
     for key, r in _running.items():
@@ -265,6 +305,52 @@ def _get_running_by_job_type(job_type: str) -> Optional[dict]:
 # ── DB helpers ──────────────────────────────────────────────────────────────
 
 
+# ── Several processes, one table (production layer step 3) ─────────────────
+# The API (backend/main.py, possibly several copies, and two side by side during a deploy) and the scheduler's worker
+# (backend/worker.py) are separate processes, so `_running` above only knows its own process's runs. What crosses the
+# process line is decided from the `job_runs` table.
+
+# Job types the API starts by hand (main.py's trigger routes) and the worker on a timer (scheduler.py). One run at a
+# time across all processes: claimed in the database, since no process sees another's `_running`.
+SHARED_JOB_TYPES = frozenset({
+    "scrape_all", "email_check", "daily_digest", "h1b_refresh", "auto_reject", "job_cleanup", "db_backup",
+})
+
+# Who is still alive: every process stamps `meta.seen_at` on the runs it holds every STAMP_EVERY_SECONDS, from its own
+# thread (`start_heartbeat`), and a `running` row nobody stamped for SILENT_FOR belongs to a process that stopped.
+# Decided 2026-11-14 with Uzair; the same rule as the résumé tailor's (tailoring.md Q10b), whose stamp this
+# generalises. A restarting process can't tell a dead process's rows from a live copy's by "I just started", so the
+# old startup clean-up failed both.
+STAMP_EVERY_SECONDS = 30
+SILENT_FOR = timedelta(minutes=2)
+
+# The candidate inbox's rows recover on their own, by lease (Samad, PR 4), and aren't held in `_running`: an import is
+# finalized by `inbox.import_progress.recover_imports` (the worker, every 5 minutes); the classifier's pause is a
+# state, not a run, and failing it would clear the pause; a command row is written completed.
+_SELF_RECOVERING_JOB_TYPES = frozenset({
+    "candidate_gmail_import", "candidate_email_classifier_pause", "candidate_email_command",
+})
+# A classification is claimed in either process (the worker's sweep, or `wake_worker` from a route) under a 2-minute
+# lease on its email, outside `_running`, so it is never stamped. A row still running well past that lease is a dead
+# process's.
+_CLASSIFICATION_JOB_TYPE = "candidate_email_classification"
+CLASSIFICATION_STALE_AFTER = timedelta(minutes=10)
+
+
+def _claim_shared_job_type(db, job_type: str) -> None:
+    """Refuse a second run of a shared job type while one is running in either process.
+
+    The transaction-scoped advisory lock makes check-and-insert one step: a second caller waits for the first one's
+    commit, then sees its row. The row is the claim, so no connection is held for the length of the run. A row left
+    `running` by a dead process blocks until it goes silent and is failed (`cleanup_stale_runs`, about 2 minutes)."""
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": f"benchq.job_runs:{job_type}"})
+    live = (db.query(JobRun).filter(JobRun.job_type == job_type, JobRun.status == "running")
+            .order_by(JobRun.started_at).first())
+    if live is not None:
+        started = live.started_at if live.started_at.tzinfo else live.started_at.replace(tzinfo=timezone.utc)
+        raise JobAlreadyRunningError(job_type, (datetime.now(timezone.utc) - started).total_seconds())
+
+
 def _insert_job_run(
     run_id: uuid.UUID,
     job_type: str,
@@ -273,8 +359,11 @@ def _insert_job_run(
     target_job_id: Optional[uuid.UUID] = None,
     firm_id: Optional[uuid.UUID] = None,
 ) -> None:
+    """Write the run's `running` row; raises JobAlreadyRunningError for a shared job type already running anywhere."""
     db = SessionLocal()
     try:
+        if job_type in SHARED_JOB_TYPES:
+            _claim_shared_job_type(db, job_type)
         run = JobRun(
             id=run_id,
             job_type=job_type,
@@ -329,24 +418,91 @@ def _finish_job_run(run_id: uuid.UUID, status: str, result_summary: Optional[str
         db.close()
 
 
-def cleanup_stale_runs() -> int:
-    """Mark any 'running' JobRun records as 'failed' (process restarted). Called at startup."""
+def _held_run_ids() -> list[str]:
+    """The ids of the runs this process holds; read from the heartbeat's thread while the loop may change `_running`."""
+    for _ in range(3):
+        try:
+            return [str(r.run_id) for r in list(_running.values())]
+        except RuntimeError:  # the dict changed size while it was copied
+            continue
+    return []
+
+
+def stamp_held_runs() -> int:
+    """Stamp `meta.seen_at` on the `running` rows this process holds; returns how many ids it stamped."""
+    ids = _held_run_ids()
+    if not ids:
+        return 0
     db = SessionLocal()
     try:
-        stale = db.query(JobRun).filter(JobRun.status == "running").all()
-        count = len(stale)
-        now = datetime.now(timezone.utc)
-        for run in stale:
-            run.status = "failed"
-            run.finished_at = now
-            run.duration_seconds = round((now - run.started_at).total_seconds(), 1) if run.started_at else 0
-            run.error = "Process restarted"
+        # A run started without meta stores JSON null, not SQL NULL: `null || {...}` would make an array, losing
+        # `seen_at`, so anything but an object starts from {}.
+        db.execute(text("UPDATE job_runs SET meta = ((CASE WHEN jsonb_typeof(meta::jsonb) = 'object' "
+                        "THEN meta::jsonb ELSE '{}'::jsonb END) || "
+                        "jsonb_build_object('seen_at', CAST(:seen AS text)))::json "
+                        "WHERE id = ANY(CAST(:ids AS uuid[])) AND status = 'running'"),
+                   {"seen": datetime.now(timezone.utc).isoformat(), "ids": ids})
         db.commit()
-        if count:
-            logger.info(f"Cleaned up {count} stale job run(s) from previous process")
-        return count
+        return len(ids)
     finally:
         db.close()
+
+
+def cleanup_stale_runs() -> int:
+    """Fail the `running` rows whose process stopped: not stamped for SILENT_FOR (a row never stamped counts from its
+    start). Safe from any process, at any time, as often as wanted: a live process's rows are always fresh. The inbox's
+    self-recovering rows are left to their own recovery; a classification is failed once well past its claim lease.
+    A tailoring failed here (no error code) reads as `lost` (resume_tailor/runs.py)."""
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        failed = db.execute(text(
+            "UPDATE job_runs SET status = 'failed', finished_at = :now, error = 'Process restarted', "
+            "duration_seconds = ROUND(CAST(EXTRACT(EPOCH FROM (CAST(:now AS timestamptz) - started_at)) AS numeric), 1) "
+            "WHERE status = 'running' AND ("
+            "  (job_type <> ALL(CAST(:quiet AS text[])) "
+            "   AND COALESCE(CAST(meta::jsonb ->> 'seen_at' AS timestamptz), started_at) < :silent_since) "
+            "  OR (job_type = :classification AND started_at < :classification_since)) "
+            "RETURNING id"),
+            {"now": now, "silent_since": now - SILENT_FOR,
+             "quiet": sorted(_SELF_RECOVERING_JOB_TYPES | {_CLASSIFICATION_JOB_TYPE}),
+             "classification": _CLASSIFICATION_JOB_TYPE,
+             "classification_since": now - CLASSIFICATION_STALE_AFTER}).fetchall()
+        db.commit()
+        if failed:
+            logger.info("Failed %d job run(s) whose process stopped", len(failed))
+        return len(failed)
+    finally:
+        db.close()
+
+
+def beat_once() -> None:
+    """One heartbeat: stamp this process's runs, then fail any process's silent ones."""
+    stamp_held_runs()
+    cleanup_stale_runs()
+
+
+def start_heartbeat():
+    """Start this process's heartbeat on its own thread (a run that blocks the event loop can't silence it); returns
+    the function that stops it. The first beat is at once, so a restart fails the dead process's silent rows."""
+    stopping = threading.Event()
+
+    def _loop():
+        while True:
+            try:
+                beat_once()
+            except Exception as e:  # a missed beat is retried; four in a row make this process's runs look stopped
+                logger.warning("Job heartbeat failed (%s)", type(e).__name__)
+            if stopping.wait(STAMP_EVERY_SECONDS):
+                return
+
+    thread = threading.Thread(target=_loop, name="job-heartbeat", daemon=True)
+    thread.start()
+
+    def stop() -> None:
+        stopping.set()
+        thread.join(timeout=5)
+    return stop
 
 
 # ── Context manager for scheduler use ──────────────────────────────────────

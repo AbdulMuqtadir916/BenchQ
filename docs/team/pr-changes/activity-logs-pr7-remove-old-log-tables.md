@@ -15,19 +15,19 @@ stops, changing nothing, if a row is missing, so no history is lost. Every scree
 
 What each table held:
 
-- `ledger_entries`: the old activity ledger. Migration 0028 copied it, and nothing has read or written it since.
+- `ledger_entries`: the old activity ledger. Migration 0033 copied it, and nothing has read or written it since.
 - `activity_log_v2`: short event lines from background jobs, with no firm or person. Scores and jobs were never in it:
   they live in `jobs` and `candidate_jobs`. Since the PR 5 part 2 addition, those events are system rows.
 
 Owner, Manager, BDE and Viewer see exactly what they saw before. Every new row has no firm, and those readers only read
 their own firm's rows.
 
-## Migration 0030
+## Migration 0035
 
 1. Copies each `activity_log_v2` row into `activity_logs` as a system row with no firm. It keeps the id, date and message.
    The actor is named by type (Scraper, H-1B refresh, Résumé scoring, Email monitor, Telegram digest), the company becomes
    the label and the details the note.
-2. Copies any `ledger_entries` row not already there, the same way 0028 did. There were none on the development database.
+2. Copies any `ledger_entries` row not already there, the same way 0033 did. There were none on the development database.
 3. Stops with an error if any row of either table is missing from `activity_logs`.
 4. Drops both tables.
 
@@ -42,7 +42,7 @@ The downgrade brings both tables back empty. What was copied stays in `activity_
 | `backend/main.py`, `backend/auth/access.py` | `GET /api/activity-log` removed. Only the Super Admin could call it, no screen did, and the Activity page now shows those events. |
 | `backend/scripts/seed_demo.py` | The demo reset no longer clears `ledger_entries`. |
 | `backend/api/routes_admin.py` | `GET /api/admin/audit`, see below. |
-| `backend/tests/*` | Tests that used the old tables now use `activity_logs` or plain SQL against the older schema. New: `test_migration_0021.py`, and an audit test. |
+| `backend/tests/*` | Tests that used the old tables now use `activity_logs` or plain SQL against the older schema. New: `test_migration_0035.py`, and an audit test. |
 
 ## Keeping the Firms page the same
 
@@ -69,3 +69,12 @@ The backend runs migrations on start, so restarting it on this branch drops both
 The migration locks both old tables against writes before it copies them (`SHARE ROW EXCLUSIVE`, reads still work), so a
 row an older process wrote between the copy and the drop can't be lost. Nothing in this code writes those tables any
 more; the lock covers an older backend still running during a deploy.
+
+## Up to date with main (2026-11-23)
+
+Main's #147 to #151 merged in.
+
+- **Migration 0035** (was 0030), on top of 0034; main took 0028 to 0032. Its test is `test_migration_0035.py` (was
+  `test_migration_0030.py`, now main's search-titles number).
+- `access.py` keeps main's AI preset routes; `GET /api/activity-log` stays removed with `activity_log_v2`.
+- Nothing in main's new code reads or writes `ledger_entries` or `activity_log_v2`.

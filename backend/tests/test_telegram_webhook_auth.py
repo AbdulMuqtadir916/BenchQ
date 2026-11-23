@@ -1,4 +1,5 @@
 """Tests for the Telegram webhook secret-token validation."""
+from backend.tests.problem_support import assert_problem
 from backend.models.db import Setting
 
 
@@ -23,7 +24,7 @@ def test_webhook_rejects_wrong_header(api_client, test_db):
         headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Invalid webhook secret"}
+    assert assert_problem(resp)["detail"] == "Invalid webhook secret"
 
 
 def test_webhook_rejects_empty_configured_secret(api_client, test_db):

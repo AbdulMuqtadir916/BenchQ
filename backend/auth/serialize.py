@@ -18,6 +18,9 @@ def firm_json(firm: Firm) -> dict:
         "id": str(firm.id), "name": firm.name, "slug": firm.slug, "logo_url": firm.logo_url,
         "primary_timezone": firm.primary_timezone, "client_timezone": firm.client_timezone,
         "application_expiry_days": firm.application_expiry_days,
+        # The firm's work hours, "HH:MM" in primary_timezone (07 Q67; backend/job_search/workday.py).
+        "work_start": firm.work_start.strftime("%H:%M") if firm.work_start else None,
+        "work_end": firm.work_end.strftime("%H:%M") if firm.work_end else None,
         "status": firm.status, "plan_id": str(firm.plan_id), "seat_limit": firm.seat_limit,
         "candidate_limit": firm.candidate_limit, "contact_phone": firm.contact_phone,
         "created_at": _iso(firm.created_at),

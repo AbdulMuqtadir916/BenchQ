@@ -23,7 +23,7 @@ const NEW_USER = "0b9c6c1e-2222-4000-8000-000000000002";
 
 const firmDto = (id: string, slug: string) => ({
   id, name: "Hyderabad Tech Staffing", slug, logo_url: null, primary_timezone: "Asia/Kolkata",
-  client_timezone: "America/New_York", application_expiry_days: 30, status: "ACTIVE",
+  client_timezone: "America/New_York", work_start: "18:30", work_end: "04:00", application_expiry_days: 30, status: "ACTIVE",
   plan_id: STARTER, seat_limit: 10, candidate_limit: 100, contact_phone: null, created_at: "2026-10-01T09:00:00+00:00",
 });
 const userDto = (id: string, firmId: string, role = "OWNER") => ({
@@ -168,12 +168,12 @@ describe("the team and /admin on the live backend", () => {
     routes.push(on("POST", "/api/admin/firms", 201, { firm: firmDto(NEW_FIRM, "northwind"), invite: inviteDto({ firm_id: NEW_FIRM, id: NEW_USER }), invite_token: "t" }));
     const firm = await platformApi.firms.create({
       name: "Northwind", slug: "northwind", planId: "plan_starter", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York",
-      contactPhone: null, ownerName: "Nora North", ownerEmail: "nora@northwind.test",
+      workStart: "18:30", workEnd: "04:00", contactPhone: null, ownerName: "Nora North", ownerEmail: "nora@northwind.test",
     });
     expect(firm.id).toBe(NEW_FIRM);
     expect(calls[0].body).toEqual({
       name: "Northwind", slug: "northwind", plan_id: STARTER, primary_timezone: "Asia/Kolkata", client_timezone: "America/New_York",
-      contact_phone: null, owner_name: "Nora North", owner_email: "nora@northwind.test",
+      work_start: "18:30", work_end: "04:00", contact_phone: null, owner_name: "Nora North", owner_email: "nora@northwind.test",
     });
   });
 

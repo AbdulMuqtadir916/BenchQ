@@ -11,15 +11,15 @@ import pytest
 from fastapi import HTTPException
 
 from backend.candidates import parse as parser
-from backend.candidates.parse_defaults import (DEFAULT_PROMPT, DEFAULT_RESPONSE_FORMAT, OLD_DEFAULT_PROMPT,
-                                               BASE_RESUME_SCHEMA)
+from backend.candidates.parse_defaults import DEFAULT_PROMPT, DEFAULT_RESPONSE_FORMAT, BASE_RESUME_SCHEMA
+from backend.tests.ai_support import edit_active, set_up_ai
 from backend.tests.test_base_resume import _matches
 
 RESUME_TEXT = ("Ravi Teja Kommineni\nSenior Java Full Stack Developer\nIrving, TX | ravi@example.com | H1B\n"
                "Experience: Capital Payments Inc., Senior Java Developer, Mar 2021 - Present")
 USER_MESSAGE_PDF = (pathlib.Path(__file__).parent / "fixtures/resume_parse/user_message_pdf.txt").read_text(encoding="utf-8")
-PARSER_ROWS = ("resume_parse_system_prompt", "resume_parse_prompt", "resume_parse_response_format",
-               "resume_parse_llm_provider", "resume_parse_llm_model", "resume_parse_llm_api_key")
+
+NOT_SET_UP = "The résumé reader isn't set up yet. Ask your admin."
 
 
 def _pdf(text: str, links: tuple[str, ...] = ()) -> bytes:
@@ -82,8 +82,8 @@ def test_the_file_kind_comes_from_the_name_and_the_bytes():
     assert parser.file_kind("Ravi.PDF", b"%PDF-1.4 ...") == "pdf"
     assert parser.file_kind("ravi.docx", b"PK\x03\x04...") == "docx"
     cases = [("ravi.doc", b"\xd0\xcf", 415, "Save it as .docx or PDF, then try again."),
-             ("ravi.pdf", b"PK\x03\x04", 415, "PDF or Word only."),          # a renamed file
-             ("ravi.txt", b"hello", 415, "PDF or Word only."),
+             ("ravi.pdf", b"PK\x03\x04", 415, "PDF or DOCX only."),          # a renamed file
+             ("ravi.txt", b"hello", 415, "PDF or DOCX only."),
              ("ravi.pdf", b"", 422, "This file is empty."),
              ("ravi.pdf", b"%PDF" + b"0" * parser.MAX_BYTES, 413, "Up to 10 MB.")]
     for name, content, status, detail in cases:
@@ -146,12 +146,10 @@ def _set(db, **values):
 
 @pytest.fixture
 def model(test_db, monkeypatch):
-    """The parser's six rows as seeded (the key filled in), the shared rows on Claude, and a stubbed model that
-    answers ANSWER with junk after it. Each call is recorded as (prompt, system, kwargs)."""
-    from backend.seed import DEFAULT_SETTINGS
-    _set(test_db, **{key: DEFAULT_SETTINGS[key][0] for key in PARSER_ROWS})
-    _set(test_db, resume_parse_llm_api_key="test-key", llm_provider="claude_api", llm_model="claude-sonnet-5",
-         llm_api_key="claude-key")
+    """The parser's active preset and shared key, the older rows on Claude, and a stubbed model that answers ANSWER
+    with junk after it. Each call is recorded as (prompt, system, kwargs)."""
+    set_up_ai(test_db)
+    _set(test_db, llm_provider="claude_api", llm_model="claude-sonnet-5", llm_api_key="claude-key")
     calls = []
 
     async def fake_call_llm(prompt, system, max_tokens=1200, **kwargs):
@@ -230,87 +228,48 @@ def test_16_and_18_the_format_and_the_rules_are_the_handoffs():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("row,value", [("resume_parse_llm_api_key", ""), ("resume_parse_llm_model", ""),
-                                       ("resume_parse_llm_provider", ""), ("resume_parse_llm_provider", "claude_api")])
-async def test_11_the_parser_never_borrows_the_shared_model(test_db, model, row, value):
-    """The shared rows hold Claude values (the fixture); an empty or wrong own row still stops the parse."""
-    _set(test_db, **{row: value})
+async def test_11_no_key_stops_the_parse_and_never_borrows_another(test_db, model, log):
+    """The BDE reads what to do; what is missing is named in the log, for the admin (docs/02 §12)."""
+    set_up_ai(test_db, key="")
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and row in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and "API key" in log.getvalue()
     assert model == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("row,value,named", [
-    ("resume_parse_response_format", '{"type": "json_object"}', "json_schema"),
-    ("resume_parse_response_format", "not json", "not valid JSON"),
-    ("resume_parse_response_format", "", "response_format"),
-    ("resume_parse_prompt", "Structure this résumé.", "{resume}"),
-    ("resume_parse_system_prompt", "", "system")])
-async def test_6_a_broken_stored_setting_is_a_500_and_the_model_is_never_called(test_db, model, row, value, named):
-    _set(test_db, **{row: value})
+async def test_11_no_model_stops_the_parse(test_db, model, log):
+    edit_active(test_db, "resume_parse", model="")
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and named in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP)
+    assert "no active AI preset" in log.getvalue()
     assert model == []
 
 
-# ── The save check (PATCH /api/settings) and the upgrade ────────────────────
-
-def _bad_formats():
-    good = json.loads(DEFAULT_RESPONSE_FORMAT)
-    spec = good["json_schema"]
-    without_awards = [k for k in spec["schema"]["required"] if k != "awards"]
-    return [("{", "not valid JSON"),
-            (good | {"type": "json_object"}, '"type": "json_schema"'),
-            (good | {"json_schema": spec | {"strict": False}}, "strict"),
-            (good | {"json_schema": spec | {"name": " "}}, "name"),
-            (good | {"json_schema": spec | {"schema": spec["schema"] | {"type": "array"}}}, "object"),
-            (good | {"json_schema": spec | {"schema": spec["schema"] | {"required": without_awards}}}, "awards")]
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt,value,named", [("parse", "Structure this résumé.", "{resume}"),
+                                                ("system", "", "system")])
+async def test_6_a_broken_prompt_is_a_500_and_the_model_is_never_called(test_db, model, log, prompt, value, named):
+    edit_active(test_db, "resume_parse", **{prompt: value})
+    with pytest.raises(HTTPException) as refused:
+        await _read(test_db)
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and named in log.getvalue()
+    assert model == []
 
 
-@pytest.mark.parametrize("value,named", _bad_formats())
-def test_5_a_broken_response_format_is_refused_on_save(value, named):
-    from backend.seed import invalid_setting_values
-    problems = invalid_setting_values({"resume_parse_response_format": value})
-    assert len(problems) == 1 and named in problems[0]
+@pytest.mark.asyncio
+async def test_a_preset_with_an_effort_sends_it_in_place_of_reasoning_off(test_db, model):
+    edit_active(test_db, "resume_parse", effort="low")
+    await _read(test_db)
+    assert (model[0][2]["effort"], model[0][2]["reasoning_off"]) == ("low", False)
 
 
-def test_5_the_default_format_and_prompt_are_accepted_as_text_or_parsed():
-    from backend.seed import invalid_setting_values
-    assert invalid_setting_values({"resume_parse_response_format": DEFAULT_RESPONSE_FORMAT,
-                                   "resume_parse_prompt": DEFAULT_PROMPT}) == []
-    assert invalid_setting_values({"resume_parse_response_format": json.loads(DEFAULT_RESPONSE_FORMAT)}) == []
-    assert invalid_setting_values({"resume_parse_llm_provider": "openrouter"}) == []
-    assert invalid_setting_values({"resume_parse_llm_provider": "claude_api"})
-
-
-def test_5_a_prompt_without_the_resume_placeholder_is_refused_over_the_api(api_client, test_db):
-    r = api_client.patch("/api/settings", json={"resume_parse_prompt": "Structure the résumé."})
-    assert r.status_code == 400 and "{resume}" in r.json()["detail"]
-
-
-def test_10_the_old_default_prompt_is_upgraded_and_an_edited_one_is_left_alone(test_db):
-    from backend.models.db import Setting
-    from backend.seed import seed_settings
-    _set(test_db, resume_parse_prompt=OLD_DEFAULT_PROMPT)
-    seed_settings(test_db)
-    row = test_db.query(Setting).filter(Setting.key == "resume_parse_prompt").one()
-    assert row.value == DEFAULT_PROMPT and "{resume}" in row.description
-    _set(test_db, resume_parse_prompt="My own prompt. {resume}")
-    seed_settings(test_db)
-    assert test_db.query(Setting).filter(Setting.key == "resume_parse_prompt").one().value == "My own prompt. {resume}"
-
-
-def test_the_key_is_seeded_empty(test_db):
-    from backend.models.db import Setting
-    from backend.seed import seed_settings
-    seed_settings(test_db)
-    rows = {r.key: r.value for r in test_db.query(Setting).filter(Setting.key.in_(PARSER_ROWS))}
-    assert set(rows) == set(PARSER_ROWS)
-    assert rows["resume_parse_llm_api_key"] == ""
-    assert (rows["resume_parse_llm_provider"], rows["resume_parse_llm_model"]) == ("openrouter", "openai/gpt-6-luna")
+def test_5_a_prompt_without_the_resume_placeholder_is_refused_on_save():
+    from backend.ai.modules import PRESET_MODULES, prompt_problems
+    module = PRESET_MODULES["resume_parse"]
+    assert prompt_problems(module, module.prompts) == []
+    assert any("{resume}" in problem for problem in prompt_problems(module, {**module.prompts, "parse": "Parse it."}))
 
 
 # ── The route ────────────────────────────────────────────────────────────────
@@ -386,7 +345,7 @@ def test_who_may_read_a_resume(anonymous_client, test_db, accounts, model):
 
 
 @pytest.mark.parametrize("failure,status,detail", [
-    ("deadline", 504, "There was an issue while parsing your resume, please try again."),
+    ("deadline", 504, "The résumé reader took too long. Try again in a minute."),
     ("exhausted", 500, "The résumé reader didn't answer. Try again in a minute."),
     ("nonsense", 422, "Couldn't read this résumé. Try another file, or enter the details yourself.")])
 def test_a_failed_parse_is_a_clear_error_and_stores_nothing(anonymous_client, test_db, accounts, model, monkeypatch,

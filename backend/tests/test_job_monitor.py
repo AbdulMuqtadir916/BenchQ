@@ -1,7 +1,7 @@
 """Tests for job_monitor — tracked_run + launch_background + cleanup_stale_runs. SQLite strips tz from DateTime(timezone=True) columns (a 'load' listener re-applies UTC) and maps JobRun.id to CHAR(32) (so tests look up rows by job_type, not id)."""
 import asyncio
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
@@ -114,7 +114,7 @@ async def test_tracked_run_raises_already_running(test_db, monkeypatch):
 
 
 def test_cleanup_stale_runs_marks_orphans_failed(test_db, monkeypatch):
-    """Startup cleanup: 'running' rows from a previous process → 'failed' with restart note."""
+    """'running' rows nobody stamped for 2 minutes (their process stopped) → 'failed' with restart note."""
     from backend.models.db import JobRun
     import backend.job_monitor as jm
 
@@ -127,13 +127,13 @@ def test_cleanup_stale_runs_marks_orphans_failed(test_db, monkeypatch):
         job_type="orphan_job_1",
         trigger="scheduler",
         status="running",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     ))
     s.add(JobRun(
         job_type="orphan_job_2",
         trigger="manual",
         status="running",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc) - timedelta(minutes=5),
     ))
     s.add(JobRun(
         job_type="done_job",
@@ -145,8 +145,7 @@ def test_cleanup_stale_runs_marks_orphans_failed(test_db, monkeypatch):
     s.commit()
     s.close()
 
-    count = jm.cleanup_stale_runs()
-    assert count == 2
+    assert jm.cleanup_stale_runs() == 2
 
     s2 = TestSession()
     orphan1 = s2.query(JobRun).filter_by(job_type="orphan_job_1").first()

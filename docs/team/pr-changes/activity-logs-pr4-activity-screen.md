@@ -134,3 +134,10 @@ start; this PR has none.
 - **The calendar catches up as soon as it starts watching.** If the firm's midnight passed in the moment between the
   picker reading the date and its once-a-minute check starting, the picker kept the old day until the next midnight.
   `watchToday` now takes the date the picker shows and compares it at once, then each minute. `today.test.ts` covers it.
+
+## Up to date with main (2026-11-23)
+
+Main's #147 to #151 merged in. One conflict: main's #149 made queries wait what `Retry-After` asks (`retryDelay`,
+`src/lib/query/retry.ts`) in `provider.tsx`, where this PR builds the client in `createQueryClient`
+(`src/lib/query/client.ts`). The client now has `retryDelay` too, so main's retry rules and this PR's Activity refresh
+both hold. Typecheck and the Activity, query and API tests pass.

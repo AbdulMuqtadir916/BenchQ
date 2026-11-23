@@ -30,7 +30,7 @@ rules (§5). §6 lists what in the backend makes this harder than it looks.
 | IDs | UUIDs (Postgres `UUID`), plus `jobs.short_id` from a sequence | `models/db.py` |
 | Global uniqueness | `jobs.external_id` (SHA-256 dedup key) and `jobs.short_id` unique across the table; `companies.name` unique; `tracer_links.token` unique; `personas.id` always 1 (a singleton); `settings` one global key-value store | `models/db.py` |
 | Background work | APScheduler inside the API process: `scrape_all`, `email_check` (one Gmail account), `auto_reject`, `daily_digest` (one Telegram chat), `db_backup`, `h1b_refresh`, `job_cleanup`; plus `job_monitor.launch_background` for on-demand runs | `scheduler.py`, `job_monitor.py` |
-| Activity log | `activity_log_v2`: system events with a message. Removed by migration 0030; its rows and later events are system rows in `activity_logs` | migration 0030 |
+| Activity log | `activity_log_v2`: system events with a message. Removed by migration 0035; its rows and later events are system rows in `activity_logs` | migration 0035 |
 | LLM spend | `llm_call_log` per call, no firm | `analyzer/llm_logger.py` |
 | Size | 120 endpoints (main.py + 11 routers); about 1,900 tests, run on **in-memory SQLite** with `create_all` | `backend/tests/conftest.py` |
 
@@ -48,6 +48,8 @@ rules (§5). §6 lists what in the backend makes this harder than it looks.
 > **Folded into the foundation:** the ledger's own table in F2 (auth, invites and support views write to
 > it; the Module 01 track then only connects the screen). Background jobs (scheduler, email monitor) pass
 > `firm_id` explicitly. Until the scheduler moves out of process, deploy **exactly one backend worker**.
+> **2026-11-14 (production layer step 3):** the scheduler runs in its own process (`backend/worker.py`, the `worker`
+> service): exactly one of it. The API stays at one worker until its in-memory limits move ([uzair.md](../team/uzair.md)).
 > Backend tests run on Postgres from F1. In F2, classify every setting as platform-wide or firm-owned.
 > "Mark applied" moves to the 03 Applications track.
 >
@@ -505,7 +507,7 @@ tests can be written before its dependencies are live; only "switch the adapter 
 6. **`activity_log_v2` is an operations log, not the ledger.** It has no actor, entity, action or firm, and
    its `type` values are system events. The first 01-ledger.md mapped it to `LedgerEntry`; that mapping got
    the "who did what" part of the product wrong (rewritten with track 01). The ledger became its own table (F2). Since
-   migration 0030 there is one log, `activity_logs`: background events sit in it with no firm, for the Super Admin only.
+   migration 0035 there is one log, `activity_logs`: background events sit in it with no firm, for the Super Admin only.
 7. **Singletons and global uniques**: `personas.id = 1` (D1 replaces it); `jobs.external_id` unique
    globally (fine for the shared pool; a per-firm copy would need `(firm_id, external_id)`);
    `companies.name` unique (right for global reference data). `jobs.short_id` comes from one global

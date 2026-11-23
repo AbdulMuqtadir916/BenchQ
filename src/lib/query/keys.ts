@@ -78,6 +78,9 @@ export const queryKeys = {
     activity: (part: string, ...params: readonly unknown[]) => ["platform", "activity", part, ...params] as const,
     team: () => ["platform", "team"] as const,
     candidateUsage: () => ["platform", "candidateUsage"] as const,
+    /** The AI provider, models, limits and presets (/admin/ai-presets). */
+    aiSetup: () => ["platform", "aiSetup"] as const,
+    aiAvailableModels: () => ["platform", "aiAvailableModels"] as const,
     /** The Super Admin's own notifications (07 Q54). */
     notifications: () => ["platform", "notifications"] as const,
   },

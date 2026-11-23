@@ -7,6 +7,7 @@ import { allText } from "@/lib/resume-doc/ops";
 import { stripTags } from "@/lib/resume-doc/rich-text";
 import { cn } from "@/lib/cn";
 import { POPOVER_TRANSITION } from "@/lib/motion";
+import { ErrorReference } from "@/components/app/error-reference";
 import { useStudio } from "./studio-store";
 
 const NOTICE_ICON = { info: Info, ai: Sparkles, danger: AlertTriangle } as const;
@@ -45,6 +46,7 @@ export function StatusBar({ doc, showWords = true }: { doc: ResumeDocument; show
             >
               <NoticeIcon size={13} aria-hidden />
               <span className="truncate">{notice.text}</span>
+              {notice.reference ? <ErrorReference reference={notice.reference} className="shrink-0" /> : null}
             </motion.span>
           ) : null}
         </AnimatePresence>
