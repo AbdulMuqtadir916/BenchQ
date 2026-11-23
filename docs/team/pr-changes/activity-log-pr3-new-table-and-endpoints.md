@@ -62,9 +62,8 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 - **A row not yet saved** has no page marker (`created_at` is empty until it is written).
 - **Main's tests** for job search, résumé versions, tailoring and the autofill screen read the entry from
   `activity_logs` (tailoring and autofill added 2026-11-14).
-- **`test_migration_0025.py`.** Its first test checks the newest migration (`head_revision()`, now 0033). Its refused
-  downgrade still expects 0026, as on main: the test moves the database down to 0026 first, and a refused downgrade
-  leaves it there.
+- **`test_migration_0025.py`.** No change: main's own version already checks the newest migration with
+  `head_revision()` (now 0033), and its refused downgrade still expects 0026.
 - **Capacity.** Main removed the capacity route (07 Q63), so its change here is gone.
 
 ## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
@@ -130,5 +129,7 @@ Main's #147 to #151 merged in. What changed here because of them:
 - **Candidate edit and assignment** (`routes_candidates.py`): main now refuses an edit that isn't the BDE's, names only
   the fields whose value changed, and restarts a new BDE's Days (`workday.assign`). The entry keeps its before and after
   values on top of that.
+- **`test_migration_0025.py`** is main's again: main made it read `head_revision()` itself, so only this PR's
+  comments were left, and its row in `cross-area-changes.md` is gone.
 - **Résumé versions test:** main replaced the name test (07 Q68: the name and email stay the candidate's); it reads
   `ActivityEntry`.
