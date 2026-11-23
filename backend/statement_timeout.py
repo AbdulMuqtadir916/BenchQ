@@ -65,5 +65,6 @@ def is_statement_timeout(exc: BaseException) -> bool:
 
 
 def busy_response() -> JSONResponse:
-    """A timed-out query or a drained pool: try again shortly."""
-    return JSONResponse(status_code=503, content={"detail": BUSY}, headers={"Retry-After": "5"})
+    """A timed-out query or a drained pool: try again shortly. The only sender of `UNAVAILABLE` (docs/02 §12.1)."""
+    from backend.problem import problem_response
+    return problem_response(503, BUSY, "UNAVAILABLE", headers={"Retry-After": "5"})

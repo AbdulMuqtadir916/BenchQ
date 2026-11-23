@@ -98,7 +98,7 @@ screen: people list, searchable actor and candidate dropdowns, dates, and the si
 [pr-changes/activity-logs-pr4-activity-screen.md](./pr-changes/activity-logs-pr4-activity-screen.md).
 
 **Activity Log PR 6 (2026-11-07):** `activity-logs/pr6-signin-events-and-super-admin`, built on PR 5 part 2, not pushed
-yet. Sign-out, failed sign-ins and lockouts are logged (migration 0029), and the Super Admin has the full Activity page,
+yet. Sign-out, failed sign-ins and lockouts are logged (migration 0034), and the Super Admin has the full Activity page,
 with a Failed sign-ins view only they can see. Details in
 [pr-changes/activity-logs-pr6-signin-events-and-super-admin.md](./pr-changes/activity-logs-pr6-signin-events-and-super-admin.md).
 

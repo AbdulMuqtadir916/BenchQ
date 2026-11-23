@@ -15,13 +15,33 @@ describe("why a tailoring failed (part 3 Q8)", () => {
   });
 
   it("says why a start was refused, with a link to the résumés when there's no base", () => {
-    const refusal = (status: number, message = "") => startRefusal(new ApiError(message, "X", status));
-    expect(refusal(422).message).toMatch(/no description/);
-    expect(refusal(429).message).toMatch(/5 tailorings running/);
-    expect(refusal(500).message).toMatch(/isn't set up/);
-    expect(refusal(409, "This candidate has no active base résumé to tailor from.")).toEqual({ message: "This candidate has no active base résumé to tailor from.", needsBase: true });
-    expect(refusal(409, "This résumé is already being tailored for this job.").needsBase).toBe(false);
+    const refusal = (status: number, backendCode: string, message = "") => startRefusal(new ApiError(message, "X", status, null, { backendCode }));
+    expect(refusal(429, "TAILORINGS_RUNNING", "You have 5 tailorings running. Wait for one to finish, then try again.").message).toBe("You have 5 tailorings running. Wait for one to finish.");
+    expect(refusal(500, "NOT_CONFIGURED", "The résumé tailor isn't set up yet. Ask your admin.").message).toBe("Tailoring isn't set up yet. Tell your admin.");
+    expect(refusal(404, "NOT_FOUND", "Not found.").message).toBe("This job or résumé isn't this candidate's.");
+    // The real "no description" 422 has no code of its own (VALIDATION_FAILED): its own sentence is shown.
+    expect(refusal(422, "VALIDATION_FAILED", "This job has no description to tailor the résumé to.").message).toBe("This job has no description to tailor the résumé to.");
+    expect(refusal(409, "CONFLICT", "This candidate has no active base résumé to tailor from.")).toMatchObject({ message: "This candidate has no active base résumé to tailor from.", needsBase: true });
+    expect(refusal(409, "CONFLICT", "This résumé is already being tailored for this job.")).toMatchObject({ message: "This résumé is already being tailored for this job.", needsBase: false });
     expect(startRefusal(new Error("offline")).message).toBe("Tailoring didn't start. Try again.");
+  });
+
+  it("no guessing from status: another code with the same status keeps the backend's text", () => {
+    // A request-validation 422 is not "no description"; a 429 without the five-running code is not that limit.
+    expect(startRefusal(new ApiError("BenchQ couldn't take this as it was sent. Refresh the page and try again.", "VALIDATION_FAILED", 422, null, { backendCode: "VALIDATION_FAILED" })).message).toMatch(/couldn't take this as it was sent/);
+    expect(startRefusal(new ApiError("Ten tailorings today.", "RATE_LIMITED", 429, null, { backendCode: "DAILY_LIMIT" })).message).toBe("Ten tailorings today.");
+    expect(startRefusal(new ApiError("", "CONFLICT", 409, null, { backendCode: "CONFLICT" })).message).toBe("Tailoring didn't start. Try again.");
+  });
+
+  it("a system error reads as everywhere else, not as a tailoring limit (step 4b)", () => {
+    const throttled = new ApiError("Too many requests.", "RATE_LIMITED", 429, null, { backendCode: "RATE_LIMITED" });
+    expect(startRefusal(throttled).message).not.toMatch(/5 tailorings/);
+    expect(startRefusal(throttled).title).toBe("Too many requests");
+    const crash = new ApiError("Something went wrong on BenchQ's side.", "HTTP_500", 500, null, { backendCode: "INTERNAL", requestId: "req-9" });
+    expect(startRefusal(crash)).toMatchObject({ reference: "req-9", needsBase: false });
+    expect(startRefusal(crash).message).not.toMatch(/isn't set up/);
+    const fiveRunning = new ApiError("You have 5 tailorings running.", "RATE_LIMITED", 429, null, { backendCode: "TAILORINGS_RUNNING" });
+    expect(startRefusal(fiveRunning).message).toMatch(/5 tailorings running/);
   });
 });
 

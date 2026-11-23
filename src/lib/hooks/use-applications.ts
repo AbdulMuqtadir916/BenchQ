@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { applicationsApi, type SaveJob } from "@/lib/api/applications";
 import { ApiError } from "@/lib/api/client";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import { queryKeys } from "@/lib/query/keys";
@@ -30,10 +31,12 @@ export type MoveVariables = { id: string; status: ApplicationStatus; note: strin
 /** What one move reports when it settles, for that move only: concurrent moves never share or lose a message. */
 export type MoveHandlers = { onSuccess?: (saved: Application) => void; onError?: (error: Error) => void };
 
-/** Why a move failed, in words. A 409 is a stale revision: someone changed the application first. */
-export function moveFailure(error: Error): string {
-  if (error instanceof ApiError && error.status === 409) return "it changed since it was loaded. The latest status is shown; move it again if needed.";
-  return error.message;
+/** Why a move failed, in words, to follow "<name> didn't move to <stage>: ". A 409 is a stale revision: someone changed
+ * the application first. A system error reads as everywhere else (src/lib/api/error-text.ts). */
+export function moveFailure(error: Error): ErrorText {
+  return describeError(error, {
+    screenText: (e) => (e instanceof ApiError && e.status === 409 ? "it changed since it was loaded. The latest status is shown; move it again if needed." : null),
+  });
 }
 
 /** Applications with a move in flight, as `firmId:applicationId`. Module-level: every screen shares it (DEBUG D-06). */

@@ -264,6 +264,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
             "version": v2.id, "base": second.id, "posting": posting.id, "tailoring": tailoring.id,
 
             "firm": firm.id, "slug": firm.slug, "job": job.id,
+            # Not an id: the candidate's name, which a résumé save must send unchanged (07 Q68).
+            "candidate_name": candidate.full_name,
             "app": app.id, "legacy_app": legacy_app.id, "inbox_message": candidate_message.id, "interview": interview.id,
             "resume": resume.id, "tailored": tailored.id, "letter": letter.id, "invite": invite.id,
             "manager": manager.id, "bde_user": bde.id, "candidate": candidate.id}
@@ -386,6 +388,9 @@ def offline(monkeypatch):
     monkeypatch.setattr("backend.scraper._shared.url_safety.assert_public_http_url", lambda *args, **kwargs: None)
     if hasattr(routes_cover_letters, "_get_browser"):
         monkeypatch.setattr(routes_cover_letters, "_get_browser", browser)
+    from backend.api import routes_candidate_resumes   # a résumé version's file (docs/02 §8.2)
+
+    monkeypatch.setattr(routes_candidate_resumes, "_get_browser", browser)
     # The new-candidate parser (onboarding 06 PR 3): no text extraction, no model.
     from backend.api import routes_candidates
     from backend.candidates.base_resume import clean_reply
@@ -416,5 +421,7 @@ def offline(monkeypatch):
     monkeypatch.setattr(routes_inbox, "revoke_token", lambda *args, **kwargs: True)
 
     from backend.api import routes_candidate_resumes
-    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "isolation résumé text")
+    # Both firms' candidates' names and the résumé's email, so a firm's own upload passes the 07 Q69 check.
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text",
+                        lambda kind, content: f"ACME candidate · {CANARY} candidate · priya@example.test")
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)

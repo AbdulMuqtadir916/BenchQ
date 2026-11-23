@@ -39,7 +39,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 | `summary-card.tsx` | Initials avatar, name ("New candidate" until set), "Marketed as" ("Role not set"), chips (work auth, engagement types, years), Location, Email, Résumé (file name), **Assigned BDE** (Q48). Below it, the step list with states. |
 | `use-wizard.ts` | State with `useReducer`, in memory only (no drafts, Q48): values, which fields were drafted from the résumé, current step, dirty flag. |
 | `step-resume.tsx`, `step-basic.tsx`, `step-work-rate.tsx`, `step-preferences.tsx` | One per step (§3). |
-| `tag-input.tsx` | Chips: only Enter (or the Add button) adds, so a comma is text ("Columbus, OH" is one chip); click a chip, or Backspace in an empty box, to edit it; remove with ×; suggestion chips "+ Java". Used for skills, target roles, locations, industries, deal breakers. |
+| `tag-input.tsx` | Chips: only Enter (or the Add button) adds, so a comma is text ("Columbus, OH" is one chip); click a chip, or Backspace in an empty box, to edit it; remove with ×; suggestion chips "+ Java". Used for skills, locations, industries, deal breakers. |
 | `drafted-marker.tsx` | "Drafted from résumé" marker on a field (§4). |
 
 - The current step is in the URL, `?step=resume|basic|work|preferences|assign`, parsed with Zod (CLAUDE.md: tabs live in
@@ -51,7 +51,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 ## 2. The frame
 
 - **Continue** validates the step (§3); errors show inline, focus moves to the first invalid field.
-- **Back** keeps values. Step 4 can't be skipped: it needs at least one target role.
+- **Back** keeps values. Step 4 can't be skipped: it needs the target role and a place for the job search.
 - **×** and `Esc`: if anything was entered, a confirm dialog "Discard this candidate? What you entered is lost." (Discard
   / Keep editing); else close straight away. Close goes back (`router.back()`), or to `/candidates` when there's no
   history.
@@ -65,7 +65,7 @@ Read first: [README](./README.md) §2 (Q48–Q49), §4 (the screens), §6 (parse
 ### Step 1 — Résumé ([screen](./screens/1-resume.webp))
 
 - Drop zone, or click / `Enter` / `Space` to browse. Accept PDF and Word (`.pdf`, `.doc`, `.docx`) up to 10 MB; reject
-  anything else before uploading, with the reason ("PDF or Word only", "Resume too large, please provide one below 10MB").
+  anything else before uploading, with the reason ("PDF or DOCX only", "Resume too large, please provide one below 10MB").
 - On a file: the zone shows the file name and "Reading the résumé…" with a skeleton of the next step; then step 2 opens
   with the drafted fields filled and a strip "{n} fields drafted from the résumé — review them before you create the
   candidate."
@@ -110,9 +110,9 @@ match, show it under the group: "The résumé says: '{workAuthText}'".
 
 | Field | Maps to |
 |---|---|
-| Target roles (tag input; suggestions: "Marketed as" and the parsed title) — "Jobs are matched against every title here." **At least one is required** | `targetRoles` |
+| Target role (one text box; a "+ Marketed as" chip fills it) — "The job search looks for this title." **Required; one only** (decided 2026-11-14) | `targetRoles: [role]` |
 | Work setting: Remote, Hybrid, On-site (several) | `workSettings` |
-| Preferred locations (tag input, "City, state"; suggestions from a constant list of US hubs) | `preferredLocations` |
+| Preferred locations (tag input, "City, state"; suggestions from a constant list of US hubs). **Required when step 2 has no city and state together**: "Add a preferred location, or their city and state on Basic details: the job search needs a place." (decided 2026-11-14, Q3, Q14; the create route refuses the same) | `preferredLocations` |
 | Willing to relocate (switch) | `willingToRelocate` |
 | Preferred industries, deal breakers (tag inputs with suggestions) | `preferredIndustries`, `dealBreakers` (columns since 0015; were inside `persona`) |
 | Notes for the BDE ("How they like to be contacted, interview windows, anything personal.") | `contactNotes` |

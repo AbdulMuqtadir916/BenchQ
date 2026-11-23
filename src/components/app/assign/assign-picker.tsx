@@ -5,7 +5,7 @@ import { AlertTriangle, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasTeamScope } from "@/lib/auth/policy";
 import { isBde, isManager } from "@/lib/auth/roles";
-import { queueByManager } from "@/lib/derive/assignment";
+import { BDE_CANDIDATE_LIMIT, BDE_FULL, heldByBde, queueByManager } from "@/lib/derive/assignment";
 import { isWorkingCandidate } from "@/lib/derive/tenancy";
 import { useCandidates } from "@/lib/hooks/use-candidates";
 import { useTeam } from "@/lib/hooks/use-team";
@@ -30,7 +30,9 @@ export interface AssignTarget {
  * Who works a candidate (07 Q41, Q43; docs/candidate-onboarding/05 §1, §6), for step 5 and the reassign dialog. A
  * MANAGER (team scope) is always the manager and picks one of their BDEs; the OWNER picks a manager, then that
  * manager's BDE or "Let {manager} choose". Load is a warning (Q46). `blockReason` (the candidate limit, Q45) disables
- * the BDE rows; handing to a manager still works. `primaryRole` drives "works N similar profiles".
+ * the BDE rows; handing to a manager still works. Each BDE shows how many candidates they hold out of 3, and a BDE who
+ * holds 3 can't be picked (07 Q70), unless they already hold this one (`currentBdeId`). `primaryRole` drives "works N
+ * similar profiles".
  */
 export function AssignPicker({
   idPrefix,
@@ -38,6 +40,7 @@ export function AssignPicker({
   onChange,
   primaryRole,
   blockReason,
+  currentBdeId = null,
   errors = {},
 }: {
   idPrefix: string;
@@ -45,6 +48,8 @@ export function AssignPicker({
   onChange: (next: AssignTarget) => void;
   primaryRole: string;
   blockReason: string | null;
+  /** The BDE who already holds the candidate (reassigning): never blocked by their own count. */
+  currentBdeId?: string | null;
   errors?: { managerId?: string; bdeId?: string };
 }) {
   const principal = useSignedInPrincipal();
@@ -81,13 +86,14 @@ export function AssignPicker({
   const shown = needle ? bdes.filter((user) => `${user.name} ${user.email}`.toLowerCase().includes(needle)) : bdes;
 
   const bdeRow = (user: User) => {
-    const working = list.filter((candidate) => candidate.bdeId === user.id && isWorkingCandidate(candidate)).length;
+    const held = heldByBde(user.id, list);
+    const isFull = held >= BDE_CANDIDATE_LIMIT && user.id !== currentBdeId;
     const similar = similarCount(user.id, primaryRole, list);
     return (
-      <AssignOption key={user.id} name={user.name} avatarKey={user.id} group={`${idPrefix}-bde`} value={user.id} checked={value.bdeId === user.id} disabled={blockReason !== null}
+      <AssignOption key={user.id} name={user.name} avatarKey={user.id} group={`${idPrefix}-bde`} value={user.id} checked={value.bdeId === user.id} disabled={blockReason !== null || isFull}
         title={user.name} onChange={() => onChange({ managerId: value.managerId, bdeId: user.id })}
-        detail={<>{user.email}{similar > 0 ? ` · works ${similar} similar ${similar === 1 ? "profile" : "profiles"}` : ""}</>}
-        figure={<>{working} working</>} />
+        detail={isFull ? BDE_FULL : <>{user.email}{similar > 0 ? ` · works ${similar} similar ${similar === 1 ? "profile" : "profiles"}` : ""}</>}
+        figure={<>{held} of {BDE_CANDIDATE_LIMIT}</>} />
     );
   };
 

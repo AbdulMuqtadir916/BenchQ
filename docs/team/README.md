@@ -120,6 +120,10 @@ it. Everyone else reads it.
 | 0025 | Samad | `email_classifications.outcome` allows `AUTO_APPLIED` (PR 4 automatic status updates); downgrade refuses while automatic evidence exists. Renumbered from 0016, 0022 and 0026; follows Abdul's 0024 | `feat/inbox-masking-and-review` (PR 4) |
 | 0026 | Arbaz | Applications let go of the old `jobs` pool: `applications_job_id_fkey` dropped. Schema only; a local database moves its rows with `python -m backend.scripts.move_local_jobs_to_postings` at 0026. Follows 0025 (another PR's, merging first; 0024 until it's on main) | `feat/autofill-screen` |
 | 0027 | Arbaz | Applications on `job_postings`: `candidate_id` NOT NULL, `(firm_id, candidate_id, job_id)` → `job_postings` ON DELETE RESTRICT; its new key refuses an application on an old job. Follows 0026 | `feat/autofill-screen` |
-| 0028 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0027 (#129) | `activity-log/pr3-new-table-and-endpoints` |
-| 0029 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0028 | `activity-logs/pr6-signin-events-and-super-admin` |
-| 0030+ | — | Claim the next number here in your PR | — |
+| 0028 | Zuhair | The Match score: `match_score`, `match_note`, `match_basis` on `job_postings` and `resumes` (a 0–100 check each) and `ix_job_postings_candidate_match`. Additive; the backend scores what has no score when it starts. Follows 0027 (Arbaz's) | `feat/job-search-indeed-and-candidate-details` |
+| 0029 | Zuhair | LinkedIn's pace for the whole backend: `linkedin_slots` (4 rows, filled here) and `linkedin_waiting` (who waits: opens before searches, firms in turn). Additive. Follows 0028 | `feat/job-search-indeed-and-candidate-details` |
+| 0030 | Zuhair | `resumes.search_titles` (JSONB, null): the job search's extra titles on the active base's v1. Additive. Follows 0029 | `feat/job-search-indeed-and-candidate-details` |
+| 0031 | Zuhair (firms and candidates columns: Abdul approves) | `firms.work_start`, `work_end` (required; existing firms 18:30–04:00), `candidates.bde_assigned_at`, `bde_day_one`, `scrape_jobs.work_date` (filled from the rows). Follows 0030 | `feat/job-search-indeed-and-candidate-details` |
+| 0033 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0032 (#150) | `activity-log/pr3-new-table-and-endpoints` |
+| 0034 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0033 | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0035+ | — | Claim the next number here in your PR | — |

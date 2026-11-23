@@ -47,3 +47,13 @@ def test_a_platform_admin_and_a_support_view_never():
         for candidate in (UNASSIGNED, THEIRS):
             assert not can_change_resume(principal, candidate)
             assert not can_manage_resume(principal, candidate)
+
+
+def test_the_candidates_details_follow_the_resume_rule():
+    """Decided 2026-11-14 (Q17, reversing 07 Q56): `can_edit_profile` is `can_change_resume`'s rule."""
+    from backend.auth.policy import can_edit_profile
+    assert _row(can_edit_profile, UNASSIGNED) == [True, True, False, False]
+    assert _row(can_edit_profile, THEIRS) == [False, False, True, False]
+    assert _row(can_edit_profile, SOMEONE_ELSES) == [False] * 4
+    for principal in (ADMIN, SUPPORT):
+        assert not can_edit_profile(principal, UNASSIGNED) and not can_edit_profile(principal, THEIRS)

@@ -76,7 +76,7 @@ describe("Abdul's review (2026-11-12)", () => {
     const html = renderToString(createElement(Row, {
       run: run({ runId: "d", status: "failed", errorCode: "provider_failed", jobTitle: "Platform Engineer" }), name: null, now,
       openHref: null, onOpenSteps: () => undefined, onRetry: () => undefined, isRetrying: false, onDismiss: () => undefined,
-      retryRefusal: "You have 5 tailorings running. Wait for one to finish.",
+      retryRefusal: { title: null, message: "You have 5 tailorings running. Wait for one to finish.", reference: null, canRetry: true },
     }));
     expect(html).toContain("Tailoring failed.");
     expect(html).toContain("Not started again: You have 5 tailorings running. Wait for one to finish.");

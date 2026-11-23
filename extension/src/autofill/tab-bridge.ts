@@ -238,6 +238,12 @@ export async function removeFileOnPage(tabId: number, name: string): Promise<boo
   return answers.some(({ result }) => result);
 }
 
+/** Whether any frame shows a chip naming `name`: the file the site took, in place of its upload (07 Q53). */
+export async function fileShownOnPage(tabId: number, name: string): Promise<boolean> {
+  const answers = await inFrames<boolean>({ tabId, allFrames: true }, "showsFile", [name]);
+  return answers.some(({ result }) => result);
+}
+
 export async function undoFills(tabId: number): Promise<UndoResult> {
   const answers = await inFrames<UndoResult>({ tabId, allFrames: true }, "undo", []);
   return answers.reduce((total, { result }) => ({

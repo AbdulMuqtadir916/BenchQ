@@ -3,6 +3,7 @@ invite names a manager, accepting it keeps the manager, the OWNER moves a BDE (a
 and sets the firm's BDE capacity."""
 import pytest
 
+from backend.tests.problem_support import assert_problem
 from backend.tests.auth_support import make_firm, make_plan, make_user
 
 
@@ -74,7 +75,7 @@ def test_no_other_role_names_a_manager(anonymous_client, firm, owner, people):
 def test_a_firm_without_a_manager_cant_invite_bdes(anonymous_client, firm, owner):
     r = _invite(anonymous_client, firm, owner)
     assert r.status_code == 409
-    assert r.json() == {"detail": "Invite a manager first. Every BDE reports to a manager."}
+    assert assert_problem(r)["detail"] == "Invite a manager first. Every BDE reports to a manager."
 
 
 def test_accepting_a_bde_invite_keeps_the_manager(anonymous_client, test_db, firm, owner, people):

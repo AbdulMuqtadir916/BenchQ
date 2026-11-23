@@ -1,17 +1,18 @@
 "use client";
 
 import { forwardRef } from "react";
-import { Activity, BriefcaseBusiness, FileText, FolderOpen, Inbox, LayoutDashboard, Send, type LucideIcon } from "lucide-react";
+import { Activity, BriefcaseBusiness, ClipboardList, FileText, FolderOpen, Inbox, LayoutDashboard, Send, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { SPRING_LAYOUT } from "@/lib/motion";
 
-export type CandidateTabId = "overview" | "applications" | "inbox" | "jobs" | "resumes" | "documents" | "activity";
+export type CandidateTabId = "overview" | "applications" | "inbox" | "jobs" | "resumes" | "details" | "documents" | "activity";
 
 /**
  * Ordered by how often a BDE needs them on a working night:
  * what needs me → where every submission stands → what recruiters said →
- * where to submit next → what to submit → what vendors ask for → the audit trail.
+ * where to submit next → what to submit → the rest of what onboarding asked (decided 2026-11-14) → what vendors ask
+ * for → the audit trail.
  */
 export const CANDIDATE_TABS: Array<{ id: CandidateTabId; label: string; Icon: LucideIcon }> = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
@@ -19,6 +20,7 @@ export const CANDIDATE_TABS: Array<{ id: CandidateTabId; label: string; Icon: Lu
   { id: "inbox", label: "Inbox", Icon: Inbox },
   { id: "jobs", label: "Jobs", Icon: BriefcaseBusiness },
   { id: "resumes", label: "Resumes", Icon: FileText },
+  { id: "details", label: "Additional candidate details", Icon: ClipboardList },
   { id: "documents", label: "Documents", Icon: FolderOpen },
   { id: "activity", label: "Activity", Icon: Activity },
 ];

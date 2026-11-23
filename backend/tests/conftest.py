@@ -14,12 +14,16 @@ TEST_DATABASE_URL = os.getenv(
 if not TEST_DATABASE_URL.split("?")[0].endswith("_test"):
     raise RuntimeError(f"TEST_DATABASE_URL must name a database ending in _test, got {TEST_DATABASE_URL!r}")
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+# A fixed test-only secret for the AI key (backend/ai/secrets.py); never a real one.
+os.environ.setdefault("AI_SETTINGS_ENCRYPTION_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 # Development settings (plain-http cookies, API docs on), as docker-compose runs the app locally. Tests that
 # need production behaviour patch backend.config / backend.auth.access themselves.
 os.environ["BENCHQ_ENV"] = "development"
 # Synthetic Gmail encryption key, never used outside the disposable test environment.
 os.environ["CANDIDATE_GMAIL_ENCRYPTION_KEY"] = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
 os.environ["CANDIDATE_GMAIL_ENABLED"] = "true"
+# The Match score's startup pass (backend/match/store.py) stays off: each test owns its rows.
+os.environ["MATCH_PASS_ON_START"] = "false"
 
 
 def pytest_configure(config):
@@ -182,7 +186,7 @@ def _clean_db(_schema):
         db_mod.engine.dispose()           # drops connections a failed test left mid-transaction
         with db_mod.engine.begin() as conn:
             conn.execute(text("SET LOCAL lock_timeout = '10s'"))
-            # activity_logs refuses a TRUNCATE unless the reset names itself for this transaction (0028).
+            # activity_logs refuses a TRUNCATE unless the reset names itself for this transaction (0033).
             conn.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))
             names = [r[0] for r in conn.execute(text(
                 "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'"))]
@@ -251,7 +255,7 @@ def api_client(test_db, accounts, monkeypatch):
     import backend.main as main_mod
     monkeypatch.setattr(main_mod, "check_schema_at_head", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
-    monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
+    monkeypatch.setattr(main_mod, "start_heartbeat", lambda: (lambda: None))
     # Prevent the real scheduler from booting.
     import backend.scheduler as sched_mod
     monkeypatch.setattr(sched_mod, "configure_scheduler", lambda: None)

@@ -42,17 +42,8 @@ def parser_model(test_db, monkeypatch):
     tests."""
     import json
 
-    from backend.models.db import Setting
-    from backend.seed import DEFAULT_SETTINGS
-    values = {key: DEFAULT_SETTINGS[key][0] for key in DEFAULT_SETTINGS if key.startswith("resume_parse_")}
-    values["resume_parse_llm_api_key"] = "test-key"
-    for key, value in values.items():
-        row = test_db.query(Setting).filter(Setting.key == key).first()
-        if row is None:
-            test_db.add(Setting(key=key, value=value))
-        else:
-            row.value = value
-    test_db.commit()
+    from backend.tests.ai_support import set_up_ai
+    set_up_ai(test_db)
     answer = {"header": {"name": NAME, "email": EMAIL, "phone": PHONE}, "professional_summary": RESUME}
 
     async def planted_reply(prompt, system, max_tokens=1200, **kwargs):
@@ -138,6 +129,7 @@ def test_creating_and_editing_a_candidate(anonymous_client, accounts, test_db, l
             "employment_types": ["C2C"], "manager_id": str(manager.id), "summary": RESUME,
             "country": "US", "years_experience": 8, "needs_sponsorship": True, "needs_transfer": True,
             "target_roles": ["Java Developer"], "skills": [{"name": "Xylophonic", "family": "Canary"}],
+            "preferred_locations": ["Austin, TX"],      # the job search needs a place (decided 2026-11-14)
             "resume_parse_id": upload()}
     created = anonymous_client.post(url, json=body, headers=_cookie(accounts.firm_token))
     assert created.status_code == 201, created.text
@@ -245,6 +237,6 @@ def test_unexpected_errors_carry_no_input(api_client, accounts, log):
         with _route_session(_invalid):
             r = client.post(f"/api/firms/{accounts.firm_id}/candidates", headers=_cookie(accounts.firm_token),
                             json={"full_name": NAME, "email": EMAIL, "phone": PHONE, "summary": RESUME})
-    assert (r.status_code, r.text) == (500, "Internal Server Error")
+    assert r.status_code == 500 and r.json()["code"] == "INTERNAL" and NAME.lower() not in r.text.lower()
     written = _assert_clean(log)
     assert "validation error(s) for Person" in written

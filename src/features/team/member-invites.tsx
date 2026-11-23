@@ -9,6 +9,7 @@ import { Tag, type TagTone } from "@/components/ui/tag";
 import { ErrorState } from "@/components/app/error-state";
 import { SkeletonCard } from "@/components/app/skeleton-card";
 import { AdminDialog, DialogFrame, Field, errorMessage, fieldAria } from "@/features/admin/admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 import { AdminDate } from "@/features/admin/admin-time";
 import type { InviteMemberInput } from "@/lib/api/team";
 import { useCan } from "@/lib/auth/permissions";
@@ -197,7 +198,7 @@ function InviteActions({ invite, blockedReason, onLink }: { invite: Invite; bloc
         </Button>
       ) : null}
       {blockedReason ? <span id={`resend-${invite.id}-reason`} className="text-caption text-[var(--color-warning-fg)]">{blockedReason}</span> : null}
-      {resend.isError ? <span role="alert" className="text-caption text-[var(--color-danger-fg)]">{errorMessage(resend.error)}</span> : null}
+      {resend.isError ? <ErrorNote as="span" text={errorMessage(resend.error)} className="text-caption" /> : null}
       {isRevoking ? (
         <AdminDialog
           open

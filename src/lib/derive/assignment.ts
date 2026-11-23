@@ -2,6 +2,18 @@ import type { Candidate } from "@/lib/schemas/candidate";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import { isWorkingCandidate } from "./tenancy";
 
+/**
+ * 07 Q70 (2026-11-18): a BDE holds at most 3 candidates at a time, every status counted (a placed one too) until a
+ * manager moves it. The backend's BDE_CANDIDATE_LIMIT (backend/api/routes_candidates.py) refuses the same.
+ */
+export const BDE_CANDIDATE_LIMIT = 3;
+export const BDE_FULL = `This BDE has ${BDE_CANDIDATE_LIMIT} candidates.`;
+
+/** How many candidates `bdeId` holds, any status: what counts toward `BDE_CANDIDATE_LIMIT`. */
+export function heldByBde(bdeId: string, candidates: readonly Pick<Candidate, "bdeId">[]): number {
+  return candidates.filter((candidate) => candidate.bdeId === bdeId).length;
+}
+
 /** How long an assignment stays "new" on the BDE's dashboard (A5). */
 export const NEW_ASSIGNMENT_DAYS = 7;
 
