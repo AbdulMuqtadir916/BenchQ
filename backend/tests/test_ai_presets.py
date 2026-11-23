@@ -82,6 +82,18 @@ def test_the_key_is_encrypted_and_never_comes_back(api_client, test_db, ai):
     assert entry.firm_id is None and "sk-real" not in entry.summary
 
 
+def test_a_missing_encryption_secret_says_so_and_saves_nothing(api_client, test_db, ai, monkeypatch):
+    """NOT_CONFIGURED, so the website shows the cause, not the bare 503's "busy, try again" (Abdul's review on #150)."""
+    monkeypatch.setenv("AI_SETTINGS_ENCRYPTION_KEY", "")
+    r = api_client.put("/api/admin/ai/provider", json={"provider": "openrouter", "api_key": "sk-new-secret-1234"})
+    body = r.json()
+    assert (r.status_code, body["code"], body["detail"]) == (503, "NOT_CONFIGURED",
+                                                             "The server's AI encryption secret isn't set.")
+    monkeypatch.undo()
+    test_db.expire_all()
+    assert store.shared_key(test_db) == "test-key"
+
+
 def test_every_use_case_runs_on_the_one_key(test_db, ai):
     assert {ai_config(key, db=test_db).api_key for key in PRESET_MODULES} == {"test-key"}
 
@@ -285,6 +297,7 @@ def test_five_later_uploads_a_shift_and_the_first_resume_doesnt_count(test_db, a
     with pytest.raises(HTTPException) as refused:
         upload_limit.refuse_past_limit(test_db, candidate, now)
     assert refused.value.status_code == 429 and refused.value.detail.startswith("Upload limit reached. Next upload at ")
+    assert refused.value.code == "DAILY_LIMIT"      # the website keeps the reset time (Abdul's review on #150)
     assert upload_limit.uploads_today(test_db, candidate, now + timedelta(days=1, hours=1)) == 0
 
 

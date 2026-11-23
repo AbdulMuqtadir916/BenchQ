@@ -22,6 +22,7 @@ from backend.auth.sessions import Principal
 from backend.job_monitor import reset_limiter
 from backend.models.ai_presets import AiModel, AiPreset, AiPresetVersion, AiProvider
 from backend.models.db import Setting, get_db, utcnow
+from backend.problem import NOT_CONFIGURED, Problem
 from backend.models.tenancy import PlatformUser
 
 logger = logging.getLogger("benchq.ai")
@@ -223,7 +224,7 @@ async def available_models():
     try:
         return await connection.live_models()
     except Exception:
-        raise HTTPException(status_code=503, detail="OpenRouter's model list couldn't be read. Try again.") from None
+        raise HTTPException(status_code=502, detail="OpenRouter's model list couldn't be read. Try again.") from None
 
 
 # ── Provider and key ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -250,7 +251,8 @@ async def save_provider(body: ProviderBody, principal: Principal = Depends(requi
                 store.store_key(row, new_key)
             except AiSecretError:
                 db.rollback()
-                raise HTTPException(status_code=503, detail="The server's AI encryption secret isn't set.") from None
+                # NOT_CONFIGURED: a setup the admin must fix, never the bare 503's "busy, try again" (Abdul, #150).
+                raise Problem(503, "The server's AI encryption secret isn't set.", NOT_CONFIGURED) from None
         _log(db, principal, "UPDATE", "ai_provider", "1", PROVIDERS[body.provider],
              "AI API key changed" if new_key else "AI provider checked and saved")
         db.commit()
@@ -269,7 +271,7 @@ async def add_model(body: ModelBody, principal: Principal = Depends(require("ai.
         try:
             live = await connection.live_models()
         except Exception:
-            raise HTTPException(status_code=503, detail="OpenRouter's model list couldn't be read. Try again.") from None
+            raise HTTPException(status_code=502, detail="OpenRouter's model list couldn't be read. Try again.") from None
         match = next((row for row in live if row["id"] == model_id), None)
         if match is None:
             raise HTTPException(status_code=422, detail="That model isn't in OpenRouter's list.")
