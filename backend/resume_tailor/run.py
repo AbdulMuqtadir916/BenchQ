@@ -44,6 +44,7 @@ def report_counts(report: dict) -> dict:
     return {
         "gaps": len(report.get("gaps") or []),
         "fact_gate_changes": len(report.get("fact_gate_changes") or []),
+        "bullets_added": int(report.get("bullets_added") or 0),
         "review_edits_applied": int(report.get("review_edits_applied") or 0),
         "review_edits_missed": len(report.get("review_edits_missed") or []),
         "verify_edits_applied": int(report.get("verify_edits_applied") or 0),

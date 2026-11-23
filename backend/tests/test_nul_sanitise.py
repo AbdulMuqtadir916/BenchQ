@@ -88,7 +88,7 @@ def test_job_field_assignment_after_construction_is_also_sanitised(test_db):
 
 def test_batch_survives_one_poisoned_job(test_db, monkeypatch):
     """Reproduces the per-job savepoint pattern shared by every scraper source
-    (backend/scraper/sources/{jobright,jobspy,levelsfyi,freehire,linkedin_personal}.py
+    (backend/scraper/sources/{jobright,jobspy,levelsfyi,linkedin_personal}.py
     and company_pages.py): each job is added inside `db.begin_nested()` and a
     failure is now caught broadly (IntegrityError for dup keys, plus a
     catch-all Exception for anything else — e.g. the DataError Postgres would

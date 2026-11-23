@@ -85,6 +85,8 @@ describe("tailoring the résumé for the connected job", () => {
     expect(startRefusal(refused(429, five))).toEqual({ message: five, canRetry: true });
     expect(startRefusal(refused(0, "BenchQ can't be reached."))).toEqual({ message: "BenchQ can't be reached.", canRetry: true });
     expect(startRefusal(refused(409, "This candidate has no active base résumé to tailor from.")).canRetry).toBe(false);
+    expect(startRefusal(refused(500, "The résumé tailor isn't set up: no tailor model."))).toEqual({ message: "Tailoring isn't set up yet. Tell your admin.", canRetry: false });
+    expect(startRefusal(refused(502, "Bad Gateway"))).toEqual({ message: "BenchQ didn't answer. Try again in a moment.", canRetry: true });
     expect(runFailure("gone")).toEqual({ message: "The resume or the job was removed in BenchQ.", canRetry: false });
     expect(runFailure("provider_failed")).toEqual({ message: "Tailoring didn't finish. Try again.", canRetry: true });
   });

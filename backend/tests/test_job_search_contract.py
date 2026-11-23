@@ -7,7 +7,7 @@ import uuid
 
 import pytest
 
-from backend.job_search import pipeline
+from backend.job_search import limits, pipeline
 from backend.tests.test_candidates_api import _create, world  # noqa: F401  (the fixture)
 from backend.tests.test_job_search_api import (FakeProvider, _job, _open, _post, _rows, _run, _url,  # noqa: F401
                                                adnans, fake, launched)
@@ -20,8 +20,8 @@ def _capture_body(**over):
 
 # ── contract: a malformed request is a 4xx ───────────────────────────────────
 
-@pytest.mark.parametrize("body", [{}, {"query": None}, {"query": 5}, {"query": ["Java"]}, {"query": {"q": 1}},
-                                  {"query": True}, {"q": "Java"}])
+@pytest.mark.parametrize("body", [{"place": 5}, {"place": ["Austin, TX"]}, {"place": {"q": 1}}, {"place": True},
+                                  {"place": ""}, {"place": "   "}, ["Austin, TX"], "Austin, TX"])
 def test_a_search_body_of_the_wrong_shape_is_422(anonymous_client, world, adnans, fake, launched, body):
     r = anonymous_client.post(_url(world, adnans, "job-searches"), json=body, headers=world["as"]["adnan"])
     assert r.status_code == 422 and launched == []
@@ -132,7 +132,7 @@ def test_a_job_the_provider_cannot_read_is_skipped_not_fatal(world, adnans, fake
 
 
 def test_metadata_the_database_cannot_store_is_cleaned(world, adnans, fake, test_db, monkeypatch):
-    async def odd(query, country, limit, cursor=None):
+    async def odd(query, country, limit, cursor=None, **ask):
         from backend.job_search.providers import SearchResult
         return SearchResult(jobs=[_job(1, extra=float("nan"))],
                             metadata={"note": "nul\x00byte", "ratio": float("inf"), "nested": [{"k": "\x07"}]})
@@ -201,8 +201,9 @@ def test_two_searches_for_different_candidates_run_side_by_side(anonymous_client
     assert [r.status_code for r in results] == [202, 202]
 
 
-def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, test_db):
+def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, test_db, monkeypatch):
     """Two batches of 60 new jobs each, finished at once: the candidate lock makes the second count the first's."""
+    monkeypatch.setattr(limits, "JOBS_PER_CANDIDATE_PER_DAY", 100)      # the rule at a round number (200 since Q145)
     fake.jobs = [_job(n) for n in range(60)]
     first = _open(world, adnans, query="Java Developer")
     second = _open(world, adnans, query="Spring Developer")
@@ -212,7 +213,7 @@ def test_the_cap_holds_when_two_searches_finish_together(world, adnans, fake, te
         from backend.job_search.providers import SearchResult
         originals = {"Java Developer": list(fake.jobs), "Spring Developer": jobs_b}
 
-        async def by_query(query, country, limit, cursor=None):
+        async def by_query(query, country, limit, cursor=None, **ask):
             return SearchResult(jobs=originals[query], metadata={})
         fake.search = by_query
         cid = uuid.UUID(adnans["id"])

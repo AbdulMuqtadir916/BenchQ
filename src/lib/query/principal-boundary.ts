@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { Principal } from "@/lib/schemas/tenancy";
 import { clearReadVersions } from "@/lib/api/resumes";
 import { useSession } from "@/lib/stores/session-store";
+import { useToastStore } from "@/lib/stores/toast-store";
 
 /** Who is signed in, as one string: a change means a different person (or firm) is looking. */
 export function principalKey(principal: Principal | null): string {
@@ -17,12 +18,13 @@ export function principalKey(principal: Principal | null): string {
  * also remounts the app under the new principal, so mounted queries start from this empty cache.
  *
  * Any other in-memory copy of firm data kept outside the query cache must be emptied here too: today, the résumé
- * versions the studio read (src/lib/api/resumes.ts).
+ * versions the studio read (src/lib/api/resumes.ts) and toasts (including persistent errors with references).
  * Returns the unsubscribe function.
  */
 export function clearCacheOnPrincipalChange(client: QueryClient): () => void {
   return useSession.subscribe((state, previous) => {
     if (principalKey(state.principal) === principalKey(previous.principal)) return;
+    useToastStore.getState().clear();
     client.clear();
     clearReadVersions();
   });

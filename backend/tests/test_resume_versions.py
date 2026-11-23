@@ -20,9 +20,13 @@ def parser(monkeypatch):
         calls.append(firm_id)
         return clean_reply({**PARSE, "header": {**PARSE["header"], "title": "Staff Java Engineer"}})
 
-    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: "résumé text")
+    # The file's text holds the test candidate's name and email (Ravi Teja, ravi@example.com): the 07 Q69 check passes.
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: RESUME_TEXT)
     monkeypatch.setattr(routes_candidate_resumes, "read_resume", read_resume)
     return calls
+
+
+RESUME_TEXT = "RAVI TEJA\nSenior Java Developer · ravi@example.com · Dallas, TX\n"
 
 
 def _url(world, candidate, tail=""):
@@ -121,7 +125,7 @@ def test_a_save_without_the_name_or_email_in_the_header_is_refused_naming_it(ano
     v1 = _v(anonymous_client, world, c)
     for blank in ("", "   ", None):
         r = _save(anonymous_client, world, c, v1, summary="A different summary.", **{field: blank})
-        assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+        assert r.status_code == 422 and field in {part for e in r.json()["errors"] for part in e["loc"]}
 
 
 def test_two_saves_from_the_same_version_are_both_kept_and_the_second_is_told(anonymous_client, test_db, world):
@@ -259,23 +263,31 @@ def test_the_bdes_upload_is_a_new_active_base_from_the_parse_and_the_profile_sta
     assert parser == [world["firm"].id]
 
 
-def test_the_ledger_and_the_profile_take_the_new_active_bases_name(anonymous_client, test_db, world, parser):
-    """Abdul's PR 7 review #3: the name read from the old base isn't reused once the active base changes (07 Q57)."""
+def test_the_name_and_email_stay_the_candidates_whatever_a_later_upload_or_save_says(anonymous_client, test_db, world,
+                                                                                    parser):
+    """07 Q68 (2026-11-18): fixed once the candidate is added. A later upload takes the candidate's name and email, not
+    the parser's, and a save that sends another name or email is refused; the ledger keeps the one name."""
     from backend.models.tenancy import LedgerEntry
     c = _candidate(anonymous_client, test_db, world, bde="adnan")         # the form's name: Ravi Teja
     assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201
     profile_url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
-    assert anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()["full_name"] == "Ravi T"   # the file's
+    profile = anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()
+    assert (profile["full_name"], profile["email"]) == (c["full_name"], c["email"])     # not the file's "Ravi T"
     upload = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
                                                LedgerEntry.action == "CREATE", LedgerEntry.entity_type == "resume") \
         .order_by(LedgerEntry.created_at.desc()).first()
-    assert upload.entity_label == "Ravi T · Base 2"
-    # A save on the active base that changes the name: its ledger entry carries the new one.
+    assert upload.entity_label == f"{c['full_name']} · Base 2"
     v1 = _v(anonymous_client, world, c, base_number=2, who="adnan")
-    assert _save(anonymous_client, world, c, v1, "adnan", full_name="Ravi Teja Kumar").status_code == 201
-    saved = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
-                                              LedgerEntry.action == "UPDATE").order_by(LedgerEntry.created_at.desc()).first()
-    assert saved.entity_label == "Ravi Teja Kumar · Base 2 v2"
+    for changed in ({"full_name": "Ravi Teja Kumar"}, {"email": "someone@example.com"}):
+        r = _save(anonymous_client, world, c, v1, "adnan", **changed)
+        assert r.status_code == 400 and r.json()["detail"] == "The candidate's name and email can't be changed."
+    assert _save(anonymous_client, world, c, v1, "adnan", email=c["email"].upper(), title="Lead").status_code == 201
+    # A base made from that version keeps them too (read before the switch of active base).
+    v2 = _v(anonymous_client, world, c, base_number=2, version=2, who="adnan")       # a new base, made active
+    assert anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"),
+                                 headers=world["as"]["adnan"]).status_code in (200, 201)
+    profile = anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()
+    assert (profile["full_name"], profile["email"]) == (c["full_name"], c["email"])
 
 
 def test_a_profile_whose_active_resume_names_no_country_reads_none_never_us(anonymous_client, test_db, world):
@@ -291,9 +303,11 @@ def test_the_same_file_again_is_answered_with_its_base_without_reading_it(anonym
     anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
     assert r.status_code == 409
-    assert r.json()["detail"]["message"] == "This résumé is already Base 2." and not r.json()["detail"]["hidden"]
+    body = r.json()                        # the base's fields at the top level (docs/02 §12)
+    assert (body["detail"], body["code"], body["hidden"]) == ("This résumé is already Base 2.", "DUPLICATE_RESUME", False)
+    assert body["base_resume_id"]
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(ONBOARDING_FILE), headers=world["as"]["adnan"])
-    assert r.json()["detail"]["message"] == "This résumé is already Base 1."      # the onboarding file
+    assert r.json()["detail"] == "This résumé is already Base 1."      # the onboarding file
     assert len(parser) == 1
 
 
@@ -388,8 +402,9 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     hidden = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     assert hidden["archived_at"] is not None
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(b"%PDF third"), headers=as_bde)
-    assert r.status_code == 409 and r.json()["detail"] == {"message": "This résumé is Base 3 (hidden). Show it again?",
-                                                           "base_resume_id": base3["id"], "hidden": True}
+    body = r.json()
+    assert r.status_code == 409 and (body["detail"], body["base_resume_id"], body["hidden"]) == (
+        "This résumé is Base 3 (hidden). Show it again?", base3["id"], True)
     shown = anonymous_client.post(_url(world, c, f"/bases/{base3['id']}/show"), headers=as_bde).json()
     assert (shown["archived_at"], shown["is_active"]) == (None, False)
     picked = anonymous_client.post(_url(world, c, f"/{v1['id']}/use-as-base"), headers=as_bde).json()
@@ -519,7 +534,7 @@ def test_two_uploads_of_one_file_at_once_make_one_base(anonymous_client, test_db
     test_db.commit()
     thread.join(30)
     assert out["response"].status_code == 409
-    assert out["response"].json()["detail"]["message"] == "This résumé is already Base 2."
+    assert out["response"].json()["detail"] == "This résumé is already Base 2."
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2
 
 
@@ -529,7 +544,7 @@ def test_save_rejects_invalid_profile_links(anonymous_client, test_db, world, fi
     version = _v(anonymous_client, world, candidate, who="adnan")
     response = _save(anonymous_client, world, candidate, version, who="adnan", **{field: value})
     assert response.status_code == 422
-    assert any(error["loc"][-1] == field for error in response.json()["detail"])
+    assert any(error["loc"][-1] == field for error in response.json()["errors"])
 
 
 def test_save_normalizes_bare_profile_links(anonymous_client, test_db, world):
@@ -541,3 +556,31 @@ def test_save_normalizes_bare_profile_links(anonymous_client, test_db, world):
     saved = _v(anonymous_client, world, candidate, version=2, who="adnan")
     assert saved["linkedin"] == "https://linkedin.com/in/qa-test"
     assert saved["github"] == "https://github.com/qa-test"
+
+
+@pytest.mark.parametrize("text,message", [
+    ("Ravi Teja · Java Developer · Dallas", "The résumé should contain the candidate's email."),
+    ("Java Developer · Dallas", "The résumé should contain the candidate's name and email."),
+    ("Ravi Teja · ravi.other@example.com", "This résumé isn't for this candidate. Please upload this candidate's résumé."),
+    ("Someone Else · someone@example.com", "This résumé isn't for this candidate. Please upload this candidate's résumé."),
+    ("R. Teja · ravi@example.com", "The résumé should contain the candidate's name."),
+])
+def test_a_later_upload_must_hold_the_candidates_name_and_email(anonymous_client, test_db, world, parser,
+                                                                 monkeypatch, text, message):
+    """07 Q69 (2026-11-18): checked on the file's text before the parser runs; a mismatch never says which part."""
+    from backend.api import routes_candidate_resumes
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")         # Ravi Teja, Ravi@Example.com
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: text)
+    r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
+    assert (r.status_code, r.json()["detail"]) == (400, message)
+    assert parser == []                                                    # the AI never read it
+    assert len(_listing(anonymous_client, world, c)["bases"]) == 1          # nothing kept
+
+
+@pytest.mark.parametrize("text", ["RAVI  TEJA\nravi@example.com", "Teja, Ravi — Ravi@Example.com",
+                                  "Ravi Kumar Teja · mailto:ravi@example.com."])
+def test_case_order_and_middle_names_dont_matter(anonymous_client, test_db, world, parser, monkeypatch, text):
+    from backend.api import routes_candidate_resumes
+    c = _candidate(anonymous_client, test_db, world, bde="adnan")
+    monkeypatch.setattr(routes_candidate_resumes, "extract_text", lambda kind, content: text)
+    assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201

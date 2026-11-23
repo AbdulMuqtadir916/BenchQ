@@ -1,8 +1,8 @@
-import type { User } from "@/lib/schemas/session";
+import type { Firm, User } from "@/lib/schemas/session";
 import type { Invite } from "@/lib/schemas/tenancy";
 import { arrayOf } from "./client";
 import { toBackendId } from "./dto/demo-ids";
-import { InviteDto, InviteWithTokenDto, UserDto, toInvite, toUser } from "./dto/session";
+import { FirmDto, InviteDto, InviteWithTokenDto, UserDto, toFirm, toInvite, toUser } from "./dto/session";
 import { http } from "./http";
 
 /** docs/07 Phase M: the OWNER invites a MANAGER, BDE or VIEWER (never an OWNER, A10). */
@@ -36,6 +36,8 @@ const live = {
     withLink(await http.post(`${firmPath(firmId)}/invites/${toBackendId(inviteId)}/resend`, InviteWithTokenDto)),
   revokeInvite: async (firmId: string, inviteId: string) =>
     toInvite(await http.post(`${firmPath(firmId)}/invites/${toBackendId(inviteId)}/revoke`, InviteDto)),
+  workHours: async (firmId: string, workStart: string, workEnd: string) =>
+    toFirm(await http.patch(`${firmPath(firmId)}/work-hours`, FirmDto, { body: { work_start: workStart, work_end: workEnd } })),
   changeManager: async (firmId: string, userId: string, managerId: string) =>
     toUser(await http.patch(`${firmPath(firmId)}/members/${toBackendId(userId)}/manager`, UserDto, { body: { manager_id: toBackendId(managerId) } })),
 };
@@ -57,4 +59,6 @@ export const teamApi = {
 
   /** OWNER only (`member.changeManager`, 07 Q40): move a BDE to another manager; their candidates follow (Q43). Also how a BDE with no manager gets one (Q51). */
   changeManager: async (firmId: string, userId: string, managerId: string): Promise<User> => live.changeManager(firmId, userId, managerId),
+  /** OWNER only (`firm.editHours`, 07 Q67): the firm's work hours. Past work keeps its Days. */
+  workHours: async (firmId: string, workStart: string, workEnd: string): Promise<Firm> => live.workHours(firmId, workStart, workEnd),
 };

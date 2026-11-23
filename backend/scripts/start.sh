@@ -1,6 +1,6 @@
 #!/bin/sh
-# Container start: migrate first (one process, under an advisory lock), then serve.
-# Run exactly ONE worker: the scheduler lives inside the API process (docs/integration/07-auth-and-tenancy.md, Q37).
+# Container start for the API: migrate first (one process, under an advisory lock), then serve.
+# The scheduler is not in this process: it runs in the worker (start_worker.sh, production layer step 3).
 set -e
 python -m backend.scripts.db_upgrade
 # No uvicorn access log: it prints raw paths, and invite links carry their token there. backend/request_log.py writes

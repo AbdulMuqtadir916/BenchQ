@@ -25,8 +25,8 @@ def default_firm_id(db) -> uuid.UUID:
     # auth_support.make_plan may already have taken the name "Default"; the firm then sits on that plan.
     plan_id = db.execute(text("SELECT id FROM plans WHERE name = 'Default'")).scalar()
     db.execute(text("""
-        INSERT INTO firms (id, name, slug, status, plan_id, seat_limit, candidate_limit)
-        VALUES (:firm, 'Default firm', 'default', 'ACTIVE', :plan, 10, 100)
+        INSERT INTO firms (id, name, slug, status, plan_id, seat_limit, candidate_limit, work_start, work_end)
+        VALUES (:firm, 'Default firm', 'default', 'ACTIVE', :plan, 10, 100, '18:30', '04:00')
         ON CONFLICT (id) DO NOTHING
     """), {"firm": DEFAULT_FIRM_ID, "plan": plan_id})
     db.flush()

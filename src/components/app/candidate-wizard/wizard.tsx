@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/features/admin/admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 import { hasTeamScope } from "@/lib/auth/policy";
 import { WORKING_STATUSES } from "@/lib/derive/tenancy";
 import { useAssignBlock, useCreateCandidate } from "@/lib/hooks/use-candidates";
@@ -114,7 +115,8 @@ export function CandidateWizard() {
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         if (!created) goNext();
-      } else if (event.key === "Escape") {
+      } else if (event.key === "Escape" && !event.defaultPrevented) {
+        // `defaultPrevented`: a dismissed failure toast took this Esc (the toast viewport).
         // Without this, the browser's own Escape handling runs after us and closes the dialog we just opened.
         event.preventDefault();
         if (created) leave();
@@ -180,8 +182,10 @@ export function CandidateWizard() {
           <Button variant="ghost" onClick={requestClose}>Cancel</Button>
         )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {isLast && (createBlock || create.isError) ? (
-            <p id="cw-create-problem" role={create.isError ? "alert" : undefined} className="text-caption text-[var(--color-danger-fg)]">{createBlock ?? errorMessage(create.error)}</p>
+          {isLast && createBlock ? (
+            <p id="cw-create-problem" className="text-caption text-[var(--color-danger-fg)]">{createBlock}</p>
+          ) : isLast && create.isError ? (
+            <ErrorNote id="cw-create-problem" text={errorMessage(create.error)} className="text-caption" />
           ) : null}
           {isLast ? (
             <Button onClick={goNext} disabled={createBlock !== null || create.isPending} aria-describedby={createBlock || create.isError ? "cw-create-problem" : undefined} aria-keyshortcuts="Control+Enter Meta+Enter">

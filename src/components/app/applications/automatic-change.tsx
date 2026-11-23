@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import { Bot, Mail, Undo2 } from "lucide-react";
 import { ApiError } from "@/lib/api/client";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import type { Application, ApplicationEvent } from "@/lib/schemas/application";
 import { useUndoAutomaticChange } from "@/lib/hooks/use-applications";
 import { newCommandId } from "@/lib/utils";
@@ -16,10 +18,15 @@ export function latestAutomaticChange(application: Application): ApplicationEven
   return latest.revision === null || latest.revision === application.statusRevision ? latest : null;
 }
 
-function undoFailure(error: Error): string {
-  if (error instanceof ApiError && error.status === 409) return "A later decision exists, so this change can no longer be undone here. Reload and set the stage by hand if needed.";
-  if (error instanceof ApiError && error.status === 403) return "You don't have permission to undo application changes.";
-  return error.message;
+/** The screen's words for a 409 and a 403; a system error reads as everywhere else (src/lib/api/error-text.ts). */
+function undoFailure(error: Error): ErrorText {
+  return describeError(error, {
+    screenText: (e) => {
+      if (e instanceof ApiError && e.status === 409) return "A later decision exists, so this change can no longer be undone here. Reload and set the stage by hand if needed.";
+      if (e instanceof ApiError && e.status === 403) return "You don't have permission to undo application changes.";
+      return null;
+    },
+  });
 }
 
 type NoticeProps = { application: Application; canAct: boolean; onOpenEmail?: (emailId: string) => void };
@@ -51,7 +58,7 @@ function AutomaticChangeBody({ application, event, canAct, onOpenEmail }: Notice
         {canAct ? <Button size="sm" variant="secondary" disabled={undo.isPending || undo.isSuccess} onClick={run}><Undo2 size={13} aria-hidden /> Undo</Button> : null}
       </div>
       {undo.isSuccess ? <p role="status">Undone. The application is back to its earlier stage.</p> : null}
-      {undo.error ? <p role="alert" className="text-[var(--color-danger-fg)]">{undoFailure(undo.error)}</p> : null}
+      {undo.error ? <ErrorNote text={undoFailure(undo.error)} /> : null}
     </div>
   );
 }

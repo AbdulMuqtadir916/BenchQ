@@ -84,6 +84,8 @@ NOT_PERSONAL = {
     ("api/routes_jobs.py", "_score_resume_names"): "a job id and a lookup error",
     ("api/routes_jobs.py", "save_from_extension"): "the extension's body is a job posting (title, company)",
     ("api/routes_llm.py", "list_models"): "an AI provider's name",
+    ("api/routes_inbox.py", "start_candidate_google_oauth"):
+        "google_oauth.py's set-up RuntimeErrors: fixed sentences naming a setting, no values (step 4b)",
     ("auth/throttle.py", "_refuse_if_over"): "the bucket's kind (`email`, `ip`), the part before the value",
     ("candidates/parse.py", "_setup_error"): "which parser setting is missing",
     ("candidates/parse.py", "read_resume"): "the provider's error, and a JSON error's message and position",
@@ -105,7 +107,6 @@ KNOWN = {
     ("api/routes_searches.py", "test_search"): "Zuhair: search name",
     ("scraper/orchestrator.py", "run_all"): "Zuhair: search name",
     ("scraper/orchestrator.py", "_run_search_by_id"): "Zuhair: search name",
-    ("scraper/sources/freehire.py", "run"): "Zuhair: search name",
     ("scraper/sources/jobright.py", "run"): "Zuhair: search name",
     ("scraper/sources/jobspy.py", "_run_sync"): "Zuhair: search name",
     ("scraper/sources/levelsfyi.py", "run"): "Zuhair: search name",

@@ -183,7 +183,7 @@ Respect `prefers-reduced-motion`.
 ## Commands
 
 Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the backend, so run
-`docker compose up -d db backend` alongside `pnpm dev`. Setup and failures: `README.md` Quick start,
+`docker compose up -d db backend worker` alongside `pnpm dev` (`worker` runs the scheduler). Setup and failures: `README.md` Quick start,
 `docs/troubleshooting.md`.
 
 ---
@@ -200,6 +200,7 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
 - [ ] No hardcoded colours, sizes or spacing; no `any`, no `@ts-ignore`
 - [ ] Works at 1440px, 1024px and 390px
 - [ ] `axe` reports no violations
+- [ ] Errors follow `docs/02` §12: the problem body, a registered code, user wording per the writing rules
 
 ---
 
@@ -226,6 +227,10 @@ Scripts are in `package.json`. Node 22+ (`.nvmrc`). The app signs in against the
 - Log a name, email, phone number, résumé or email text, password, token or API key. Log ids, route patterns, counts
   and timings instead. `backend/logging_setup.py` masks what it recognises, and a canary test fails on what it
   doesn't (`docs/team/uzair.md` §1, step 4a).
+- Send an error any way but through `backend/problem.py` (raise `Problem` or `HTTPException`, never a hand-built
+  `JSONResponse`), or show one on the website other than through `describeError` (`src/lib/api/error-text.ts`). User
+  text follows the writing rules in `docs/02-DATA-CONTRACTS.md` §12. Tests fail on a hand-built response, an
+  unregistered code, exception text in a message and a raw `error.message` on screen.
 
 ---
 

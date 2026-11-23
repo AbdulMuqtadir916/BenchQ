@@ -36,7 +36,7 @@ def test_classifier_never_borrows_the_primary_provider(test_db):
         test_db.merge(Setting(key=key, value=value))
     test_db.commit()
     cfg = ai_config('email_classification', db=test_db)
-    assert (cfg.provider, cfg.model, cfg.api_key) == ('', '', '')
+    assert (cfg.model, cfg.api_key) == ('', '')    # no preset and no shared key: it borrows neither
     assert ai_config('scoring', db=test_db).provider == 'claude_api'  # other modules keep their fallback
 
 

@@ -24,9 +24,9 @@ def launched(monkeypatch, test_db):
     from backend import job_monitor
     from backend.api import routes_resume_tailoring
     from backend.seed import seed_settings
+    from backend.tests.ai_support import set_up_ai
     seed_settings(test_db)
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value="test-key"))
-    test_db.commit()
+    set_up_ai(test_db)
     calls = []
 
     def launch(job_type, coro_func, *, scope_key=None, meta=None, target_job_id=None, firm_id=None,
@@ -128,6 +128,16 @@ def test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed(anonymous
     second = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
     row = test_db.get(Resume, uuid.UUID(second["resume_id"]))
     assert row.version == 2 and row.autofill == typed
+
+
+def test_a_tailored_version_has_its_match_against_its_job(anonymous_client, test_db, world, launched, setup,
+                                                         monkeypatch):
+    """Decided 2026-11-14 (Q39): the "Resume sent" tag's Match, worked out when the tailoring writes the version."""
+    _start(anonymous_client, world, setup)
+    done = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
+    test_db.expire_all()
+    row = test_db.get(Resume, uuid.UUID(done["resume_id"]))
+    assert 0 <= row.match_score <= 100 and len(row.match_basis) == 64
 
 
 def test_a_step_that_fails_writes_no_version(anonymous_client, test_db, world, launched, setup, monkeypatch):
@@ -259,11 +269,17 @@ def test_a_bde_with_five_running_waits_for_one(anonymous_client, test_db, world,
     assert r.status_code == 429 and "5 tailorings running" in r.json()["detail"]
 
 
-def test_a_tailor_not_set_up_is_a_500_naming_the_row(anonymous_client, test_db, world, launched, setup):
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value=""))
-    test_db.commit()
+NOT_SET_UP = "The résumé tailor isn't set up yet. Ask your admin."
+
+
+def test_a_tailor_not_set_up_is_a_500_naming_what_is_missing_in_the_log(anonymous_client, test_db, world, launched,
+                                                                        setup, log):
+    from backend.tests.ai_support import set_up_ai
+    set_up_ai(test_db, key="")
     r = _start(anonymous_client, world, setup)
-    assert r.status_code == 500 and "resume_tailor_llm_api_key" in r.json()["detail"] and launched == []
+    body = r.json()
+    assert (r.status_code, body["code"], body["detail"]) == (500, "NOT_CONFIGURED", NOT_SET_UP) and launched == []
+    assert "API key" in log.getvalue()          # what is missing, for the admin; never in the answer
 
 
 # ── Lost runs and the heartbeat ──────────────────────────────────────────────
@@ -299,9 +315,29 @@ def test_a_stamped_run_stays_running_until_the_thirty_minute_backstop(anonymous_
 def test_a_run_failed_by_the_startup_clean_up_reads_as_lost(anonymous_client, test_db, world, launched, setup):
     from backend.job_monitor import cleanup_stale_runs
     run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _age(test_db, run_id, 3)          # never stamped since: its process stopped
     cleanup_stale_runs()
     test_db.expire_all()
     assert _status(anonymous_client, world, setup, run_id).json()["error_code"] == "lost"
+
+
+def test_a_run_the_heartbeat_failed_while_it_was_still_going_saves_no_version(anonymous_client, test_db, world,
+                                                                              launched, setup, monkeypatch):
+    """Its process only stalled past SILENT_FOR: the sweep fails the row with no error code, and when the run reaches
+    its save it stops there, so the BDE told it was lost finds no version (CodeRabbit on #147)."""
+    from backend.job_monitor import cleanup_stale_runs
+    run_id = _start(anonymous_client, world, setup).json()["run_id"]
+    _age(test_db, run_id, 3)
+    cleanup_stale_runs()
+    test_db.expire_all()
+    swept = test_db.get(JobRun, uuid.UUID(run_id))
+    assert swept.status == "failed" and "error_code" not in (swept.meta or {})   # what the old check let through
+    _drive(test_db, launched, list(REPLIES), monkeypatch)
+    run = test_db.get(JobRun, uuid.UUID(run_id))
+    assert run.status == "failed" and run.meta["error_code"] == "lost" and "resume_id" not in run.meta
+    assert test_db.query(Resume).filter(Resume.category == "TAILORED").count() == 0
+    status = _status(anonymous_client, world, setup, run_id).json()
+    assert (status["status"], status["error_code"], status["resume_id"]) == ("failed", "lost", None)
 
 
 def test_the_heartbeat_stamps_only_running_rows(test_db, world):

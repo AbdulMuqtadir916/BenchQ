@@ -96,8 +96,9 @@ DRAFT_SCHEMA = _object("The CV drafted for this posting.", {
     "experience": _list(
         "One entry per resume role, in the resume's order; every role stays.",
         {"role_number": _number("The role's number as the resume numbers it (ROLE 1 is the most recent)."),
-         "bullets": _texts("The role's bullets, most relevant to this posting first: 4-6 for the most recent role, "
-                           "3-4 for the previous one, 2-3 for older roles.",
+         "bullets": _texts("The role's bullets, most relevant to this posting first: exactly 6 for the most recent "
+                           "role, 4 for the previous one, 3 for each older role (fewer only when the resume role "
+                           "holds fewer).",
                            "One bullet as plain text: no list marker, at most about 30 words, no pronouns.")},
         "One role."),
     "projects": _list(

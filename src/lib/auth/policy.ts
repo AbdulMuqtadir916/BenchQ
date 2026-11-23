@@ -34,7 +34,8 @@ export type FirmAction =
 
 /**
  * Managing the firm and its team (07 Q15). `candidate.assign` also covers reassigning (07 Q43); who may be given which
- * candidate is `canAssignTo` below. `member.changeManager` moves a BDE to another manager (Q40). The OWNER edits no firm settings (Q59, Q63).
+ * candidate is `canAssignTo` below. `member.changeManager` moves a BDE to another manager (Q40). The OWNER edits no firm settings (Q59, Q63)
+ * except its work hours, `firm.editHours` (Q67).
  */
 export type TeamAction =
   | "member.invite"
@@ -43,10 +44,14 @@ export type TeamAction =
   | "member.deactivate"
   | "member.changeManager"
   | "candidate.assign"
-  | "notification.approve";
+  | "notification.approve"
+  | "firm.editHours";
 
-/** Not an action: whether the person sees the team (members, owner, assignments) on firm pages (Q15). */
-export type FirmVisibility = "team.view";
+/**
+ * Not actions: what the person sees. The team (members, owner, assignments) on firm pages (Q15); a candidate's extra
+ * search titles, read-only, for the OWNER and a MANAGER and never the BDE (07 Q68, 2026-11-18).
+ */
+export type FirmVisibility = "team.view" | "candidate.viewSearchTitles";
 
 /** The platform tier (07 §2.3): PLATFORM_ADMIN only. */
 export type PlatformAction =
@@ -58,14 +63,15 @@ export type PlatformAction =
   | "invite.resend"
   | "invite.revoke"
   | "platformTeam.manage"
-  | "platform.notification.approve";
+  | "platform.notification.approve"
+  | "ai.manage";
 
 export type Action = FirmAction | TeamAction | FirmVisibility | PlatformAction;
 
 export const FIRM_ACTIONS: readonly FirmAction[] = ["candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search", "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify"];
-export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "notification.approve"];
-export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve"];
-export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", ...PLATFORM_ACTIONS];
+export const TEAM_ACTIONS: readonly TeamAction[] = ["member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager", "candidate.assign", "notification.approve", "firm.editHours"];
+export const PLATFORM_ACTIONS: readonly PlatformAction[] = ["firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve", "ai.manage"];
+export const ALL_ACTIONS: readonly Action[] = [...FIRM_ACTIONS, ...TEAM_ACTIONS, "team.view", "candidate.viewSearchTitles", ...PLATFORM_ACTIONS];
 
 const ALL_ACTING: readonly FirmRole[] = ["OWNER", "MANAGER", "BDE"];
 const OWNER_ONLY: readonly FirmRole[] = ["OWNER"];
@@ -76,8 +82,8 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   /** 07 Q41: only the OWNER and MANAGERs add candidates; a BDE no longer does. */
   "candidate.create": OWNER_AND_MANAGER,
   "candidate.edit": ALL_ACTING,
-  /** 07 Q56: the profile (submission facts) is the OWNER's and MANAGER's; a BDE edits only the résumés (Q55). */
-  "candidate.editProfile": OWNER_AND_MANAGER,
+  /** Who, for one candidate: `canEditProfile` (decided 2026-11-14, Q17; reverses 07 Q56). */
+  "candidate.editProfile": ALL_ACTING,
   "email.retry": ALL_ACTING,
   "email.reclassify": OWNER_AND_MANAGER,
   "job.capture": ALL_ACTING,
@@ -94,7 +100,11 @@ const FIRM_TABLE: Record<FirmAction | TeamAction | FirmVisibility, readonly Firm
   "member.changeManager": OWNER_ONLY,
   "candidate.assign": OWNER_AND_MANAGER,
   "notification.approve": OWNER_AND_MANAGER,
+  /** 07 Q67 (2026-11-17): the firm's work hours, on settings/firm. */
+  "firm.editHours": OWNER_ONLY,
   "team.view": OWNER_AND_MANAGER,
+  /** 07 Q68 (2026-11-18): the extra search titles, read-only; the BDE doesn't see them. */
+  "candidate.viewSearchTitles": OWNER_AND_MANAGER,
 };
 
 const isPlatformAction = (action: Action): action is PlatformAction => (PLATFORM_ACTIONS as readonly string[]).includes(action);
@@ -146,6 +156,17 @@ export function canAssignTo(
  */
 export function canChangeResume(principal: Principal, candidate: { bdeId: string | null }): boolean {
   if (!can(principal, "resume.edit") || principal.kind !== "firm") return false;
+  if (candidate.bdeId === null) return OWNER_AND_MANAGER.includes(principal.role);
+  return candidate.bdeId === principal.userId;
+}
+
+/**
+ * Who edits a candidate's details, every onboarding answer that isn't on the résumé (the "Additional candidate details"
+ * tab; decided 2026-11-14, Q17, reversing 07 Q56): the résumé rule (Q55). The candidate's BDE once one is assigned;
+ * before that the OWNER and a MANAGER. VIEWER and a support view never. The backend's `can_edit_profile` is the same rule.
+ */
+export function canEditProfile(principal: Principal, candidate: { bdeId: string | null }): boolean {
+  if (!can(principal, "candidate.editProfile") || principal.kind !== "firm") return false;
   if (candidate.bdeId === null) return OWNER_AND_MANAGER.includes(principal.role);
   return candidate.bdeId === principal.userId;
 }
