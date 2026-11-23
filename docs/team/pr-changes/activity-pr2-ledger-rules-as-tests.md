@@ -124,3 +124,13 @@ Main added the Super Admin's AI presets (#150) and the firm's work hours (#150),
   saves nothing, so it is in `NOT_LOGGED` with that reason.
 - The presets' `_log` and the work-hours change (`api/routes_team.py`) didn't state `candidate_id`. Neither is about a
   candidate, so both now say `candidate_id=None`.
+
+## Review fix (Abdul, 2026-11-17)
+
+**A thread or partial that is only looked at doesn't count.** The check counted any use of the name a `Thread(...)` or
+`partial(...)` was given as running it, so a route that built `worker = Thread(target=write_audit, args=(db,))`, called
+`worker.is_alive()` and committed passed without ever logging. Now only running it or handing it on counts: `.start()`
+or `.run()`, calling it, or passing it somewhere (returned, an argument, queued). `worker.is_alive()` and `send.args`
+are looks. `test_a_thread_or_partial_that_is_built_and_dropped_does_not_count` has both, and a thread started with
+`.run()`.
+
