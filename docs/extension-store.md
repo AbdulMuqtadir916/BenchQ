@@ -11,7 +11,12 @@ correct. The privacy text in particular needs a person who is responsible for it
    `/api/auth/me` returned 404, while `app.benchq.io/api/auth/me` returned the backend's 401. `npm run build:store`
    builds for `storeOrigin` in `extension/hosts.json` and nothing else.
 2. **Developer account** ($5, one time) at the Chrome Web Store developer dashboard, on a company-owned Google account
-   with 2-Step Verification: the item stays with the account that publishes it.
+   with 2-Step Verification: the item stays with the account that publishes it. Google also verifies the publisher
+   before it can publish: an organization needs proof of business registration or a D-U-N-S number (which can take 30+
+   days); an individual needs a government ID and a document showing their name and address. A trader account's name,
+   address and phone are shown to users in the EU. An item published from an individual's account can move to the
+   company's own account later, through the Chrome Web Store support form (the company account registers first; the
+   move takes up to 7 days).
 3. **Build the store package:** `npm run build:store` in `extension/`, then zip the contents of `extension/dist` (not
    the folder itself, and without `*.map` files).
 4. **First upload by hand, as a draft** (Items, New item). This creates the item and its permanent ID. Nothing is
@@ -124,8 +129,8 @@ Draft answers, to be confirmed by the owner:
 
 Published at `https://app.benchq.io/privacy` (`src/app/privacy/page.tsx`), open to everyone, signed in or not. That
 page is the policy, and it goes out with the website. When the extension starts reading, sending or keeping something
-new, change the page and section 3 together, and move the page's date. Until BenchQ has a support address, the page's
-contact line sends people to their firm's owner; once the address is chosen, add it there.
+new, change the page and section 3 together, and move the page's date. Its contact line gives hello@benchq.io, and sends
+questions about a firm's own data to that firm's owner.
 
 ## 5. Instructions for the reviewer
 

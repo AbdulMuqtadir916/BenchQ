@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <p className="text-display text-[var(--color-text)]">BenchQ</p>
           <h1 className="mt-5 text-h1 text-[var(--color-text)]">BenchQ Apply privacy policy</h1>
           <p className="mt-2 text-caption text-[var(--color-text-3)]">
-            Last updated <time dateTime="2026-11-21">21 November 2026</time>
+            Last updated <time dateTime="2026-11-23">23 November 2026</time>
           </p>
         </header>
 
@@ -88,7 +88,10 @@ export default function PrivacyPage() {
           </Section>
 
           <Section title="Questions">
-            <p>For BenchQ account data, contact your firm&apos;s owner in BenchQ.</p>
+            <p>
+              For BenchQ account data, contact your firm&apos;s owner in BenchQ, or write to{" "}
+              <a href="mailto:hello@benchq.io" className="text-[var(--color-primary)]">hello@benchq.io</a>.
+            </p>
           </Section>
         </div>
 
