@@ -50,7 +50,6 @@ export function CandidateJobsTab({ candidate, jobs, applications, isLoading, err
           transition={{ duration: 0.32, ease: EASE_OUT }}
         >
           <JobExplorer
-            jobs={jobs}
             applications={applications}
             loading={isLoading}
             lockedCandidate={candidate}

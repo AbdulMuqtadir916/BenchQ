@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { slugProblem, suggestSlug } from "@/lib/derive/platform";
 import { CANDIDATES_PER_SEAT, candidateLimitFor, formatUsd, periodAmountCents } from "@/lib/derive/billing";
+import { workHoursProblem } from "@/lib/derive/work-hours";
 import { useCreateFirm, usePlans, usePlatformFirms } from "@/lib/hooks/use-platform";
 import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
@@ -31,16 +32,19 @@ interface Form {
   candidateLimit: string;
   primaryTimezone: string;
   clientTimezone: string;
+  workStart: string;
+  workEnd: string;
   contactPhone: string;
   ownerName: string;
   ownerEmail: string;
 }
 
-const EMPTY: Form = { name: "", slug: "", planId: "", seatLimit: "", candidateLimit: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", contactPhone: "", ownerName: "", ownerEmail: "" };
+// The work hours start empty: they are required and have no default (07 Q67, decided 2026-11-17, Q152).
+const EMPTY: Form = { name: "", slug: "", planId: "", seatLimit: "", candidateLimit: "", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York", workStart: "", workEnd: "", contactPhone: "", ownerName: "", ownerEmail: "" };
 
 /**
  * /admin/firms/new (docs/04 §14.4). Creates the firm (ONBOARDING) with a BDE count (the plan's by default; 10 candidates
- * per BDE follow, 07 Q65) and the plan's price copied, and
+ * per BDE follow, 07 Q74) and the plan's price copied, and
  * the OWNER's 7-day invite. Application expiry takes its default: the OWNER
  * changes them in settings/firm. Esc or Cancel goes back to the list, confirming if anything was typed.
  */
@@ -74,6 +78,7 @@ export function CreateFirm() {
     planId: plan ? null : "Choose a plan.",
     seatLimit: seatsText === "" || (Number.isInteger(seats) && seats >= 1 && seats <= 1000) ? null : "A whole number from 1 to 1000.",
     candidateLimit: candidatesText === "" || (Number.isInteger(candidates) && candidates <= 100000) ? null : "A whole number from 0 to 100000.",
+    workHours: workHoursProblem(form.workStart, form.workEnd),
     ownerName: form.ownerName.trim() ? null : "Enter the owner's name.",
     ownerEmail: EMAIL.test(form.ownerEmail.trim()) ? null : "Enter a valid email address.",
   };
@@ -180,6 +185,14 @@ export function CreateFirm() {
                 <select id="firm-client-tz" value={form.clientTimezone} onChange={(event) => set("clientTimezone", event.target.value)} className="bq-input w-full">
                   {TIMEZONES.map((zone) => <option key={zone.value} value={zone.value}>{zone.label}</option>)}
                 </select>
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="firm-work-start" label="Work hours start" error={shown("workHours")} hint="In the primary timezone. A work day runs from one start to the next.">
+                <Input {...fieldAria("firm-work-start", shown("workHours"), true)} type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
+              </Field>
+              <Field id="firm-work-end" label="Work hours end" hint="May be past midnight, e.g. 4:00 AM.">
+                <Input {...fieldAria("firm-work-end", null, true)} aria-invalid={shown("workHours") ? true : undefined} type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
               </Field>
             </div>
             <Field id="firm-phone" label="Contact phone (optional)">

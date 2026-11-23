@@ -31,6 +31,8 @@ export const FirmDto = z.object({
   logo_url: z.string().nullable(),
   primary_timezone: z.string(),
   client_timezone: z.string(),
+  work_start: z.string(),
+  work_end: z.string(),
   application_expiry_days: z.number(),
   status: z.string(),
   plan_id: id,
@@ -146,7 +148,7 @@ export const InviteLookupDto = z.union([
 
 /** What creating a firm or sending / resending an invite returns: the link's token, shown once (07 Q38). */
 export const InviteWithTokenDto = z.object({ invite: InviteDto, invite_token: z.string() });
-/** A firm as the Super Admin reads it: the firm plus its price per BDE (07 Q67). No firm-side response has the price. */
+/** A firm as the Super Admin reads it: the firm plus its price per BDE (07 Q76). No firm-side response has the price. */
 export const AdminFirmDto = FirmDto.extend({ price_cents_per_seat: z.number() });
 export const CreatedFirmDto = InviteWithTokenDto.extend({ firm: AdminFirmDto });
 
@@ -165,6 +167,8 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
     logoUrl: dto.logo_url,
     primaryTimezone: dto.primary_timezone,
     clientTimezone: dto.client_timezone,
+    workStart: dto.work_start,
+    workEnd: dto.work_end,
     applicationExpiryDays: dto.application_expiry_days,
     status: dto.status,
     planId: mapId(dto.plan_id),

@@ -1,4 +1,4 @@
-"""The Super Admin's billing record and the firm actions that go with it (07 Q65-Q67, docs/02 §3.5): the base plan's
+"""The Super Admin's billing record and the firm actions that go with it (07 Q74-Q76, docs/02 §3.6): the base plan's
 price, a firm's BDE count, 30-day billing periods, and suspending or reactivating a firm. Super Admin only
 (backend/auth/access.py classifies each route PLATFORM); each write needs its platform action and is logged.
 
@@ -82,10 +82,10 @@ class SeatsBody(BaseModel):
 @router.patch("/firms/{firm_id}/seats", summary="Set a firm's BDE count, candidate limit and (optionally) price per BDE")
 def set_seats(firm_id: uuid.UUID, body: SeatsBody, principal: Principal = Depends(require("firm.edit")),
               db: DbSession = Depends(get_db)):
-    """Q68: the candidate limit is its own number, set here by the Super Admin; a BDE-count change never moves it. It
+    """Q77: the candidate limit is its own number, set here by the Super Admin; a BDE-count change never moves it. It
     is only checked when a candidate is assigned to a BDE (Q45). Allowed below what the firm uses:
     nothing is removed, the firm is over its limit, and new BDE invites and assignments stay blocked until it is under
-    (A4). The period running today takes the new numbers, no proration (Q66)."""
+    (A4). The period running today takes the new numbers, no proration (Q75)."""
     admin = db.get(PlatformUser, principal.user_id)
     _get(db, Firm, firm_id, "Firm")
     firm = lock_firm(db, firm_id)
@@ -103,7 +103,7 @@ def set_seats(firm_id: uuid.UUID, body: SeatsBody, principal: Principal = Depend
         ledger.record(db, actor=admin, action="PLAN_CHANGED", entity_type="firm_limits", entity_id=firm.id,
                       entity_label=firm.name, firm_id=firm.id,
                       summary=f"BDE seats {old_seats} → {firm.seat_limit}, candidates {old_candidates} → {firm.candidate_limit}")
-    if price != old_price:        # a price is billing: platform-only, never in the firm's own ledger (Q67)
+    if price != old_price:        # a price is billing: platform-only, never in the firm's own ledger (Q76)
         ledger.record(db, actor=admin, action="PLAN_CHANGED", entity_type="billing_terms", entity_id=firm.id,
                       entity_label=firm.name, firm_id=None,
                       summary=f"Price per BDE {dollars(old_price)} → {dollars(price)} for {firm.name}")
@@ -126,7 +126,7 @@ class SuspendBody(BaseModel):
 @router.post("/firms/{firm_id}/suspend", summary="Suspend a firm: its people are signed out and blocked")
 def suspend_firm(firm_id: uuid.UUID, body: SuspendBody, principal: Principal = Depends(require("firm.suspend")),
                  db: DbSession = Depends(get_db)):
-    """Manual only (07 Q18, Q66): an overdue period never suspends anyone. The reason is kept in the firm's ledger."""
+    """Manual only (07 Q18, Q75): an overdue period never suspends anyone. The reason is kept in the firm's ledger."""
     admin = db.get(PlatformUser, principal.user_id)
     reason = body.reason.strip()
     if not reason:

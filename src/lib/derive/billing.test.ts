@@ -6,11 +6,11 @@ import {
 
 const period = (over: Partial<BillingPeriod> = {}): BillingPeriod => ({
   id: "p1", firmId: "firm_a", startsOn: "2026-11-01", endsOn: "2026-12-01", seatLimit: 10, candidateLimit: 100,
-  jobsPerCandidatePerDay: 100, priceCentsPerSeat: 3500, amountCents: 35000, status: "UNPAID", paidOn: null, note: null,
+  jobsPerCandidatePerDay: 50, priceCentsPerSeat: 3500, amountCents: 35000, status: "UNPAID", paidOn: null, note: null,
   createdAt: "2026-11-01T00:00:00.000Z", ...over,
 });
 
-describe("the arithmetic (07 Q65)", () => {
+describe("the arithmetic (07 Q74)", () => {
   it("gives a firm ten candidates per BDE and bills the BDE count times the price", () => {
     expect([10, 12, 1].map(candidateLimitFor)).toEqual([100, 120, 10]);
     expect(periodAmountCents(10, 3500)).toBe(35000);
@@ -30,7 +30,7 @@ describe("the arithmetic (07 Q65)", () => {
   });
 });
 
-describe("the overdue flag (07 Q66)", () => {
+describe("the overdue flag (07 Q75)", () => {
   it("is 'none', never overdue, for a firm with no period", () => {
     expect(billingState("firm_a", [], "2026-11-12")).toBe("none");
     expect(billingState("firm_a", [period({ firmId: "firm_b" })], "2026-11-12")).toBe("none");

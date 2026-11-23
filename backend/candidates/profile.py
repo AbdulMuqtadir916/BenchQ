@@ -10,7 +10,9 @@ from sqlalchemy.orm import load_only, object_session
 # candidates' name → resumes column
 FIELDS = {"full_name": "full_name", "email": "email", "phone": "phone", "linkedin_url": "linkedin",
           "city": "city", "state": "state", "country": "country"}
-EMPTY = dict.fromkeys(FIELDS)
+# Read from the active base's version 1, not its newest (decided 2026-11-17: the job search's extra titles).
+V1_FIELDS = {"search_titles": "search_titles"}
+EMPTY = dict.fromkeys({**FIELDS, **V1_FIELDS})
 
 
 def _headers(db, firm_id, candidate_ids) -> dict:
@@ -24,11 +26,14 @@ def _headers(db, firm_id, candidate_ids) -> dict:
     rows = (scoped(db, Resume, firm_id).join(BaseResume, BaseResume.id == Resume.base_resume_id)
             .filter(Resume.candidate_id.in_(ids), BaseResume.is_active, BaseResume.deleted_at.is_(None),
                     Resume.category == "BASE", Resume.deleted_at.is_(None))
-            .options(load_only(Resume.candidate_id, Resume.version, *(getattr(Resume, c) for c in FIELDS.values())))
+            .options(load_only(Resume.candidate_id, Resume.version,
+                               *(getattr(Resume, c) for c in {**FIELDS, **V1_FIELDS}.values())))
             .order_by(Resume.candidate_id, Resume.version.desc()).all())
     out: dict = {}
     for r in rows:
-        out.setdefault(r.candidate_id, {k: getattr(r, c) for k, c in FIELDS.items()})
+        out.setdefault(r.candidate_id, {**{k: getattr(r, c) for k, c in FIELDS.items()}, **dict.fromkeys(V1_FIELDS)})
+        if r.version == 1:
+            out[r.candidate_id].update({k: getattr(r, c) for k, c in V1_FIELDS.items()})
     return out
 
 

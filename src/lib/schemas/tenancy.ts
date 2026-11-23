@@ -28,7 +28,7 @@ export const FirmStatus = z.enum(["ONBOARDING", "ACTIVE", "SUSPENDED"]);
 export type FirmStatus = z.infer<typeof FirmStatus>;
 
 /**
- * The base plan (docs/02 §3.5, 07 Q65): a template (A3) whose numbers are copied onto a firm when it is created.
+ * The base plan (docs/02 §3.6, 07 Q74): a template (A3) whose numbers are copied onto a firm when it is created.
  * `candidateLimit` is always 10 × `seatLimit`. The price is the Super Admin's: no firm-side response carries it.
  */
 export const PlanSchema = z.object({
@@ -45,7 +45,7 @@ export type Plan = z.infer<typeof PlanSchema>;
 export const BillingStatus = z.enum(["UNPAID", "PAID"]);
 export type BillingStatus = z.infer<typeof BillingStatus>;
 
-/** One 30-day period of a firm's billing record (docs/02 §3.5, 07 Q66): a snapshot, so later changes never rewrite it. */
+/** One 30-day period of a firm's billing record (docs/02 §3.6, 07 Q75): a snapshot, so later changes never rewrite it. */
 export const BillingPeriodSchema = z.object({
   id: z.string(),
   firmId: z.string(),

@@ -8,6 +8,7 @@ import {
   Layers,
   LayoutDashboard,
   ShieldCheck,
+  Sparkles,
   Mail,
   ScrollText,
   Send,
@@ -135,6 +136,7 @@ const ROUTE_DEFS = [
   { id: "admin.audit", path: "/admin/audit", title: "Audit", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText }, shortcut: "a", palette: true },
   { id: "admin.system", path: "/admin/system", title: "System", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 5, icon: Activity }, shortcut: "s", palette: true },
   { id: "admin.team", path: "/admin/team", title: "Team", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 6, icon: Users }, shortcut: "t", palette: true },
+  { id: "admin.aiPresets", path: "/admin/ai-presets", title: "AI presets", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 7, icon: Sparkles }, shortcut: "i", palette: true },
   { id: "admin.notifications", path: "/admin/notifications", title: "Notifications", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "preferences", order: 1, icon: Bell }, palette: true },
   { id: "admin.notifications.requests", path: "/admin/notifications/requests", title: "Requests", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "notifications", order: 1, icon: KeyRound }, palette: true },
 ] as const satisfies readonly RouteDef[];

@@ -13,7 +13,7 @@ These tables exist only through Alembic (migrations/versions/0003_auth_tenancy.p
 import uuid
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Index, Integer, String, Text, Time, UniqueConstraint,
     text,
 )
 from sqlalchemy import event
@@ -77,8 +77,8 @@ class Plan(Base):
     name = Column(String, nullable=False, unique=True)
     seat_limit = Column(Integer, nullable=False)
     candidate_limit = Column(Integer, nullable=False)
-    features = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))  # unused since 07 Q65 (no features list)
-    price_cents_per_seat = Column(Integer, nullable=False, server_default=text("3500"))   # USD cents per BDE per period (Q65)
+    features = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))  # unused since 07 Q74 (no features list)
+    price_cents_per_seat = Column(Integer, nullable=False, server_default=text("3500"))   # USD cents per BDE per period (Q74)
     is_active = Column(Boolean, nullable=False, server_default=text("true"))      # false = hidden from new firms
     created_at = _created_at()
     updated_at = _updated_at()
@@ -99,17 +99,23 @@ class Firm(Base):
     status = Column(String, nullable=False, server_default=text("'ONBOARDING'"))
     plan_id = Column(UUID(as_uuid=True), _restrict("plans.id"), nullable=False, index=True)  # required (A16)
     seat_limit = Column(Integer, nullable=False)          # effective limits, copied from the plan (A3)
-    candidate_limit = Column(Integer, nullable=False)     # set by the Super Admin; starts at CANDIDATES_PER_SEAT × seat_limit (07 Q68)
+    candidate_limit = Column(Integer, nullable=False)     # set by the Super Admin; starts at CANDIDATES_PER_SEAT × seat_limit (07 Q77)
     price_cents_per_seat = Column(Integer, nullable=False, server_default=text("3500"))   # Super Admin only, never serialized to a firm
     contact_phone = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
     primary_timezone = Column(String, nullable=False, server_default=text("'Asia/Kolkata'"))
     client_timezone = Column(String, nullable=False, server_default=text("'America/New_York'"))
     application_expiry_days = Column(Integer, nullable=False, server_default=text("30"))
+    # The firm's work hours, in `primary_timezone` (migration 0031; decided 2026-11-17, Q152–Q174): required, no
+    # default (existing firms got 18:30–04:00). A work day runs from one start to the next
+    # (backend/job_search/workday.py); the end is only shown.
+    work_start = Column(Time, nullable=False)
+    work_end = Column(Time, nullable=False)
     created_at = _created_at()
     updated_at = _updated_at()
 
     __table_args__ = (
+        CheckConstraint("work_start <> work_end", name="ck_firms_work_hours"),
         CheckConstraint(f"slug ~ '{SLUG_PATTERN}'", name="ck_firms_slug_format"),
         CheckConstraint(_in("status", FIRM_STATUSES), name="ck_firms_status"),
         CheckConstraint("seat_limit >= 0 AND candidate_limit >= 0", name="ck_firms_limits_not_negative"),
@@ -122,7 +128,7 @@ BILLING_STATUSES = ("UNPAID", "PAID")
 
 
 class BillingPeriod(Base):
-    """One 30-day period of a firm's billing record (07 Q66, docs/02 §3.5): a snapshot of the numbers it was billed on.
+    """One 30-day period of a firm's billing record (07 Q75, docs/02 §3.6): a snapshot of the numbers it was billed on.
     Super Admin only; nothing here reaches a firm user. The amount is the BDE count times the price, enforced here."""
     __tablename__ = "firm_billing_periods"
 

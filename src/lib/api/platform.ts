@@ -17,18 +17,21 @@ export interface CreateFirmInput {
   name: string;
   slug: string;
   planId: string;
-  /** BDEs the firm may have (07 Q65); the plan's count when left out. */
+  /** BDEs the firm may have (07 Q74); the plan's count when left out. */
   seatLimit?: number;
-  /** Candidates that may be assigned to BDEs (07 Q68); 10 per BDE when left out. */
+  /** Candidates that may be assigned to BDEs (07 Q77); 10 per BDE when left out. */
   candidateLimit?: number;
   primaryTimezone: string;
   clientTimezone: string;
+  /** Required, no default (07 Q67): "HH:MM" in `primaryTimezone`. */
+  workStart: string;
+  workEnd: string;
   contactPhone: string | null;
   ownerName: string;
   ownerEmail: string;
 }
 export type FirmProfileInput = Pick<Firm, "name" | "contactPhone" | "primaryTimezone" | "clientTimezone">;
-/** A firm's BDE count, candidate limit and, optionally, its price per BDE in USD cents (07 Q65, Q68). The candidate limit is its own number: left out, the firm keeps its own. */
+/** A firm's BDE count, candidate limit and, optionally, its price per BDE in USD cents (07 Q74, Q77). The candidate limit is its own number: left out, the firm keeps its own. */
 export interface SeatsInput {
   seatLimit: number;
   candidateLimit?: number;
@@ -60,7 +63,7 @@ const live = {
     create: async (input: CreateFirmInput) => {
       const body = {
         name: input.name, slug: input.slug, plan_id: toBackendId(input.planId), primary_timezone: input.primaryTimezone,
-        client_timezone: input.clientTimezone, seat_limit: input.seatLimit, candidate_limit: input.candidateLimit, contact_phone: input.contactPhone, owner_name: input.ownerName, owner_email: input.ownerEmail,
+        client_timezone: input.clientTimezone, work_start: input.workStart, work_end: input.workEnd, seat_limit: input.seatLimit, candidate_limit: input.candidateLimit, contact_phone: input.contactPhone, owner_name: input.ownerName, owner_email: input.ownerEmail,
       };
       return toAdminFirm((await http.post("/api/admin/firms", CreatedFirmDto, { body })).firm);
     },
@@ -134,7 +137,7 @@ export const platformApi = {
     changeSlug: unavailable<[string, string], AdminFirm>(),
     suspend: async (firmId: string, reason: string): Promise<AdminFirm> => live.firms.suspend(firmId, reason),
     reactivate: async (firmId: string): Promise<AdminFirm> => live.firms.reactivate(firmId),
-    /** The BDE count (07 Q65); the candidate limit follows. Replaces Change plan and Adjust limits. */
+    /** The BDE count (07 Q74); the candidate limit follows. Replaces Change plan and Adjust limits. */
     setSeats: async (firmId: string, input: SeatsInput): Promise<AdminFirm> => live.firms.setSeats(firmId, input),
   },
   users: {
@@ -154,7 +157,7 @@ export const platformApi = {
     list: async (): Promise<Plan[]> => live.plans.list(),
     update: async (planId: string, input: PlanInput): Promise<Plan> => live.plans.update(planId, input),
   },
-  /** Billing records, Super Admin only (07 Q66–Q67). Omit the firm for every period. */
+  /** Billing records, Super Admin only (07 Q75–Q76). Omit the firm for every period. */
   billing: {
     list: async (firmId?: string): Promise<BillingPeriod[]> => live.billing.list(firmId),
     start: async (firmId: string, input: StartPeriodInput): Promise<BillingPeriod> => live.billing.start(firmId, input),

@@ -6,7 +6,7 @@ import { Check, LoaderCircle, SkipForward } from "lucide-react";
 import type { Application } from "@/lib/schemas/application";
 import type { Candidate } from "@/lib/schemas/candidate";
 import type { Job } from "@/lib/schemas/job";
-import { deriveMatchScore, isJobForCandidate } from "@/lib/derive";
+import { isJobForCandidate, matchFor } from "@/lib/derive";
 import { cn } from "@/lib/cn";
 import { EASE_OUT } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ function useMatchStats(candidate: Candidate | null, jobs: Job[], applications: A
     if (!candidate) return { active: active.length, eligible: 0, strong: 0, best: null as null | { score: number; job: Job } };
     const applied = new Set(applications.filter((a) => a.candidateId === candidate.id).map((a) => a.jobId));
     const eligible = active.filter((j) => isJobForCandidate(j, candidate) && !applied.has(j.id));
-    const scored = eligible.map((job) => ({ job, score: deriveMatchScore(candidate, job) }));
+    // The stored Match (decided 2026-11-14); a job not scored yet counts as eligible, never as strong.
+    const scored = eligible.map((job) => ({ job, score: matchFor(job, candidate.id)?.score ?? 0 }));
     const best = scored.reduce<null | { score: number; job: Job }>((top, s) => (!top || s.score > top.score ? s : top), null);
     return { active: active.length, eligible: eligible.length, strong: scored.filter((s) => s.score >= 70).length, best };
   }, [candidate, jobs, applications]);

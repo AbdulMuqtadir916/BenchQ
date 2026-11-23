@@ -407,9 +407,9 @@ def create_application(
 
         def under_the_cap():
             if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
-                resets = f"{limits.next_reset(now).astimezone(limits.IST):%I:%M %p}".lstrip("0")
+                resets = limits.resets_at_text(db, firm_id, now)
                 raise Problem(429, f"You've added {limits.CAPTURES_PER_BDE_PER_DAY} jobs today, the most for one day. "
-                                   f"It resets at {resets} IST.", DAILY_LIMIT)
+                                   f"It resets at {resets}.", DAILY_LIMIT)
         posting, job_created = add_job(db, firm_id=firm_id, actor=actor, candidate=candidate, source=data.job.source,
                                        job=data.job.model_dump(exclude={"source"}), admit=under_the_cap)
         app, application_created = ensure_saved(db, firm_id=firm_id, actor=actor, candidate=candidate, posting=posting)

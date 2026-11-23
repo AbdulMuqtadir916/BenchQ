@@ -49,7 +49,8 @@ export function BdeDashboard() {
     [myCandidates],
   );
   // The queue is one candidate's: only their jobs are read (Zuhair 2026-11-12), once the candidate is known.
-  const jobsQuery = useJobs({ limit: 300, candidateId: topCandidate?.id }, { isEnabled: Boolean(topCandidate) });
+  // The top candidate's best Match first (decided 2026-11-14): the first page holds the ones to queue.
+  const jobsQuery = useJobs({ limit: 100, candidateId: topCandidate?.id, sort: "match", excludeApplied: true }, { isEnabled: Boolean(topCandidate) });
   // With no candidate there is no jobs read to wait for (a disabled query stays pending).
   const jobReads = topCandidate ? [jobsQuery] : [];
   // docs/04 §13: one group per set of cards that read the same queries.
@@ -169,7 +170,7 @@ export function BdeDashboard() {
             <EmptyState icon={Users} title="Queue is clear" description="No unapplied matches for this candidate right now." variant="filtered" />
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
-              {queue.map(({ job, score }) => (
+              {queue.map(({ job, score, note }) => (
                 // Wraps so the Tailor note (an item of this row, docs: TailorButton "icon") takes its own line below
                 // it. gap-x-1 between the actions, me-2 after the title and the score keep the old gap-3 spacing.
                 <li key={job.id} className="flex flex-wrap items-center gap-x-1 gap-y-1 px-4 py-3 hover:bg-[var(--color-surface-2)]">
@@ -182,7 +183,7 @@ export function BdeDashboard() {
                       <Tag tone="neutral">{job.remoteMode}</Tag>
                     </div>
                   </div>
-                  <MatchScore score={score} className="me-2 hidden sm:flex" />
+                  {score !== null ? <MatchScore score={score} note={note} className="me-2 hidden sm:flex" /> : null}
                   {/* Mark applied and Outreach go in Tailor's group, before its note in the DOM: focus runs Tailor,
                       picker, Mark applied, Outreach, then the note's Copy and links, as the eye reads it (WCAG 2.4.3). */}
                   {topCandidate ? (

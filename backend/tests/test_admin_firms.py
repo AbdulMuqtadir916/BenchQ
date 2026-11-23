@@ -16,6 +16,7 @@ ADMIN_FIRMS = "/api/admin/firms"
 def _body(accounts, **over):
     body = {"name": "Northwind Staffing", "slug": "northwind", "plan_id": str(accounts.plan_id),
             "primary_timezone": "Asia/Kolkata", "client_timezone": "America/New_York", "contact_phone": " +91 98 ",
+            "work_start": "18:30", "work_end": "04:00",
             "owner_name": " Nora North ", "owner_email": " Nora@Northwind.test "}
     return {**body, **over}
 
@@ -69,6 +70,9 @@ def test_create_logs_firm_created_and_invite_sent_in_the_firms_ledger(api_client
     ({"slug": "acme"}, "Another firm already uses this slug."),
     ({"owner_email": "not-an-email"}, "Enter a valid email address."),
     ({"primary_timezone": "Mars/Olympus"}, "Unknown timezone: Mars/Olympus"),
+    ({"work_start": "6pm"}, "Enter the work hours' start and end as HH:MM."),
+    ({"work_end": "25:00"}, "Enter the work hours' start and end as HH:MM."),
+    ({"work_start": "09:00", "work_end": "09:00"}, "The work hours can't start and end at the same time."),
 ])
 def test_create_refuses_bad_input_with_the_mocks_messages(api_client, accounts, over, message):
     r = _create(api_client, accounts, **over)

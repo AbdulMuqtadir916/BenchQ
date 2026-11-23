@@ -197,3 +197,30 @@ describe("using the tab that shows the job (#130)", () => {
     expect(stored(before)).toBeUndefined();
   });
 });
+
+describe("LinkedIn postings inside BenchQ (frame-rules.ts, decided 2026-11-17)", () => {
+  it("lifts the frame headers only for frames BenchQ opens, and sends the page-visit headers", async () => {
+    const { frameRules, benchqHost } = await import("./frame-rules");
+    const host = benchqHost("http://localhost:3000");
+    const [lift, visit] = frameRules(host);
+    expect(lift.condition).toEqual({ urlFilter: "*", resourceTypes: ["sub_frame"], initiatorDomains: ["localhost"],
+      excludedRequestDomains: ["localhost"] });
+    expect((lift.action as { responseHeaders: { header: string }[] }).responseHeaders.map((h) => h.header))
+      .toEqual(["x-frame-options", "content-security-policy"]);
+    expect((visit.action as { requestHeaders: unknown[] }).requestHeaders).toEqual([
+      { header: "sec-fetch-dest", operation: "set", value: "document" },
+      { header: "sec-fetch-site", operation: "set", value: "none" }]);
+  });
+
+  it("the panel's switch takes the rules away and puts them back", async () => {
+    const { setupFrameRules } = await import("./frame-rules");
+    fake.declarativeNetRequest.updateSessionRules.mockClear();
+    fake.sync.set("previewUnblock", false);
+    await setupFrameRules();
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenCalledTimes(1);           // removed only
+    fake.sync.set("previewUnblock", true);
+    await setupFrameRules();
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenLastCalledWith(
+      expect.objectContaining({ addRules: expect.any(Array) }));
+  });
+});

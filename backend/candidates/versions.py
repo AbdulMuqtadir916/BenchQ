@@ -55,6 +55,19 @@ def content_of(row: Resume) -> dict:
             **{k: copy.deepcopy(getattr(row, k) or []) for k in SECTIONS}}
 
 
+def fixed_identity(candidate) -> dict:
+    """The candidate's name and email, which every version carries (07 Q68, 2026-11-18): fixed once the candidate is
+    added, so a save, an upload, a base made from another version and a tailoring all take them from the candidate,
+    never from what was sent, parsed or copied."""
+    return {"full_name": candidate.full_name, "email": candidate.email}
+
+
+def _same_identity(candidate, submitted: dict) -> bool:
+    """Whether a save sends the candidate's own name and email (spacing around them and the email's case aside)."""
+    name, email = (submitted.get("full_name") or "").strip(), (submitted.get("email") or "").strip().lower()
+    return name == (candidate.full_name or "").strip() and email == (candidate.email or "").strip().lower()
+
+
 def _items(content: dict):
     """Every item with an id, bullets included: (id, its fields without the id). A job's or project's fields hold its
     bullets' text, since its claim covers them: a changed, added or removed bullet changes the job too (§4.5). The
@@ -158,7 +171,9 @@ def version_json(row: Resume, *, with_content: bool = False) -> dict:
            "title": row.title,
            "template": row.template, "page_format": row.page_format,
            "created_by_user_id": str(row.created_by_user_id) if row.created_by_user_id else None,
-           "created_at": row.created_at.isoformat() if row.created_at else None}
+           "created_at": row.created_at.isoformat() if row.created_at else None,
+           # A tailored version's Match against its job (decided 2026-11-14, Q39); null for a base, or until worked out.
+           "match_score": row.match_score, "match_note": row.match_note}
     return {**out, **content_of(row)} if with_content else out
 
 
@@ -274,7 +289,9 @@ def _record(db, actor: User, candidate, action: str, entity_id, label: str, summ
 
 
 def _activate(db, candidate, base: BaseResume) -> None:
-    """`base` becomes the one the workflow uses; the previous one is switched off first (the database allows one)."""
+    """`base` becomes the one the workflow uses; the previous one is switched off first (the database allows one). The
+    job search's extra titles go with it (decided 2026-11-17, Q142): they come from the target role, not the résumé."""
+    candidate.__dict__["_carried_titles"] = candidate.search_titles
     scoped(db, BaseResume, candidate.firm_id).filter(BaseResume.candidate_id == candidate.id, BaseResume.is_active,
                                                      BaseResume.id != base.id) \
         .update({BaseResume.is_active: False}, synchronize_session="fetch")
@@ -284,6 +301,19 @@ def _activate(db, candidate, base: BaseResume) -> None:
     # The candidate's name and contact are the active base's (07 Q57): forget the ones read from the old base, so the
     # ledger entry written next and the response carry the new ones (Abdul's PR 7 review, #3).
     profile.refresh(candidate)
+    carry_titles(db, candidate)
+
+
+def carry_titles(db, candidate) -> None:
+    """The extra search titles the previous active base had, onto the new active base's v1 when it has none yet (its
+    v1 may be written after `_activate`: `upload_base` calls this again)."""
+    from backend.job_search import search_titles
+    carried = candidate.__dict__.get("_carried_titles")
+    row = search_titles.active_v1(db, candidate) if carried else None
+    if row is not None and row.search_titles is None:
+        row.search_titles = list(carried)
+        db.flush()
+        profile.refresh(candidate)
 
 
 @dataclass
@@ -333,8 +363,10 @@ def save_autofill(db, actor: User, candidate, row: Resume, change: dict, *, only
 
 def save_version(db, actor: User, candidate, source: Resume, submitted: dict) -> Saved:
     """The next version of `source`'s résumé with `submitted` as its content (§4.3)."""
+    if not _same_identity(candidate, submitted):
+        raise _bad("The candidate's name and email can't be changed.")
     before = content_of(source)
-    content = _with_ids(before, submitted)
+    content = {**_with_ids(before, submitted), **fixed_identity(candidate)}
     if content == before:
         raise _bad("No changes to save.")
     latest = _group(db, source).with_entities(func.max(Resume.version)).scalar() or source.version
@@ -370,6 +402,7 @@ def base_for_tailoring(db, actor: User, candidate, row: Resume) -> BaseResume:
 
 
 def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> BaseResume:
+    identity = fixed_identity(candidate)        # read before a switch of active base empties the profile (07 Q68)
     numbers = base_numbers(db, candidate)
     if row.category == "BASE" and row.version == 1:
         target = candidate_base(db, candidate, row.base_resume_id)
@@ -397,9 +430,12 @@ def _base_from(db, actor: User, candidate, row: Resume, *, activate: bool) -> Ba
         _activate(db, candidate, base)
     copied = Resume(firm_id=candidate.firm_id, candidate_id=candidate.id, base_resume_id=base.id, category="BASE",
                     job_id=None, version=1, name=row.name, template=row.template, page_format=row.page_format,
-                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)), **content_of(row))
+                    created_by_user_id=actor.id, autofill=copy.deepcopy(autofill.entries_of(row)),
+                    **{**content_of(row), **identity})
     db.add(copied)
     db.flush()
+    if activate:
+        carry_titles(db, candidate)             # its v1 exists only now
     number = len(numbers) + 1
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
             f"Made Base {number} from {source}" + ("; the workflow uses it" if activate else purpose))
@@ -476,6 +512,7 @@ def upload_base(db, actor: User, candidate, parse_row: ResumeParse) -> BaseResum
     _activate(db, candidate, base)
     db.add(version)
     db.flush()
+    carry_titles(db, candidate)
     number = base_numbers(db, candidate)[base.id]
     _record(db, actor, candidate, "CREATE", base.id, _label(candidate, number),
             f"Uploaded a new résumé ({parse_row.file_name}) as Base {number}; the workflow uses it")

@@ -57,6 +57,13 @@ NOT_REACHED: dict[str, str] = {
     # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": "403: Only this candidate's BDE adds jobs for them",
+    # The sweep plants a value in every query parameter, and `batch` names no search of the candidate's: the same 404
+    # as any unknown id (2026-11-17, Q109). The list logs nothing of a job (test_job_search_fanout.py lists it).
+    "GET /api/firms/{firm_id}/job-postings": "404: Not found",
+    # A posting is pasted only for a job that came without its text (a LinkedIn job, Q107); the seeded job has its
+    # text. The paste logs nothing of the text (test_job_search_linkedin.py pastes one).
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting":
+        "409: This job already has its posting",
     # Only the candidate's BDE tailors (07 Q55) and the sweep signs in as the OWNER; its seeded job_runs row is no
     # firm's tailoring. The tailor's own logging (ids, codes, counts; never a résumé or a posting) is checked in
     # test_resume_tailor_routes.py.

@@ -41,8 +41,8 @@ def _plan() -> uuid.UUID:
 
 def _firm(slug: str | None = None, plan_id=None) -> uuid.UUID:
     fid = uuid.uuid4()
-    _run("""INSERT INTO firms (id, name, slug, plan_id, seat_limit, candidate_limit)
-            VALUES (:id, 'Acme', :slug, :plan, 4, 25)""",
+    _run("""INSERT INTO firms (id, name, slug, plan_id, seat_limit, candidate_limit, work_start, work_end)
+            VALUES (:id, 'Acme', :slug, :plan, 4, 25, '18:30', '04:00')""",
          id=fid, slug=slug or f"f{fid.hex[:12]}", plan=plan_id or _plan())
     return fid
 
@@ -91,14 +91,23 @@ def test_bad_slugs_are_refused(slug):
 
 def test_slugs_are_unique():
     _firm("acme")
-    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit)
-                VALUES ('Other', 'acme', :plan, 1, 1)""", plan=_plan())
+    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit, work_start, work_end)
+                VALUES ('Other', 'acme', :plan, 1, 1, '18:30', '04:00')""", plan=_plan())
 
 
 def test_a_firm_needs_a_plan_and_a_known_status():
-    _refused("INSERT INTO firms (name, slug, seat_limit, candidate_limit) VALUES ('X', 'xxx', 1, 1)")
-    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit, status)
-                VALUES ('X', 'xxx', :plan, 1, 1, 'TRIAL')""", plan=_plan())
+    _refused("INSERT INTO firms (name, slug, seat_limit, candidate_limit, work_start, work_end) "
+             "VALUES ('X', 'xxx', 1, 1, '18:30', '04:00')")
+    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit, status, work_start, work_end)
+                VALUES ('X', 'xxx', :plan, 1, 1, 'TRIAL', '18:30', '04:00')""", plan=_plan())
+
+
+def test_a_firm_needs_its_work_hours_and_they_differ():
+    """07 Q67 (migration 0031): required, no default; start and end can't be the same."""
+    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit)
+                VALUES ('X', 'xxx', :plan, 1, 1)""", plan=_plan())
+    _refused("""INSERT INTO firms (name, slug, plan_id, seat_limit, candidate_limit, work_start, work_end)
+                VALUES ('X', 'xxx', :plan, 1, 1, '09:00', '09:00')""", plan=_plan())
 
 
 def test_a_firm_starts_onboarding():

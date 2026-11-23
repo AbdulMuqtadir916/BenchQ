@@ -213,7 +213,7 @@ const DEV_ROUTES: readonly RouteId[] = ["design-system"];
 /** docs/07 §2.3: PLATFORM_ADMIN only, every route of the list (P3). */
 const PLATFORM_ROUTES: readonly RouteId[] = [
   "admin", "admin.firms", "admin.firms.new", "admin.firms.detail", "admin.firms.detail.users", "admin.firms.detail.plan", "admin.firms.detail.activity",
-  "admin.plans", "admin.audit", "admin.system", "admin.team", "admin.notifications", "admin.notifications.requests",
+  "admin.plans", "admin.audit", "admin.system", "admin.team", "admin.aiPresets", "admin.notifications", "admin.notifications.requests",
 ];
 
 describe("access table (docs/07 §2.2)", () => {
@@ -403,7 +403,7 @@ describe("platform tier (docs/07 §2.3, §2.2 Support, P1)", () => {
   it("lands a platform admin on /admin and gives them only the admin nav", () => {
     expect(landingFor(admin)).toBe("admin");
     expect(hrefFor(landingFor(admin))).toBe("/admin");
-    expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin", "admin.firms", "admin.plans", "admin.audit", "admin.system", "admin.team"]);
+    expect(navFor(admin, "admin").map((route) => route.id)).toEqual(["admin", "admin.firms", "admin.plans", "admin.audit", "admin.system", "admin.team", "admin.aiPresets"]);
     expect(navFor(admin, "preferences").map((route) => route.id)).toEqual(["admin.notifications"]);
     expect(navFor(admin, "notifications").map((route) => route.id)).toEqual(["admin.notifications.requests"]);
     expect(navFor(admin, "workspace")).toEqual([]);
@@ -419,9 +419,9 @@ describe("admin nav and keys (docs/04 §14.1)", () => {
     expect(matchRoute("/admin/firms/firm_hts")?.id).toBe("admin.firms.detail");
   });
 
-  it("has the admin g-map g o · g f · g p · g a · g s · g t, only in the admin shell; the firm map stays the firm's", () => {
+  it("has the admin g-map g o · g f · g p · g a · g s · g t · g i, only in the admin shell; the firm map stays the firm's", () => {
     const keys = (principal: Principal, area: "firm" | "platform") => Object.fromEntries(shortcutsFor(principal, area).map(({ key, route }) => [key, route.id]));
-    expect(keys(admin, "platform")).toEqual({ o: "admin", f: "admin.firms", p: "admin.plans", a: "admin.audit", s: "admin.system", t: "admin.team" });
+    expect(keys(admin, "platform")).toEqual({ o: "admin", f: "admin.firms", p: "admin.plans", a: "admin.audit", s: "admin.system", t: "admin.team", i: "admin.aiPresets" });
     expect(keys(admin, "firm")).toEqual({});
     expect(keys(inSupport, "firm")).toEqual({ d: "dashboard", m: "managers", c: "candidates", j: "jobs", a: "applications" });
     expect(keys(asRole("MANAGER"), "firm")).not.toHaveProperty("m");
@@ -451,7 +451,7 @@ describe("⌘K navigation by area (P5, docs/04 §14.1)", () => {
   const ids = (principal: Principal, area: "firm" | "platform") => paletteRoutesFor(principal, area).map((route) => route.id).sort();
 
   it("a platform admin in the admin shell: the admin pages, nothing of a firm", () => {
-    expect(ids(admin, "platform")).toEqual(["admin", "admin.audit", "admin.firms", "admin.notifications", "admin.notifications.requests", "admin.plans", "admin.system", "admin.team"]);
+    expect(ids(admin, "platform")).toEqual(["admin", "admin.aiPresets", "admin.audit", "admin.firms", "admin.notifications", "admin.notifications.requests", "admin.plans", "admin.system", "admin.team"]);
     expect(ids(admin, "firm")).toEqual([]);
   });
 

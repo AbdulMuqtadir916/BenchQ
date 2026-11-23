@@ -18,7 +18,7 @@ import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 /**
- * A firm's billing record (docs/02 §3.5, 07 Q66): its 30-day periods, each a snapshot of the BDE count, the price and
+ * A firm's billing record (docs/02 §3.6, 07 Q75): its 30-day periods, each a snapshot of the BDE count, the price and
  * the calculated amount. Start next 30 days copies the firm's current limits; Mark paid / unpaid edits one period.
  * Super Admin only: amounts appear nowhere a firm can open.
  */
@@ -72,7 +72,7 @@ function BillingSection({ detail, periods }: { detail: FirmDetail; periods: Bill
         header: "",
         enableSorting: false,
         cell: ({ row }) => {
-          // A period that has not started cannot be paid or unpaid yet (docs/02 §3.5).
+          // A period that has not started cannot be paid or unpaid yet (docs/02 §3.6).
           if (row.original.startsOn > today) return null;
           return (
             <Can action="billing.edit">

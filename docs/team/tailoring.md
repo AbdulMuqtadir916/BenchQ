@@ -34,6 +34,7 @@ not started. Committed, not pushed.
 | Q10 | part 2 deletes `backend/analyzer/legacy_tailoring.py` and the old `tailoring` AI module (`cv_tailor_*`, `persona_tailor_prompt`) once nothing reads them. 422 when the posting has no description; 409 when the candidate has no usable base, or the same base and job is already being tailored. |
 | Q11 | Part 1's tests port JobNavigator's (`test_mads_tailor.py`, `test_mads_fact_gate.py`) and add the handoff's §13 list and the mappers. |
 | Q12 | A tailored version may leave out whole printed sections of the base (projects, certifications, awards). The header is the base's but for the title (the tailored headline). Every job stays. **Languages always stay as the base has them** (2026-11-12): they are never printed, and autofill reads them from the version. |
+| Bullets | Decided by Zuhair 2026-11-17 (**replaces the handoff's ranges** 4–6, 3–4, 2–3, under which an older role often got 2): **6 bullets for the most recent role, 4 for the previous one, 3 for each older role**, fewer only when the résumé's role holds fewer. The draft, revise and verify prompts and the draft format ask for the counts (verify cuts a role that is over); `bullet_counts.to_count` runs after the fact gate: a role over its count keeps its first bullets, a short one gets its own unused résumé bullets, those naming more of the posting's keywords first, never one the draft already says in other words. `bullets_added` is kept in the run's counts. A database seeded before gets the new wording on start (`settings.upgrade_stored_defaults`), only where a row still holds the old default. |
 
 ## 2. What part 1 holds (`backend/resume_tailor/`)
 
@@ -55,24 +56,27 @@ Also in part 1: `without_fake_markers` in `backend/analyzer/prompt_fence.py` (no
 and `keyword_match.py` (at its last commit). Every difference is an import or a module prefix, and the documented
 `requirements_met: []`.
 
-## 3. Setup (`settings`)
+## 3. Setup (the `resume_tailor` AI preset)
 
-| Row | Value |
+Since 2026-11-22 the tailor runs on its active preset at `/admin/ai-presets` and the one shared key
+(`docs/integration/08-ai-presets.md`).
+
+| Part | Where |
 |---|---|
-| `resume_tailor_llm_provider` | `openrouter` (the only value accepted) |
-| `resume_tailor_llm_model` | `openai/gpt-6-luna` |
-| `resume_tailor_llm_api_key` | Seeded **empty**; set on the settings page, never in code or commits. Until it is set, every tailoring fails naming this row. |
-| `resume_tailor_system_prompt`, `resume_tailor_review_system_prompt`, `resume_tailor_writing_style`, `resume_tailor_cv_rules` | The two system prompts and the rules filled into `{writing_style}` and `{cv_rules}` |
-| `resume_tailor_{analyse,draft,review,revise,verify}_prompt` | The five step templates. Each must keep its placeholders (`settings.PLACEHOLDERS`). |
-| `resume_tailor_{analyse,draft,review,verify}_format` | The strict response formats, stored whole (`json_schema`, `strict: true`). Revise answers in the draft's, named `mads_revise`. Each schema must require the fields the code reads (`settings.READ_FIELDS`). |
+| Provider and key | The one OpenRouter key on the panel. Until it is set, every tailoring fails saying so. |
+| Model | The active preset (`openai/gpt-6-luna` by default) |
+| Two system prompts, writing style, CV rules, five step templates | The preset's prompts. Each step must keep its placeholders (`settings.PLACEHOLDERS`). |
+| The four strict response formats | In code (`schemas.py`). Revise answers in the draft's, named `mads_revise`. |
+| Running at once | `resume_tailor_max_concurrent`, 40 per backend process, editable on the panel |
 
 - **The request** (handoff §1) is BenchQ's `call_llm` with: the strict format and `provider.require_parameters`,
   `reasoning: {enabled: false}`, no temperature, `max_tokens` 12,000, no fallback model, a reply cut off at the cap
   retried. Four attempts with 2, 4 and 8 s between them. A reply that isn't JSON is asked for once more.
-- **The checks:** a save through `/api/settings` refuses a broken prompt or format (`invalid_setting_values`), and every
-  run reads the rows through `read_setup`, which raises `TailorSetupError` naming the row. part 2 answers that with a 500
-  (`NOT_CONFIGURED`, "The résumé tailor isn't set up yet. Ask your admin.") and logs the row (step 4b, `docs/02` §12).
-- **A prompt or format change needs re-testing:** they were measured as written.
+- **The checks:** a preset save refuses a broken prompt (`backend/ai/modules.py`), and every run reads its setup through
+  `read_setup`, which raises `TailorSetupError` saying what's missing. part 2 answers that with a 500
+  (`NOT_CONFIGURED`, "The résumé tailor isn't set up yet. Ask your admin.") and logs what's missing (step 4b, `docs/02`
+  §12).
+- **A prompt change needs re-testing:** they were measured as written.
 
 ## 4. A version in and out (`stored.py`)
 
@@ -98,6 +102,7 @@ handoff's base résumé (`build_base_resume`).
 Into `job_runs.meta`, counts only:
 - `gaps`;
 - `fact_gate_changes`;
+- `bullets_added` (2026-11-17): résumé bullets the count step put back to reach 6, 4, then 3;
 - `review_edits_applied` and `review_edits_missed`, and the same two for verify;
 - `keywords`: covered, synonym only, missing (has it), missing (gap);
 - `seconds` and `tokens` (input, output) per step.

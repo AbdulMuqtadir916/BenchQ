@@ -20,8 +20,9 @@ def _firm_and_candidate(engine):
         firm = db.get(Firm, accounts.firm_id)
         manager = make_user(db, firm, email="m@acme.test", role="MANAGER")
         other = make_firm(db, db.get(Plan, firm.plan_id), slug="globex")
-        db.commit()
+        # Read before the commit expires them: this older `firms` can't be reloaded through the model.
         firm_id, owner_id, manager_id, other_firm_id = accounts.firm_id, accounts.user_id, manager.id, other.id
+        db.commit()
     candidate_id = uuid.uuid4()
     with engine.begin() as conn:
         conn.execute(text(

@@ -17,11 +17,13 @@ import { cn } from "@/lib/cn";
 import { describeError, screenErrorText, type ErrorText } from "@/lib/api/error-text";
 import { ErrorReference } from "@/components/app/error-reference";
 import { startRefusal } from "./messages";
+import { PastePostingDialog } from "./paste-posting-dialog";
+import { ApiError } from "@/lib/api/client";
 
 interface TailorButtonProps {
   candidate: Candidate;
   /** One of the candidate's own jobs (its id is their posting's). */
-  job: { id: string; title: string };
+  job: { id: string; title: string; company?: { name: string } | null };
   /** "icon": a row's sparkle (the dashboard queue), the same picker beside it. */
   variant?: "button" | "icon";
   /**
@@ -105,6 +107,8 @@ function TailorControl({ candidate, job, variant = "button", align, leading, tra
     [shelfQuery.data, candidate.id],
   );
   const [picked, setPicked] = useState<string | null>(null);
+  // A job without its text (a LinkedIn job, Q107): the tailor refuses it (422), so the BDE pastes the posting first.
+  const [isPasting, setPasting] = useState(false);
   const sourceId = picked && sources.some((s) => s.value === picked && !s.disabled) ? picked : defaultId;
   const source = sources.find((s) => s.value === sourceId) ?? null;
 
@@ -120,7 +124,9 @@ function TailorControl({ candidate, job, variant = "button", align, leading, tra
 
   function tailor() {
     if (!isReady || !sourceId) return;
-    start.mutate({ candidateId: candidate.id, jobId: job.id, resumeId: sourceId });
+    start.mutate({ candidateId: candidate.id, jobId: job.id, resumeId: sourceId }, {
+      onError: (error) => { if (error instanceof ApiError && error.status === 422) setPasting(true); },
+    });
   }
 
   const Icon = isRunning || start.isPending ? LoaderCircle : Sparkles;
@@ -140,6 +146,10 @@ function TailorControl({ candidate, job, variant = "button", align, leading, tra
     // takes a line of its own below the row instead of squeezing the row's title (the row must wrap: see the dashboard
     // queue). The button variant is a column: the group, the note under it.
     <div className={cn(isIcon ? "contents" : cn("flex min-w-0 max-w-full flex-col gap-1", isStart ? "items-start" : "items-end"), className)}>
+      {isPasting ? (
+        <PastePostingDialog candidateId={candidate.id} job={{ id: job.id, title: job.title, company: job.company?.name }}
+          onClose={() => setPasting(false)} onSaved={() => { setPasting(false); start.reset(); tailor(); }} />
+      ) : null}
       <div className={groupClass(isIcon, isStart)}>
         {leading}
         {isIcon ? (

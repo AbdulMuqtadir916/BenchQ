@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
+from backend.job_search import workday
 from backend.auth import ledger, support
 from backend.auth.billing import amount_fits, candidate_limit_for
 from backend.auth.invites import (bad_request, check_email_free, conflict, invite_json, normal_email, resend_invite,
@@ -63,10 +64,13 @@ class CreateFirmBody(BaseModel):
     name: str = Field(max_length=200)
     slug: str = Field(max_length=64)
     plan_id: uuid.UUID
-    seat_limit: int | None = Field(default=None, ge=1, le=MAX_SEATS)     # BDEs; the plan's count when left out (Q65)
-    candidate_limit: int | None = Field(default=None, ge=0, le=100_000)   # 10 per BDE when left out (Q68)
+    seat_limit: int | None = Field(default=None, ge=1, le=MAX_SEATS)     # BDEs; the plan's count when left out (Q74)
+    candidate_limit: int | None = Field(default=None, ge=0, le=100_000)   # 10 per BDE when left out (Q77)
     primary_timezone: str = Field(default="Asia/Kolkata", max_length=64)
     client_timezone: str = Field(default="America/New_York", max_length=64)
+    # Required, no default (decided 2026-11-17, Q152): "HH:MM" in primary_timezone; the end may be past midnight.
+    work_start: str = Field(max_length=5)
+    work_end: str = Field(max_length=5)
     contact_phone: str | None = Field(default=None, max_length=40)
     owner_name: str = Field(max_length=200)
     owner_email: str = Field(max_length=320)
@@ -97,6 +101,10 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
     problem = slug_problem(body.slug)
     if problem:
         raise bad_request(problem)
+    try:
+        work_start, work_end = workday.entered_hours(body.work_start, body.work_end)
+    except ValueError as error:
+        raise bad_request(str(error))
     if db.query(Firm.id).filter(Firm.slug == body.slug).first() is not None:
         raise bad_request("Another firm already uses this slug.")
     plan = db.get(Plan, body.plan_id)
@@ -116,7 +124,8 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
                 candidate_limit=(body.candidate_limit if body.candidate_limit is not None else candidate_limit_for(seats)),
                 price_cents_per_seat=plan.price_cents_per_seat,
                 contact_phone=(body.contact_phone or "").strip() or None,
-                primary_timezone=_timezone(body.primary_timezone), client_timezone=_timezone(body.client_timezone))
+                primary_timezone=_timezone(body.primary_timezone), client_timezone=_timezone(body.client_timezone),
+                work_start=work_start, work_end=work_end)
     db.add(firm)
     try:
         db.flush()

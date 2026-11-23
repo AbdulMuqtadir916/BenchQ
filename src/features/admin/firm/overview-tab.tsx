@@ -11,6 +11,7 @@ import { AdminDate } from "../admin-time";
 import { ActivityList } from "../activity-list";
 import { CopyInviteLinkButton, ResendInviteButton } from "./invite-actions";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
+import { workHoursLabel } from "@/lib/derive/work-hours";
 
 /** /admin/firms/[firmId] Overview tab (docs/04 §14.5). The shell shows the error and not-found. */
 export function FirmOverviewTab() {
@@ -65,6 +66,7 @@ function Overview({ detail }: { detail: FirmDetail }) {
           <Row label="Slug"><span className="text-mono-sm">{firm.slug}</span></Row>
           <Row label="Primary timezone">{firm.primaryTimezone}</Row>
           <Row label="Client timezone">{firm.clientTimezone}</Row>
+          <Row label="Work hours">{workHoursLabel(firm.workStart, firm.workEnd)}</Row>
           <Row label="Contact phone">{firm.contactPhone ?? <span className="text-[var(--color-text-3)]">None</span>}</Row>
           <Row label="Created"><AdminDate iso={firm.createdAt} /></Row>
         </dl>

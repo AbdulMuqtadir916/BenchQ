@@ -2,6 +2,9 @@ import { z } from "zod";
 import { FirmRole } from "./enums";
 import { FirmPrincipalSchema, FirmStatus, PlatformPrincipalSchema, PlatformUserSchema, SlugSchema } from "./tenancy";
 
+/** A time of day, "HH:MM", 24-hour. */
+export const WorkClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
 export const FirmSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -10,13 +13,17 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default("Asia/Kolkata"),
   clientTimezone: z.string().default("America/New_York"),
+  /** The firm's work hours, "HH:MM" in `primaryTimezone`; the end may be past midnight (07 Q67, decided 2026-11-17). A
+   * work day runs from one start to the next: the candidate's Days and the daily limits follow it. */
+  workStart: WorkClockSchema,
+  workEnd: WorkClockSchema,
   applicationExpiryDays: z.number().int().default(30),
   status: FirmStatus,
   /** Required in every status, ONBOARDING included (A16). */
   planId: z.string(),
   /** Effective limits, copied from the plan when it is assigned (A3). Usage is derived, never stored. `seatLimit` counts BDE seats (07 Q44). */
   seatLimit: z.number().int().positive(),
-  /** A count the Super Admin sets by hand, 0 included (07 Q68). */
+  /** A count the Super Admin sets by hand, 0 included (07 Q77). */
   candidateLimit: z.number().int().nonnegative(),
   /** The only profile addition (A6). The OWNER is the primary contact, derived. */
   contactPhone: z.string().nullable(),
@@ -24,7 +31,7 @@ export const FirmSchema = z.object({
 });
 export type Firm = z.infer<typeof FirmSchema>;
 
-/** A firm as the Super Admin reads it: adds the price per BDE, which no firm-side response carries (docs/02 §3.5). */
+/** A firm as the Super Admin reads it: adds the price per BDE, which no firm-side response carries (docs/02 §3.6). */
 export const AdminFirmSchema = FirmSchema.extend({
   /** USD cents per BDE per 30-day period. */
   priceCentsPerSeat: z.number().int().nonnegative(),

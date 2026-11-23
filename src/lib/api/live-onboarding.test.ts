@@ -23,7 +23,7 @@ const NEW_USER = "0b9c6c1e-2222-4000-8000-000000000002";
 
 const firmDto = (id: string, slug: string) => ({
   id, name: "Hyderabad Tech Staffing", slug, logo_url: null, primary_timezone: "Asia/Kolkata",
-  client_timezone: "America/New_York", application_expiry_days: 30, status: "ACTIVE",
+  client_timezone: "America/New_York", work_start: "18:30", work_end: "04:00", application_expiry_days: 30, status: "ACTIVE",
   plan_id: STARTER, seat_limit: 10, candidate_limit: 100, contact_phone: null, created_at: "2026-10-01T09:00:00+00:00",
 });
 const userDto = (id: string, firmId: string, role = "OWNER") => ({
@@ -168,16 +168,16 @@ describe("the team and /admin on the live backend", () => {
     routes.push(on("POST", "/api/admin/firms", 201, { firm: { ...firmDto(NEW_FIRM, "northwind"), price_cents_per_seat: 3500 }, invite: inviteDto({ firm_id: NEW_FIRM, id: NEW_USER }), invite_token: "t" }));
     const firm = await platformApi.firms.create({
       name: "Northwind", slug: "northwind", planId: "plan_starter", primaryTimezone: "Asia/Kolkata", clientTimezone: "America/New_York",
-      contactPhone: null, ownerName: "Nora North", ownerEmail: "nora@northwind.test",
+      workStart: "18:30", workEnd: "04:00", contactPhone: null, ownerName: "Nora North", ownerEmail: "nora@northwind.test",
     });
     expect(firm.id).toBe(NEW_FIRM);
     expect(calls[0].body).toEqual({
       name: "Northwind", slug: "northwind", plan_id: STARTER, primary_timezone: "Asia/Kolkata", client_timezone: "America/New_York",
-      contact_phone: null, owner_name: "Nora North", owner_email: "nora@northwind.test",
+      work_start: "18:30", work_end: "04:00", contact_phone: null, owner_name: "Nora North", owner_email: "nora@northwind.test",
     });
   });
 
-  it("sets a firm's BDE count and price (07 Q65) and suspends and reactivates it", async () => {
+  it("sets a firm's BDE count and price (07 Q74) and suspends and reactivates it", async () => {
     const adminFirm = (over: Record<string, unknown> = {}) => ({ ...firmDto(HTS, "hyderabad-tech-staffing"), price_cents_per_seat: 4000, ...over });
     routes.push(
       on("PATCH", `/api/admin/firms/${HTS}/seats`, 200, adminFirm({ seat_limit: 12, candidate_limit: 120 })),
@@ -192,7 +192,7 @@ describe("the team and /admin on the live backend", () => {
     expect((await platformApi.firms.reactivate("firm_hts")).status).toBe("ACTIVE");
   });
 
-  it("edits the base plan and reads, starts and marks billing periods (07 Q66)", async () => {
+  it("edits the base plan and reads, starts and marks billing periods (07 Q75)", async () => {
     const periodDto = (over: Record<string, unknown> = {}) => ({
       id: "11111111-1111-4111-8111-111111111111", firm_id: HTS, starts_on: "2026-11-12", ends_on: "2026-12-12", seat_limit: 10,
       candidate_limit: 100, jobs_per_candidate_per_day: 100, price_cents_per_seat: 3500, amount_cents: 35000, status: "UNPAID",

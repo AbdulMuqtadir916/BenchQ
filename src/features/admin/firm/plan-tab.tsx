@@ -23,8 +23,8 @@ import { BillingPeriods } from "./billing-periods";
 import { useFirmDetail, type FirmDetail } from "./use-firm-detail";
 
 /**
- * /admin/firms/[firmId]/plan (docs/04 §14.5, 07 Q65–Q66): the firm's BDE count and candidate limit (set separately; a new firm starts at ten
- * candidates per BDE, 100 jobs per candidate per day), its price per BDE, its 30-day billing periods and the history
+ * /admin/firms/[firmId]/plan (docs/04 §14.5, 07 Q74–Q75): the firm's BDE count and candidate limit (set separately; a new firm starts at ten
+ * candidates per BDE, 50 jobs per candidate per day), its price per BDE, its 30-day billing periods and the history
  * of count changes. Changing the count is allowed over current usage, with a warning first (A4: never auto-remove).
  */
 export function FirmPlanTab() {

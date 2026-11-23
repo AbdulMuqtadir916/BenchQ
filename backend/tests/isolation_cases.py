@@ -67,9 +67,13 @@ def _irrelevant_ready(db, ids):
 
 
 def _resume_country_us(db, ids):
-    """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py)."""
+    """The candidate's résumés say US, so a job search has a country (backend/job_search/country.py), and the
+    candidate has a target role and a place, which a search needs since 2026-11-14 (backend/job_search/places.py)."""
+    from backend.models.candidates import Candidate
     from backend.models.db import Resume
     db.query(Resume).filter(Resume.candidate_id == ids["candidate"]).update({Resume.country: "US"})
+    db.query(Candidate).filter(Candidate.id == ids["candidate"]).update(
+        {Candidate.target_roles: ["Java Developer"], Candidate.preferred_locations: ["Austin, TX"]})
     db.commit()
 
 
@@ -96,6 +100,8 @@ CASES: dict[str, Case] = {
     # The hierarchy (onboarding 06 PR 2): a BDE's manager, the firm's BDE capacity.
     "PATCH /api/firms/{firm_id}/members/{user_id}/manager": Case(body=lambda i: {"manager_id": str(i["manager"])},
                                                                  body_ids=True),
+    # The firm's work hours (07 Q67): the OWNER's, in their own firm only.
+    "PATCH /api/firms/{firm_id}/work-hours": Case(body=lambda i: {"work_start": "19:00", "work_end": "04:00"}),
 
     # ── Candidates (onboarding 06): the firm is in the path ──────────────────
     "POST /api/firms/{firm_id}/candidates/parse-resume": Case(upload=True),
@@ -104,10 +110,14 @@ CASES: dict[str, Case] = {
         "full_name": "New candidate", "primary_role": "Data Engineer", "email": "new@example.test", "work_auth": "GC",
         "phone": "+1 555 0100", "country": "US", "years_experience": 5, "needs_sponsorship": False,
         "needs_transfer": False, "target_roles": ["Data Engineer"], "employment_types": ["W2"],
+        "preferred_locations": ["Austin, TX"],      # the job search needs a place (decided 2026-11-14, Q14)
         "manager_id": str(i["manager"]), "bde_id": str(i["bde_user"]),
         "resume_parse_id": str(i["pending_parse"])}, body_ids=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}": Case(),
-    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(body=lambda i: {"rate_target": 90}),
+    # The candidate has a BDE, so only that BDE edits its details; an edit leaves a place for the job search (decided
+    # 2026-11-14, Q17, Q20), and this candidate's résumé has no city, so the edit sends a preferred location.
+    "PATCH /api/firms/{firm_id}/candidates/{candidate_id}": Case(
+        body=lambda i: {"rate_target": 90, "preferred_locations": ["Austin, TX"]}, as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/assign": Case(
         body=lambda i: {"manager_id": str(i["manager"]), "bde_id": str(i["bde_user"])}, body_ids=True),
     # The firm's résumés across candidates (résumé versioning PR 7): read-only, in the principal's scope.
@@ -122,7 +132,7 @@ CASES: dict[str, Case] = {
     # The upload's own v1 ("resume"): only an uploaded base's first version has a file (07 Q49).
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file": Case(),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/save": Case(path={"resume_id": "version"}, as_bde=True,
-                                       body=lambda i: {"full_name": "Edited", "email": "edited@example.test", "summary": "An edited summary"}),
+                                       body=lambda i: {"full_name": i["candidate_name"], "email": "priya@example.test", "summary": "An edited summary"}),   # the name and email are fixed (07 Q68)
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/use-as-base": Case(path={"resume_id": "version"}, as_bde=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/resumes/upload": Case(upload=True, as_bde=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/removal": Case(path={"resume_id": "version"}),
@@ -139,13 +149,17 @@ CASES: dict[str, Case] = {
     "GET /api/firms/{firm_id}/tailorings": Case(),
     # Job search (job search PR 1): a search is the candidate's BDE's, with the résumé country it searches in.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(
-        as_bde=True, body=lambda i: {"query": "Java Developer"}, prepare=_resume_country_us),
+        as_bde=True, body=lambda i: {"place": "Austin, TX"}, prepare=_resume_country_us),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": Case(
         as_bde=True, body=lambda i: {"source": "manual", "title": "Java Developer", "company": "Example Corp",
                                      "description": f"Captured job {uuid.uuid4()}", "url": "https://jobs.example.test/c"}),
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}": Case(shows_rows=True),
+    # The BDE pastes a posting only for a job that came without its text (a LinkedIn job); the sweep's job has its
+    # text, so firm B's own call is refused with 409, and firm A's is the 404 of isolation.
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting": Case(
+        as_bde=True, refused=409, body=lambda i: {"text": "Java Developer at Example Corp. " + "Build services. " * 5}),
     "GET /api/firms/{firm_id}/job-postings": Case(shows_rows=True),
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": Case(shows_rows=True),
     "POST /api/firms/{firm_id}/invites/{invite_id}/resend": Case(),

@@ -262,6 +262,9 @@ export const FirmSchema = z.object({
   logoUrl: z.string().url().nullable(),
   primaryTimezone: z.string().default('Asia/Kolkata'),
   clientTimezone: z.string().default('America/New_York'),
+  // The firm's work hours, "HH:MM" in primaryTimezone; required, no default (07 Q67, migration 0031)
+  workStart: WorkClockSchema,
+  workEnd: WorkClockSchema,
   applicationExpiryDays: z.number().int().default(30),
 });
 
@@ -745,10 +748,18 @@ export const AiUsageSchema = z.object({
 | S11 | Time zone for period boundaries | **Answered (07 Q34):** IST, like the rest of the admin area |
 | S12 | Do failed AI calls count in spend? | **Answered (07 Q34):** yes, when the provider billed them |
 
-### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59)
+### 3.3 Firm working rhythm — WITHDRAWN 2026-11-08 (07 Q59); work hours back 2026-11-17 (07 Q67)
 
 > **Withdrawn, never built.** The product owner dropped the shift window and the follow-up cadence on 2026-11-08: no
 > columns, no endpoint, and `settings/firm` shows neither. Kept below only as a record of what was proposed.
+>
+> **Work hours, 2026-11-17 (07 Q67, Zuhair; pending Abdul):** `firms.work_start`, `firms.work_end` (`Firm.workStart`,
+> `workEnd`, "HH:MM" in `primaryTimezone`; migration 0031). **Required, no default**: the Super Admin enters them when
+> creating the firm (`POST /api/admin/firms {work_start, work_end}`); every firm that existed got 18:30–04:00. The end
+> may be past midnight; start ≠ end (400 "The work hours can't start and end at the same time."). The **OWNER** changes
+> them on `settings/firm` (`PATCH /api/firms/{firm}/work-hours`, `firm.editHours`; one `UPDATE` ledger entry, entity
+> `firm`, with the hours before). A **work day** runs from one start to the next (searches run at any time); the daily
+> job-search limits reset at the start; a candidate's **Days** count from it (§6.w "Days"). Nothing else reads them.
 
 Two additions to `FirmSchema` (§3.1). Both are set when a firm is created (to the defaults below) and
 edited by the OWNER on `settings/firm`; a support view reads them.
@@ -812,31 +823,70 @@ handoff note. Changing a BDE's manager logs `UPDATE` on the `user`.
 
 ---
 
-### 3.5 Billing records — APPROVED 2026-11-12 (07 Q65–Q67)
+### 3.5 AI setup — APPROVED 2026-11-22 (Zuhair with Abdul), BUILT (migration 0032)
+
+Platform data, Super Admin only (`ai.manage`), never shown to a firm. The rules are in
+[08-ai-presets.md](./integration/08-ai-presets.md).
+
+```ts
+AiSetup = {
+  provider: { provider: "openrouter", isKeySet: boolean, keyLast4: string | null, updatedAt: string | null },
+  providers: { id: string, label: string }[],
+  models: { id, modelId, label, isHidden: boolean, inUse: boolean }[],
+  limits: { resumeTailor: number, resumeParse: number },   // 1-200, per backend process
+  efforts: string[],
+  useCases: {
+    key: "resume_parse" | "resume_tailor" | "search_titles" | "email_classification",
+    label: string, takesEffort: boolean, modelIds: string[],
+    prompts: { name, label, placeholders: string[], optional: boolean }[],
+    presets: { id, module, name, notes, isActive, archivedAt: string | null,
+               current: { version, modelId, effort, prompts: Record<string, string>, createdAt } }[],
+  }[],
+}
+```
+
+Tables: `ai_provider` (one row; `api_key_encrypted`, `key_last4`), `ai_models`, `ai_presets` (at most one active per use
+case), `ai_preset_versions` (never edited). `llm_call_log` gains `preset_id` and `preset_version`.
+
+| Route under `/api/admin/ai` | What it does |
+|---|---|
+| `GET /`, `GET /available-models` | The setup; OpenRouter's live model list |
+| `PUT /provider` | Tests, then saves the provider and key. 422 rejected; 409 unreachable, unless `force` |
+| `POST /models`, `DELETE /models/{id}` | Approves a model from the live list; hides one no active preset uses |
+| `POST /presets`, `PATCH /presets/{id}` | Creates or edits a preset; a model, effort or prompt change is a new version |
+| `POST /presets/{id}/activate`, `/archive`, `/restore` | Makes it active after testing it (refused if its model is no longer approved); archives one that isn't active; brings an archived one back, not active |
+| `POST /presets/{id}/test-run` | Runs a pasted sample; nothing is saved |
+| `PATCH /limits` | Sets the tailoring and parser limits, applied without a restart |
+
+Email classification's `prompts` are `state` and `question`, each JSON text. A save is refused unless `state` uses
+`{subject}` and `{body}` and `question` keeps its key, `choice` type and the 10 category names. A version from before
+they were editable holds only `instructions` and is shown and run as the same State and Question.
+
+### 3.6 Billing records — APPROVED 2026-11-12 (07 Q65–Q67)
 
 Super Admin only. No payment provider, no invoice, no GST, no trial. The amount is USD and **calculated by the backend**,
 never typed and never stored as a literal in a fixture.
 
 ```ts
-// The one base plan (07 Q65). The frontend's PlanSchema (§3.1) gains the price and loses the features list.
+// The one base plan (07 Q74). The frontend's PlanSchema (§3.1) gains the price and loses the features list.
 Plan = {
   id, name, isActive,
   seatLimit: 10,                    // BDEs, the default for a new firm; a new firm's candidateLimit starts at 10 × seatLimit
-  candidateLimit: 100,              // a new firm starts here; the Super Admin then sets each firm's own (07 Q68)
+  candidateLimit: 100,              // a new firm starts here; the Super Admin then sets each firm's own (07 Q77)
   priceCentsPerSeat: 3500,          // $35.00 per BDE per period, integer cents; Super Admin only
 }
-// The plan has no features list (dropped, 07 Q65). The firm carries its own `priceCentsPerSeat`, copied from the plan
+// The plan has no features list (dropped, 07 Q74). The firm carries its own `priceCentsPerSeat`, copied from the plan
 // and edited per firm; it appears only in /api/admin responses, never in the session or any firm-side read.
-// Fixed in code, not fields: 10 candidates per BDE as a new firm's starting limit (backend/auth/billing.py), 100 new jobs per candidate per day
+// Fixed in code, not fields: 10 candidates per BDE as a new firm's starting limit (backend/auth/billing.py), 50 new jobs per candidate per day
 // (backend/job_search/limits.py), a 30-day period.
 
-// One row per firm per 30 days (07 Q66). A snapshot: later changes to the plan or the firm never rewrite it.
+// One row per firm per 30 days (07 Q75). A snapshot: later changes to the plan or the firm never rewrite it.
 BillingPeriod = {
   id, firmId,
   startsOn: date, endsOn: date,     // endsOn = startsOn + 30 days; the next period starts the day after endsOn
   seatLimit: number,                // BDEs billed
-  candidateLimit: number,           // the firm's limit when the period was billed (07 Q68); does not change the amount
-  jobsPerCandidatePerDay: 100,
+  candidateLimit: number,           // the firm's limit when the period was billed (07 Q77); does not change the amount
+  jobsPerCandidatePerDay: 50,
   priceCentsPerSeat: number,
   amountCents: number,              // seatLimit × priceCentsPerSeat, written by the backend
   status: "UNPAID" | "PAID",
@@ -846,7 +896,7 @@ BillingPeriod = {
 }
 ```
 
-- `Firm.seatLimit` is the billed BDE count. `Firm.candidateLimit` is its own number (07 Q68): a new firm starts at
+- `Firm.seatLimit` is the billed BDE count. `Firm.candidateLimit` is its own number (07 Q77): a new firm starts at
   `candidatesPerSeat × seatLimit`, and after that the Super Admin sets it; changing the BDE count never moves it.
   `seatLimit × priceCentsPerSeat` must fit a 32-bit integer (the amount column); the backend refuses terms above it.
 - **Start next 30 days** creates a period from the firm's current limits and price. **Mark paid / unpaid** edits only the
@@ -971,7 +1021,8 @@ export const CreateCandidateSchema = CandidateSchema.pick({
   managerId: z.string().min(1),
   bdeId: z.string().nullable(),
   handoffNote: z.string().trim().max(1000).nullable(),
-});
+  // targetRoles: exactly one; and a place: city + state together, or a preferred location (2026-11-14, below)
+}).refine((body) => hasCityAndState(body) || hasPreferredLocation(body), { path: ["preferredLocations"] });
 
 export const ReassignCandidateSchema = z.object({
   managerId: z.string().min(1),
@@ -1005,6 +1056,13 @@ works nothing out and only checks that they were sent (a missing one is a 422 na
 `phone`, `yearsExperience`, `country` (any country; the flow's Country box starts empty, takes the parsed résumé's
 country, else the person types one, so a TN candidate from Canada or Mexico is saved as such), `workAuth`, `needsSponsorship`, `needsTransfer`,
 `employmentTypes` (at least one), `targetRoles` (at least one), `managerId`; a MANAGER also names the BDE. `resumeParseId` is required: no candidate without their résumé (07 Q58), whose file becomes their first base.
+
+**One target role and a place — 2026-11-14 (Zuhair; Abdul reviews with the PR, Q1, Q3, Q10, Q14).** The job search looks
+for the target role in a place the BDE picks, so the create takes **exactly one** `targetRoles` entry (two is a 422
+naming the field) and needs **a place**: `city` and `state` together, or at least one non-blank `preferredLocations`
+entry (a city alone is ambiguous). Without one, the create is refused (400, "…the job search needs a place.") and the
+flow's step 4 doesn't continue. `targetRoles` stays a list: a candidate created before this keeps every role, and the
+search uses the first.
 
 **No default country — 2026-11-07 (Zuhair; raised by Abdul in the PR 7 review, #5, and approved in his re-review).**
 BenchQ never invents a country. `Candidate.country` is the active base résumé's (07 Q57) and is `null` when that résumé
@@ -1337,12 +1395,13 @@ export const JobMarkSchema = z.object({
 - **The search pipeline (job search PR 1, decided 2026-11-10):**
   - **Who:** only the candidate's assigned BDE (`job.search`, BDE role, plus `bde_id` = the user: `can_search_jobs`);
     nobody while the candidate has no BDE. Reads: anyone who can see the candidate.
-  - **Input:** `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
+  - **Input** (**superseded 2026-11-14 by §6.w**: the role and the place are the candidate's, the body only picks the
+    place): `query` (1–100 characters, one role per search, no control characters: NUL, tab or a line break
     inside it is 422 with nothing written; Abdul's second review, P2). The country is the candidate's résumé country
     (`Candidate.country`: the active base, newest version) mapped to `us` / `ca` / `in`; empty or anything else is
     422, never a default.
   - **Provider:** a registry by name; the active one is the global setting `job_search_provider` (default
-    `freehire`), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
+    `freehire`; **`indeed` since 2026-11-14, §6.w**), a PLATFORM setting (`settings_scope.py`) that `PATCH /api/settings` takes only as a registered
     provider. Every search asks for 100 jobs. One call: 20 s limit, one retry after 2 s on a timeout, a dropped
     connection, 5xx or 429; 5 MB cap; no redirects. Error codes: `timeout`, `provider_unavailable`,
     `provider_rejected`, `bad_response`, `too_large`, `internal`.
@@ -1354,9 +1413,9 @@ export const JobMarkSchema = z.object({
     time (409), checked from the `running` row with the candidate row locked, so it holds across workers. The BDE
     is locked too (a Postgres advisory lock on their id, after the candidate), so two of their searches for
     different candidates count the 20 attempts in turn (Abdul's review, P2).
-  - **Caps (per day from 6:30 PM IST):** 100 **new** jobs per candidate (a job seen again only refreshes its row);
+  - **Caps (per firm work day):** **50 new** jobs per candidate since 2026-11-21 (07 Q71; 100 when built; a job seen again only refreshes its row);
     20 attempts per BDE, any outcome. Over either is 429 up front, nothing written. A search that reaches the
-    candidate's 100 keeps the provider's order and drops the rest (`skipped_over_cap`).
+    candidate's daily limit keeps the provider's order and drops the rest (`skipped_over_cap`).
   - **Saving:** closed and unreadable jobs (no title, company or description) and repeats within the reply are
     dropped. One transaction with the candidate row locked: the `scrape_jobs` row, then each job — one the candidate
     has gets `batch_id`, `last_seen_at`, `content` and `source` replaced (`discovered_at` kept); a new one is inserted
@@ -1400,7 +1459,8 @@ export const JobMarkSchema = z.object({
 > `jobs` switch are gone (decided 2026-11-11). A job's source shows as the backend says it (freehire.me, added by
 > hand, from the extension), never a guessed job board.
 
-**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400)
+**Reads (firm level, PR 3):** `GET /api/firms/{firm}/job-postings?candidate_id=&limit=` (limit 1–400, default 400;
+**since 2026-11-14 default 100, sorted, filtered and paged by the backend: §6.w**)
 and `GET /api/firms/{firm}/job-postings/{id}`. Both read only the candidates the signed-in person may see (the owner
 and a viewer: the whole firm; a manager: their BDEs' candidates; a BDE: their own; a support view: read-only, like
 the firm's owner). The list has **one item per job** (`job_postings.job_id`, the content hash), newest first, with
@@ -1458,15 +1518,182 @@ export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
   searches: z.array(JobSearchSchema),               // newest first, searches and captures
   usage: JobSearchUsageSchema,
+  role: z.string().nullable(),                      // the target role a search asks for (§6.w)
+  places: z.array(JobSearchPlaceSchema),            // {value, label, kind}: where a search can look (§6.w)
+  sources: z.array(JobSearchSourceSchema),          // {value, label}: Indeed, freehire.me; the first is the default (§6.w, 2026-11-16)
 });
 ```
 
-Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's main role, else the first target role.
+Only the candidate's BDE starts one (`canSearchJobs`), for the candidate's target role in one of their places (§6.w;
+before 2026-11-14: the main role, else the first target role).
 The screen polls the searches every 3 s while one runs. A capture names its candidate (`CaptureJob.candidateId`) and
 sends only the link, title, company, location and description; the same job again is the job the candidate already
 has.
 
+### 6.w Job search on Indeed, the candidate's places, and the Match (decided 2026-11-14, Zuhair)
+
+**The source.** Indeed, through a small subclass of python-jobspy's Indeed scraper
+(`backend/job_search/providers/indeed.py`): at most 3 requests a search, Indeed's own next-page cursor, every failed
+reply a failed search, TLS checked, 60 s for the whole search, no retry. `job_search_provider` defaults to `indeed`,
+and a stored value that names a provider no longer registered is set to the default when settings are seeded.
+
+**freehire.me, the second source (decided 2026-11-16, Q53–Q56).** The BDE picks Indeed or freehire.me for each search,
+beside the place picker (Indeed first). `POST …/job-searches {place?, source?}`: `source` is `indeed` or `freehire`
+(none: `job_search_provider`); `GET …/job-searches` adds `sources` (`{value, label}`, Indeed first). freehire.me's
+agent search (`backend/job_search/providers/freehire.py`) gets the same inputs as Indeed: the role on job titles, the
+city's metro area (freehire.me's own list; alone, since its geography widens) or the country when it has none or the
+place is Remote (`work_mode=remote`), 14 days, 100 from the last offset, the whole posting as plain text (stored with
+`_description_format: "text"`), and `source_exclude=adzuna` (Q64: freehire.me passes Adzuna's listings on as a
+preview, often 500 characters; one that comes back anyway is dropped and counted, `skipped_adzuna`).
+
+**LinkedIn, the third source (decided 2026-11-16, Q75–Q86).** `source: "linkedin"`: LinkedIn's public job search
+through python-jobspy (`backend/job_search/providers/linkedin.py`), the same inputs as Indeed (the titles, the place
+and 50 miles or remote anywhere in the country, 14 days, 100 jobs). LinkedIn answers 10 jobs a request and sends no
+description. Every LinkedIn request, from every firm, takes one of 4 slots kept in Postgres (migration 0029,
+`backend/job_search/linkedin_queue.py`): 4 at a time, a slot busy 5 s after it is given back, a refusal (429) sent
+again after 7 s (3 tries), opens before searches, firms in turn. A search stops at 4 minutes and the next continues
+from there. A LinkedIn job is identified by its own id (`JobFields.source_id`), saved without a Match and without the
+work-authorization and level filters (Q80), and its posting is fetched once per firm on its first open (Q83, Q85),
+put on every copy of the job in the firm, and then scored; "Open on LinkedIn" shows at once (Q86). Measured live: about
+16 requests in 25 s before refusals, which clear within 7 s. LinkedIn's terms forbid scraping: settled before
+production.
+
+**The role's titles (Q69).** A search asks for every title of the target role, split the way Match reads a title
+(`places.search_titles`: "A | B" is two, "GenAI / LLM Engineer" is "GenAI Engineer" and "LLM Engineer", at most 4).
+Indeed and LinkedIn get them in quotes joined by OR (live: 15 of 20 jobs with a wanted title, against 7 unquoted);
+freehire.me as title alternatives. The batch's `request` keeps `titles`.
+
+**The candidate's level (Q70, Q74).** A search leaves out a job Match holds at 40 for the candidate's level (far more
+years asked, or two rungs away), counted as `skipped_level`. freehire.me also asks only for jobs within the
+candidate's years (`experience_years_max`, the most Match accepts: their years + max(2, 40%)) and those that state
+none. Since 2026-11-17 (Q96–Q99) the search also gets the candidate's level (`score.level_of`: entry, mid or senior):
+LinkedIn leaves the other levels out with NOT words (its own level filter is ignored by its public search),
+Indeed takes nothing more (one filter type per search; excluded words apply to the whole posting); a job without its
+text gets the level check from its title alone. LinkedIn's newest jobs' date (`listdate--new`) is read too.
+
+**freehire.me's titles and level (decided by Zuhair 2026-11-21, `job_search/freehire_titles.py`).** freehire.me has no
+synonyms, so "Sr" never found "Senior". Senior, Sr, Snr, Mid-Level, Middle, Intermediate, Junior, Jr, Intern and
+Internship leave the title for its `seniority` filter. A title with Lead, Staff or Principal stays as typed. A
+Developer title also searches Engineer, never the reverse. With no level word, the level is the first that says:
+target role, "Marketed as", `years_experience`, latest résumé role, the résumé's years (`score.search_level_of`; under
+2 entry, under 5 mid, under 10 senior, then lead). Match keeps its own order. Jobs tagged with the level come first;
+jobs stating none are added only when those run out. freehire.me drops symbols, so for C#, C++, C, F#, R and Go a job
+is kept only if its own title names the technology.
+
+**LinkedIn postings (2026-11-17, Q106–Q115; replaces the first-open fetch of Q83–Q86).** BenchQ never fetches a
+LinkedIn posting and never scores a LinkedIn job (`match.store.UNSCORED_SOURCES`). The job pane shows LinkedIn's own
+page in a frame (`source-preview.tsx` `LinkedInFrame`); LinkedIn refuses framing, and the BenchQ Apply extension lifts
+that for frames BenchQ opens, with JobNavigator's two session rules (`extension/src/frame-rules.ts`: sub_frame,
+initiator BenchQ's host, BenchQ's own responses excluded, x-frame-options and CSP removed, sec-fetch-dest/site set; the
+panel's "Posting preview" switch, on by default). "Open on LinkedIn" stays beside it. To tailor a LinkedIn job, the
+tailor's 422 opens a paste pop-up: `PUT …/candidates/{id}/job-postings/{posting_id}/posting {text}` (the candidate's
+BDE, `can_manage_resume`; 50–100,000 characters; 409 when the job already has its text; 422 when the text names
+neither the job's title nor its company) puts the text on every copy of the job in the firm, with `_pasted`, and a
+ledger entry.
+
+**One click, several sources (2026-11-17, Q90–Q93, Q109, Q113, Q121–Q124, Q145–Q146; replaces the source picker of
+Q53).** `POST …/job-searches {place?}` asks every source the place's mode names (`job_search/fanout.py`); the batch's
+`request.provider` is `"all"`. `GET …/job-searches` `places` lists places only (`kind` home, preferred or remote; the
+label is the place, no mode). The stored place says the mode, the city's taken from the candidate's work settings
+(`places.searched_place`), each source asked for some jobs and keeping some (**since 2026-11-18, 07 Q71**): "City, ST" =
+on-site (LinkedIn asked 25, keeps 20; Indeed asked 13, keeps 10; all in the city), when they don't include hybrid;
+"hybrid:City, ST" = the city (LinkedIn 25 → 20, Indeed 10 → 5) plus remote in the country (Indeed 10 → 5), when they
+include hybrid or are empty; it reads "City, ST"; `remote` = Indeed 33 → 30, remote (LinkedIn's public search can't ask
+for remote). LinkedIn and Indeed start together, Indeed's two searches one after the other; Indeed saves as it answers
+within today's room less LinkedIn's 20, held for it; room left then goes to the jobs over a source's share, LinkedIn's
+first, then Indeed's; only if the day still isn't full is **freehire.me** asked (20, the city on-site, remote
+otherwise) to fill the rest. The daily limit is **50** new jobs per candidate since 2026-11-21 (30 from 2026-11-18, 200 from Q145 before that). The
+same job (company and title) from another source isn't saved again (`skipped_duplicate_source`); a source whose jobs
+didn't all fit is read again from the same place next click (`request.legs[provider|place]`: cursor, exhausted); one
+failing source doesn't fail the click (`errors`), all failing does. `counts.by_source` holds each source's counts;
+`GET …/job-searches` no longer lists sources. `JobFields.work_mode` is what the source says (Indeed's labels,
+freehire.me's `work_mode`) and is the list's work mode. `GET /firms/{f}/job-postings` adds `batch` (one of the
+candidate's searches: the jobs it first found, saved while it ran) and answers `source_counts` (the list by source
+before `source` narrows it); LinkedIn's jobs come first in `match` and `newest`.
+
+**A candidate's Days (2026-11-17, Q152–Q174; migration 0031).** The firm's work hours (§3.3) make a **work day**: from
+one start to the next (`job_search/workday.py`). `candidates.bde_assigned_at` and `bde_day_one` (not in the frontend
+`Candidate`) are written when the BDE changes (create with a BDE, `…/assign`): Day 1 is the assignment's work day when
+it fell inside the hours, else the next one, and work between the assignment and that start is Day 1 too; a new BDE
+starts again; no BDE clears both. `scrape_jobs.work_date` is stamped when a row is written (a model hook), so changing
+the hours never moves past work. `GET …/job-searches` adds, per search, `work_date`, `day` and `batch` (the current
+assignment's finished searches numbered on across Days; null before it, without a BDE, for a capture or one not
+finished) and `workday` (`start`, `end`, `timezone`, `label`, `assigned_at`, `day_one`, `today`, `today_day`,
+`days_worked`); the empty Days are worked out from these, never stored. `GET /firms/{f}/job-postings` adds `day` (with
+`candidate_id`; every batch of that Day; 422 without a candidate). The daily limits' day and "resets …" text follow the
+firm's start and time zone.
+
+**The extra search titles (2026-11-17, Q131–Q144; migration 0030).** `Candidate.searchTitles: string[]` (backend
+`search_titles`, on the active base's version 1, `resumes.search_titles`, read like the résumé's city): after a candidate
+is added, one AI call (`job_search/search_titles.py`: the shared AI key and the `search_titles` preset's model,
+`search_titles_prompt` with `{target_role}`, `search_titles_response_format`; thinking off) suggests 2 related titles
+for the target role, guarded (no seniority words, never a generic title, none the candidate has). **Since 2026-11-18
+(07 Q68) nobody edits them**, like the target role: the "Additional candidate details" tab shows them read-only to the
+OWNER and a MANAGER (`candidate.viewSearchTitles`), and the API leaves `search_titles` out for anyone else (the BDE).
+A new active base takes them over. A search asks for the target role's titles and these (5 at
+most); the Match counts them as wanted titles. None: the target role alone. The same filters at save; the daily limits are shared by both sources. A key
+(`FREEHIRE_API_KEY`) is sent when set: freehire.me's terms allow the API without one for non-commercial use only, so
+the licence is settled before production.
+
+**What a search asks.** The candidate's **target role** (one: onboarding takes one; a candidate from before keeps
+several and the first is searched) in **one of their places** (`backend/job_search/places.py`): the résumé's city and
+state together, then each preferred location, then "Remote" when their work settings include it. `POST
+…/job-searches {place?}` names one of them by its value (none: the first); anything else is 422, and a candidate with
+no role or no place is 422 with what to add. `GET …/job-searches` adds `role` and `places` (`{value, label, kind}`).
+50 miles around the place; jobs listed in the last 14 days. A search is continued per role + place + country.
+
+**What a search leaves out**, each counted in the batch's `counts` and said on the panel: a job posted over 14 days
+ago by its own date (`skipped_too_old`: Indeed's date filter means "listed on Indeed"), a job that isn't remote on a
+Remote search (`skipped_not_remote`), and a job whose text rules out the candidate's work authorization
+(`skipped_work_auth`: the Match calculator's rules, `backend/match/score.py` `ruled_out`). A freehire.me search also
+counts the Adzuna jobs it left out (`skipped_adzuna`, 2026-11-16, Q64), and every search the jobs at the wrong
+level (`skipped_level`, Q70).
+
+**Onboarding and the details.** The create takes exactly one target role and needs a place (§4); the candidate's
+details (every onboarding answer that isn't on the résumé) are edited on their "Additional candidate details" tab
+(§9.z, 07 Q66).
+
+**The Match** ([docs/team/ats-score.md](./team/ats-score.md)): a candidate's fit for a job, 0–100, worked out in
+plain code (`backend/match/`) against the active résumé's v1, and a tailored version's against its job. Stored on
+`job_postings` and `resumes` (migration 0028: `match_score`, `match_note`, `match_basis`), worked out when a job is
+saved, again when what it read changes, and for whatever has none when the backend starts.
+
+```ts
+// src/lib/schemas/job.ts
+export const JobMatchSchema = z.object({
+  score: z.number().int().min(0).max(100).nullable(),   // null: not worked out yet
+  note: z.string().nullable(),                           // the first reason it is held at 40
+});
+// Job gains:
+//   matches: Record<candidateId, JobMatch>              // each visible candidate's; read it with matchFor(job, id)
+//   remoteMode                                          // the backend's (Indeed's labels, else the location's words)
+// ResumeVersion.atsScore is a tailored version's Match against its job (the "Resume sent" tag says "Match").
+```
+
+**The list, 50 first and then 10 at a time** (decided 2026-11-22; replaces Q29's 100; Q28, Q36, Q47): `GET /api/firms/{firm}/job-postings` sorts and filters the whole
+list on the backend and answers `{items, total, next_offset}`:
+
+| Parameter | |
+|---|---|
+| `candidate_id` | one candidate's jobs (one the person sees; another is 404); none: every visible candidate's |
+| `limit`, `offset` | 1–400 (default 100) from `offset`; `next_offset` is null at the end. The Jobs list asks for 50, then 10 with each Load more |
+| `sort` | `match` (one candidate's best first, unscored last), `newest` (default; by the job's posted date, else the day it was saved: 2026-11-16, Q87), `company` |
+| `min_score` | one candidate's; above 0 leaves out unscored jobs |
+| `source` | `indeed`, `freehire`, `linkedin`, `manual`, `extension`, `other` |
+| `remote` | `REMOTE`, `HYBRID`, `ONSITE` (the job's work mode) |
+| `q` | text in the title, company or location (case ignored) |
+| `exclude_applied` | one candidate's jobs with an application past Saved, left out |
+
+A closed job is never listed, nor one posted more than 14 days ago (by its own date; one without a date counts from
+the day it was first saved; decided 2026-11-16, Q56, any source): it stays saved, and its job page, application and
+tailored résumés still open. The Jobs list opens on All days (2026-11-22) and on freehire.me, else Indeed, else LinkedIn, else the first other source with jobs (2026-11-21). Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
+`remote_mode`; a candidate's own posting (`…/candidates/{id}/job-postings/{id}`, a capture's answer) adds `match`.
+The job list reads it a page at a time with "Load more"; a candidate's list opens at "Any score", best Match first.
+⌘K asks it for the jobs matching what is typed (`q`, 20).
+
 ## 7. Matching & scoring
+
+> **2026-11-14:** the job screens' score is the Match (§6.w); the scoring records below are not built.
 
 ```ts
 // src/lib/schemas/match.ts
@@ -2067,13 +2294,21 @@ an `ApplicationEvent` — the same write the kanban makes.
 - Endpoints: `GET/POST /api/candidates/:id/documents` (POST takes metadata only in the mock),
   `DELETE /api/documents/:id`.
 
-### 9.z Candidate submission facts
+### 9.z Candidate submission facts and details
 
-`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — a partial of `workAuth`, `needsSponsorship`, `needsTransfer`,
-`workAuthExpiry`, `rateTarget`, `rateMin`, `availableFrom`, `noticePeriodDays`, `willingToRelocate`,
-`employmentTypes`, sent to `PATCH /api/firms/{firm}/candidates/{id}`. A changed `workAuth` is sent with
-`needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
-`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both.
+`UpdateCandidate` (`src/lib/schemas/candidate.ts`) — **since 2026-11-14 (07 Q66)** a partial of every onboarding answer
+that isn't on the résumé: `primaryRole`, `yearsExperience`, `workAuth`,
+`needsSponsorship`, `needsTransfer`, `workAuthExpiry`, `employmentTypes` (at least one), `rateTarget`, `rateMin`,
+`availableFrom`, `noticePeriodDays`, `workSettings`, `preferredLocations`, `willingToRelocate`, `preferredIndustries`,
+`dealBreakers`, `contactNotes`, sent to `PATCH /api/firms/{firm}/candidates/{id}` by the "Additional candidate
+details" tab. **Not** the name, email, target role or extra search titles: fixed once the candidate is added (07 Q68,
+2026-11-18); the backend refuses a request that sends one (422, extra fields), and a résumé save that sends another
+name or email (400). Only the fields sent change; a required one sent as null is a 400, and list items are trimmed, blanks
+dropped, repeats removed. After the edit the candidate must still have a place for the job search (the résumé's city
+and state, or a preferred location; else 400). Who: `canEditProfile` (the résumé rule). A changed `workAuth` is sent
+with `needsSponsorship` and `needsTransfer` worked out by the same rule as the new-candidate flow (`workAuthChange` in
+`src/lib/constants/work-auth.ts`); the backend refuses a new `work_auth` without both. The `UPDATE` ledger entry
+names only the fields whose value changed (none: no entry); a changed target role keeps the old list in its note.
 
 `CreateCandidate` (`src/lib/schemas/candidate.ts`, Phase B fix PR 1) — the New candidate form (docs/04 §4.2),
 sent to `POST /api/candidates`: `fullName`, `primaryRole`, `email`, `phone`, `workAuth`, `needsSponsorship`,

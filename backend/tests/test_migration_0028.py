@@ -1,58 +1,30 @@
-"""Migration 0028 (07 Q65-Q67): a price per BDE on plans and firms, and the billing periods table. A firm copies its
-plan's price; existing firms get no period; the database refuses an amount that isn't count times price."""
-import pytest
-from sqlalchemy import inspect, text
-from sqlalchemy.exc import IntegrityError
+"""Migration 0028 (decided 2026-11-14, Q35, Q39): the Match score's three columns on `job_postings` and `resumes`, a
+0–100 check, and the index for one candidate's jobs best Match first. Additive: nothing is filled."""
+from sqlalchemy import inspect
 
 from backend.tests.test_migration_0002 import _alembic, _ok, scratch_db  # noqa: F401
 
+COLUMNS = {"match_score", "match_note", "match_basis"}
 
-def _columns(engine, table) -> set[str]:
+
+def _columns(engine, table) -> set:
     return {column["name"] for column in inspect(engine).get_columns(table)}
 
 
-def test_upgrade_adds_prices_and_periods_and_downgrade_removes_them(scratch_db):
+def test_0028_adds_the_match_columns_and_the_index(scratch_db):
     name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0027"))
-    assert "price_cents_per_seat" not in _columns(engine, "plans")
-    assert "firm_billing_periods" not in inspect(engine).get_table_names()
     _ok(_alembic(name, "upgrade", "0028"))
-    assert "price_cents_per_seat" in _columns(engine, "plans") and "price_cents_per_seat" in _columns(engine, "firms")
-    assert "firm_billing_periods" in inspect(engine).get_table_names()
+    for table in ("job_postings", "resumes"):
+        assert COLUMNS <= _columns(engine, table)
+        checks = {c["name"] for c in inspect(engine).get_check_constraints(table)}
+        assert f"ck_{table}_match_score_range" in checks
+    assert "ix_job_postings_candidate_match" in {i["name"] for i in inspect(engine).get_indexes("job_postings")}
+
+
+def test_0028_downgrades_cleanly(scratch_db):
+    name, engine = scratch_db
+    _ok(_alembic(name, "upgrade", "0028"))
     _ok(_alembic(name, "downgrade", "0027"))
-    assert "price_cents_per_seat" not in _columns(engine, "firms")
-    assert "firm_billing_periods" not in inspect(engine).get_table_names()
+    for table in ("job_postings", "resumes"):
+        assert not COLUMNS & _columns(engine, table)
     _ok(_alembic(name, "upgrade", "0028"))
-
-
-def test_existing_firms_copy_their_plans_price_and_start_with_no_period(scratch_db):
-    name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0027"))
-    with engine.begin() as conn:
-        conn.execute(text("INSERT INTO plans (id, name, seat_limit, candidate_limit) "
-                          "VALUES ('00000000-0000-4000-8000-0000000000a1', 'Old', 4, 40)"))
-        conn.execute(text("INSERT INTO firms (id, name, slug, plan_id, seat_limit, candidate_limit) "
-                          "VALUES ('00000000-0000-4000-8000-0000000000b1', 'Old Co', 'oldco', "
-                          "'00000000-0000-4000-8000-0000000000a1', 4, 40)"))
-    _ok(_alembic(name, "upgrade", "0028"))
-    with engine.connect() as conn:
-        assert conn.execute(text("SELECT price_cents_per_seat FROM firms WHERE slug = 'oldco'")).scalar() == 3500
-        assert conn.execute(text("SELECT count(*) FROM firm_billing_periods")).scalar() == 0
-
-
-@pytest.mark.parametrize("values", [
-    "10, 100, 100, 3500, 1, 'UNPAID', NULL",                       # amount is not count x price
-    "10, 100, 100, 3500, 35000, 'PAID', NULL",                     # paid without a paid date
-    "10, 100, 100, 3500, 35000, 'UNPAID', '2026-11-12'",           # a paid date without paying
-])
-def test_the_database_refuses_inconsistent_periods(scratch_db, values):
-    name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0028"))
-    with engine.connect() as conn:
-        firm = conn.execute(text("SELECT id FROM firms LIMIT 1")).scalar()
-        assert firm is not None
-        with pytest.raises(IntegrityError):
-            conn.execute(text(
-                "INSERT INTO firm_billing_periods (firm_id, starts_on, ends_on, seat_limit, candidate_limit, "
-                "jobs_per_candidate_per_day, price_cents_per_seat, amount_cents, status, paid_on) "
-                f"VALUES (:f, '2026-11-12', '2026-12-12', {values})"), {"f": firm})

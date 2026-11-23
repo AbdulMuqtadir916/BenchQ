@@ -16,10 +16,13 @@ from backend.auth.sessions import Principal
 FIRM_ACTIONS = ("candidate.create", "candidate.edit", "candidate.editProfile", "job.capture", "job.apply", "job.search",
                 "application.move", "resume.edit", "outreach.act", "email.retry", "email.reclassify")
 TEAM_ACTIONS = ("member.invite", "member.remove", "member.changeRole", "member.deactivate", "member.changeManager",
-                "candidate.assign", "notification.approve")
+                "candidate.assign", "notification.approve", "firm.editHours")
 PLATFORM_ACTIONS = ("firm.create", "firm.edit", "firm.suspend", "firm.viewWorkspace", "plan.edit", "billing.edit",
-                    "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve")
-ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + ("team.view",) + PLATFORM_ACTIONS
+                    "invite.resend", "invite.revoke", "platformTeam.manage", "platform.notification.approve", "ai.manage")
+# Not actions: what a person sees. The team (07 Q15), and a candidate's extra search titles (07 Q68): the OWNER and
+# MANAGER only, never the BDE.
+VISIBILITY = ("team.view", "candidate.viewSearchTitles")
+ALL_ACTIONS = FIRM_ACTIONS + TEAM_ACTIONS + VISIBILITY + PLATFORM_ACTIONS
 
 _ALL_ACTING = ("OWNER", "MANAGER", "BDE")
 _OWNER_ONLY = ("OWNER",)
@@ -29,7 +32,7 @@ _OWNER_AND_MANAGER = ("OWNER", "MANAGER")
 _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "candidate.create": _OWNER_AND_MANAGER,      # 07 Q41: a BDE no longer adds candidates
     "candidate.edit": _ALL_ACTING,               # work on the candidate: inbox, documents
-    "candidate.editProfile": _OWNER_AND_MANAGER,  # 07 Q56: the profile (submission facts) isn't the BDE's
+    "candidate.editProfile": _ALL_ACTING,         # who, for one candidate: can_edit_profile (2026-11-14, Q17)
     "email.retry": _ALL_ACTING,
     "email.reclassify": _OWNER_AND_MANAGER,
     "job.capture": _ALL_ACTING,
@@ -45,7 +48,9 @@ _FIRM_TABLE: dict[str, tuple[str, ...]] = {
     "member.changeManager": _OWNER_ONLY,          # 07 Q40
     "candidate.assign": _OWNER_AND_MANAGER,
     "notification.approve": _OWNER_AND_MANAGER,   # 07 Q54; recipient check remains request-specific
+    "firm.editHours": _OWNER_ONLY,                # 07 Q67: the firm's work hours, the one firm setting the OWNER edits
     "team.view": _OWNER_AND_MANAGER,
+    "candidate.viewSearchTitles": _OWNER_AND_MANAGER,   # 07 Q68 (2026-11-18): read-only, and not the BDE
 }
 
 
@@ -112,6 +117,18 @@ def can_change_resume(principal: Principal, candidate) -> bool:
     assigned; before that the OWNER and a MANAGER (the caller has already checked the candidate is in their scope). A
     VIEWER and a support view never. Checked when the request arrives, with the candidate row locked."""
     if not can(principal, "resume.edit") or principal.kind != "firm":
+        return False
+    if candidate.bde_id is None:
+        return principal.role in _OWNER_AND_MANAGER
+    return candidate.bde_id == principal.user_id
+
+
+def can_edit_profile(principal: Principal, candidate) -> bool:
+    """Who edits `candidate`'s details, every onboarding answer that isn't on the résumé (the "Additional candidate
+    details" tab; decided 2026-11-14, Q17, reversing 07 Q56): the résumé rule (Q55). The candidate's BDE once one is
+    assigned; before that the OWNER and a MANAGER (the caller has already checked the candidate is in their scope). A
+    VIEWER and a support view never. The Python mirror of `canEditProfile`. Checked with the candidate row locked."""
+    if not can(principal, "candidate.editProfile") or principal.kind != "firm":
         return False
     if candidate.bde_id is None:
         return principal.role in _OWNER_AND_MANAGER

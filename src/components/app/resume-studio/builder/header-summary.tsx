@@ -9,8 +9,8 @@ import { useDocActions } from "../use-doc-actions";
 import { FieldLabel, TextField } from "./fields";
 import { RichField } from "./rich-field";
 
-const CONTACT: Array<{ key: Exclude<keyof ResumeHeader, "workAuthorization">; label: string; placeholder: string }> = [
-  { key: "email", label: "Email", placeholder: "name@example.com" },
+// The name and email are the candidate's, fixed once they are added (07 Q68): shown, never edited.
+const CONTACT: Array<{ key: Exclude<keyof ResumeHeader, "workAuthorization" | "email">; label: string; placeholder: string }> = [
   { key: "phone", label: "Phone", placeholder: "+1 214 555 0100" },
   { key: "city", label: "City", placeholder: "e.g. Dallas" },
   { key: "state", label: "State", placeholder: "e.g. TX" },
@@ -35,11 +35,24 @@ function LinkField({ label, value, onChange, placeholder }: { label: string; val
   );
 }
 
+/** A value the résumé takes from the candidate's profile: shown, not edited here. */
+function FixedField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <FieldLabel hint="from the candidate's profile">{label}</FieldLabel>
+      <p className="break-words rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
+        {value || "Not set"}
+      </p>
+    </div>
+  );
+}
+
 export function HeaderFields({ doc }: { doc: ResumeDocument }) {
   const a = useDocActions();
   return (
     <>
-      <TextField label="Full name" value={doc.fullName} onChange={(v) => a.setTop("fullName", v)} />
+      <FixedField label="Full name" value={doc.fullName} />
+      <FixedField label="Email" value={doc.header.email} />
       <TextField label="Title" value={doc.title} onChange={(v) => a.setTop("title", v)} placeholder="Headline, e.g. Senior Java Developer" />
       <div className="grid gap-3 sm:grid-cols-2">
         {CONTACT.map((f) => isProfileLinkField(f.key) ? (
@@ -48,12 +61,7 @@ export function HeaderFields({ doc }: { doc: ResumeDocument }) {
           <TextField key={f.key} label={f.label} value={doc.header[f.key]} onChange={(v) => a.setHeader(f.key, v)} placeholder={f.placeholder} />
         ))}
       </div>
-      <div>
-        <FieldLabel hint="from the candidate's profile">Work authorization</FieldLabel>
-        <p className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-2)]">
-          {doc.header.workAuthorization || "Not set"}
-        </p>
-      </div>
+      <FixedField label="Work authorization" value={doc.header.workAuthorization} />
     </>
   );
 }

@@ -51,7 +51,7 @@ def test_an_upload_over_11_mb_is_refused_with_the_file_message(anonymous_client,
 def test_an_upload_over_1_mb_but_under_the_upload_cap_reaches_the_route(api_client, accounts):
     files = {"file": ("ravi.txt", b"x" * (2 * LIMIT), "text/plain")}
     r = api_client.post(f"/api/firms/{accounts.firm_id}/candidates/parse-resume", files=files)
-    assert (r.status_code, body_of(r)) == (415, expected(415, "PDF or Word only."))   # the route's own check
+    assert (r.status_code, body_of(r)) == (415, expected(415, "PDF or DOCX only."))   # the route's own check
 
 
 def test_a_later_resume_over_1_mb_reaches_its_route_too(api_client, accounts):

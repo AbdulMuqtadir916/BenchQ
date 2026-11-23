@@ -2,7 +2,7 @@
 
 All external real-mail and purge switches ship OFF. PR 3 has no automatic status writer. PR 4 automatic execution/Undo is a separate gate.
 
-Configure platform settings candidate_email_llm_provider, candidate_email_llm_model, candidate_email_llm_api_key, candidate_email_llm_effort and optional candidate_email_instructions through the platform `ai_config("email_classification")` seam. The intended configured model is the existing Perplexity Decider model via OpenRouter Decisions, not an arbitrary chat model. There is no new preset-admin UI and firms cannot select providers/prompts. Do not copy a development key into source/fixtures/logs.
+Configure the classifier at `/admin/ai-presets`: its active `email_classification` preset, read through `ai_config("email_classification")` (the old `candidate_email_*` settings were removed in migration 0032). The intended configured model is the existing Perplexity Decider model via OpenRouter Decisions, not an arbitrary chat model. Firms cannot select providers or prompts. Do not copy a development key into source/fixtures/logs.
 
 Before enabling `CANDIDATE_EMAIL_CLASSIFICATION_ENABLED` AND `CANDIDATE_EMAIL_REAL_MAIL_APPROVED`, record written provider/downstream retention/logging verification, updated candidate consent and Google/delegated-access requirements. Redaction covers common direct identifiers/credentials, not arbitrary sensitive prose or all names. Every imported message is externally classified in enabled V1; no relevance prefilter is being implied.
 
@@ -26,16 +26,20 @@ Switching on classifies only mail imported after that point. Existing and disabl
 
 ## PR 4 additions (2026-11-06, branch codex/pr4-code-correction)
 
-### Setup checklist (platform settings, AI preset scope)
+### Setup checklist (the `email_classification` AI preset, since 2026-11-22)
 
-| Setting | Value |
+Set these at `/admin/ai-presets` (`docs/integration/08-ai-presets.md`):
+
+| Part | Value |
 |---|---|
-| `candidate_email_llm_provider` | `openrouter` (the only accepted provider) |
-| `candidate_email_llm_model` | the Perplexity Decider model on OpenRouter Decisions (used in testing: `perplexity/pplx-decider-v1.2`; confirm the id in OpenRouter) |
-| `candidate_email_llm_api_key` | the OpenRouter key; never in code, logs or docs |
-| `candidate_email_llm_effort`, `candidate_email_instructions` | optional |
+| Provider and key | OpenRouter and the one shared key; never in code, logs or docs |
+| Model | The active preset: a Perplexity Decider model on OpenRouter Decisions (default `perplexity/pplx-decider-v1.2`; the save tests it) |
+| State | Editable JSON. Must use `{subject}` and `{body}`, which are masked and length-limited in code |
+| Question | Editable JSON: instructions and category descriptions. Its key, `choice` type and the 10 category names can't change |
 
-- The classifier **never borrows the primary model's settings** (`llm_*`). If any of the three required settings is empty,
+- Making a preset active, or changing the active one's State or Question, sends that exact setup to OpenRouter first. A real
+  change gives a new fingerprint; an unchanged default keeps the evaluated one. Restart the worker after a code change.
+- The classifier **never borrows the older `llm_*` settings**. With no key or no active preset,
   classification is "not configured": mail stays `PENDING`, no attempt is spent, and the log says so once per sweep.
 - A key the provider refuses (401/403) **pauses** this configuration: mail stays `PENDING`, no attempt is spent, retry and
   reclassify answer 409 "Classifier paused". Changing the key or model resumes at once; otherwise one probe email is sent

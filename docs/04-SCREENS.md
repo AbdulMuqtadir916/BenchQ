@@ -328,8 +328,9 @@ target rate, availability and relocation. The owning BDE shows to managers and o
 looking at their own candidate doesn't need it. Actions: `Find jobs` (runs the matching
 sequence inside the Jobs tab — never navigates away) and `Build resume`. Since job search PR 3 (docs/02 §6.z) `Find
 jobs` is the candidate's BDE's only and really searches, for the candidate's main role (else the first target role):
-under it, the last search's outcome ("12 new · 3 seen again") and today's usage ("47/100 jobs · 3/20 searches ·
-2/20 captures · resets 6:30 PM IST"); disabled with the reason when there is no role, no résumé country, or the
+under it, the work day's usage only ("17/50 jobs · 3/20 searches · 2/20 added manually · resets 6:30 PM IST", the
+reset in the firm's time zone; since 2026-11-17 no per-source, seen-again, over-limit or left-out counts), plus a note
+only when the last search failed or a source didn't answer ("LinkedIn didn't answer: try again"); disabled with the reason when there is no role, no résumé country, or the
 day's searches are used. Below it, the derived
 stat strip (applications, active, interviews, offers, response rate, days on bench); **every stat
 is a button** that opens the tab behind it.
@@ -345,8 +346,9 @@ show on Applications and Resumes; a dot marks Overview and Inbox when something 
 | 3 | **Inbox** | What recruiters said, matched to applications, with suggested status updates |
 | 4 | **Jobs** | Where to submit next, ranked for this profile |
 | 5 | **Resumes** | What to submit — the base résumés, their versions and the copies tailored from each |
-| 6 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers. **Planned to be dropped** (see Documents below) |
-| 7 | **Activity** | The audit trail a manager opens |
+| 6 | **Additional candidate details** | Every onboarding answer that isn't on the résumé (07 Q66, 2026-11-14), edited in the new-candidate flow's own fields |
+| 7 | **Documents** | What vendors ask for: visa papers, ID, certificates, screening answers. **Planned to be dropped** (see Documents below) |
+| 8 | **Activity** | The audit trail a manager opens |
 
 There is no separate Profile/Record tab: it duplicated the base résumé and left the BDE unsure where to fix a line.
 
@@ -357,8 +359,20 @@ stage the pipeline hasn't caught up with (one-click *Move to …*),
 *Show more*; resolving one animates it out. Then **Pipeline** (current count per stage, animated
 bars, each row opens the board) and **Latest from recruiters** (four newest emails, or the connect
 prompt). Right: **Submission facts** (work authorization + validity, rate and floor, availability
-and notice, employment types, relocation, target roles — editable in place by the OWNER and the candidate's MANAGER,
-not the BDE (07 Q56); the rate floor can't exceed the target), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
+and notice, employment types, relocation, the target role — read-only since 2026-11-14 (07 Q66): *Edit* opens the
+**Additional candidate details** tab for whoever may edit them), **Base résumé** (its name, newest version and how many tailored copies hang off it, with *Open*), **Best new matches**.
+
+#### Additional candidate details
+Decided 2026-11-14 (07 Q66). What onboarding asked that isn't on the résumé, in the new-candidate flow's own fields:
+**Role** ("Marketed as", years), then the flow's step 3 (work authorization and its expiry, engagement types, target
+rate and floor, available from, notice) and step 4 (the target role, **read-only**; work setting; preferred locations;
+relocation; industries; deal breakers; notes for the BDE). The target role and the extra search titles are fixed once
+the candidate is added (07 Q68, 2026-11-18); the titles show, read-only, in a *Job search* card to the OWNER and a
+MANAGER only, never to the BDE. The same rules as onboarding: a place for the job search (the résumé's city and state,
+or a preferred location; the hint says which the search will use).
+*Save details* and *Discard changes* sit in a bar at the bottom, enabled once something changed. Edited by the
+candidate's BDE once one is assigned, before that by the OWNER and the candidate's MANAGER (the résumé rule); everyone
+else sees the same details read-only, with a line saying who edits them.
 
 #### Applications
 Toolbar: *Active / All* and *Board / List*, plus a one-line summary. When emails suggest updates, a
@@ -390,6 +404,28 @@ The profile-locked job explorer: the candidate's own jobs (job search PR 3). `Fi
 work authorization → score → rank) with real counts, then the ranked list staggers in. While the candidate's search
 runs, the last step holds on "Searching for new jobs…" until it ends; Skip opens the list and the search goes on.
 A job whose work authorization is unknown (a searched job's) is shown, never filtered out.
+**Since 2026-11-14 (docs/02 §6.w):** the list holds every job the candidate has, 50 first and 10 more with each **Load more**,
+sorted and filtered by the backend; it opens at "Any score", best Match first, and a score held at 40 says why on
+hover ("Held at 40: no C2C…"). Beside **Find jobs**, the BDE picks where to search: the résumé's city and state, a
+preferred location, or Remote.
+**Since 2026-11-16 (docs/02 §6.w, Q53, Q56):** beside the place, the BDE also picks the source, Indeed (first) or
+freehire.me. The job lists show only jobs posted in the last 14 days. (The source filter's opening order changed on 2026-11-21, below.)
+**Since 2026-11-16 (Q75–Q86):** LinkedIn is the third source in both lists. A LinkedIn job shows "—" for its Match until
+its posting arrives on the first open (a loading bar, then the text); "Open on LinkedIn" is there at once. The
+result line also counts "N left out: level".
+**Since 2026-11-17 (Q90–Q124):** no source picker: the place dropdown lists places only, as before ("Austin, TX",
+each preferred location, "Remote (anywhere in the US)"); a city is searched on-site or hybrid by the candidate's work
+settings, never shown; one click asks every source that mode names; the header names only a source that didn't
+answer (each source's count shows on the Jobs list's source filter). The Jobs list has a **Day and
+batch** picker (2026-11-17, Q152–Q174): the candidate's Days, newest first ("Day 3 · Nov 17–18", counted from their
+assignment to their BDE in the firm's work days; picking a Day lists all its batches), each Day's batches under it
+("Batch 4 · 7:42 PM", numbered on across Days), "Earlier searches" (before this assignment, by date and time), then
+"All days"; it opens on **All days** (decided 2026-11-22), and changing the candidate returns to it. The OWNER and MANAGER also see the empty Days, folded ("Days 2–39 · no
+searches"), never pickable; a BDE sees only Days with work. The source filter shows each source's count and one source
+at a time (2026-11-21; a search still asks every source). It opens on freehire.me, else Indeed, else LinkedIn, else the
+first other source with jobs, and opens that way again when the candidate or Day changes. A pick is kept in the URL
+(`?source=`).
+LinkedIn jobs show LinkedIn's own page in the pane (the extension), and tailoring one asks for its posting.
 
 #### Resumes
 This candidate's résumés as a collapsible tree (the same component as the Resume Builder library): each **base**
@@ -438,6 +474,12 @@ Row: title, company + verification badge, location + remote mode, rate, posted a
 leaving the list — the BDE evaluates most jobs without ever navigating.
 
 Virtualise past 100 rows. 500 rows must scroll at 60fps.
+
+> **Built 2026-11-14 (docs/02 §6.w):** the toolbar's search, candidate, source, work mode and score filters and the
+> sort are the backend's request, so the list is every job they match, 50 first and 10 more with each **Load more**, and the
+> header counts all of them. With a candidate picked, each job shows their **Match** (docs/team/ats-score.md), best
+> first, starting at "Any score"; a score held at 40 says why on hover. The single job page's picker lists only the
+> candidates who have the job, and a search's job is labelled "Indeed".
 
 **Empty:** no jobs captured → a card explaining the two capture paths with a link to `/jobs/capture`.
 Filtered to nothing → clear-filters state.
@@ -530,7 +572,8 @@ first, so nothing overlaps. Labels fold into their icons as the window narrows (
   Certifications. Two Column keeps contact and skills in its side column; the rest follow the order in the main one.
 - **Builder mode** — collapsible section forms on the left (Header, then the sections in that order), live page on the right: every field of the parser's strict format
   but languages (kept, never shown). The header has the name, title, email, phone, city, state, country, LinkedIn
-  and GitHub; work authorization is shown read-only (the profile's fact). A job has its printed dates and its start,
+  and GitHub; the name, email and work authorization are shown read-only (the profile's; the name and email are fixed
+  once the candidate is added, 07 Q68, so the page shows them but never edits them either). A job has its printed dates and its start,
   end and "current role"; projects and jobs have bullets. Rows reorder and remove in place. Enter in a bullet starts
   the next one.
 - **Save** — explicit (no autosave; `⌘S`). It makes the résumé's next version and the studio moves to it; if another
@@ -686,7 +729,7 @@ the knowledge that it exists.
 | Route | Role | Content |
 |---|---|---|
 | `/settings` | all | No content: redirects to the first section the role may open (docs/07 Q1) |
-| `/settings/firm` | OWNER | Read-only: the firm's name and timezones (a Super Admin changes them), and a Plan and usage card: BDE seats and candidates against the plan's limits (07 Q59, Q63). There is no BDE capacity |
+| `/settings/firm` | OWNER | Read-only: the firm's name and timezones (a Super Admin changes them), and a Plan and usage card: BDE seats and candidates against the plan's limits (07 Q59, Q63). There is no BDE capacity. One exception: a **Work hours** card the OWNER changes (Change → start and end times, Save; Esc cancels; 07 Q67) |
 | `/settings/team` | OWNER, MANAGER | Member table and candidate assignment matrix. **OWNER** invites, removes and deactivates members and changes roles; **MANAGER** sees the team read-only and assigns candidates to BDEs (docs/07 Q15). BDE and VIEWER don't see it |
 | `/settings/templates` | OWNER, MANAGER | Resume templates and outreach templates, with preview and merge-field reference |
 | `/settings/preferences` | all | Theme, density, keyboard shortcut sheet, notification preferences, timezone display |
@@ -850,6 +893,7 @@ plus "Clear filters".
 | Plan | required, active plans only. Shows the limits that will be copied onto the firm (A3) |
 | Primary timezone | default `Asia/Kolkata` |
 | Client timezone | default `America/New_York` |
+| Work hours start, end | required, no default (07 Q67): "HH:MM" in the primary timezone; the end may be past midnight; not the same. A work day runs from one start to the next |
 | Contact phone | optional |
 | Owner name | required |
 | Owner email | required, valid email |
@@ -908,9 +952,9 @@ Suspend shows only for ACTIVE firms; Reactivate only for SUSPENDED.
 
 Empty: members "No users yet — the owner hasn't accepted their invite."; invites "No pending invites."
 
-### Plan tab — `/admin/firms/[firmId]/plan` (07 Q65–Q66, billing is Super Admin only)
+### Plan tab — `/admin/firms/[firmId]/plan` (07 Q74–Q75, billing is Super Admin only)
 
-- **Current:** the firm's BDE count, its candidate limit (set by the Super Admin; a new firm starts at 10 per BDE), 100 new jobs per candidate per day (fixed),
+- **Current:** the firm's BDE count, its candidate limit (set by the Super Admin; a new firm starts at 10 per BDE), 50 new jobs per candidate per day (fixed),
   the price per BDE and the amount for 30 days (BDE count × price, calculated), and what is in use.
 - **Change limits:** BDEs, the candidate limit (its own field; changing BDEs never moves it, the hint shows what 10 per
   BDE would be) and the price per BDE; the hint shows the new amount. If current usage exceeds the new numbers, a warning: "This firm will be over its
@@ -931,7 +975,7 @@ This firm's ledger, newest first, every action including support views (`ADMIN_A
 `ADMIN_ACCESS_END`, with admin name and reason). Filters in the URL: action type, actor type, date range.
 Read-only.
 
-## 14.6 `/admin/plans` — The base plan (07 Q65)
+## 14.6 `/admin/plans` — The base plan (07 Q74)
 
 **Table:** name · BDEs (the count a new firm starts with) · candidates (10 per BDE) · price per BDE (USD) · status ·
 firms on this plan (derived count). **Action:** Edit (name, BDEs for a new firm, price per BDE); no New plan, no Hide,
@@ -974,6 +1018,20 @@ are drafted for sign-off separately — `HealthCheck`, `ScraperRun`, `AiUsage` (
 cost, run reference, timestamp) — and the page is built after approval. The contracts are now
 approved, not built (`docs/02` §3.2, 07 Q33, Q34).
 
+## 14.9a `/admin/ai-presets` — AI presets (2026-11-22)
+
+Super Admin only; `g i`. Rules: [integration/08-ai-presets.md](./integration/08-ai-presets.md).
+
+- **Provider and API key:** the provider dropdown (OpenRouter), a write-only key field, "Key set · ending 1234", and
+  **Test and save**. A rejected key or model shows the reason; an unreachable OpenRouter offers **Save anyway**.
+- **Running at once:** résumé tailoring and parser limits, per backend process.
+- **Approved models:** the catalog, with **Add model** searching OpenRouter's live list. A model in use can't be removed.
+- **One card per use case** (parser, tailoring, search titles, email classification): its presets with version, model and
+  an **Active** tag; **Make active**, **Test**, **Edit**, **Archive**, **New preset**, and an **Archived** list with **Restore**. A use case with none active shows
+  "Needs setup". The dialog shows each prompt in its own box, locked until that box's pencil is clicked, with its required
+  placeholders. One box is open at a time: opening another locks the last and keeps its unsaved text until Save or Cancel. Email classification's boxes are **State** and **Question**, as JSON.
+- States: skeleton while loading, an error with retry, and an empty state if no use case exists.
+
 ## 14.10 Support view
 
 **Start from the firm page:** "View workspace" opens a dialog: firm name, a required reason (min. 10
@@ -998,7 +1056,7 @@ view (A12).
 1. **System and AI spend:** `/admin/system` is a placeholder; `HealthCheck`, `ScraperRun` and `AiUsage`
    contracts are drafted for sign-off separately; the demo-data reset moves onto the placeholder; AI spend is
    hidden on the overview until its contract is approved (14.9).
-2. **Custom limits** per firm: *replaced by 07 Q65:* the Super Admin sets a firm's BDE count directly (14.5); there is no "custom limits" mark.
+2. **Custom limits** per firm: *replaced by 07 Q74:* the Super Admin sets a firm's BDE count directly (14.5); there is no "custom limits" mark.
 3. **View workspace** of an ONBOARDING firm with no users: allowed; it shows empty states.
 4. **Suspend:** ACTIVE firms only.
 5. **Stalled onboarding** shows in Needs attention after 7 days.

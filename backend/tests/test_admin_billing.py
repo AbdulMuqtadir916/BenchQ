@@ -1,4 +1,4 @@
-"""Billing records (07 Q65-Q67, docs/02 §3.5): a firm's BDE count and the candidate limit that follows, 30-day
+"""Billing records (07 Q74-Q76, docs/02 §3.6): a firm's BDE count and the candidate limit that follows, 30-day
 periods, the base plan's price, suspend and reactivate, and the rule that no money reaches a firm."""
 from datetime import date, timedelta
 import json
@@ -6,6 +6,7 @@ import json
 import pytest
 
 from backend.auth.billing import today_ist
+from backend.job_search.limits import JOBS_PER_CANDIDATE_PER_DAY
 from backend.models.db import utcnow
 from backend.models.tenancy import BillingPeriod, Firm, LedgerEntry, Plan
 from backend.tests.auth_support import make_firm, make_user
@@ -40,7 +41,7 @@ def test_a_new_firm_starts_at_ten_candidates_per_bde_unless_a_limit_is_given(api
     from backend.models.tenancy import Plan
     plan = test_db.query(Plan).filter(Plan.is_active.is_(True)).first()
     body = {"name": "Zed Co", "slug": "zed-co", "plan_id": str(plan.id), "seat_limit": 3,
-            "owner_name": "Zed Owner", "owner_email": "zed@zed.test"}
+            "work_start": "18:30", "work_end": "04:00", "owner_name": "Zed Owner", "owner_email": "zed@zed.test"}
     r = api_client.post("/api/admin/firms", json=body)
     assert r.status_code in (200, 201), r.text
     assert r.json()["firm"]["candidate_limit"] == 30
@@ -94,7 +95,7 @@ def test_start_a_period_snapshots_the_firm_and_calculates_the_amount(api_client,
     assert r.status_code == 201, r.text
     p = r.json()
     assert (p["starts_on"], p["ends_on"]) == ("2026-11-12", "2026-12-12")
-    assert (p["seat_limit"], p["candidate_limit"], p["jobs_per_candidate_per_day"]) == (10, 100, 100)
+    assert (p["seat_limit"], p["candidate_limit"], p["jobs_per_candidate_per_day"]) == (10, 100, JOBS_PER_CANDIDATE_PER_DAY)
     assert (p["price_cents_per_seat"], p["amount_cents"]) == (3500, 35000)
     assert (p["status"], p["paid_on"], p["note"]) == ("UNPAID", None, "First month")
 
@@ -200,7 +201,7 @@ def test_editing_the_plan_changes_new_firms_not_existing_ones(api_client, accoun
 def test_create_firm_takes_a_bde_count_and_copies_the_price(api_client, accounts, test_db):
     api_client.patch(f"/api/admin/plans/{accounts.plan_id}", json={"price_cents_per_seat": 4000})
     r = api_client.post("/api/admin/firms", json={
-        "name": "Northwind", "slug": "northwind", "plan_id": str(accounts.plan_id), "seat_limit": 12,
+        "name": "Northwind", "slug": "northwind", "plan_id": str(accounts.plan_id), "seat_limit": 12, "work_start": "18:30", "work_end": "04:00",
         "owner_name": "Nora", "owner_email": "nora@northwind.test"})
     assert r.status_code == 201, r.text
     assert (r.json()["firm"]["seat_limit"], r.json()["firm"]["candidate_limit"]) == (12, 120)
@@ -260,7 +261,7 @@ def test_a_firm_user_cannot_reach_billing_or_firm_actions(anonymous_client, acco
     assert r.status_code == 403
 
 
-# ── No money reaches a firm (Q67) ────────────────────────────────────────────
+# ── No money reaches a firm (Q76) ────────────────────────────────────────────
 
 def test_no_firm_side_response_carries_price_amount_or_periods(api_client, anonymous_client, accounts):
     _start(api_client, accounts, starts_on="2026-11-12")
