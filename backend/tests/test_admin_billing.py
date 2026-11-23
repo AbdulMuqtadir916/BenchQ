@@ -132,6 +132,17 @@ def test_terms_whose_amount_overflows_the_column_are_refused_before_they_are_sav
     assert firm.price_cents_per_seat != 10_000_000
 
 
+def test_a_higher_amount_on_a_paid_running_period_makes_it_unpaid_and_a_lower_one_does_not(api_client, accounts):
+    pid = _start(api_client, accounts).json()["id"]
+    api_client.patch(f"/api/admin/billing-periods/{pid}", json={"status": "PAID"})
+    url = SEATS.format(_firm(accounts))
+    api_client.patch(url, json={"seat_limit": 1})                          # lower: still paid
+    assert api_client.get("/api/admin/billing-periods", params={"firm_id": _firm(accounts)}).json()[0]["status"] == "PAID"
+    api_client.patch(url, json={"seat_limit": 20})                         # higher: back to unpaid
+    period = api_client.get("/api/admin/billing-periods", params={"firm_id": _firm(accounts)}).json()[0]
+    assert (period["status"], period["paid_on"]) == ("UNPAID", None)
+
+
 def test_a_period_that_has_not_started_cannot_be_marked_paid(api_client, accounts):
     future = (today_ist(utcnow()) + timedelta(days=10)).isoformat()
     pid = _start(api_client, accounts, starts_on=future).json()["id"]

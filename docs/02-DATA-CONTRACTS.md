@@ -852,7 +852,9 @@ BillingPeriod = {
 - **Start next 30 days** creates a period from the firm's current limits and price. **Mark paid / unpaid** edits only the
   current-or-past period's `status`, `paidOn` and `note`.
 - A BDE-count change updates the **current** period's snapshot and amount in the same transaction, and logs
-  `PLAN_CHANGED` (entity `firm_limits`) with the old and new counts. There is no proration.
+  `PLAN_CHANGED` (entity `firm_limits`) with the old and new counts. There is no proration. If the period was `PAID` and
+  its amount goes up, it returns to `UNPAID` (`paidOn` cleared; the ledger keeps the payment); a lower or equal amount
+  stays paid.
 - **Derived, not stored:** `isPaymentOverdue(firm, periods, today)` = the firm has at least one period and none with
   `status = PAID` has `startsOn <= today <= endsOn`. A firm with no period is "No billing period", never overdue.
 - **Nothing here reaches a firm user:** `firm_json`, the session and every firm-side response omit price, amount and

@@ -67,13 +67,18 @@ def new_period(firm: Firm, starts_on: date, note: str | None) -> BillingPeriod:
 
 
 def sync_current_period(db: DbSession, firm: Firm, today: date) -> BillingPeriod | None:
-    """A change to the firm's BDE count or price applies to the period running today, without proration (Q66)."""
+    """A change to the firm's BDE count or price applies to the period running today, without proration (Q66). A paid
+    period whose amount goes UP is no longer fully paid: it goes back to unpaid (the ledger keeps the payment), so the firm
+    shows as overdue until the Super Admin marks it paid again. A lower or equal amount stays paid."""
     period = current_period(db, firm.id, today)
     if period is not None:
+        new_amount = amount_cents(firm.seat_limit, firm.price_cents_per_seat)
+        if period.status == "PAID" and new_amount > period.amount_cents:
+            period.status, period.paid_on = "UNPAID", None
         period.seat_limit = firm.seat_limit
         period.candidate_limit = firm.candidate_limit
         period.price_cents_per_seat = firm.price_cents_per_seat
-        period.amount_cents = amount_cents(firm.seat_limit, firm.price_cents_per_seat)
+        period.amount_cents = new_amount
     return period
 
 

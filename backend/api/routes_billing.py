@@ -112,7 +112,7 @@ def set_seats(firm_id: uuid.UUID, body: SeatsBody, principal: Principal = Depend
         ledger.record(db, actor=admin, action="UPDATE", entity_type="billing_period", entity_id=period.id,
                       entity_label=firm.name, firm_id=None,
                       summary=f"Period {period.starts_on} to {period.ends_on} for {firm.name} now "
-                              f"{period.seat_limit} BDEs, {dollars(period.amount_cents)}")
+                              f"{period.seat_limit} BDEs, {dollars(period.amount_cents)}, {period.status.lower()}")
     db.commit()
     return admin_firm_json(firm)
 
