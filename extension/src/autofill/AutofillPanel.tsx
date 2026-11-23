@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resumeStudioUrl, type Application } from "../api";
-import { ALERT, BELOW_TOP_BAR, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
+import { ALERT, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
 import { isOtherJobOnSite } from "./AddJobCard";
+import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
-import { documentOf, resumeFileName } from "./documents";
+import { documentOf, fileKey, readOwnFile, resumeFileName } from "./documents";
 import { filledValue } from "./form-memory";
 import FormProgress from "./FormProgress";
 import { CHECK, SPARKLES_ICON, SPINNER_ICON } from "./icons";
 import JobCard from "./JobCard";
 import MarkApplied from "./MarkApplied";
-import NextSteps from "./NextSteps";
 import OutcomeNote from "./OutcomeNote";
 import ResumePicker from "./ResumePicker";
 import ReviewList from "./ReviewList";
@@ -18,6 +18,7 @@ import RunList from "./RunList";
 import type { AppliedForm, Connection, ReviewRow, ShortcutMessage } from "./types";
 import { SiteAccessNotice } from "./SiteAccessNotice";
 import { useAutofill, type Outcome } from "./use-autofill";
+import { finishOwnFile, removeOwnFile as forgetOwnFile, settleSwap, startOwnFile, useOwnFile } from "./own-files";
 import { useResumes, type ApplicationContextStatus } from "./use-resumes";
 import TailorResume from "./TailorResume";
 import { useTailoring } from "./use-tailoring";
@@ -66,7 +67,9 @@ function scrollToResult(card: HTMLElement | null) {
 }
 
 /** A fill waiting for its résumé's review: which application it's for and which résumé answers it. */
-type PendingFill = { context: string; resumeId: string | null };
+/** `isFileSwap`: a file to put in place of the one on the form, which runs Autofill though no answer is left to fill:
+ * taking the old file off is what brings the upload back for the new one (#148's review). */
+type PendingFill = { context: string; resumeId: string | null; isFileSwap?: boolean };
 
 /** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
@@ -87,7 +90,16 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const canReview = applicationStatus === "ready" && !["loading", "unavailable", "missing"].includes(resumes.status);
   const resumeId = canReview ? picked?.id ?? null : undefined;
   const fileName = picked ? resumeFileName(candidateName, picked.title) : null;
-  const state = useAutofill({ connection, firmId, resumeId, fileName, onSessionExpired, onAccessLost, isHeld: movedAway });
+  // A file the BDE picked from their computer for this candidate (Q5): kept outside the panel while the side panel is
+  // open (`own-files.ts`), so switching tabs and back keeps it (#148's review); never saved or sent to BenchQ. It goes on
+  // the form in place of the résumé's own until they remove it. While a pick is still being read, nothing fills, from a
+  // click, a shortcut or a next page, so the file the BDE replaced can't go on the form (#148); the hold lifts once the
+  // read settles, and the form is looked at again. Each pick and Remove counts, so the last one wins.
+  const own = useOwnFile(connection.candidateId);
+  const pickedFile = own.file;
+  const isReadingOwnFile = own.isReading;
+  const [ownFileError, setOwnFileError] = useState<string | null>(null);
+  const state = useAutofill({ connection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway || isReadingOwnFile });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
   // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so
@@ -105,13 +117,42 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const isSelectionSyncing = pendingFill !== null && !(error && !scanning) && !state.needsAccess;
   // A run is busy from its first step (taking the old file off) to its last fill.
   const isWorking = filling || Boolean(step) || isSelectionSyncing;
+  // A review is this application's, this résumé's and this file's: one for an earlier pick from the computer isn't (#148).
   const reviewMatches = canReview && reviewedFor?.applicationId === connection.applicationId
-    && reviewedFor.candidateId === connection.candidateId && reviewedFor.resumeId === resumeId;
+    && reviewedFor.candidateId === connection.candidateId && reviewedFor.resumeId === resumeId
+    && (reviewedFor.fileId ?? null) === (pickedFile ? fileKey(pickedFile) : null);
   const currentRows = reviewMatches ? rows : null;
   const studioUrl = useCallback((versionId: string) => (firmSlug ? resumeStudioUrl(firmSlug, versionId) : null), [firmSlug]);
   const pickResume = (id: string) => {
     setPendingFill({ context, resumeId: id });
     pick(id);
+  };
+  // A file picked while BenchQ's is on the form takes its place at once, as a résumé pick does (07 Q24): once the read
+  // settles and the form is looked at again, Autofill takes the old file off and puts this one on. The swap is the
+  // candidate's, in the store, so a panel rebuilt while the file was read (a switch to another tab and back) still makes
+  // it; whichever panel queues it settles it there, so none queues it twice. Remove does the same the other way, when
+  // the BDE's file is the one on the form, known by its identity: it goes on under the résumé's file name (#148's review).
+  const takeOwnFile = async (chosen: File) => {
+    const candidateId = connection.candidateId;
+    const pick = startOwnFile(candidateId, Boolean(state.attachedFile));
+    const read = await readOwnFile(chosen).catch(() => "That file couldn't be read. Pick it again.");
+    if (!finishOwnFile(candidateId, pick, typeof read === "string" ? null : read)) return;
+    setOwnFileError(typeof read === "string" ? read : null);
+  };
+  const [queuedSwap, setQueuedSwap] = useState<number | null>(null);
+  // Queued once the résumés are in: one queued while they load would wait for a résumé that never comes (#148's review).
+  if (own.swap !== null && !own.isReading && own.file && own.swap !== queuedSwap && canReview && resumeId !== undefined) {
+    setQueuedSwap(own.swap);
+    setPendingFill({ context, resumeId, isFileSwap: true });
+  }
+  useEffect(() => {
+    if (own.swap !== null && own.swap === queuedSwap) settleSwap(connection.candidateId, own.swap);
+  }, [own.swap, queuedSwap, connection.candidateId]);
+  const removeOwnFile = () => {
+    const isOnForm = Boolean(pickedFile && state.holdsFile(fileKey(pickedFile)));
+    forgetOwnFile(connection.candidateId);
+    setOwnFileError(null);
+    if (isOnForm && resumeId !== undefined) setPendingFill({ context, resumeId, isFileSwap: true });
   };
   // Tailor for this job: the connected job as BenchQ holds it for the candidate, once its record is confirmed.
   const jobPostingId = applicationStatus === "ready" ? details?.job_id ?? null : null;
@@ -137,12 +178,13 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   useEffect(() => {
     const wanted = pendingFill;
     // While the tab shows another job, the fill waits, queued: "Keep it connected" lets it run (PR #140's review).
-    if (!wanted || movedAway || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
+    // A file still being read keeps the fill queued: it runs once the read settles, with that file (#148).
+    if (!wanted || movedAway || isReadingOwnFile || startedFill.current === wanted || wanted.context !== context || wanted.resumeId !== resumeId || !reviewMatches || scanning || filling) return;
     startedFill.current = wanted;
     // A new pick fills what it answers and takes back what the old one filled that it doesn't, so nothing stale stays.
-    const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0) ? autofill() : undefined;
+    const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0 || wanted.isFileSwap) ? autofill() : undefined;
     void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
-  }, [pendingFill, movedAway, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
+  }, [pendingFill, movedAway, isReadingOwnFile, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {
@@ -216,12 +258,6 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       </div>}
       {/* A site BenchQ may not read yet: its permission first, alone; the rest shows once it's given. */}
       {!movedAway && state.needsAccess && <SiteAccessNotice access={state.needsAccess} isDenied={state.isAccessDenied} isAsking={state.isAsking} onAllow={() => void state.allowAccess()} />}
-      {isOpen && <NextSteps steps={[
-        { key: "resume", label: "Resume", isDone: resumes.status === "ready" && Boolean(picked) },
-        { key: "fill", label: "Autofill", isDone: hasForm && !hasFillsLeft },
-        { key: "submit", label: "Submit on site", isDone: isApplied },
-        { key: "applied", label: "Mark applied", isDone: isApplied },
-      ]} />}
       {isOpen && needsConfirmation && <div className={WARNING} role="alert">
         <strong>This page may be a different job.</strong>
         <p className="mt-0.5 mb-2 wrap-anywhere">Saved: {jobName}.{state.check.detected ? ` This page: ${state.check.detected}.` : ""}</p>
@@ -231,18 +267,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
         </div>
       </div>}
 
-      {/* Autofill first, the résumé it answers from under it. */}
+      {/* How far the form is, then the résumé it answers from; Autofill itself floats at the bottom. */}
       {isOpen && hasForm && <FormProgress rows={currentRows} isRestarting={pendingFill !== null} />}
-
-      {isOpen && hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || !reviewMatches || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
-        {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
-      </button>}
-      {isOpen && hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`-mt-1.5 text-center ${MUTED_TEXT}`}>
-        Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id ? ", the resume file first" : ""}.
-      </p>}
-      {isOpen && isComplete && <p data-slot="autofill-done" className={`flex items-center gap-1 ${BELOW_TOP_BAR} text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`} role="status">{CHECK}Autofill complete</p>}
-      {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
-      {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`-mt-1.5 ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
+      {isOpen && isComplete && <AutofillDone filled={outcome?.filled ?? 0} rows={currentRows ?? []} attached={state.attachedFile}
+        attachedShown={state.attachedShown} canSave onGoTo={goTo} />}
 
       {isOpen && <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
         isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />}
@@ -265,14 +293,27 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {isOpen && state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {isOpen && hasForm && <DocumentSections rows={currentRows} details={details} resumesUrl={resumesUrl} isFilling={filling} onGoTo={goTo}
-        picked={picked ? { label: picked.label, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null } : null} attached={state.attachedFile}
-        onChangeResume={hasOtherResumes ? changeResume : undefined} />}
+        picked={picked ? { label: picked.label, meta: picked.meta, url: studioUrl(picked.id), file: answeredFrom === picked.id ? attachment : null,
+          source: answeredFrom === picked.id ? state.attachmentSource : null } : null} attached={state.attachedShown ? state.attachedFile : null}
+        onChangeResume={hasOtherResumes ? changeResume : undefined} fileProblem={state.fileProblem} onRetryFile={() => void state.rescan()}
+        ownFileError={ownFileError} onOwnFile={(chosen) => void takeOwnFile(chosen)} onRemoveOwnFile={removeOwnFile}
+        ownFile={pickedFile ? { name: pickedFile.name } : null} refusedAccept={state.refusedAccept ?? null} benchQFile={state.attachedFile} />}
       {isOpen && !filling && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
         onSuggest={(row, entry) => void state.fillWith(row, entry)} onSave={state.saveAnswer} />}
     </div>
 
-    <div data-slot="autofill-actions" className="sticky bottom-0 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 empty:hidden">
+    {/* The main actions float at the bottom of the panel, so Autofill is always in reach however long the form is: flush
+        with its edge, over the workspace's own bottom padding (-bottom-3 matches its pb-3). */}
+    <div data-slot="autofill-actions" className="sticky -bottom-3 z-1 grid gap-1.5 rounded-b-[var(--radius-lg)] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-2 pb-3 shadow-[var(--shadow-sm)] empty:hidden">
+      {isOpen && hasFillsLeft && <button type="button" data-slot="autofill-run" className={button("primary", "large")} disabled={isWorking || !reviewMatches || scanning || fillCount === 0 || needsConfirmation} onClick={() => void state.autofill()}>
+        {isWorking ? "Filling…" : <>{SPARKLES_ICON}Autofill</>}
+      </button>}
+      {isOpen && hasFillsLeft && reviewMatches && !filling && fillCount > 0 && <p data-slot="autofill-ready" className={`text-center ${MUTED_TEXT}`}>
+        Ready to fill {fillCount} field{fillCount === 1 ? "" : "s"}{attachment && answeredFrom === picked?.id && rows?.some((row) => row.status === "ready" && row.write?.type === "file") ? ", the resume file first" : ""}.
+      </p>}
+      {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
+      {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className={`text-center ${MUTED_TEXT}`}>Next pages of this form fill on their own as they open.</p>}
       {/* Mark applied steps aside while a run fills the form, and is back once it ends. */}
       {/* On a site BenchQ may not read yet there is no review to wait for: the BDE who declines fills the form by hand, and may still mark it applied. */}
       {/* Not while the tab shows another job: marking it would mark the connected job from another job's page. */}

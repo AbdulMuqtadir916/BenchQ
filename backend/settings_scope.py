@@ -6,16 +6,14 @@ PLATFORM in backend/auth/access.py). Firms never configure models, prompts or sc
 that isn't, so a new setting has to say whose it is.
 
 - PLATFORM    stays here: schedules, limits, scraping filters, link formats.
-- AI_PRESET   the models, keys and prompts of each AI module. They move to the Super Admin's AI presets
-              (one active preset per module) when that module is built; until then they stay here.
+- AI_PRESET   the model and prompt rows of the older AI code outside the Super Admin's AI presets. The four live use
+              cases and the one API key are no longer in this table (backend/models/ai_presets.py, migration 0032).
 - FIRM_LATER  really a firm's (or a candidate's) choice. It stays platform-wide until its track gives it a firm
               table; that track's owner moves it. Firm code must not treat its value as the firm's own data.
 - UNUSED      not part of BenchQ (LinkedIn and Jobright logins, Telegram, JobNavigator's own UI). The owner's track
               deletes the key together with the code that reads it.
 """
 from enum import Enum
-
-from backend.resume_tailor import settings as tailor_settings
 
 
 class Scope(str, Enum):
@@ -29,12 +27,6 @@ P, AI, FIRM, UNUSED = Scope.PLATFORM, Scope.AI_PRESET, Scope.FIRM_LATER, Scope.U
 
 # key -> (scope, the track that moves or deletes it; "" for PLATFORM keys that stay)
 SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
-    "candidate_email_llm_provider": (AI, "AI presets"),
-    "candidate_email_llm_model": (AI, "AI presets"),
-    "candidate_email_llm_api_key": (AI, "AI presets"),
-    "candidate_email_llm_effort": (AI, "AI presets"),
-    "candidate_email_instructions": (AI, "AI presets"),
-
     # ── Platform: schedules, limits, scraping filters ────────────────────────
     "scrape_interval_minutes": (P, ""),
     "h1b_cron": (P, ""),
@@ -52,6 +44,7 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "scoring_max_concurrent": (P, ""),
     "tailoring_max_concurrent": (P, ""),
     "resume_tailor_max_concurrent": (P, ""),
+    "resume_parse_max_concurrent": (P, ""),
     "tracer_links_base_url": (P, ""),
     "tracer_links_url_style": (P, ""),
     "job_search_provider": (P, ""),        # the job source every firm's search uses (job search PR 1)
@@ -59,18 +52,15 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     # ── AI presets: models, keys, prompts (one active preset per module, Super Admin) ──
     "llm_provider": (AI, "AI presets"),
     "llm_model": (AI, "AI presets"),
-    "llm_api_key": (AI, "AI presets"),
     "llm_effort": (AI, "AI presets"),
     "llm_fallback_provider": (AI, "AI presets"),
     "llm_fallback_model": (AI, "AI presets"),
-    "llm_fallback_api_key": (AI, "AI presets"),
     "llm_fallback_effort": (AI, "AI presets"),
     "llm_models_list": (AI, "AI presets"),
     "llm_seeded_models": (AI, "AI presets"),
     "prompt_caching_enabled": (AI, "AI presets"),
     "scoring_llm_provider": (AI, "AI presets"),
     "scoring_llm_model": (AI, "AI presets"),
-    "scoring_llm_api_key": (AI, "AI presets"),
     "scoring_llm_effort": (AI, "AI presets"),
     "scoring_rubric": (AI, "AI presets"),
     "scoring_output_light": (AI, "AI presets"),
@@ -78,28 +68,17 @@ SETTING_SCOPES: dict[str, tuple[Scope, str]] = {
     "scoring_default_depth": (AI, "AI presets"),
     "cover_letter_llm_provider": (AI, "AI presets"),
     "cover_letter_llm_model": (AI, "AI presets"),
-    "cover_letter_llm_api_key": (AI, "AI presets"),
     "cover_letter_llm_effort": (AI, "AI presets"),
     "cover_letter_prompt": (AI, "AI presets"),
-    "resume_parse_system_prompt": (AI, "AI presets"),
-    "resume_parse_prompt": (AI, "AI presets"),
-    "resume_parse_response_format": (AI, "AI presets"),
-    "resume_parse_llm_provider": (AI, "AI presets"),
-    "resume_parse_llm_model": (AI, "AI presets"),
-    "resume_parse_llm_api_key": (AI, "AI presets"),
-    # The résumé tailor's model, prompts and formats (backend/resume_tailor/settings.py).
-    **{key: (AI, "AI presets") for key in tailor_settings.DEFAULT_SETTINGS},
     "cover_letter_voice_presets": (AI, "AI presets"),
     "email_llm_enabled": (AI, "AI presets"),
     "email_llm_provider": (AI, "AI presets"),
     "email_llm_model": (AI, "AI presets"),
-    "email_llm_api_key": (AI, "AI presets"),
     "email_llm_effort": (AI, "AI presets"),
     "email_llm_prompt": (AI, "AI presets"),
     "email_llm_confidence_threshold": (AI, "AI presets"),
     "autofill_llm_provider": (AI, "AI presets"),
     "autofill_llm_model": (AI, "AI presets"),
-    "autofill_llm_api_key": (AI, "AI presets"),
     "autofill_llm_effort": (AI, "AI presets"),
     "autofill_prompt": (AI, "AI presets"),
 

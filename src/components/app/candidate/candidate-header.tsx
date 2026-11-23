@@ -65,10 +65,10 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
         <ArrowLeft size={14} aria-hidden /> Candidates
       </Link>
 
-      {/* Identity left, actions right, on one row from `md` up: the identity shrinks (its lines wrap), the actions never
-          move. Narrower, the actions stack under the identity, right-aligned (between `sm` and `md` the row left the
-          name too narrow to read). */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      {/* Identity left, actions right, on one row from `xl` up: the identity shrinks (its lines wrap), the actions never
+          move. Narrower, the actions stack under the identity, right-aligned: with the sidebar open, a 1024px window
+          left the name a few letters wide beside Find jobs and its result line (2026-11-17). */}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-4">
           <motion.span initial={reduce ? false : { scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, ease: EASE_OUT }} className="inline-flex">
             <CandidateAvatar name={candidate.fullName} colorKey={candidate.id} size="lg" />
@@ -92,7 +92,7 @@ export function CandidateHeader({ candidate, stats, ownerName, showOwner, canAct
             </div>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-start justify-end gap-2 md:ml-auto md:w-auto">
+        <div className="flex w-full flex-wrap items-start justify-end gap-2 xl:ml-auto xl:w-auto">
           <Can action="candidate.assign"><ReassignAction candidate={candidate} /></Can>
           {search ? <FindJobs candidate={candidate} resumeHref={resumeHref} search={search} /> : null}
           {canAct ? (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { missingForSave } from "@/lib/resume-doc/save-check";
 import { useSaveResume } from "@/lib/hooks/use-resumes";
 import { useHref } from "@/lib/routes/use-href";
+import { describeError } from "@/lib/api/error-text";
 import { useStudio, type StudioTab } from "./studio-store";
 
 const FIELD_WORDS = { fullName: "the full name", email: "the email" } as const;
@@ -39,7 +40,10 @@ export function useStudioSave(versionId: string, tab: StudioTab) {
           ? toHref("resumes.autofill", { id: opened.versionId })
           : toHref("resumes.studio", { id: opened.versionId }, tab === "view" ? { mode: "view" } : undefined));
       },
-      onError: (error) => notify(error instanceof Error ? error.message : "The save didn't go through. Try again.", "danger"),
+      onError: (error) => {
+        const text = describeError(error, { fallback: "The save didn't go through. Try again." });
+        notify(text.message, "danger", text.reference);
+      },
     });
   }, [save, versionId, tab, router, toHref]);
 

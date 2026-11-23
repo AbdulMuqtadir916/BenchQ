@@ -22,6 +22,7 @@ from sqlalchemy import text as sql_text
 
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.tests.log_leak_cases as leak_cases
+from backend.tests.problem_support import LEFTOVER_DEFAULT_CODES, LEFTOVER_SHAPE, assert_problem
 from backend.tests.route_sweep import build_request, seed_every_table, stub_outside
 from backend.tests.test_logging_canary import MARKERS
 
@@ -56,6 +57,13 @@ NOT_REACHED: dict[str, str] = {
     # logging (ids, codes, counts; never the query) is checked in test_job_search_api.py.
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-searches": "403: Only this candidate's BDE searches jobs for them",
     "POST /api/firms/{firm_id}/candidates/{candidate_id}/job-postings": "403: Only this candidate's BDE adds jobs for them",
+    # The sweep plants a value in every query parameter, and `batch` names no search of the candidate's: the same 404
+    # as any unknown id (2026-11-17, Q109). The list logs nothing of a job (test_job_search_fanout.py lists it).
+    "GET /api/firms/{firm_id}/job-postings": "404: Not found",
+    # A posting is pasted only for a job that came without its text (a LinkedIn job, Q107); the seeded job has its
+    # text. The paste logs nothing of the text (test_job_search_linkedin.py pastes one).
+    "PUT /api/firms/{firm_id}/candidates/{candidate_id}/job-postings/{posting_id}/posting":
+        "409: This job already has its posting",
     # Only the candidate's BDE tailors (07 Q55) and the sweep signs in as the OWNER; its seeded job_runs row is no
     # firm's tailoring. The tailor's own logging (ids, codes, counts; never a résumé or a posting) is checked in
     # test_resume_tailor_routes.py.
@@ -90,6 +98,8 @@ NOT_REACHED.update({route: "410: the old job pool is retired" for route in (
     "POST /api/jobs/backfill-descriptions", "POST /api/scrape/company/{company_id}", "POST /api/searches/{search_id}/run",
     "POST /api/searches/{search_id}/test", "POST /api/companies/{company_id}/test-scrape", "POST /api/cover-letters",
     "POST /api/cover-letters/generate", "POST /api/jobs/bulk-update")})
+# The scheduler runs in the worker process (production layer step 3), so the API's list of its jobs is retired.
+NOT_REACHED["GET /api/scheduler/jobs"] = "410: Scheduled jobs run in the worker process"
 # A letter's job is a job posting since 0023; the sweep's `job_id` names the old pool's seeded job, so this is 404.
 NOT_REACHED["PATCH /api/cover-letters/{cl_id}"] = "404: Job not found"
 # Only the candidate's BDE adds a job for them (backend/auth/policy.py can_add_job), and the sweep signs in as the OWNER.
@@ -163,6 +173,10 @@ def test_no_route_writes_planted_values_to_the_log(route, swept, api_client, tes
     else:
         assert not leaked, f"{route} wrote planted values to the log: {leaked}\n{log.getvalue()[-3000:]}"
     reached = response.status_code < 400
+    # The same requests check the error body (docs/team/uzair.md step 4b): every error a route answers is one Problem
+    # Details body with a registered code, but the leftovers' hand-built ones (problem_support.LEFTOVER_SHAPE).
+    if not reached and route not in LEFTOVER_SHAPE and response.status_code != 303:
+        assert_problem(response, route)
     if route in NOT_REACHED:
         assert not reached, f"{route} gets through now: remove it from NOT_REACHED"
     else:
@@ -178,8 +192,10 @@ def test_every_table_is_seeded(swept):
 
 
 def test_the_list_names_only_routes_that_exist():
-    stale = sorted((set(NOT_REACHED) | set(KNOWN_LEAKS)) - set(_routes(backend.main.app)))
-    assert not stale, f"these routes no longer exist; remove them from NOT_REACHED or KNOWN_LEAKS: {stale}"
+    stale = sorted((set(NOT_REACHED) | set(KNOWN_LEAKS) | LEFTOVER_SHAPE | LEFTOVER_DEFAULT_CODES)
+                   - set(_routes(backend.main.app)))
+    assert not stale, (f"these routes no longer exist; remove them from NOT_REACHED, KNOWN_LEAKS or "
+                       f"problem_support's leftover lists: {stale}")
 
 
 # ── The check, measured against log_leak_cases.py ─────────────────────────

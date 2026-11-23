@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ApiError } from "@/lib/api/client";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import type { Application } from "@/lib/schemas/application";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
 import type { EmailReview, InboxMessage, ReviewEmailAction } from "@/lib/schemas/inbox";
@@ -25,10 +27,11 @@ const stageOptions = (stages: readonly ApplicationStatus[]) => [{ value: "", lab
   ...stages.map((s) => ({ value: s, label: STATUS_LABEL[s] })), { value: IRRELEVANT, label: "Irrelevant (not about an application)" }];
 export const STAGE_OPTIONS = stageOptions(REVIEW_STAGES);
 
-function failure(error: Error): string {
-  return error instanceof ApiError && error.status === 409
-    ? "This email or application changed. The latest data was loaded: check the status, then decide again."
-    : error.message;
+/** A 409 is a stale revision; a system error reads as everywhere else (src/lib/api/error-text.ts). */
+function failure(error: Error): ErrorText {
+  return describeError(error, {
+    screenText: (e) => (e instanceof ApiError && e.status === 409 ? "This email or application changed. The latest data was loaded: check the status, then decide again." : null),
+  });
 }
 
 interface Props {
@@ -117,7 +120,7 @@ export function EmailReviewPanel({ message, review, applications, canAct, onHide
             <Button size="sm" variant="secondary" disabled={!app || busy || !ready} onClick={() => decide("LINK_ONLY")}>Link only</Button>
           </div>
           {mutation.isSuccess ? <p role="status" className="text-sm text-[var(--color-text-2)]">Decision saved.</p> : null}
-          {mutation.error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{failure(mutation.error)}</p> : null}
+          {mutation.error ? <ErrorNote text={failure(mutation.error)} /> : null}
         </div>
       ) : !canAct ? <p className="text-sm text-[var(--color-text-3)]">You have read-only access to this review.</p> : null}
     </section>

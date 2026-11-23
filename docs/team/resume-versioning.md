@@ -59,26 +59,17 @@ argument; every other caller behaves exactly as before.
 | Cut-off reply | `finish_reason == "length"` counts as a failed attempt and is retried | A reply cut off halfway is unusable |
 | Deadline and retries | 80 s per attempt; 4 attempts, 2/4/8 s apart; a timeout ends the call | Someone is watching the upload spinner |
 
-### 2.2 The parser's settings (decided 2026-11-01)
+### 2.2 The parser's setup (the `resume_parse` AI preset, since 2026-11-22)
 
-The parser gets its own rows in the `settings` table, each with its default in `backend/seed.py` and its entry in
-`backend/settings_scope.py`. Seeding only inserts a missing key, so an admin's edits are never overwritten.
+The parser runs on its active preset at `/admin/ai-presets` and the one shared OpenRouter key
+(`docs/integration/08-ai-presets.md`). Its model defaults to `openai/gpt-6-luna`; its system and user prompts are the
+preset's; its strict response format is in code (`parse_defaults.py`).
 
-| Key | Value |
-|---|---|
-| `resume_parse_system_prompt` | The system prompt |
-| `resume_parse_prompt` | The user prompt template (replaces today's default) |
-| `resume_parse_response_format` | The strict JSON schema (§2), as JSON text |
-| `resume_parse_llm_provider` | `openrouter` |
-| `resume_parse_llm_model` | `openai/gpt-6-luna` |
-| `resume_parse_llm_api_key` | Seeded **empty**; set on the settings page. Never in code, seed data or commits |
-
-- **Save check:** `/api/settings` refuses a broken `resume_parse_response_format` (not valid JSON, not `json_schema`,
-  not `strict: true`, no name, or missing a top-level key) and a `resume_parse_prompt` without `{resume}`, with a 400.
-- **The parser never borrows the shared settings:** if any of its provider, model or key rows is empty, the parse
-  stops with a 500 naming that row and makes no AI call.
-- Until `resume_parse_llm_api_key` is set, every parse fails with that error. This is expected; tell the team before
-  PR 2 merges.
+- **Save check:** a preset whose parse prompt has no `{resume}` is refused.
+- **It never borrows other settings:** with no key, no active preset or a broken prompt, the parse stops with a 500
+  saying what's missing and makes no AI call.
+- **Limits:** 10 parses at once per backend process (more wait), and 5 saved later uploads per candidate per firm work
+  day (07 Q72).
 
 ---
 
@@ -388,11 +379,16 @@ assign the BDE first, then send the file. The onboarding upload (§4.2) stays th
 1. The file is read and fingerprinted. **The same file the candidate already has** (whoever uploaded it, the
    onboarding file included) is refused before the AI call: *"This résumé is already Base 3."* If that base is
    hidden: *"This résumé is Base 3 (hidden). Show it again?"*.
-2. The parser reads it (`read_resume`, §2.1; no database connection held during the call).
-3. **One transaction:** `resume_parses` (candidate set, `expires_at` NULL), `base_resumes` (`UPLOAD`, **active**, the
-   previous one switched off), `resumes` `BASE` v1 from the parse (`first_base()` without the form). If the parse
-   fails, nothing is saved.
-4. The candidate's profile is not changed by an upload.
+2. **Is it the candidate's?** (07 Q69, 2026-11-18) The file's text (OCR included) must hold the candidate's email and
+   the first and last words of their name (`backend/candidates/identity_check.py`), checked **before** the AI call; a
+   refused file is not kept. A missing email or name is named (*"The résumé should contain the candidate's email."*,
+   *"… name."*, *"… name and email."*); someone else's email only says *"This résumé isn't for this candidate. Please
+   upload this candidate's résumé."*, never which part differs.
+3. The parser reads it (`read_resume`, §2.1; no database connection held during the call).
+4. **One transaction:** `resume_parses` (candidate set, `expires_at` NULL), `base_resumes` (`UPLOAD`, **active**, the
+   previous one switched off), `resumes` `BASE` v1 from the parse (`first_base()` without the form), with the
+   candidate's own name and email, not the parser's (07 Q68). If the parse fails, nothing is saved.
+5. The candidate's profile is not changed by an upload.
 
 ### 4.7 Deleting, hiding and showing again (decided 2026-11-02, Abdul and Zuhair; deleting made soft 2026-11-04, Zuhair)
 

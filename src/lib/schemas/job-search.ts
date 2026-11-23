@@ -11,16 +11,52 @@ export const JobSearchSchema = z.object({
   state: z.enum(["RUNNING", "SUCCESS", "EMPTY", "ERROR"]),
   /** The role searched; null for a capture. */
   query: z.string().nullable(),
+  /** Where it searched: "City, ST", "remote", or null (a capture, or a search from before places, 2026-11-14). */
+  place: z.string().nullable(),
   newCount: z.number().int(),
   seenAgainCount: z.number().int(),
   overLimitCount: z.number().int(),
+  /** Left out by the search (decided 2026-11-14): the job's text rules out the candidate's work authorization,
+   * it was posted over 14 days ago, or it isn't remote on a Remote search. */
+  leftOutWorkAuthCount: z.number().int(),
+  leftOutOldCount: z.number().int(),
+  leftOutNotRemoteCount: z.number().int(),
+  /** Left out because freehire.me passed it on from Adzuna, as a preview only (decided 2026-11-16, Q64). */
+  leftOutAdzunaCount: z.number().int(),
+  /** Left out because Match holds it at 40 for the candidate's level: far more years asked, or two rungs away (Q70). */
+  leftOutLevelCount: z.number().int(),
+  /** New jobs by source, for a click that asked several (decided 2026-11-17, Q90): backend source name → count. */
+  newBySource: z.record(z.string(), z.number().int()),
+  /** Sources that failed in that click (Q93): backend source names. */
+  failedSources: z.array(z.string()),
   errorCode: JobSearchErrorCode.nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),
+  /** The firm's work day it ran in, "YYYY-MM-DD" (decided 2026-11-17, Q161, Q170); stamped when it started. */
+  workDate: z.string().nullable(),
+  /** Its Day and batch number in the candidate's current assignment (Q158, Q166); null before it or without a BDE
+   * (Q168, Q174: "Earlier searches"), and for a capture or an unfinished search. */
+  day: z.number().int().positive().nullable(),
+  batch: z.number().int().positive().nullable(),
 });
 export type JobSearch = z.infer<typeof JobSearchSchema>;
 
-/** Today's numbers since 6:30 PM IST: the candidate's new jobs, their BDE's searches and captures (null: no BDE). */
+/** The candidate's Days (decided 2026-11-17, Q152–Q174): the firm's work hours, Day 1 and today's Day, and the Days
+ * with a search; the empty Days between are worked out from these, never stored (Q156). */
+export const JobSearchWorkdaySchema = z.object({
+  /** "HH:MM" in `timezone`. */
+  start: z.string(),
+  end: z.string(),
+  timezone: z.string(),
+  /** Day 1's work date and today's, "YYYY-MM-DD"; `dayOne` and `todayDay` are null without a BDE. */
+  dayOne: z.string().nullable(),
+  today: z.string(),
+  todayDay: z.number().int().positive().nullable(),
+  daysWorked: z.array(z.number().int().positive()),
+});
+export type JobSearchWorkday = z.infer<typeof JobSearchWorkdaySchema>;
+
+/** Today's numbers since the firm's work day started: the candidate's new jobs, their BDE's searches and captures (null: no BDE). */
 export const JobSearchUsageSchema = z.object({
   jobsToday: z.number().int(),
   jobsCap: z.number().int(),
@@ -32,10 +68,24 @@ export const JobSearchUsageSchema = z.object({
 });
 export type JobSearchUsage = z.infer<typeof JobSearchUsageSchema>;
 
+/** One of the candidate's places a search can use (backend/job_search/places.py): the résumé's city and state, a
+ * preferred location, or remote anywhere in the country. `value` is what a search sends. */
+export const JobSearchPlaceSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  kind: z.enum(["home", "preferred", "remote"]),
+});
+export type JobSearchPlace = z.infer<typeof JobSearchPlaceSchema>;
+
 export const JobSearchesSchema = z.object({
   running: JobSearchSchema.nullable(),
   /** Newest first, searches and captures. */
   searches: z.array(JobSearchSchema),
   usage: JobSearchUsageSchema,
+  /** The role a search asks for: the candidate's target role (decided 2026-11-14); null without one. */
+  role: z.string().nullable(),
+  /** The places the BDE picks from, in order; empty when the candidate has none (no search then). */
+  places: z.array(JobSearchPlaceSchema),
+  workday: JobSearchWorkdaySchema,
 });
 export type JobSearches = z.infer<typeof JobSearchesSchema>;

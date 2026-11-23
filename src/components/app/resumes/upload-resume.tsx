@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { DuplicateUploadError, useShowBase, useUploadResume } from "@/lib/hooks/use-resumes";
-import { useShowToast } from "@/lib/stores/toast-store";
+import { useShowErrorToast, useShowToast } from "@/lib/stores/toast-store";
+import { describeError } from "@/lib/api/error-text";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 
@@ -17,6 +18,7 @@ export function UploadResume({ candidateId, label = "Upload résumé" }: { candi
   const upload = useUploadResume();
   const showBase = useShowBase();
   const toast = useShowToast();
+  const toastError = useShowErrorToast();
   const [hidden, setHidden] = useState<{ message: string; baseId: string } | null>(null);
 
   function onFile(file: File | undefined) {
@@ -26,7 +28,7 @@ export function UploadResume({ candidateId, label = "Upload résumé" }: { candi
       onError: (error) => {
         if (error instanceof DuplicateUploadError && error.isHidden) setHidden({ message: "You uploaded this file before, and it's on the hidden list. Show it again?", baseId: error.baseId });
         else if (error instanceof DuplicateUploadError) toast("This file is already one of the candidate's résumés.");
-        else toast(error instanceof Error ? error.message : "The upload didn't go through. Try again.");
+        else toastError(describeError(error, { fallback: "The upload didn't go through. Try again." }));
       },
     });
   }
@@ -43,7 +45,7 @@ export function UploadResume({ candidateId, label = "Upload résumé" }: { candi
         onCancel={() => setHidden(null)}
         onConfirm={() => hidden && showBase.mutate({ candidateId, baseId: hidden.baseId }, {
           onSuccess: () => { setHidden(null); toast("It's back on the list. Make it main if you want to send it by default."); },
-          onError: (e) => { setHidden(null); toast(e instanceof Error ? e.message : "That didn't go through. Try again."); },
+          onError: (e) => { setHidden(null); toastError(describeError(e)); },
         })}>
         <p>{hidden?.message}</p>
       </ConfirmDialog>

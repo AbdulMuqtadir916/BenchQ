@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useHref } from "@/lib/routes/use-href";
 import { useCompletePasswordReset } from "@/lib/hooks/use-password-recovery";
+import { describeError } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 
 const RESET_TOKEN_KEY = "benchq.reset-password.token";
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -21,7 +23,7 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
   const completeReset = useCompletePasswordReset();
   const busy = completeReset.isPending;
-  const error = completeReset.error ? completeReset.error.message || "Couldn't reset your password. Try again." : "";
+  const error = completeReset.error ? describeError(completeReset.error, { fallback: "Couldn't reset your password. Try again." }) : null;
   function clearStoredToken() {
     try { window.sessionStorage.removeItem(RESET_TOKEN_KEY); } catch { /* Storage may be disabled. */ }
   }
@@ -89,6 +91,6 @@ export default function ResetPasswordPage() {
   }
   return <main className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4"><Card className="w-full max-w-xl p-8 shadow-lg">
     <div className="text-center mb-8"><h1 className="text-display text-[var(--color-text)]">BenchQ</h1><h2 className="mt-5 text-xl font-semibold text-[var(--color-text)]">Choose a new password</h2><p className="mt-2 text-[var(--color-text-3)]">Your approver shared this one-time reset link with you.</p></div>
-    {done ? <div><p role="status">Password reset successfully. You can now sign in.</p><Link className="mt-5 block text-center text-caption text-[var(--color-primary)]" href={toHref("sign-in")}>Go to sign in</Link></div> : <form onSubmit={submit} className="space-y-4"><label className="block space-y-2 text-label text-[var(--color-text-2)]">New password<Input type="password" autoComplete="new-password" minLength={8} maxLength={1024} required value={password} onChange={e => setPassword(e.target.value)} className="bq-input" /></label><label className="block space-y-2 text-label text-[var(--color-text-2)]">Confirm new password<Input type="password" autoComplete="new-password" minLength={8} maxLength={1024} required value={confirm} onChange={e => setConfirm(e.target.value)} className="bq-input" /></label>{password && confirm && password !== confirm && <p className="text-sm text-[var(--color-danger-fg)]">Passwords do not match.</p>}{error && <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{error}</p>}<Button type="submit" className="bq-primary w-full" disabled={busy || !tokenReady || !token || password.length < 8 || password !== confirm}>{busy ? "Resetting..." : "Reset password"}</Button>{tokenReady && !token && <p role="alert" className="text-sm text-[var(--color-danger-fg)]">This link has expired. Contact your manager or firm owner for a new one.</p>}</form>}
+    {done ? <div><p role="status">Password reset successfully. You can now sign in.</p><Link className="mt-5 block text-center text-caption text-[var(--color-primary)]" href={toHref("sign-in")}>Go to sign in</Link></div> : <form onSubmit={submit} className="space-y-4"><label className="block space-y-2 text-label text-[var(--color-text-2)]">New password<Input type="password" autoComplete="new-password" minLength={8} maxLength={1024} required value={password} onChange={e => setPassword(e.target.value)} className="bq-input" /></label><label className="block space-y-2 text-label text-[var(--color-text-2)]">Confirm new password<Input type="password" autoComplete="new-password" minLength={8} maxLength={1024} required value={confirm} onChange={e => setConfirm(e.target.value)} className="bq-input" /></label>{password && confirm && password !== confirm && <p className="text-sm text-[var(--color-danger-fg)]">Passwords do not match.</p>}<ErrorNote text={error} /><Button type="submit" className="bq-primary w-full" disabled={busy || !tokenReady || !token || password.length < 8 || password !== confirm}>{busy ? "Resetting..." : "Reset password"}</Button>{tokenReady && !token && <p role="alert" className="text-sm text-[var(--color-danger-fg)]">This link has expired. Contact your manager or firm owner for a new one.</p>}</form>}
   </Card></main>;
 }

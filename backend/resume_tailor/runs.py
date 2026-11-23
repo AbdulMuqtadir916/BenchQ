@@ -30,9 +30,11 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import func, text as sql
 
+from backend.problem import TAILORINGS_RUNNING, Problem
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.candidates import autofill, versions
+from backend.match import store as match_store
 from backend.candidates.values import text
 from backend.job_monitor import get_all_running, mark_run_failed
 from backend.job_search import providers
@@ -277,8 +279,8 @@ def admit(db, candidate, actor: User, job_posting_id, resume_id=None) -> dict:
     if any(m.get("source_resume_id") == str(source.id) and m.get("job_posting_id") == str(posting.id) for m in running):
         raise HTTPException(status_code=409, detail="This résumé is already being tailored for this job.")
     if sum(m.get("user_id") == str(actor.id) for m in running) >= MOST_RUNNING_PER_BDE:
-        raise HTTPException(status_code=429, detail=f"You have {MOST_RUNNING_PER_BDE} tailorings running. "
-                                                    "Wait for one to finish, then try again.")
+        raise Problem(429, f"You have {MOST_RUNNING_PER_BDE} tailorings running. Wait for one to finish, then try "
+                           "again.", TAILORINGS_RUNNING)
     return {"candidate_id": str(candidate.id), "source_resume_id": str(source.id),
             "base_resume_id": str(source.base_resume_id) if source.version == 1 else None,
             "job_posting_id": str(posting.id), "job_title": title[:300], "user_id": str(actor.id)}
@@ -357,7 +359,11 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
         firm = db.get(Firm, firm_id)
         if candidate is None or firm is None or firm.status == "SUSPENDED":
             raise _Stop(GONE)
-        if ((db.get(JobRun, run_id).meta or {}).get("error_code")):
+        # The run's row locked too, after the candidate's (the order admit's expire_lost takes them in): a heartbeat
+        # sweep (job_monitor.cleanup_stale_runs) fails a silent run with no error code, and a sweep that commits first
+        # is read here; one that comes later waits for this commit and finds the version saved (CodeRabbit on #147).
+        current = db.query(JobRun).filter(JobRun.id == run_id).with_for_update().first()
+        if current is None or current.status != "running" or (current.meta or {}).get("error_code"):
             raise _Stop(LOST)                 # told the BDE it failed: keep it that way
         source = _source(db, firm_id, candidate, source_resume_id)
         posting = scoped(db, JobPosting, firm_id).filter(JobPosting.id == job_posting_id).first()
@@ -368,7 +374,8 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
             base = versions.base_for_tailoring(db, actor, candidate, source)
         except HTTPException:
             raise _Stop(HIDDEN)               # the base made from this version was hidden meanwhile
-        content = versions._with_ids(versions.content_of(source), tailored.content)
+        content = {**versions._with_ids(versions.content_of(source), tailored.content),
+                   **versions.fixed_identity(candidate)}     # the candidate's name and email (07 Q68)
         group = scoped(db, Resume, firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "TAILORED",
                                                    Resume.job_id == posting.id)
         latest = group.with_entities(func.max(Resume.version)).scalar() or 0
@@ -380,6 +387,7 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
                      autofill=copy.deepcopy(autofill.entries_of(newest or source)), **content)
         db.add(row)
         db.flush()
+        match_store.score_tailored(db, candidate, row, posting)    # its Match against the job (decided 2026-11-14, Q39)
         number = versions.base_numbers(db, candidate)[base.id]
         entry = ledger.record(db, actor=actor, action="CREATE", entity_type="resume",
                               entity_id=row.id,

@@ -37,6 +37,8 @@ export type ScannedField = {
   options: FieldOption[];
   maxLength: number | null;
   inAccountForm: boolean;
+  /** An upload's `accept` list as the page wrote it (`.pdf,.docx`); empty takes any file. Uploads only. */
+  accept?: string;
   /** The same control keeps this id across scans of one page load, so what the panel remembers about it stays with it
    * when fields come or go above it. */
   stableId?: string;
@@ -58,7 +60,9 @@ export type FrameScan = { scanId: number; url: string; fields: ScannedField[]; s
 export type FrameRead = { scanId: number; values: Record<string, string>; moved: boolean };
 
 export type FieldWrite =
-  | { type: "text"; value: string }
+  /** `also`: other ways to write the same value, tried in turn when the form refuses `value`, like a phone number's
+   * digits alone (#148). */
+  | { type: "text"; value: string; also?: string[] }
   | { type: "option"; optionId: string }
   | { type: "check"; checked: boolean; optionIds?: string[] }
   /** `also`: other wordings of the answer, tried in turn when the dropdown has no option for `value`, like the status a
@@ -69,7 +73,12 @@ export type FieldWrite =
   | { type: "file" } & ResumeFile;
 
 /** A résumé's file as the panel holds it: its name on the form, its type and its bytes in base64. */
-export type ResumeFile = { name: string; mimeType: string; data: string };
+/** `id`: which file this is, apart from its name on the form: the BDE's own file and BenchQ's can share a name. */
+export type ResumeFile = { name: string; mimeType: string; data: string; source?: ResumeFileSource; id?: string };
+
+/** Where the file came from: the résumé's upload as it was uploaded, made by BenchQ from the version's text (docs/02
+ * §8.2), or picked by the BDE from their computer in the panel. */
+export type ResumeFileSource = "uploaded" | "generated" | "picked";
 
 export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string };
 export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "no-match"; current: string; reason?: string };
@@ -114,6 +123,7 @@ export type PageApi = {
   flagged(scanId: number, fieldIds: string[]): Promise<string[]>;
   focusField(target: FieldTarget): boolean;
   takeBack(target: FieldTarget): Promise<boolean>;
+  showsFile(name: string): boolean;
   removeFile(name: string): Promise<boolean>;
   undo(): Promise<UndoResult>;
   undoCount(): number;

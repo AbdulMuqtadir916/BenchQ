@@ -129,7 +129,7 @@ export function CommandPalette({ area }: { area: "firm" | "platform" }) {
     }
   }, [isOpen]);
 
-  const records = usePaletteRecords();
+  const records = usePaletteRecords(query);
   const reduceMotion = useReducedMotion() ?? false;
   const principal = useSignedInPrincipal();
   const firmId = useOptionalFirm()?.id;

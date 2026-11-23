@@ -108,7 +108,7 @@ def test_the_form_country_wins_over_the_files(anonymous_client, test_db, world):
 def test_other_is_not_a_work_authorization(anonymous_client, test_db, world):
     upload = _upload(test_db, world)
     r = _create(anonymous_client, world, resume_parse_id=str(upload.id), work_auth="OTHER")
-    assert r.status_code == 422 and r.json()["detail"][0]["loc"][-1] == "work_auth"
+    assert r.status_code == 422 and r.json()["errors"][0]["loc"][-1] == "work_auth"
 
 
 def test_two_candidates_each_get_their_own_base(anonymous_client, test_db, world):
@@ -146,7 +146,7 @@ def test_a_failure_saves_nothing(anonymous_client, test_db, world, monkeypatch):
 def test_create_rejects_an_invalid_profile_link(anonymous_client, world):
     response = _create(anonymous_client, world, linkedin_url="aghajrgng;knga")
     assert response.status_code == 422
-    assert any(error["loc"][-1] == "linkedin_url" for error in response.json()["detail"])
+    assert any(error["loc"][-1] == "linkedin_url" for error in response.json()["errors"])
 
 
 @pytest.mark.parametrize("link", ["LinkedIn", "bare-handle", "ftp://linkedin.com/in/qa"])
@@ -156,6 +156,6 @@ def test_first_base_drops_invalid_parser_links(link):
     from backend.candidates.first_base import first_base
 
     upload = SimpleNamespace(id=uuid.uuid4(), parse={"header": {"linkedin": link, "github": link}})
-    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate")
+    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate", email="candidate@example.com")
     _, version = first_base(upload, candidate, None, uuid.uuid4())
     assert version.linkedin is None and version.github is None

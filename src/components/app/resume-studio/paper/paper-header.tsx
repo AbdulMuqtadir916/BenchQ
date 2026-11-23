@@ -12,7 +12,8 @@ export function PaperName({ doc, editable, children }: { doc: ResumeDocument; ed
   const a = useDocActions();
   return (
     <header className="rt-header" data-rt-section="header" data-rt-block="header">
-      <EditableText className="rt-name" value={doc.fullName} onChange={(v) => a.setTop("fullName", v)} editable={editable} label="Full name" />
+      {/* The name and email are the candidate's, fixed once they are added (07 Q68): never editable here. */}
+      <EditableText className="rt-name" value={doc.fullName} onChange={() => {}} editable={false} label="Full name" />
       {editable || doc.title ? (
         <EditableText className="rt-title" value={doc.title} onChange={(v) => a.setTop("title", v)} editable={editable} label="Title" placeholder="Headline, e.g. Senior Java Developer" />
       ) : null}
@@ -59,7 +60,7 @@ export function PaperContacts({ doc, editable }: { doc: ResumeDocument; editable
           <EditableText value={h.country} onChange={(v) => a.setHeader("country", v)} editable label="Country" placeholder="Country" />
         </span>
       ) : place.length ? <span className="rt-contact">{place.join(", ")}</span> : null}
-      {shown.map((f) => !editable ? (
+      {shown.map((f) => !editable || f.key === "email" ? (
         <span key={f.key} className="rt-contact"><PaperAnchor link={f.toLink(h[f.key], h.country)} text={h[f.key]} /></span>
       ) : (
         <PaperContact key={f.key} value={h[f.key]} label={f.label} editable={editable} isLink={isProfileLinkField(f.key)}

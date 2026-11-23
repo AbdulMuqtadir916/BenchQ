@@ -48,6 +48,8 @@ rules (§5). §6 lists what in the backend makes this harder than it looks.
 > **Folded into the foundation:** the ledger's own table in F2 (auth, invites and support views write to
 > it; the Module 01 track then only connects the screen). Background jobs (scheduler, email monitor) pass
 > `firm_id` explicitly. Until the scheduler moves out of process, deploy **exactly one backend worker**.
+> **2026-11-14 (production layer step 3):** the scheduler runs in its own process (`backend/worker.py`, the `worker`
+> service): exactly one of it. The API stays at one worker until its in-memory limits move ([uzair.md](../team/uzair.md)).
 > Backend tests run on Postgres from F1. In F2, classify every setting as platform-wide or firm-owned.
 > "Mark applied" moves to the 03 Applications track.
 >

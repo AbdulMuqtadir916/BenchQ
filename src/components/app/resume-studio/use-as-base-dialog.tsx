@@ -2,6 +2,7 @@
 
 import { useUseAsBase } from "@/lib/hooks/use-resumes";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { describeError } from "@/lib/api/error-text";
 import { useStudio } from "./studio-store";
 
 /**
@@ -26,7 +27,7 @@ export function UseAsBaseDialog() {
         if (!ask) return;
         useAsBase.mutate({ candidateId: ask.candidateId, versionId: ask.versionId }, {
           onSuccess: () => { setAsk(null); notify(`v${ask.number} is now the base in use. New tailoring starts from it.`); },
-          onError: (error) => { setAsk(null); notify(error instanceof Error ? error.message : "That didn't go through. Try again.", "danger"); },
+          onError: (error) => { setAsk(null); const text = describeError(error); notify(text.message, "danger", text.reference); },
         });
       }}
     >

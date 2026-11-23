@@ -83,3 +83,5 @@ export function useWizard() {
 }
 
 export type Wizard = ReturnType<typeof useWizard>;
+/** What a step's fields read and write: the wizard, or the "Additional candidate details" tab's own form. */
+export type WizardForm = Pick<Wizard, "values" | "drafted" | "set">;
