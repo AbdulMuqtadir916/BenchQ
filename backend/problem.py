@@ -49,13 +49,14 @@ TAILORINGS_RUNNING = "TAILORINGS_RUNNING"          # a BDE's tailorings running 
 NOT_CONFIGURED = "NOT_CONFIGURED"                  # a feature this server isn't set up for; the text says which
 RESUME_READER_FAILED = "RESUME_READER_FAILED"      # the résumé reader's model didn't answer
 RESUME_READER_TIMEOUT = "RESUME_READER_TIMEOUT"    # the résumé reader's model ran out of time
+RESUME_FILE_FAILED = "RESUME_FILE_FAILED"          # a résumé version's PDF or Word file couldn't be made; try again
 SEARCH_NOT_STARTED = "SEARCH_NOT_STARTED"          # a job search couldn't be launched
 DUPLICATE_RESUME = "DUPLICATE_RESUME"              # the file is already one of the candidate's bases
 MAILBOX_BUSY = "MAILBOX_BUSY"                      # a Google account's connect or clean-up is running; try shortly
 
 CODES = frozenset(DEFAULT_CODES.values()) | {
     DAILY_LIMIT, TAILORINGS_RUNNING, NOT_CONFIGURED, RESUME_READER_FAILED, RESUME_READER_TIMEOUT,
-    SEARCH_NOT_STARTED, DUPLICATE_RESUME, MAILBOX_BUSY,
+    RESUME_FILE_FAILED, SEARCH_NOT_STARTED, DUPLICATE_RESUME, MAILBOX_BUSY,
 }
 
 # The validation 422's detail: what the person can do (docs/02 §12.2, rule 4). The fields are in `errors`.

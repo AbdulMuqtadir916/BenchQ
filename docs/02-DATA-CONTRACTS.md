@@ -2364,6 +2364,7 @@ Every error the backend makes is one RFC 9457 "Problem Details" body, `Content-T
 | `NOT_CONFIGURED` | 500 / 503 | `api/routes_resume_tailoring.py:55` `_admit` (tailor not set up); `candidates/parse.py:158` `_setup_error` (résumé reader not set up); `auth/password_reset.py:109` (reset links); `api/routes_inbox.py:307` (Gmail connect) and :485 (Gmail confirm, switched off) | backend |
 | `RESUME_READER_FAILED` | 500 | `candidates/parse.py:217` (the reader didn't answer) | backend |
 | `RESUME_READER_TIMEOUT` | 504 | `candidates/parse.py:213` | backend |
+| `RESUME_FILE_FAILED` | 503 | `api/routes_candidate_resumes.py` `_not_made` (`GET …/resumes/{resume_id}/file`: a version's PDF or Word file couldn't be made; the extension can try again) | backend |
 | `SEARCH_NOT_STARTED` | 503 | `api/routes_job_search.py:160` | backend |
 | `MAILBOX_BUSY` | 503 | `inbox/grant_locks.py:39,50` (a Google account's connect or clean-up holds its lock); `Retry-After: 5` | backend |
 | `DUPLICATE_RESUME` | 409 | `candidates/versions.py:467`; extensions `base_resume_id`, `hidden` | backend |
