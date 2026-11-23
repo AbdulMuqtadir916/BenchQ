@@ -1,3 +1,4 @@
+import { accepts } from "./accepts";
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
 import { fireEvents, pause, setText } from "./events";
@@ -56,6 +57,12 @@ function setFiles(input: HTMLInputElement, files: File[]) {
 
 const fileOf = ({ name, mimeType, data }: FieldWrite & { type: "file" }) =>
   new File([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], name, { type: mimeType });
+
+/** A site's words for an upload that didn't go through, beside the file's name. */
+const UPLOAD_FAILED = /\b(could ?n[o']t|cannot|can't|failed|error|invalid|too (large|big)|not (supported|allowed)|unsupported|try again)\b/i;
+
+/** Why a file wasn't written: the upload no longer takes its kind. */
+const UPLOAD_REFUSES_KIND = "This upload doesn't take this kind of file.";
 
 /** A control that takes a file off an upload, by its words or its label: "Remove", "Delete", an ×. */
 const REMOVE_CONTROL = /\b(remove|delete|clear|discard)\b|^[×✕✖x]$/i;
@@ -142,6 +149,32 @@ function sameChoice(shown: string, label: string) {
 function sameValue(shown: string, wanted: string) {
   const plain = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
   return plain(shown) !== "" && plain(shown) === plain(wanted);
+}
+
+/** The form fails what the control holds: its own checks (a pattern or a type the value doesn't fit), or the page's,
+ * which mark it invalid. */
+const isInvalid = (entry: Entry) => {
+  const control = entry.controls[0] as HTMLInputElement;
+  return control.getAttribute("aria-invalid") === "true" || control.validity?.valid === false;
+};
+
+/** A value the form didn't take, or holds but fails, written again the other ways the panel sent with it (#148): only a
+ * phone number's row sends them (with and without its code, spaced or not). The page never invents a way of its own,
+ * as it can't tell a phone number from a salary: "85000.50" with its point taken out is another amount (#148's review).
+ * The first the form takes and passes stays. With none, the value goes back as first written, for the form's verdict. */
+async function refit(entry: Entry, write: FieldWrite & { type: "text" }): Promise<FieldWrite & { type: "text" }> {
+  const retries = [...new Set(write.also ?? [])].filter((value) => value !== write.value);
+  if (retries.length === 0) return write;
+  const control = entry.controls[0] as HTMLInputElement;
+  for (const value of retries) {
+    setText(control, value);
+    await pause(SETTLE_MS);
+    const retry = { ...write, value };
+    if (accepted(entry, retry) && !isInvalid(entry)) return retry;
+  }
+  setText(control, write.value);
+  await pause(SETTLE_MS);
+  return write;
 }
 
 function accepted(entry: Entry, write: FieldWrite): boolean {
@@ -263,14 +296,19 @@ export function createFiller(registry: () => Registry | null) {
       if (!entry) return STALE;
       const present = readCurrent(entry);
       if (present !== current) return { status: "changed", current: present };
+      // The page can change what an upload takes after the scan: a file it won't take now isn't written.
+      if (write.type === "file" && !accepts((entry.controls[0] as HTMLInputElement).accept, write.mimeType, write.name)) {
+        return { status: "failed", current: present, reason: UPLOAD_REFUSES_KIND };
+      }
       const before = snapshot(entry);
       apply(entry, write);
       await pause(SETTLE_MS);
-      if (!accepted(entry, write)) {
+      const written = write.type === "text" && (!accepted(entry, write) || isInvalid(entry)) ? await refit(entry, write) : write;
+      if (!accepted(entry, written)) {
         await putBack(entry, before);
         return { status: "failed", current: readCurrent(entry) };
       }
-      filled.push({ scanId, entry, write, before, after: snapshot(entry) });
+      filled.push({ scanId, entry, write: written, before, after: snapshot(entry) });
       return { status: "filled", current: readCurrent(entry) };
     },
 
@@ -345,6 +383,16 @@ export function createFiller(registry: () => Registry | null) {
      * names it (07 Q51): a page such as Greenhouse shows a taken file as a chip and ignores a new one put under it. Only
      * a file this frame attached is removed, and only its own chip, beside the upload it went to: a file of the same
      * name the BDE attached elsewhere, here or in another frame, stays. True once its control was clicked. */
+    /** Whether the page shows the chip of a file this frame attached as `name`: the site took it and shows it in place of
+     * its upload (07 Q53). Its chip, beside the upload it went to (as removeFile finds it), never a message that merely
+     * names it ("Could not upload …"). */
+    showsFile(name: string): boolean {
+      const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
+        .map(({ entry }) => entry.controls[0] as HTMLInputElement);
+      if (uploads.length === 0) return false;
+      return ownChip(uploads, chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip).split(name).join(" ")))) !== null;
+    },
+
     async removeFile(name: string): Promise<boolean> {
       const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
         .map(({ entry }) => entry.controls[0] as HTMLInputElement);

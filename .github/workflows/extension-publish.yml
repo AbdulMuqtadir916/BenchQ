@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: extension/package-lock.json
       - run: npm ci --prefix extension
       - run: npm --prefix extension run test
-      # The store build: https://www.benchq.io from extension/.env.store, no local address, no all-sites access.
+      # The store build: https://app.benchq.io from extension/.env.store, no local address, no all-sites access.
       - run: npm --prefix extension run build:store
       # The store refuses a version it already has. Each run gets the next one, and a re-run of the same run (a retry
       # after a failed upload) gets its own: major.minor from the manifest, then the run number, then the attempt.

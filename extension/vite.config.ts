@@ -1,6 +1,8 @@
 /// <reference types="node" />
+import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { mplSources } from "./licenses.ts";
 import { buildManifest } from "./manifest.ts";
 
 /** page.js is injected as a classic script, again on every scan. So it can't import anything, and its top-level
@@ -29,6 +31,20 @@ function manifest(benchqUrl: string, isStore: boolean): Plugin {
   };
 }
 
+const SOURCE = fileURLToPath(new URL("./src/", import.meta.url));
+
+/** The MPL-2.0 files' source, in licenses/mpl-2.0-source/: the bundle holds them compiled (licenses.ts says why). */
+function mplSource(): Plugin {
+  return {
+    name: "benchq-mpl-source",
+    generateBundle() {
+      const files = mplSources(SOURCE);
+      if (files.length === 0) this.error("No MPL-2.0 file found under src/, yet THIRD-PARTY-NOTICES.txt says their source ships.");
+      for (const { path, source } of files) this.emitFile({ type: "asset", fileName: `licenses/mpl-2.0-source/${path}`, source });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const benchqUrl = env.BENCHQ_URL || "http://localhost:3000";
@@ -36,7 +52,7 @@ export default defineConfig(({ mode }) => {
   const isStore = mode === "store";
   if (isStore && !benchqUrl.startsWith("https://")) throw new Error("A store build needs BENCHQ_URL to be the https address of BenchQ.");
   return {
-    plugins: [react(), pageScript(), manifest(benchqUrl, isStore)],
+    plugins: [react(), pageScript(), manifest(benchqUrl, isStore), mplSource()],
     define: {
       // The origin only: the extension calls `${origin}/api/...`, whatever else the variable held.
       __BENCHQ_URL__: JSON.stringify(new URL(benchqUrl).origin),

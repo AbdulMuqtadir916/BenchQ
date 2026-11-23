@@ -18,7 +18,7 @@ vi.mock("../api", async (actual) => ({
 vi.mock("./tab-bridge", () => ({
   scanTab: vi.fn(), readTab: vi.fn(), fillField: vi.fn(), fillChoice: vi.fn(), rejectedFields: vi.fn(), flaggedFields: vi.fn(),
   focusField: vi.fn(), undoFills: vi.fn(), undoCount: vi.fn(), takeBackField: vi.fn(), listChoices: vi.fn(), chooseChoice: vi.fn(),
-  removeFileOnPage: vi.fn(),
+  removeFileOnPage: vi.fn(), fileShownOnPage: vi.fn(async () => false),
 }));
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 vi.spyOn(console, "error").mockImplementation(() => undefined);

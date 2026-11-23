@@ -252,6 +252,7 @@ ROUTE_ACCESS: dict[str, Access] = {
 SUPPORT_VIEW_REFUSED: frozenset[str] = frozenset({
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/mailbox/confirm/{attempt_id}",
     "GET /api/cover-letters/{cl_id}/pdf",
+    "GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file",   # a résumé as a file (docs/02 §8.2)
 })
 SUPPORT_VIEW_READ_ONLY = "A support view is read-only."
 

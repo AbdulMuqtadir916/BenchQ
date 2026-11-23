@@ -199,6 +199,24 @@ of the AI answer routes and their `access.py` rows are undone (2026-11-09): the 
 | Root tooling | `vitest.config.ts`, `package.json` | `pnpm test` skips `extension/**`; `pnpm ext:test` runs the extension's own tests. | They need the extension's jsdom and `vitest`, which the root doesn't have. |
 | Candidates / résumés (Zuhair) | `backend/api/routes_candidate_resumes.py`, `backend/candidates/versions.py` (`uploaded_file`), `backend/auth/access.py` (one `F` row, approved by Arbaz), `isolation_cases.py`, `test_resume_file.py`, `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file`: an uploaded base's version 1 as its file, as uploaded; 404 for any other version. | The extension attaches the picked résumé to the form's résumé upload (07 Q49–Q52). A file for every version is asked of Zuhair (Q25). |
 
+## The extension's store release: a public privacy page (`feat/resume-files-coverage-ux`)
+
+The user's call (2026-11-21): the Chrome Web Store needs a public privacy policy for BenchQ Apply's listing. A record,
+not a request.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Route registry and 07 (Abdul) | `src/lib/routes/registry.ts`, `registry.test.ts`, `src/app/privacy/page.tsx` (new), `docs/07-ROUTES-AND-RBAC.md` §2.1 | A public route, `/privacy`: BenchQ Apply's privacy policy, open signed in or not, in the sign-in page's card style. | The store listing links to it (`docs/extension-store.md` §4). |
+| Tenancy (Abdul) | `src/lib/schemas/tenancy.ts` and `backend/auth/invites.py` (`RESERVED_SLUGS`), `docs/07-ROUTES-AND-RBAC.md` §2.4 | `privacy` is a reserved firm slug, at the end of both lists, which `test_admin_firms.py` compares. | A firm with that slug would shadow the page: every top-level route is reserved (07 §2.4). |
+
+## Résumé files on demand — a file for every version (`feat/resume-files-coverage-ux`)
+
+The user's call (2026-11-18): BenchQ makes the file itself, on request, without waiting on Zuhair. A record, not a request.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Candidates / résumés (Zuhair) | `backend/candidates/resume_file.py` (new), `backend/api/routes_candidate_resumes.py`, `backend/api/render_shared.py` (`_get_browser`), `backend/auth/access.py` (`SUPPORT_VIEW_REFUSED`), `test_resume_file.py`, `test_isolation.py`, `isolation_support.py` and `route_sweep.py` (the browser stand-ins), `docs/02-DATA-CONTRACTS.md` §8.2 | `GET …/resumes/{rid}/file` answers every version: an uploaded base's version 1 as uploaded (unless `?format=` asks for the other kind), any other version made from its own text on request: a plain single-column PDF (the cover letters' headless Chromium) or Word (`?format=docx`, python-docx). `X-Resume-File` says `uploaded` or `generated`; 503 when it can't be made. A GET writes nothing (links as the version writes them, no tracer rows); its database work runs in a worker and ends before the print. `_get_browser` stops Playwright's driver when Chromium fails to start. A support view may not use the route (`SUPPORT_VIEW_REFUSED`: a view never exports a résumé; the user's OK, 2026-11-18). No migration, no new route. | Builder saves, promoted bases and tailored résumés had no file, so the extension couldn't attach the picked résumé (the 2026-11-18 test round). This builds what Q25 asked of Zuhair. |
+
 ## The Autofill screen — phase 3 of résumé autofill (Arbaz; contract for Abdul's sign-off)
 
 Not agreed yet: docs/02 §8.4 is proposed for Abdul's sign-off; the `access.py` row was approved by Arbaz (2026-11-09).
