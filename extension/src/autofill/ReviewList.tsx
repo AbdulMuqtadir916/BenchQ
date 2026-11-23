@@ -64,6 +64,16 @@ function SaveAnswer({ row, isFilling, onSave }: { row: ReviewRow; isFilling: boo
 
 const isFilled = (row: ReviewRow) => Boolean(filledValue(row));
 const isUpload = ({ field }: ReviewRow) => field.kind === "file";
+const isKept = (row: ReviewRow) => row.status === "kept";
+/** Answers the BDE typed and can keep, or kept already (07 Q58). */
+const isOfferedIn = (canSave: boolean) => (row: ReviewRow) => (typeof row.saveOffer === "object" || row.saveOffer === "saved") && canSave;
+
+/** The fields still the BDE's to fill: neither an upload, a value the form held already, nor an answer to keep. The
+ * list's Needs you group, and the count a finished run gives (AutofillDone). */
+export function needsYou(rows: ReviewRow[], canSave: boolean): ReviewRow[] {
+  const isOffered = isOfferedIn(canSave);
+  return rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row) && !isFilled(row));
+}
 
 /** Fields still to fill first, each kind in the form's order. A run keeps every row in place, so it ticks where it is. */
 const stillToFillFirst = (rows: ReviewRow[]) => [...rows.filter((row) => !isFilled(row)), ...rows.filter(isFilled)];
@@ -205,10 +215,9 @@ export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListO
   const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest, onSave };
   // Answers the BDE typed and can keep come first, in sight, until they're saved (07 Q58).
   // A saved one stays there, saying so, rather than folding away the moment it's kept.
-  const isOffered = (row: ReviewRow) => (typeof row.saveOffer === "object" || row.saveOffer === "saved") && Boolean(onSave);
-  const isKept = (row: ReviewRow) => row.status === "kept";
+  const isOffered = isOfferedIn(Boolean(onSave));
   const typed = rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row));
-  const needed = typed.filter((row) => !isFilled(row));
+  const needed = needsYou(rows, Boolean(onSave));
   const uploads = rows.filter(isUpload);
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">
     <KeptGroup rows={rows.filter(isKept)} onReplace={onReplace} {...actions} />

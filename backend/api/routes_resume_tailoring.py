@@ -13,12 +13,14 @@ view included (read only, backend/auth/access.py); the firm-level read, a firm m
 Registered before the résumé routes (backend/main.py), so `…/resumes/tailorings` is never read as a résumé id.
 """
 import asyncio
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DbSession
 
+from backend.problem import NOT_CONFIGURED, Problem
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidate_resumes import _writer
 from backend.api.routes_candidates import _candidate, _member_of
@@ -28,6 +30,8 @@ from backend.job_monitor import launch_background
 from backend.models.db import get_db
 from backend.resume_tailor import runs
 from backend.resume_tailor.settings import TailorSetupError, read_setup
+
+logger = logging.getLogger("jobnavigator.resume_tailor")
 
 router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}/resumes", tags=["résumé tailoring"])
 firm_router = APIRouter(prefix="/firms/{firm_id}", tags=["résumé tailoring"])
@@ -45,7 +49,10 @@ def _admit(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id
     try:
         read_setup(db)
     except TailorSetupError as e:
-        raise HTTPException(status_code=500, detail=f"The résumé tailor isn't set up: {e}.")
+        # The row that isn't set up goes to the log for the admin (TailorSetupError names the row, never a value);
+        # the BDE reads what to do (docs/02 §12, writing an error message).
+        logger.error("The résumé tailor isn't set up: %s", e)
+        raise Problem(500, "The résumé tailor isn't set up yet. Ask your admin.", NOT_CONFIGURED) from None
     return runs.admit(db, candidate, actor, body.job_posting_id, body.resume_id)
 
 
@@ -55,7 +62,8 @@ async def start_tailoring(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Tai
     """Starts a background run (about a minute) and answers at once with its id; read its status from
     `…/tailorings/{run_id}`. 404 for a posting or version that isn't the candidate's; 409 when there's no usable
     version (a tailored one, a hidden base, no active base) or the same version and job is already being tailored; 422 when the job has no description; 429 when the BDE has
-    `MOST_RUNNING_PER_BDE` tailorings running; 500 naming the setting when the tailor isn't set up."""
+    `MOST_RUNNING_PER_BDE` tailorings running (`TAILORINGS_RUNNING`); 500 `NOT_CONFIGURED` when the tailor isn't set up
+    (the setting it lacks goes to the log)."""
     meta = await asyncio.to_thread(_admit, db, firm_id, principal, candidate_id, body)
     try:
         # Launched with the candidate still locked, so no other request passes the checks before this run's row is

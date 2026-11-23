@@ -1,5 +1,6 @@
 import { connectionKey } from "./autofill/connection-store";
 import { hostOf, isConfirmedHost } from "./autofill/job-check";
+import { PREVIEW_KEY, setupFrameRules } from "./frame-rules";
 import type { Connection, NewConnection, PanelMessage, PanelReply, ShortcutCommand, ShortcutMessage } from "./autofill/types";
 
 /** The one writer of tab connections. It keeps them in session storage, because Chrome can stop this worker at any
@@ -78,7 +79,16 @@ async function handle(message: PanelMessage): Promise<PanelReply> {
 
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  void setupFrameRules();
 });
+
+// LinkedIn postings inside BenchQ (frame-rules.ts): session rules go when the browser closes, so they're put back on
+// every start, when the panel's switch changes, and whenever this worker wakes.
+chrome.runtime.onStartup.addListener(() => void setupFrameRules());
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && PREVIEW_KEY in changes) void setupFrameRules();
+});
+void setupFrameRules();
 
 // Only the side panel talks to this worker. A page script never sends anything, so a tab's message is refused.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

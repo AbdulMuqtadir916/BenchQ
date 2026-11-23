@@ -67,8 +67,9 @@ const LABELS: [EngineFieldType, string[]][] = [
   ["preferred-name", ["preferred name", "preferred first name", "preferred full name", "preferred first and last name",
     "chosen name", "nickname", "name you go by"]],
   ["email", ["email", "e mail"]],
-  ["phone", ["phone", "mobile", "cell", "telephone"]],
-  ["phone-country-code", ["country code", "phone country code", "dial code"]],
+  ["phone", ["phone", "mobile", "cell", "telephone", "contact number", "whatsapp", "whatsapp number"]],
+  ["phone-country-code", ["country code", "phone country code", "dial code", "dialing code", "dialling code", "calling code",
+    "country calling code", "international country code", "international dialing code", "international phone country code"]],
   ["address-city", ["city"]],
   ["address-region", ["state", "province", "state reside", "state province live"]],
   ["address-postal", ["zip", "zip code", "postal code", "zip postal code", "pin code", "pincode"]],
@@ -227,15 +228,34 @@ function knownKind(label: string): EngineFieldType | null {
   return best.length === 1 ? best[0]!.type : null;
 }
 
+/** A phone number with a word on its code: "Phone number with country code", "Mobile (incl. country code)", "Phone
+ * number (without country code)", "Contact number (international format)". That's the number, with or without its code
+ * as the label says (`shaped`), never the code alone, as "Phone country code" is. */
+const NUMBER_WORDS = /\b(phone|mobile|cell|telephone|whatsapp|contact (?:number|no))\b/;
+/** "with country code", "incl. code", "without country code": a word on the number's code. */
+const QUALIFIED_CODE = /\b(?:with|without|incl\w*|including|excluding|exclude)(?: the)?(?: country)? code\b/;
+const INTERNATIONAL_FORMAT = /\binternational(?: format)?\b|\be 164\b/;
+/** The code named as what's asked, not as part of the number: "International phone country code" (#148's review). */
+const CODE_ITSELF = /\b(?:country|dial|dialing|dialling|calling) code\b/;
+const NOT_THE_CANDIDATES = /\b(emergency|next of kin|kin|reference|referee|referrer|recruiter|manager|supervisor|spouse|parent|guardian)\b/;
+const asksWholeNumber = (label: string) => {
+  const text = canonical(label);
+  if (!NUMBER_WORDS.test(text) || NOT_THE_CANDIDATES.test(text)) return false;
+  return QUALIFIED_CODE.test(text) || (INTERNATIONAL_FORMAT.test(text) && !CODE_ITSELF.test(text));
+};
+
 /** What a field or a bank question asks for, only when its whole label is about that and nothing else, so "Referrer
  * email", "State your reason" and "Years of experience with Java" stay out. The browser's autocomplete hints are the
  * engine's to read (`classifyField`), bar the one it lacks. */
 export function fieldTypeFor(field: Asked): EngineFieldType | null {
   const shaped = askedByShape(field);
   if (shaped) return shaped;
+  // The page saying it's a country code box outranks any reading of its label (#148's review).
+  if (/\btel-country-code$/i.test(field.autocomplete.trim())) return "phone-country-code";
+  if (asksWholeNumber(field.label)) return "phone";
   const known = knownKind(field.label);
   if (known) return asksOtherDetail(known, field.label) ? null : known;
-  return /\btel-country-code$/i.test(field.autocomplete.trim()) ? "phone-country-code" : null;
+  return null;
 }
 
 /** Screening questions: one kind gathers a subject, but a stance, a number or a place can make it another question.

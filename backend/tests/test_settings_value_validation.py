@@ -32,6 +32,7 @@ def test_int_keys_match_the_rows_settings_marks_int():
         "scoring_max_concurrent",
         "tailoring_max_concurrent",
         "resume_tailor_max_concurrent",
+        "resume_parse_max_concurrent",
         "email_llm_confidence_threshold",
         "autofill_default_length",
     }
@@ -207,6 +208,6 @@ def test_patch_accepts_valid_values(api_client, test_db):
 @needs_container
 def test_patch_ignores_the_redacted_placeholder(api_client, test_db):
     """A GET returns '••••••' for secrets; PATCHing that back must not be validated or written as a real value."""
-    resp = api_client.patch("/api/settings", json={"llm_api_key": "•" * 6})
+    resp = api_client.patch("/api/settings", json={"gmail_refresh_token": "•" * 6})
     assert resp.status_code == 200
     assert resp.json()["updated"] == []

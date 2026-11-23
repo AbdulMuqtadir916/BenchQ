@@ -85,6 +85,36 @@ services:
       # agy keeps its OAuth token in a file here; no keyring in this image.
       - antigravity_auth:/root/.gemini
 
+  # The scheduler's own process (backend/worker.py, production layer step 3): inbox sync, email classification, and
+  # the timed jobs. Same image and settings as the backend. Run exactly ONE: every copy runs every scheduled job.
+  worker:
+    image: benchq-backend:local
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["sh", "backend/scripts/start_worker.sh"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://jobnavigator:${POSTGRES_PASSWORD:-password}@db:5432/jobnavigator
+      BENCHQ_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./backups:/app/backups
+      - ./backend/.linkedin_api:/root/.linkedin_api
+      - codex_auth:/root/.codex
+      - antigravity_auth:/root/.gemini
+
   # Database viewer, off by default: docker compose --profile tools up -d adminer
   # then open http://localhost:8081 (server db, user/db jobnavigator, password "password").
   adminer:

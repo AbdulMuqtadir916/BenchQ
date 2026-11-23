@@ -115,6 +115,8 @@ def log_llm_call(
     firm_id: Optional[UUID] = None,
     cost_usd: Optional[float] = None,
     db=None,
+    preset_id: Optional[UUID] = None,
+    preset_version: Optional[int] = None,
 ):
     """Insert a row into llm_call_log; swallows DB errors so logging never breaks scoring. usage: {input_tokens, output_tokens, cache_read_tokens, cache_write_tokens}. `firm_id`: the firm the call was for, so AI spend can be split by firm (Q33); an entry point that knows its firm passes it."""
     # `cost_usd` (optional): a known amount, e.g. the provider's own charge, used instead of the price table.
@@ -146,6 +148,8 @@ def log_llm_call(
                 duration_ms=duration_ms,
                 success=success,
                 error=(error[:500] if error else None),  # truncate long error strings
+                preset_id=preset_id,
+                preset_version=preset_version,
             )
             if caller_db is not None:
                 with caller_db.begin_nested():
@@ -165,7 +169,8 @@ def log_llm_call(
 
 
 @asynccontextmanager
-async def track_llm_call(purpose: str, provider: str, model: str, job_id=None, firm_id=None):
+async def track_llm_call(purpose: str, provider: str, model: str, job_id=None, firm_id=None, preset_id=None,
+                         preset_version=None):
     """Async context manager that times an LLM call and logs it to llm_call_log; the caller must set tracker.usage (or call tracker.record(resp)) so a fallback dispatch is logged as the model that actually answered."""
     started = time.monotonic()
 
@@ -212,6 +217,7 @@ async def track_llm_call(purpose: str, provider: str, model: str, job_id=None, f
                 success=success,
                 error=error,
                 **({"firm_id": firm_id} if firm_id is not None else {}),
+                **({"preset_id": preset_id, "preset_version": preset_version} if preset_id is not None else {}),
             )
         except Exception as e:
             logger.warning(f"track_llm_call finally block failed (non-fatal): {e}")

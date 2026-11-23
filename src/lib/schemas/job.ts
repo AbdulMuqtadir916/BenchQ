@@ -31,6 +31,16 @@ export const JobRequirementSchema = z.object({
 });
 export type JobRequirement = z.infer<typeof JobRequirementSchema>;
 
+/**
+ * One candidate's Match for a job (decided 2026-11-14, backend/match): the stored score, null until it is worked out,
+ * and the first reason it is held at 40 ("no C2C or third-party candidates…"), shown on hover.
+ */
+export const JobMatchSchema = z.object({
+  score: z.number().int().min(0).max(100).nullable(),
+  note: z.string().nullable(),
+});
+export type JobMatch = z.infer<typeof JobMatchSchema>;
+
 export const JobSchema = z.object({
   id: z.string(),
   firmId: z.string(),
@@ -66,6 +76,8 @@ export const JobSchema = z.object({
   isActive: z.boolean(),
   /** The candidates this job was found or captured for, only those the viewer may see (docs/02 §6.z). */
   candidateIds: z.array(z.string()),
+  /** Each of those candidates' Match for this job (decided 2026-11-14): read it with `matchFor`. */
+  matches: z.record(z.string(), JobMatchSchema).default({}),
 });
 export type Job = z.infer<typeof JobSchema>;
 

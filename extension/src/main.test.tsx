@@ -151,11 +151,14 @@ it("shows the list and tabs when no job is linked", async () => {
   expect(jobCards()).toHaveLength(1);
 });
 
-it("locks the dropdown while a job is linked", async () => {
+it("hides the dropdown and who's signed in while a job is linked: the job's card says whose job it is", async () => {
   connectTab();
   await mount();
+  expect(document.querySelector("#candidate-select")).toBeNull();
+  expect(document.body.textContent).not.toContain("· BDE ·");
+  await endConnection();
   expect(picker().value).toBe("cand-1");
-  expect(picker().disabled).toBe(true);
+  expect(picker().disabled).toBe(false);
 });
 
 it("moves the dropdown to the linked job's candidate", async () => {
@@ -163,8 +166,9 @@ it("moves the dropdown to the linked job's candidate", async () => {
   localStorage.setItem("benchq-selected-candidate", "cand-2");
   await mount();
   await settle();
-  expect(picker().value).toBe("cand-1");
   expect(actionLabels()).toContain("Mark applied");
+  await endConnection();
+  expect(picker().value).toBe("cand-1");
 });
 
 it("follows the BDE between tabs, and stays on that candidate on a tab with no job", async () => {
@@ -174,8 +178,7 @@ it("follows the BDE between tabs, and stays on that candidate on a tab with no j
   expect(picker().disabled).toBe(false);
 
   await switchToTab(8);
-  expect(picker().value).toBe("cand-2");
-  expect(picker().disabled).toBe(true);
+  expect(document.querySelector("#candidate-select")).toBeNull();
   expect(actionLabels()).toContain("Mark applied");
 
   await switchToTab(7);
@@ -229,17 +232,20 @@ it("goes by the latest load when an earlier one answers late", async () => {
     fake.storage.onChanged.fire({ [connectionKey(7)]: {} }, "session");
   });
   await settle();
-  expect(picker().value).toBe("cand-1");
   expect(actionLabels()).toContain("Mark applied");
   await act(async () => { release(); });
   await settle();
   expect(actionLabels()).toContain("Mark applied");
+  await endConnection();
+  expect(picker().value).toBe("cand-1");
 });
 
 it("leaves out a candidate the BDE can no longer reach", async () => {
   connectTab(7, { ...job, candidate_id: "cand-gone" });
   await mount();
+  await endConnection();
   expect(picker().value).toBe("cand-1");
+  expect([...picker().options].map(({ value }) => value)).not.toContain("cand-gone");
 });
 
 it("offers Mark applied in the panel of a connected tab", async () => {

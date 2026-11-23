@@ -127,7 +127,7 @@ def test_a_write_shows_up_in_the_ledger(anonymous_client, accounts, ledger, test
 # 07 Q52: a BDE also reads the ASSIGN entries about the candidates they work now; and every reader can filter.
 
 def _stamp_from_today(test_db):
-    """These entries are built by hand, so they get their stamps as migration 0028 gave the rows it copied."""
+    """These entries are built by hand, so they get their stamps as migration 0033 gave the rows it copied."""
     from sqlalchemy import text
     test_db.execute(text("ALTER TABLE activity_logs DISABLE TRIGGER activity_logs_append_only"))
     test_db.execute(text("UPDATE activity_logs a SET team_manager_id = CASE u.role WHEN 'MANAGER' THEN u.id "

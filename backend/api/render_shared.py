@@ -7,6 +7,7 @@ the old `/api/resumes` router (JobNavigator's), which résumé versioning PR 6 r
 - Tracer links: contact URLs swapped for tracking links on export.
 - `_resolve_tailoring_jd`: the job description to write from, fetched once if the job has none.
 """
+import asyncio
 import functools as _functools
 import logging
 import re
@@ -39,15 +40,38 @@ def reset_tailoring_semaphore():
 # Warm Playwright browser singleton for fast PDF generation (~3-13ms warm vs ~500ms cold)
 _pw_instance = None
 _pw_browser = None
+# One start, or restart, at a time: requests that waited for it use the browser it started instead of launching their
+# own. Printing happens outside it, so a healthy browser serves every request at once.
+_pw_starting = asyncio.Lock()
 
 async def _get_browser():
     """Get or create a warm Playwright browser instance."""
+    if _pw_browser and _pw_browser.is_connected():
+        return _pw_browser
+    async with _pw_starting:
+        return await _start_browser()
+
+
+async def _start_browser():
+    """The browser, started (or restarted) under `_pw_starting`; already up when a request before this one started it."""
     global _pw_instance, _pw_browser
     if _pw_browser and _pw_browser.is_connected():
         return _pw_browser
     from playwright.async_api import async_playwright
-    _pw_instance = await async_playwright().start()
-    _pw_browser = await _pw_instance.chromium.launch(headless=True, args=['--font-render-hinting=none'])
+    if _pw_instance is not None:          # a browser that went away: its driver goes too, not just the handle
+        try:
+            await _pw_instance.stop()
+        except Exception:  # noqa: BLE001  (already gone)
+            pass
+        _pw_instance = None
+    instance = await async_playwright().start()
+    try:
+        browser = await instance.chromium.launch(headless=True, args=['--font-render-hinting=none'])
+    except Exception:
+        # Chromium didn't start: stop the driver now, or every retry leaves another one running.
+        await instance.stop()
+        raise
+    _pw_instance, _pw_browser = instance, browser
     logger.info("Warm Playwright browser started for PDF generation")
     return _pw_browser
 

@@ -7,7 +7,7 @@ import { EmploymentType, WorkAuth } from "@/lib/schemas/enums";
 import { ChoicePill, DraftedMarker, fieldAria, StepSection, WizardField } from "./field";
 import { PrefixedInput, ReviewStrip } from "./parts";
 import type { Errors } from "./model";
-import type { Wizard } from "./use-wizard";
+import type { WizardForm } from "./use-wizard";
 
 /** The line under each work authorization card (the screens' copy). */
 const WORK_AUTH_DETAIL: Record<WorkAuth, string> = {
@@ -24,7 +24,7 @@ const WORK_AUTH_DETAIL: Record<WorkAuth, string> = {
 const digits = (value: string) => value.replace(/[^\d]/g, "");
 
 /** Step 3 (04-wizard-steps.md §3): what filters jobs out before a BDE sees them, so it must be right. */
-export function StepWorkRate({ wizard, errors }: { wizard: Wizard; errors: Errors }) {
+export function StepWorkRate({ wizard, errors }: { wizard: WizardForm; errors: Errors }) {
   const { values, drafted, set } = wizard;
   const workAuthDrafted = drafted.has("workAuth");
 

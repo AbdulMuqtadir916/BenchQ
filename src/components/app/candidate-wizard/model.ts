@@ -51,12 +51,15 @@ export interface WizardValues {
   rateMin: string;
   availableFrom: string;
   noticePeriodDays: string;
-  targetRoles: string[];
+  /** One target role (decided 2026-11-14): the job search looks for this title. Sent as `targetRoles: [role]`. */
+  targetRole: string;
   workSettings: RemoteMode[];
   preferredLocations: string[];
   willingToRelocate: boolean;
   preferredIndustries: string[];
   dealBreakers: string[];
+  /** The details tab only: the job search's extra titles (onboarding doesn't ask; an AI call makes them, Q131). */
+  searchTitles: string[];
   contactNotes: string;
   /** Step 5 (07 Q41): the candidate's manager, its BDE (null = the manager's "Needs a BDE" queue) and the handoff note. */
   managerId: string;
@@ -71,8 +74,8 @@ export type DraftableField = (typeof DRAFTABLE)[number];
 export const EMPTY_VALUES: WizardValues = {
   resume: null, fullName: "", primaryRole: "", yearsExperience: "", email: "", phone: "", linkedinUrl: "", city: "", state: "",
   country: "", skills: [], summary: "", workAuth: null, workAuthText: null, workAuthExpiry: "", employmentTypes: ["C2C"], rateTarget: "",
-  rateMin: "", availableFrom: "", noticePeriodDays: "", targetRoles: [], workSettings: [], preferredLocations: [],
-  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], contactNotes: "", managerId: "", bdeId: null,
+  rateMin: "", availableFrom: "", noticePeriodDays: "", targetRole: "", workSettings: [], preferredLocations: [],
+  willingToRelocate: false, preferredIndustries: [], dealBreakers: [], searchTitles: [], contactNotes: "", managerId: "", bdeId: null,
   handoffNote: "",
 };
 
@@ -130,6 +133,19 @@ export function applyDraft(values: WizardValues, draft: ResumeDraft): { values: 
 
 export type Errors = Partial<Record<keyof WizardValues, string>>;
 
+/** Where the city and state are entered: the flow's step 2, or the résumé (the "Additional candidate details" tab). */
+export type HomeFrom = "basic" | "resume";
+export const HOME_WHERE: Record<HomeFrom, string> = { basic: "their city and state on Basic details", resume: "a city and state on the résumé" };
+
+/** Shown on step 4 when there's no place to search (decided 2026-11-14, Q3, Q14). */
+export const placeError = (homeFrom: HomeFrom = "basic") => `Add a preferred location, or ${HOME_WHERE[homeFrom]}: the job search needs a place.`;
+export const PLACE_ERROR = placeError("basic");
+
+/** The job search needs a place: the city and state together (a city alone is ambiguous), or a preferred location. */
+export function hasPlace(values: Pick<WizardValues, "city" | "state" | "preferredLocations">): boolean {
+  return (values.city.trim() !== "" && values.state.trim() !== "") || values.preferredLocations.some((place) => place.trim() !== "");
+}
+
 const asNumber = (value: string): number | null => (value.trim() === "" ? null : Number(value));
 const isWhole = (value: number | null, min: number, max: number) => value === null || (Number.isInteger(value) && value >= min && value <= max);
 
@@ -137,7 +153,7 @@ const isWhole = (value: number | null, min: number, max: number) => value === nu
  * The step's problems, by field; empty when it may continue. Steps without required fields never block. On step 5 a
  * MANAGER must pick a BDE (`requiresBde`, 07 Q41); the OWNER may leave the candidate in the manager's queue.
  */
-export function validateStep(step: StepId, values: WizardValues, context: { requiresBde?: boolean } = {}): Errors {
+export function validateStep(step: StepId, values: WizardValues, context: { requiresBde?: boolean; homeFrom?: HomeFrom } = {}): Errors {
   const errors: Errors = {};
   // 07 Q58 (Abdul, 2026-11-06): no candidate without their résumé, so step 1 can't be passed without one.
   if (step === "resume" && values.resume === null) errors.resume = "Upload the candidate's résumé.";
@@ -166,7 +182,8 @@ export function validateStep(step: StepId, values: WizardValues, context: { requ
     if (!isWhole(asNumber(values.noticePeriodDays), 0, 365)) errors.noticePeriodDays = "Notice is a whole number of days, 0 to 365.";
   }
   if (step === "preferences") {
-    if (values.targetRoles.length === 0) errors.targetRoles = "Add at least one role they are looking for.";
+    if (!values.targetRole.trim()) errors.targetRole = "Enter the role they are looking for.";
+    if (!hasPlace(values)) errors.preferredLocations = placeError(context.homeFrom);
   }
   return errors;
 }
@@ -220,7 +237,7 @@ export function toCreateCandidate(values: WizardValues): CreateCandidate {
     rateMin: asNumber(values.rateMin),
     availableFrom: toIsoDate(values.availableFrom),
     noticePeriodDays: asNumber(values.noticePeriodDays),
-    targetRoles: values.targetRoles,
+    targetRoles: [values.targetRole.trim()],
     willingToRelocate: values.willingToRelocate,
     workSettings: values.workSettings,
     preferredLocations: values.preferredLocations,

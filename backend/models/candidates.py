@@ -14,8 +14,8 @@ foreign keys ON DELETE RESTRICT.
 import hashlib
 
 from sqlalchemy import (
-    ARRAY, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String, Text,
-    UniqueConstraint, text,
+    ARRAY, Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String,
+    Text, UniqueConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
@@ -44,6 +44,10 @@ class Candidate(Base):
     firm_id = Column(UUID(as_uuid=True), _restrict("firms.id"), nullable=False, index=True)
     manager_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)    # always set (Q41)
     bde_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=True)         # null = "Needs a BDE" (Q42)
+    # When the current BDE got the candidate, and the work date of their Day 1 (migration 0031; Q155, Q164, Q169,
+    # Q170): set whenever the BDE changes, both null without a BDE. Recorded, so later work-hour changes never renumber.
+    bde_assigned_at = Column(DateTime(timezone=True), nullable=True)
+    bde_day_one = Column(Date, nullable=True)
     created_by_user_id = Column(UUID(as_uuid=True), _restrict("users.id"), nullable=False)
 
     # 07 Q57 (migration 0017): name, email, phone, LinkedIn, city, state and country are the résumé's, read from the
@@ -122,7 +126,7 @@ def _resume_field(name: str) -> property:
     return property(get, put)
 
 
-for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country"):
+for _field in ("full_name", "email", "phone", "linkedin_url", "city", "state", "country", "search_titles"):
     setattr(Candidate, _field, _resume_field(_field))
 
 class ResumeParse(Base):

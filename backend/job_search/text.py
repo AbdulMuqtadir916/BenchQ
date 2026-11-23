@@ -11,7 +11,7 @@ _BR = re.compile(r"(?i)<br\s*/?>")
 
 def html_to_text(value) -> str:
     """A description's HTML as plain text: newlines at block ends only, so inline markup doesn't split words. The same
-    rule as the old freehire.me scraper (backend/scraper/sources/freehire.py `_strip_html`)."""
+    rule as the old pool's freehire.me scraper had (`_strip_html`, removed 2026-11-14)."""
     if not isinstance(value, str) or not value:
         return ""
     s = _BR.sub("\n", value)

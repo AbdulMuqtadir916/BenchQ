@@ -51,6 +51,11 @@ def resolve_llm_config(feature: str = "", db=None) -> dict:
             # Effort values are per provider, so the Primary's effort carries over only to the same provider.
             if not effort and provider == (_get_setting(db, "llm_provider", "") or DEFAULT_PROVIDER):
                 effort = _get_setting(db, "llm_effort", "")
+        if provider == "openrouter":
+            # The one key from the Super Admin's AI setup (docs/integration/08-ai-presets.md). Never sent to another
+            # provider.
+            from backend.ai.store import shared_key
+            api_key = shared_key(db) or api_key
         return {
             "provider": provider,
             "model": model or DEFAULT_MODEL,

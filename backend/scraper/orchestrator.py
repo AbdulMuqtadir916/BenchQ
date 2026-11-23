@@ -34,9 +34,6 @@ async def run_search(search: Search, proxy_url: Optional[str] = None) -> dict:
     if mode == "jobright":
         from backend.scraper.sources.jobright import run
         return await run(search)
-    if mode == "freehire":
-        from backend.scraper.sources.freehire import run
-        return await run(search)
     if mode == "linkedin_extension":
         # No scraper — jobs come via POST /api/jobs/linkedin-import (Chrome extension push)
         return {
@@ -204,7 +201,6 @@ def _source_for_search(search: Search) -> str:
         "levels_fyi": "levels_fyi",
         "linkedin_personal": "linkedin_personal",
         "jobright": "jobright",
-        "freehire": "freehire",
     }
     return source_map.get(search.search_mode, search.search_mode)
 
@@ -218,9 +214,7 @@ def _search_mode_is_valid(search: Search) -> bool:
         return bool(search.direct_url)
     if mode in ("linkedin_personal", "jobright"):
         return True
-    if mode == "freehire":
-        return bool(search.direct_url or search.search_term)
-    return False
+    return False                # a mode no longer run (freehire, removed 2026-11-14) is skipped
 
 
 # ── Fan-out: all active searches + companies ────────────────────────────────

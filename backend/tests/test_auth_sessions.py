@@ -5,9 +5,10 @@ import re
 
 import pytest
 
+from backend.tests.problem_support import body_of, expected
 from backend.tests.auth_support import TEST_PASSWORD, make_admin, make_firm, make_plan, make_user
 
-INVALID = {"detail": "Email or password is incorrect."}
+INVALID = expected(401, "Email or password is incorrect.")
 
 
 def _sign_in(client, email, password=TEST_PASSWORD, **kw):
@@ -50,7 +51,7 @@ def test_the_session_matches_the_frontend_contract(anonymous_client, accounts):
                                               "isActive", "lastActiveAt"}
     assert set(map(_camel, firm["firm"])) == {
         "id", "name", "slug", "logoUrl", "primaryTimezone", "clientTimezone",
-        "applicationExpiryDays", "status", "planId", "seatLimit", "candidateLimit", "contactPhone",
+        "workStart", "workEnd", "applicationExpiryDays", "status", "planId", "seatLimit", "candidateLimit", "contactPhone",
         "createdAt"}
     platform = _sign_in(anonymous_client, "admin@benchq.test").json()
     assert set(map(_camel, platform)) == {"principal", "platformUser", "firm"}
@@ -71,7 +72,7 @@ def test_the_email_matches_case_insensitively_and_trimmed(anonymous_client, acco
 def test_every_failure_is_the_same_401(anonymous_client, accounts, email, password):
     r = _sign_in(anonymous_client, email, password)
     assert r.status_code == 401
-    assert r.json() == INVALID
+    assert body_of(r) == INVALID
     assert "set-cookie" not in r.headers
 
 
@@ -80,8 +81,8 @@ def test_a_deactivated_account_gets_the_same_401(anonymous_client, accounts, tes
     test_db.get(User, accounts.user_id).is_active = False
     test_db.get(PlatformUser, accounts.admin_id).is_active = False
     test_db.commit()
-    assert _sign_in(anonymous_client, "owner@acme.test").json() == INVALID
-    assert _sign_in(anonymous_client, "admin@benchq.test").json() == INVALID
+    assert body_of(_sign_in(anonymous_client, "owner@acme.test")) == INVALID
+    assert body_of(_sign_in(anonymous_client, "admin@benchq.test")) == INVALID
 
 
 def test_a_suspended_firm_user_can_sign_in(anonymous_client, accounts, test_db):
