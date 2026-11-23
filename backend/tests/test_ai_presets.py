@@ -159,6 +159,29 @@ def test_one_active_preset_and_a_switch_reaches_new_runs(api_client, test_db, ai
     assert api_client.post(f"/api/admin/ai/presets/{first['id']}/activate", json={}).status_code == 409
 
 
+def test_an_edit_saved_while_activation_tests_is_never_made_active(api_client, test_db, ai, monkeypatch):
+    """Abdul's review on #150: only the version that was tested goes live."""
+    from backend.models.ai_presets import AiPresetVersion
+    setup = api_client.post("/api/admin/ai/presets", json=_body(_setup(api_client))).json()
+    second = next(p for p in _module(setup, "search_titles")["presets"] if p["name"] == "Second")
+    passing = connection.check_model
+
+    async def edited_meanwhile(key, module, model, effort="", prompts=None):
+        latest = store.latest_version(test_db, uuid.UUID(second["id"]))
+        test_db.add(AiPresetVersion(preset_id=latest.preset_id, version=latest.version + 1, model_id=latest.model_id,
+                                    effort=latest.effort, prompts={"prompt": "Untested {target_role}"}))
+        test_db.commit()
+        return await passing(key, module, model, effort, prompts)
+
+    monkeypatch.setattr(connection, "check_model", edited_meanwhile)
+    r = api_client.post(f"/api/admin/ai/presets/{second['id']}/activate", json={})
+    assert r.status_code == 409 and "edited while it was being tested" in r.json()["detail"]
+    test_db.expire_all()
+    assert str(ai_config("search_titles", db=test_db).preset_id) != second["id"]
+    monkeypatch.setattr(connection, "check_model", passing)
+    assert api_client.post(f"/api/admin/ai/presets/{second['id']}/activate", json={}).status_code == 200
+
+
 def test_a_rejected_model_cant_be_made_active(api_client, ai):
     setup = api_client.post("/api/admin/ai/presets", json=_body(_setup(api_client))).json()
     second = next(p for p in _module(setup, "search_titles")["presets"] if p["name"] == "Second")
@@ -207,6 +230,34 @@ def test_the_email_fingerprint_is_the_model_and_prompts_not_the_preset(test_db, 
     edit_active(test_db, "email_classification", model="perplexity/pplx-decider-v2")
     test_db.expire_all()
     assert config_identity(ai_config("email_classification", db=test_db)) != config_identity(cfg)
+
+
+def test_an_unchanged_setup_keeps_its_pre_preset_fingerprint():
+    """CANDIDATE_EMAIL_PURGE_EVALUATION_CONFIG_ID holds hashes made before presets (Abdul's review on #150): the
+    formula below is config_identity as it was then, with the preset id and version always None."""
+    import hashlib
+    import uuid as _uuid
+    from backend.ai.config import AiConfig
+    from backend.inbox.decider import (CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD, DISAGREEMENT_LIMIT,
+                                       INSTRUCTIONS)
+    from backend.inbox.decider_request import DEFAULT_QUESTION, DEFAULT_STATE
+
+    def before_presets(provider, model, prompts):
+        return hashlib.sha256(repr((provider, model, prompts, None, None,
+                                    INSTRUCTIONS, CATEGORIES, CATEGORY_VERSION, CONFIDENCE_THRESHOLD,
+                                    DISAGREEMENT_LIMIT, "minimization-2026-11-07.1",
+                                    "gmail-auth-2026-11-04.1")).encode()).hexdigest()
+
+    def now(prompts):
+        return config_identity(AiConfig(module="email_classification", provider="openrouter", model=DECIDER_MODEL,
+                                        api_key="k", effort="", prompts=prompts, preset_id=_uuid.uuid4(),
+                                        preset_version=3))
+
+    default = before_presets("openrouter", DECIDER_MODEL, {"instructions": ""})
+    assert now({"instructions": ""}) == default                                  # a preset from before the editor
+    assert now({"state": DEFAULT_STATE, "question": DEFAULT_QUESTION}) == default  # the editor's default text
+    custom = before_presets("openrouter", DECIDER_MODEL, {"instructions": "Be strict."})
+    assert now({"instructions": "Be strict."}) == custom
 
 
 # ── The upload limit ─────────────────────────────────────────────────────────

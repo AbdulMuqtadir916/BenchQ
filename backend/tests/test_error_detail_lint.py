@@ -34,7 +34,7 @@ USER_WORDS = {
     # candidates/autofill.py `Refused`: "A change the save route refuses (400), with what to tell the user". Its
     # messages are BenchQ's fixed sentences naming the question or the limit, never a library's text.
     "api/routes_candidate_resumes.py:220": "autofill_answers.Refused, BenchQ's own sentence for the user",
-    "api/routes_ai_presets.py:443": "ai.test_run.TestRunRefused, BenchQ's own sentence for the admin (\"Add target role.\")",
+    "api/routes_ai_presets.py:459": "ai.test_run.TestRunRefused, BenchQ's own sentence for the admin (\"Add target role.\")",
 }
 
 

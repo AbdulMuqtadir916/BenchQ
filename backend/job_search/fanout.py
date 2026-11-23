@@ -291,7 +291,8 @@ async def run(*, firm_id, candidate_id, user_id, batch_id, query: str, country: 
                 query, country, leg.ask, state.get("cursor"), place=leg.place,
                 posted_within_days=limits.POSTED_WITHIN_DAYS, titles=titles, years=years, level=level,
                 search_level=search_level, firm_id=firm_id), None
-        except ProviderError as error:
+        except ProviderError as error:      # saved in the batch's meta["errors"] too; never shown to the BDE (#150)
+            logger.warning("job search batch=%s leg=%s failed code=%s", batch_id, leg.provider, error.code)
             return None, error.code
         except Exception as error:      # a provider's own bug: its message may hold a URL, so only its type
             logger.error("job search batch=%s leg=%s unexpected %s", batch_id, leg.provider, type(error).__name__)

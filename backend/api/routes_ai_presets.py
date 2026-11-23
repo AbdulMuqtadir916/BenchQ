@@ -184,6 +184,14 @@ def _preset(db: DbSession, preset_id: uuid.UUID) -> AiPreset:
     return preset
 
 
+def _locked_preset(db: DbSession, preset_id: uuid.UUID) -> AiPreset:
+    """The preset, its row locked until commit: activation and an edit's save take it in turn (Abdul's review on #150)."""
+    preset = (db.query(AiPreset).filter(AiPreset.id == preset_id).with_for_update().populate_existing().first())
+    if preset is None:
+        raise HTTPException(status_code=404, detail="Preset not found")
+    return preset
+
+
 def _check_version(db: DbSession, module: PresetModule, model_id: str, effort: str, prompts: dict,
                    before_model: str | None = None) -> None:
     if effort not in EFFORTS or (effort and not module.takes_effort):
@@ -335,15 +343,19 @@ async def edit_preset(preset_id: uuid.UUID, body: PresetPatch, principal: Princi
                                             or (module.request == "decision" and prompts != stored))
         key = _key_or_refuse(db) if needs_check else ""
         version_number = current.version
+        was_active = preset.is_active
         db.commit()
-        return module, model, effort, prompts, changed, needs_check, key, version_number
+        return module, model, effort, prompts, changed, needs_check, key, version_number, was_active
 
-    module, model, effort, prompts, changed, needs_check, key, version_number = await asyncio.to_thread(prepare)
+    module, model, effort, prompts, changed, needs_check, key, version_number, was_active = \
+        await asyncio.to_thread(prepare)
     if needs_check:
         await _check_all(key, [(module, model, effort, prompts)], body.force)
 
     def write() -> dict:
-        preset = _preset(db, preset_id)
+        preset = _locked_preset(db, preset_id)
+        if preset.is_active != was_active:     # made active meanwhile: this change wasn't checked as a live one
+            raise HTTPException(status_code=409, detail="This preset was just made active. Reload and try again.")
         if body.name is not None:
             preset.name = body.name.strip()
         if body.notes is not None:
@@ -377,15 +389,19 @@ async def activate_preset(preset_id: uuid.UUID, body: ForceBody, principal: Prin
         key = _key_or_refuse(db)
         target = (module, version.model_id, version.effort or "", dict(version.prompts or {}))
         db.commit()
-        return module, key, target
+        return module, key, target, version.version
 
-    module, key, target = await asyncio.to_thread(prepare)
+    module, key, target, tested = await asyncio.to_thread(prepare)
     await _check_all(key, [target], body.force)
 
     def write() -> dict:
-        preset = _preset(db, preset_id)
+        preset = _locked_preset(db, preset_id)
         if preset.archived_at is not None:
             raise HTTPException(status_code=409, detail="This preset was archived meanwhile.")
+        # Only the version that was tested goes live: an edit saved while OpenRouter answered is refused here.
+        if store.latest_version(db, preset.id).version != tested:
+            raise HTTPException(status_code=409, detail="This preset was edited while it was being tested. "
+                                                        "Test it again to make it active.")
         _refuse_removed_model(db, module, target[1])     # it may have been removed while OpenRouter answered
         db.query(AiPreset).filter(AiPreset.module == preset.module, AiPreset.id != preset.id,
                                   AiPreset.is_active.is_(True)).update({"is_active": False})

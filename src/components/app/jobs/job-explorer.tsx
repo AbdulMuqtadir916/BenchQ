@@ -221,6 +221,12 @@ export function JobExplorer({
   const isListLoading = loading || pages.isLoading || (!isSourceSettled && !pages.error);
 
   const selected = rows.find(({ job }) => job.id === selectedId) ?? rows[0] ?? null;
+  const loadedCount = pages.data?.pages.reduce((sum, page) => sum + page.jobs.length, 0) ?? 0;
+  const loadMore = (
+    <Button variant="secondary" size="sm" className="w-full" disabled={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
+      {pages.isFetchingNextPage ? "Loading…" : `Load more (${Math.max(0, total - loadedCount)} more)`}
+    </Button>
+  );
   const arrivedToday = rows.filter(({ job }) => job.postedAt && renderedAt - new Date(job.postedAt).getTime() < 86_400_000).length;
   // A save error belongs to the candidate it was for: another candidate in context never shows it.
   const failedFor = toggleSavedJob.variables && ("save" in toggleSavedJob.variables ? toggleSavedJob.variables.save.candidateId : toggleSavedJob.variables.unsave.candidateId);
@@ -331,7 +337,11 @@ export function JobExplorer({
             ) : pages.error ? (
               <div className="p-4"><ErrorState error={pages.error} onRetry={() => void pages.refetch()} /></div>
             ) : rows.length === 0 ? (
-              <div className="p-4"><EmptyState icon={Search} title="No matching jobs" description="Try a wider search or lower the score filter." variant="filtered" /></div>
+              // Hidden jobs are dropped after a page arrives, so a page can be all hidden with more behind it (#150).
+              <div className="p-4">
+                <EmptyState icon={Search} title="No matching jobs" description={pages.hasNextPage ? "The jobs loaded so far are hidden. Load more to see the rest." : "Try a wider search or lower the score filter."} variant="filtered" />
+                {pages.hasNextPage ? <div className="mt-3">{loadMore}</div> : null}
+              </div>
             ) : (
               <ul className="divide-y divide-[var(--color-border)]">
                 {rows.map((row, index) => {
@@ -391,13 +401,7 @@ export function JobExplorer({
                     </motion.li>
                   );
                 })}
-                {pages.hasNextPage ? (
-                  <li className="p-3">
-                    <Button variant="secondary" size="sm" className="w-full" disabled={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
-                      {pages.isFetchingNextPage ? "Loading…" : `Load more (${Math.max(0, total - (pages.data?.pages.reduce((sum, page) => sum + page.jobs.length, 0) ?? 0))} more)`}
-                    </Button>
-                  </li>
-                ) : null}
+                {pages.hasNextPage ? <li className="p-3">{loadMore}</li> : null}
               </ul>
             )}
           </div>
