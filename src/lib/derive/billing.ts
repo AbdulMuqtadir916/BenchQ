@@ -24,7 +24,11 @@ export function parseUsdToCents(text: string): number | null {
 }
 
 /** `YYYY-MM-DD` for "today" in India, where the Super Admin works (the backend uses the same day). */
-export const todayInIndia = (now: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+export const todayInIndia = (now: Date): string => {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
 
 /** The period running on `today` (both ends included), if any. */
 export function currentPeriod(periods: readonly BillingPeriod[], today: string): BillingPeriod | null {

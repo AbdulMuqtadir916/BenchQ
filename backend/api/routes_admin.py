@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, support
-from backend.auth.billing import candidate_limit_for
+from backend.auth.billing import amount_fits, candidate_limit_for
 from backend.auth.invites import (bad_request, check_email_free, conflict, invite_json, normal_email, resend_invite,
                                   revoke_invite, send_invite, slug_problem)
 from backend.auth.policy import require
@@ -107,6 +107,8 @@ def create_firm(body: CreateFirmBody, principal: Principal = Depends(require("fi
     seats = body.seat_limit if body.seat_limit is not None else plan.seat_limit
     if seats < 1:
         raise bad_request("That plan has no seats, so its owner can't be invited.")
+    if not amount_fits(seats, plan.price_cents_per_seat):
+        raise bad_request("That BDE count and the plan's price make an amount too large to record. Lower the count.")
     email = normal_email(body.owner_email)
     check_email_free(db, email, now)
 

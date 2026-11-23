@@ -846,8 +846,9 @@ BillingPeriod = {
 }
 ```
 
-- `Firm.seatLimit` is the billed BDE count. `Firm.candidateLimit` is always `candidatesPerSeat × seatLimit`; the backend
-  writes both together. Neither is ever set to a free number.
+- `Firm.seatLimit` is the billed BDE count. `Firm.candidateLimit` is its own number (07 Q68): a new firm starts at
+  `candidatesPerSeat × seatLimit`, and after that the Super Admin sets it; changing the BDE count never moves it.
+  `seatLimit × priceCentsPerSeat` must fit a 32-bit integer (the amount column); the backend refuses terms above it.
 - **Start next 30 days** creates a period from the firm's current limits and price. **Mark paid / unpaid** edits only the
   current-or-past period's `status`, `paidOn` and `note`.
 - A BDE-count change updates the **current** period's snapshot and amount in the same transaction, and logs

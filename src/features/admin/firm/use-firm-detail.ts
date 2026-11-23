@@ -3,7 +3,6 @@
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { ApiError } from "@/lib/api/client";
-import { periodsOf } from "@/lib/derive/billing";
 import { ownerStatus, usageOf } from "@/lib/derive/platform";
 import { useBillingPeriods, usePlans, usePlatformFirm } from "@/lib/hooks/use-platform";
 import { useNow } from "@/lib/hooks/use-now";
@@ -17,8 +16,8 @@ export function useFirmIdParam(): string {
 }
 
 /**
- * One firm's admin view (docs/04 §14.5): the firm, its plan, usage, owner and billing periods, all
- * derived from the platform records. `isNotFound` for an unknown firm id.
+ * One firm's admin view (docs/04 §14.5): the firm, its plan, usage and owner, all derived from the
+ * platform records. Billing periods load on their own (`billing`): a failure there never hides the other tabs. `isNotFound` for an unknown firm id.
  */
 export function useFirmDetail() {
   const firmId = useFirmIdParam();
@@ -27,11 +26,11 @@ export function useFirmDetail() {
   const plans = usePlans();
   const billing = useBillingPeriods();
   const platform = usePlatformData();
-  const group = queryGroup(firm, plans, billing, ...Object.values(platform.queries));
+  const group = queryGroup(firm, plans, ...Object.values(platform.queries));
   const isNotFound = firm.error instanceof ApiError && firm.error.status === 404;
 
   const detail = useMemo(() => {
-    if (!firm.data || !plans.data || !billing.data || !platform.data) return null;
+    if (!firm.data || !plans.data || !platform.data) return null;
     const data = platform.data;
     return {
       firm: firm.data,
@@ -39,13 +38,12 @@ export function useFirmDetail() {
       plans: plans.data,
       usage: usageOf(firm.data, data, now),
       owner: ownerStatus(firm.data.id, data, now),
-      periods: periodsOf(firm.data.id, billing.data),
       data,
       now,
     };
-  }, [firm.data, plans.data, billing.data, platform.data, now]);
+  }, [firm.data, plans.data, platform.data, now]);
 
-  return { firmId, group, isNotFound, detail };
+  return { firmId, group, isNotFound, detail, billing };
 }
 
 export type FirmDetail = NonNullable<ReturnType<typeof useFirmDetail>["detail"]>;

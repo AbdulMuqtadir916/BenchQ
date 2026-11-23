@@ -22,8 +22,16 @@ def candidate_limit_for(seat_limit: int) -> int:
     return CANDIDATES_PER_SEAT * seat_limit
 
 
+MAX_AMOUNT_CENTS = 2_147_483_647   # the largest value of the integer column `amount_cents` (PostgreSQL integer)
+
+
 def amount_cents(seat_limit: int, price_cents_per_seat: int) -> int:
     return seat_limit * price_cents_per_seat
+
+
+def amount_fits(seat_limit: int, price_cents_per_seat: int) -> bool:
+    """A period's amount must fit its column; the terms are refused before they are saved, never at the next period."""
+    return amount_cents(seat_limit, price_cents_per_seat) <= MAX_AMOUNT_CENTS
 
 
 def period_json(period: BillingPeriod) -> dict:

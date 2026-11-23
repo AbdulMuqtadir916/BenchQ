@@ -124,6 +124,21 @@ def test_mark_paid_and_unpaid(api_client, accounts):
     assert (back["status"], back["paid_on"], back["note"]) == ("UNPAID", None, "bounced")
 
 
+def test_terms_whose_amount_overflows_the_column_are_refused_before_they_are_saved(api_client, accounts, test_db):
+    r = api_client.patch(SEATS.format(_firm(accounts)), json={"seat_limit": 1000, "price_cents_per_seat": 10_000_000})
+    assert r.status_code == 400, r.text
+    firm = test_db.get(Firm, accounts.firm_id)
+    test_db.refresh(firm)
+    assert firm.price_cents_per_seat != 10_000_000
+
+
+def test_a_period_that_has_not_started_cannot_be_marked_paid(api_client, accounts):
+    future = (today_ist(utcnow()) + timedelta(days=10)).isoformat()
+    pid = _start(api_client, accounts, starts_on=future).json()["id"]
+    assert api_client.patch(f"/api/admin/billing-periods/{pid}", json={"status": "PAID"}).status_code == 400
+    assert api_client.patch(f"/api/admin/billing-periods/{pid}", json={"note": "agreed"}).status_code == 200
+
+
 def test_a_paid_date_without_paying_is_refused(api_client, accounts):
     pid = _start(api_client, accounts, starts_on="2026-11-12").json()["id"]
     assert api_client.patch(f"/api/admin/billing-periods/{pid}", json={"paid_on": "2026-11-13"}).status_code == 400

@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger
-from backend.auth.billing import (candidate_limit_for, dollars, latest_period, new_period, period_json,
+from backend.auth.billing import (amount_fits, candidate_limit_for, dollars, latest_period, new_period, period_json,
                                   sync_current_period, today_ist)
 from backend.auth.invites import bad_request, conflict, lock_firm
 from backend.auth.policy import require
@@ -53,6 +53,10 @@ def edit_plan(plan_id: uuid.UUID, body: PlanBody, principal: Principal = Depends
                 raise bad_request("Another plan already has this name.")
             changes.append(f"name {plan.name} → {name}")
             plan.name = name
+    new_seats = plan.seat_limit if body.seat_limit is None else body.seat_limit
+    new_price = plan.price_cents_per_seat if body.price_cents_per_seat is None else body.price_cents_per_seat
+    if not amount_fits(new_seats, new_price):
+        raise bad_request("That BDE count and price make an amount too large to record. Lower one of them.")
     if body.seat_limit is not None and body.seat_limit != plan.seat_limit:
         changes.append(f"BDE seats {plan.seat_limit} → {body.seat_limit}")
         plan.seat_limit = body.seat_limit
@@ -88,6 +92,8 @@ def set_seats(firm_id: uuid.UUID, body: SeatsBody, principal: Principal = Depend
     old_seats, old_candidates, old_price = firm.seat_limit, firm.candidate_limit, firm.price_cents_per_seat
     price = old_price if body.price_cents_per_seat is None else body.price_cents_per_seat
     candidate_limit = old_candidates if body.candidate_limit is None else body.candidate_limit
+    if not amount_fits(body.seat_limit, price):
+        raise bad_request("That BDE count and price make an amount too large to record. Lower one of them.")
     if (body.seat_limit, candidate_limit, price) == (old_seats, old_candidates, old_price):
         return admin_firm_json(firm)
     firm.seat_limit = body.seat_limit
@@ -202,6 +208,8 @@ def edit_period(period_id: uuid.UUID, body: PeriodBody, principal: Principal = D
     admin = db.get(PlatformUser, principal.user_id)
     period = _get(db, BillingPeriod, period_id, "Billing period")
     firm = db.get(Firm, period.firm_id)
+    if body.status is not None and period.starts_on > today_ist(utcnow()):
+        raise bad_request("A period can be marked paid or unpaid only after it starts.")
     if body.status == "PAID":
         period.status, period.paid_on = "PAID", body.paid_on or today_ist(utcnow())
     elif body.status == "UNPAID":

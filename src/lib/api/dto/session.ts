@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { LedgerEntrySchema, type LedgerEntry } from "@/lib/schemas/analytics";
-import { FirmSchema, SessionSchema, UserSchema, type Firm, type Session, type User } from "@/lib/schemas/session";
+import { AdminFirmSchema, FirmSchema, SessionSchema, UserSchema, type Firm, type Session, type User } from "@/lib/schemas/session";
 import {
   BillingPeriodSchema, InviteSchema, PlanSchema, PlatformUserSchema, type BillingPeriod, type Invite, type Plan, type PlatformUser,
 } from "@/lib/schemas/tenancy";
@@ -175,9 +175,9 @@ export function toFirm(dto: z.infer<typeof FirmDto>): Firm {
   });
 }
 
-export type AdminFirm = Firm & { priceCentsPerSeat: number };
+export type AdminFirm = z.infer<typeof AdminFirmSchema>;
 export function toAdminFirm(dto: z.infer<typeof AdminFirmDto>): AdminFirm {
-  return { ...toFirm(dto), priceCentsPerSeat: dto.price_cents_per_seat };
+  return AdminFirmSchema.parse({ ...toFirm(dto), priceCentsPerSeat: dto.price_cents_per_seat });
 }
 
 export function toUser(dto: z.infer<typeof UserDto>): User {

@@ -33,11 +33,11 @@ export function FirmPlanTab() {
   return <FirmPlan detail={detail} />;
 }
 
-/** The warning a lower count gets: what will be over, and that nothing is removed. */
+/** The warning a lower limit gets: what will be over, which addition each limit blocks, and that nothing is removed. */
 function overWarnings(usage: FirmUsage, seatLimit: number, candidateLimit: number): string[] {
   const warnings: string[] = [];
-  if (usage.seatsUsed > seatLimit) warnings.push(`This firm will be over its BDE limit (${usage.seatsUsed} / ${seatLimit}).`);
-  if (usage.assignedCandidates > candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.assignedCandidates} / ${candidateLimit}).`);
+  if (usage.seatsUsed > seatLimit) warnings.push(`This firm will be over its BDE limit (${usage.seatsUsed} / ${seatLimit}): new BDE invites will be blocked until it is under.`);
+  if (usage.assignedCandidates > candidateLimit) warnings.push(`This firm will be over its candidate limit (${usage.assignedCandidates} / ${candidateLimit}): assigning a candidate to a BDE will be blocked until it is under.`);
   return warnings;
 }
 
@@ -46,7 +46,7 @@ function OverWarning({ warnings }: { warnings: string[] }) {
   return (
     <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-warning-fg)] bg-[var(--color-warning-bg)] p-3 text-sm text-[var(--color-warning-fg)]">
       {warnings.map((warning) => <p key={warning}>{warning}</p>)}
-      <p className="mt-1">Existing users keep working; new BDE invites and assignments will be blocked until it is under.</p>
+      <p className="mt-1">Existing users and candidates keep working; nothing is removed.</p>
     </div>
   );
 }
