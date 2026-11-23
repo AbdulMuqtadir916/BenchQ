@@ -125,7 +125,7 @@ def test_a_save_without_the_name_or_email_in_the_header_is_refused_naming_it(ano
     v1 = _v(anonymous_client, world, c)
     for blank in ("", "   ", None):
         r = _save(anonymous_client, world, c, v1, summary="A different summary.", **{field: blank})
-        assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+        assert r.status_code == 422 and field in {part for e in r.json()["errors"] for part in e["loc"]}
 
 
 def test_two_saves_from_the_same_version_are_both_kept_and_the_second_is_told(anonymous_client, test_db, world):
@@ -303,9 +303,11 @@ def test_the_same_file_again_is_answered_with_its_base_without_reading_it(anonym
     anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"])
     assert r.status_code == 409
-    assert r.json()["detail"]["message"] == "This résumé is already Base 2." and not r.json()["detail"]["hidden"]
+    body = r.json()                        # the base's fields at the top level (docs/02 §12)
+    assert (body["detail"], body["code"], body["hidden"]) == ("This résumé is already Base 2.", "DUPLICATE_RESUME", False)
+    assert body["base_resume_id"]
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(ONBOARDING_FILE), headers=world["as"]["adnan"])
-    assert r.json()["detail"]["message"] == "This résumé is already Base 1."      # the onboarding file
+    assert r.json()["detail"] == "This résumé is already Base 1."      # the onboarding file
     assert len(parser) == 1
 
 
@@ -400,8 +402,9 @@ def test_a_bdes_unused_base_is_soft_deleted_and_the_same_file_restores_it_and_a_
     hidden = next(b for b in _listing(anonymous_client, world, c)["bases"] if b["id"] == base3["id"])
     assert hidden["archived_at"] is not None
     r = anonymous_client.post(_url(world, c, "/upload"), files=_pdf(b"%PDF third"), headers=as_bde)
-    assert r.status_code == 409 and r.json()["detail"] == {"message": "This résumé is Base 3 (hidden). Show it again?",
-                                                           "base_resume_id": base3["id"], "hidden": True}
+    body = r.json()
+    assert r.status_code == 409 and (body["detail"], body["base_resume_id"], body["hidden"]) == (
+        "This résumé is Base 3 (hidden). Show it again?", base3["id"], True)
     shown = anonymous_client.post(_url(world, c, f"/bases/{base3['id']}/show"), headers=as_bde).json()
     assert (shown["archived_at"], shown["is_active"]) == (None, False)
     picked = anonymous_client.post(_url(world, c, f"/{v1['id']}/use-as-base"), headers=as_bde).json()
@@ -531,7 +534,7 @@ def test_two_uploads_of_one_file_at_once_make_one_base(anonymous_client, test_db
     test_db.commit()
     thread.join(30)
     assert out["response"].status_code == 409
-    assert out["response"].json()["detail"]["message"] == "This résumé is already Base 2."
+    assert out["response"].json()["detail"] == "This résumé is already Base 2."
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2
 
 
@@ -541,7 +544,7 @@ def test_save_rejects_invalid_profile_links(anonymous_client, test_db, world, fi
     version = _v(anonymous_client, world, candidate, who="adnan")
     response = _save(anonymous_client, world, candidate, version, who="adnan", **{field: value})
     assert response.status_code == 422
-    assert any(error["loc"][-1] == field for error in response.json()["detail"])
+    assert any(error["loc"][-1] == field for error in response.json()["errors"])
 
 
 def test_save_normalizes_bare_profile_links(anonymous_client, test_db, world):

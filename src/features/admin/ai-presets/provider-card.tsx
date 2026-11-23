@@ -11,6 +11,7 @@ import { Tag } from "@/components/ui/tag";
 import { useSaveAiProvider } from "@/lib/hooks/use-ai-presets";
 import type { AiSetup } from "@/lib/schemas/ai-presets";
 import { Field, errorMessage, fieldAria } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 /** The one provider and key. A save tests the key and every active model first; the key is never shown again. */
 export function ProviderCard({ setup, canEdit }: { setup: AiSetup; canEdit: boolean }) {
@@ -44,7 +45,7 @@ export function ProviderCard({ setup, canEdit }: { setup: AiSetup; canEdit: bool
             <Input {...fieldAria("ai-key", null, true)} type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
           </Field>
         ) : null}
-        {save.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(save.error)}</p> : null}
+        <ErrorNote text={errorMessage(save.error)} />
         {canEdit ? (
           <div className="flex flex-wrap gap-2">
             <Button disabled={save.isPending || (!apiKey.trim() && !setup.provider.isKeySet)} onClick={() => submit(false)}>

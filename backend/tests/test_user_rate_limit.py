@@ -3,10 +3,11 @@ docs/team/uzair.md §1): every signed-in firm user's requests, 429 with Retry-Af
 never limited, in or out of a support view; signed-out requests are left to the per-IP rules."""
 import pytest
 
+from backend.tests.problem_support import body_of, expected
 from backend.tests.auth_support import make_user
 
 LIMIT = 3
-TOO_MANY = {"detail": "Too many attempts. Try again in a few minutes."}
+TOO_MANY = expected(429, "Too many attempts. Try again in a few minutes.")
 
 
 def _cookie(token):
@@ -30,7 +31,7 @@ def test_a_user_over_the_limit_gets_429_with_retry_after(anonymous_client, accou
     r = _me(anonymous_client, accounts.firm_token)
     assert r.status_code == 429
     assert 1 <= int(r.headers["Retry-After"]) <= 61
-    assert r.json() == TOO_MANY
+    assert body_of(r) == TOO_MANY
 
 
 def test_the_limit_applies_to_every_route_not_just_one(anonymous_client, accounts):

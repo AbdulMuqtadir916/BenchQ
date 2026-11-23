@@ -9,6 +9,7 @@ import { Tag } from "@/components/ui/tag";
 import { useAddAiModel, useAvailableAiModels, useHideAiModel } from "@/lib/hooks/use-ai-presets";
 import type { AiModel } from "@/lib/schemas/ai-presets";
 import { errorMessage } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 const MOST_SHOWN = 8;
 
@@ -48,7 +49,7 @@ export function ModelsCard({ models, canEdit }: { models: AiModel[]; canEdit: bo
           <div className="space-y-2">
             <Input aria-label="Search OpenRouter models" placeholder="Search OpenRouter's models…" value={query} onChange={(event) => setQuery(event.target.value)} />
             {live.isPending ? <p className="text-caption text-[var(--color-text-3)]">Loading models…</p> : null}
-            {live.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(live.error)}</p> : null}
+            <ErrorNote text={errorMessage(live.error)} />
             {query.trim() && live.isSuccess && matches.length === 0 ? <p className="text-caption text-[var(--color-text-3)]">No models match.</p> : null}
             {matches.length > 0 ? (
               <ul className="divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
@@ -62,7 +63,7 @@ export function ModelsCard({ models, canEdit }: { models: AiModel[]; canEdit: bo
             ) : null}
           </div>
         ) : null}
-        {error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{error}</p> : null}
+        <ErrorNote text={error} />
       </div>
     </SectionCard>
   );

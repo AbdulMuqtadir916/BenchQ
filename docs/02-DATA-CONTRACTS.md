@@ -2538,3 +2538,157 @@ or activation of external processing/purge/automation. Exact legacy/UI status ma
   gates. A passing synthetic integration test is not model accuracy or launch approval.
 
 PR 3 routing clarification: below-0.8 Other remains readable in review, consistent with the below-threshold review rule. Confident Other is hidden/encrypted; no classification confidence alone enables purge.
+
+
+## 12. Error body — PROPOSED 2026-11-20, for Abdul's sign-off
+
+> **Status: proposed; being built.** Uzair's plan in `docs/team/uzair.md`, step 4b: one PR (the backend's shape and
+> the frontend's text), which merges only after Abdul signs off this contract and the wording. Until it merges,
+> `main` sends `{"detail": …}` and `src/lib/api/http.ts` derives the code from the status.
+
+Every error the backend makes is one RFC 9457 "Problem Details" body, `Content-Type: application/problem+json`:
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "This résumé is already Base 2.",
+  "code": "DUPLICATE_RESUME", "request_id": "…",
+  "base_resume_id": "…", "hidden": false }
+```
+
+| Member | Type | Rule |
+|---|---|---|
+| `type` | string | `"about:blank"`. |
+| `title` | string | The status's reason phrase (`"Conflict"`). |
+| `status` | int | Same as the HTTP status. |
+| `detail` | string | Always a string, written for the user. Never library exception text or a stack trace (rule 2). |
+| `code` | string | From the registry below. |
+| `request_id` | string | Always present; same as the `X-Request-ID` header. |
+| `errors` | `{loc, msg, type}[]` | 422 validation only. Never the submitted input (Pydantic's `input`, `ctx`). |
+| extensions | any | At the top level, never nested in `detail`: the duplicate résumé's `base_resume_id`, `hidden`. |
+
+`Retry-After` stays a header. Mapped to `ApiError` in `src/lib/api/http.ts`; no snake_case member leaves
+`src/lib/api/dto/`.
+
+### 12.1 Codes
+
+**Default, from the status** — every error without a specific code. Existing names kept from `http.ts`
+`STATUS_CODES`; new ones marked *new* (today the frontend makes `HTTP_<status>` for them).
+
+| Status | Code | Status | Code |
+|---|---|---|---|
+| 400 | `BAD_REQUEST` | 415 | `UNSUPPORTED_TYPE` *new* |
+| 401 | `UNAUTHENTICATED` | 422 | `VALIDATION_FAILED` |
+| 403 | `FORBIDDEN` | 429 | `RATE_LIMITED` |
+| 404 | `NOT_FOUND` | 500 | `INTERNAL` *new* |
+| 405 | `METHOD_NOT_ALLOWED` *new* | 502 | `UPSTREAM_FAILED` |
+| 409 | `CONFLICT` | 503 | `UNAVAILABLE` |
+| 410 | `GONE` *new* | 504 | `TIMEOUT` *new* |
+| 413 | `TOO_LARGE` *new* | | |
+
+**The registry.** "Text" says whose words the user sees: *frontend* = the frontend's own message, chosen by code
+(one map beside `ApiError`); *backend* = the body's `detail`.
+
+| Code | Status | Sent by | Text |
+|---|---|---|---|
+| `RATE_LIMITED` | 429 | `backend/auth/throttle.py:61` only (sign-in, and the per-user limit via `main.py` `limit_per_user`) | frontend |
+| `UNAVAILABLE` | 503 | `backend/statement_timeout.py:67` `busy_response()` only (pool drained, query timed out) | frontend |
+| `INTERNAL` | 500 | `main.py` unexpected-error handler and the DataError handler only | frontend + "Reference: …" |
+| `VALIDATION_FAILED` | 422 | FastAPI request validation (the `main.py` handler) | backend (§12.2, rule 4) |
+| `DAILY_LIMIT` | 429 | `api/routes_applications.py:411` (jobs added today); `api/routes_job_search.py:85` `_too_many`, raised at :113 (jobs saved for a candidate), :116 (searches), :208 (captures) | backend |
+| `TAILORINGS_RUNNING` | 429 | `resume_tailor/runs.py:281` (5 running for one BDE) | backend |
+| `NOT_CONFIGURED` | 500 / 503 | `api/routes_resume_tailoring.py:55` `_admit` (tailor not set up); `candidates/parse.py:158` `_setup_error` (résumé reader not set up); `auth/password_reset.py:109` (reset links); `api/routes_inbox.py:307` (Gmail connect) and :485 (Gmail confirm, switched off) | backend |
+| `RESUME_READER_FAILED` | 500 | `candidates/parse.py:217` (the reader didn't answer) | backend |
+| `RESUME_READER_TIMEOUT` | 504 | `candidates/parse.py:213` | backend |
+| `RESUME_FILE_FAILED` | 503 | `api/routes_candidate_resumes.py` `_not_made` (`GET …/resumes/{resume_id}/file`: a version's PDF or Word file couldn't be made; the extension can try again) | backend |
+| `SEARCH_NOT_STARTED` | 503 | `api/routes_job_search.py:160` | backend |
+| `MAILBOX_BUSY` | 503 | `inbox/grant_locks.py:39,50` (a Google account's connect or clean-up holds its lock); `Retry-After: 5` | backend |
+| `DUPLICATE_RESUME` | 409 | `candidates/versions.py:467`; extensions `base_resume_id`, `hidden` | backend |
+| any default code | any | every other `HTTPException` | backend |
+| `NETWORK` | 0 | frontend only: `src/lib/api/http.ts:93`, no answer | frontend |
+| `SCHEMA_MISMATCH` | any | frontend only: `http.ts:104`, the body fails its Zod schema | frontend |
+| `NOT_AVAILABLE` | 501 | frontend only: `src/lib/api/client.ts:26`, no live adapter yet | frontend |
+| `DUPLICATE_JOB` | 409 | frontend only: `src/lib/api/jobs.ts:20`, built from a 409 that names the existing job | frontend |
+
+**Exceptions, JobNavigator leftovers no BenchQ screen or the extension calls:** the 11 "already running" trigger 409s
+and the Telegram webhook 503 (`main.py:799`), the companies test-scrape 500 (`api/routes_companies.py:670`), the
+posting fetch 502s (`api/routes_jobs.py:1199–1206`), "Unsafe URL" (`api/routes_applications.py:1013`), the persona
+500s (`api/routes_persona.py:49,62`), Autofill's old routes (`api/routes_autofill.py`: `/api/autofill/config`,
+`/answer`, `/answer/stream`), cover letters. Raised errors get the shape from the central handler; hand-built
+ones keep the old shape until Abdul's clean-up track, listed in the sweep test.
+
+### 12.2 Rules
+
+1. **No specific code on a 404 or 403, ever.** Every not-found is `NOT_FOUND` with no extension members, so a body
+   can't confirm a record exists in another firm (CLAUDE.md, routes and access). Same for `FORBIDDEN`.
+2. **`detail` never carries exception text or a setting's name.** Both go to the log. The set-up 500s say what to do
+   ("The résumé tailor isn't set up yet. Ask your admin."); the row that isn't set up is logged for the admin
+   (`routes_resume_tailoring.py` `_admit`, `candidates/parse.py` `_setup_error`; decided by Uzair 2026-11-20, replacing
+   "keep the setting name").
+3. **A 422 never echoes input.** `errors` keeps `loc`, `msg`, `type`; nothing else. `loc` may carry a key name the
+   sender sent (an unknown field, a typed question's key): that is allowed. A value never is.
+4. **The validation 422's `detail` is one actionable sentence:** "BenchQ couldn't take this as it was sent. Refresh
+   the page and try again." (confirmed 2026-11-20). The website and the extension show this sentence, not the field
+   list; `errors` is for logs and tests. The extension's `failureOf`
+   (`extension/src/api.ts:56`) shows a string `detail` and today falls back to this same advice, so it needs no change.
+5. **`request_id` is always present** on a backend-made error. The frontend shows "Reference: <request_id>" on an
+   unexpected 500 (`INTERNAL`) only; with no id (the Next proxy's own 500, no JSON body) there is no reference line.
+6. **`RATE_LIMITED`, `UNAVAILABLE` and `INTERNAL` come only from the senders above.** Any other 429, 503 or 500 has a
+   specific code. The route sweep fails a status-default one from any other route (`problem_support.assert_problem`),
+   and `test_error_responses_lint.py` fails a hand-built error response outside `backend/problem.py`.
+7. **Retries.** Queries never retry a 4xx; network errors and 5xx are retried, waiting what `Retry-After` asks (with
+   a ceiling). Mutations are never retried.
+
+**How it's enforced.** The central handlers in `backend/main.py` give every raised error the body; `backend/problem.py`
+refuses an unregistered code, and a specific code or extra field on a 403/404, when the error is raised.
+`test_error_responses_lint.py` fails a hand-built error response outside `problem.py`. `test_error_detail_lint.py`
+fails a `detail` built from a caught exception (`str(e)`, `f"{e}"`, `.args`, `repr`, a traceback) or one with
+"please", "Oops" or "!". The route sweep (`test_log_every_route.py` with `problem_support.assert_problem`) checks
+every route's error has the shape, a registered code, and a system code only from its named sender.
+`test_error_shape.py` covers the cases the sweep doesn't reach. `test_isolation.py` holds out-of-scope records to a
+plain `NOT_FOUND`. `test_error_codes_doc.py` fails when §12.1's tables and `backend.problem.CODES` differ (it runs in
+CI, which has the whole checkout; the backend container mounts only `backend/`, so locally it skips). On the website,
+`src/lib/api/error-display.test.ts` fails a screen that shows a raw `error.message` instead of `describeError`.
+Leftovers are listed by file:line in each test, and each list has a stale check.
+
+### 12.3 Writing an error message
+
+For every `detail` the backend writes, and the frontend's own messages.
+
+1. Say what happened, then what to do, in one or two short sentences.
+2. Plain words for a BDE at 11pm: no status numbers, setting names, exception text or jargon. An admin's detail goes
+   in the log.
+3. Give the specifics when they help: the limit, when it resets ("It resets at 6:30 PM IST."), which base.
+4. Calm and direct: no "Oops", no "please", no exclamation marks, no blame.
+5. Product words spelled one way: "résumé", "BenchQ", "Base 2".
+6. Never confirm what the user can't see: every not-found reads the same.
+
+**The frontend's own messages, proposed** (`src/lib/api/error-text.ts`, one map; for Abdul's sign-off). The system
+codes read the same on every screen; every other error shows the backend's `detail`.
+
+| Code | Title | When | Message |
+|---|---|---|---|
+| `UNAVAILABLE` | BenchQ is busy | everywhere (a page's card shows only after its retries ran out) | BenchQ is handling a lot right now. Try again in a few seconds. |
+| `RATE_LIMITED` | Too many requests | `Retry-After` present | You've sent a lot of requests in a short time. Try again in 15 minutes. (the real wait, from `Retry-After`) |
+| `RATE_LIMITED` | Too many requests | no `Retry-After` | You've sent a lot of requests in a short time. Wait a few minutes, then try again. |
+| `RATE_LIMITED` | (the sign-in page's own line) | sign-in (it counts failed passwords) | Too many sign-in attempts. Try again in 15 minutes. (the real wait, from `Retry-After`) |
+| `NETWORK` | Can't reach BenchQ | no answer | Check your internet connection, then try again. |
+| `INTERNAL` | Something went wrong | with a request id | This one is on our side. Try again; if it keeps happening, send support the reference below. (+ "Reference: <request_id>", with a copy button) |
+| `INTERNAL` | Something went wrong | no request id (the Next proxy's own 500) | This one is on our side. Try again; if it keeps happening, tell support. |
+| `SCHEMA_MISMATCH` | BenchQ needs a refresh | the answer doesn't match the page | This page is out of date with BenchQ. Refresh the page to continue. |
+
+Every `RATE_LIMITED` sender sends `Retry-After` (`auth/throttle.py` `_refuse_if_over`: sign-in, invite accept, the
+password-reset request, the per-user limit), each pinned by a test.
+
+### 12.4 Questions for sign-off (Abdul)
+
+1. This contract: the body, the default codes (the five *new* names) and the registry.
+2. The busy code: `UNAVAILABLE` kept for busy (proposed; same pattern as `RATE_LIMITED`, no rename in the frontend),
+   with "not configured" and "the search couldn't start" on their own codes. Or a new `BUSY`, leaving `UNAVAILABLE`
+   as a plain 503 that shows the backend's text?
+3. The groupings: one `DAILY_LIMIT` for the four daily quotas, one `NOT_CONFIGURED` for the set-up errors (500 and
+   503), separate `RESUME_READER_FAILED` and `RESUME_READER_TIMEOUT`.
+4. The wording of the frontend's own messages (busy, rate-limited, offline, unexpected + reference, data mismatch),
+   and the writing rules in §12.3.
+5. The JobNavigator leftovers keep the old shape until your clean-up track.
+6. Tests in your area that assert the old shape are updated in the step 4b PR (rows in `docs/team/cross-area-changes.md`).
+7. "Q2/Q3 of #104" (open in `docs/team/uzair.md` since 2026-11-03): were they settled?

@@ -7,6 +7,8 @@ import { Select } from "@/components/ui/select";
 import { formatIst } from "@/lib/format/timezone";
 import { useJobSearches } from "@/lib/hooks/use-jobs";
 import type { Candidate } from "@/lib/schemas/candidate";
+import type { ErrorText } from "@/lib/api/error-text";
+import { ErrorReference } from "@/components/app/error-reference";
 import type { JobSearch, JobSearchErrorCode, JobSearches } from "@/lib/schemas/job-search";
 
 /** The words for a failed search's code (backend/job_search/providers/base.py `ERROR_MESSAGES`). */
@@ -88,8 +90,8 @@ export interface FindJobsSearch {
   place: string | null;
   setPlace: (value: string) => void;
   isStarting: boolean;
-  /** Why the backend refused the last start (409, 422, 429, 503), as it says it. */
-  refusal: string | null;
+  /** Why the backend refused the last start (409, 422, 429, 503), as it says it, or a system error's shared text. */
+  refusal: ErrorText | null;
 }
 
 interface FindJobsProps {
@@ -145,7 +147,10 @@ export function FindJobs({ candidate, resumeHref, search }: FindJobsProps) {
         ) : blocked ? (
           linksToResume && resumeHref ? <Link href={resumeHref} className="underline">{blocked}</Link> : blocked
         ) : refusal ? (
-          <span className="text-[var(--color-danger-fg)]">{refusal}</span>
+          <span className="text-[var(--color-danger-fg)]">
+            {refusal.message}
+            {refusal.reference ? <ErrorReference reference={refusal.reference} className="ml-1" /> : null}
+          </span>
         ) : isSearching ? (
           `Searching ${running?.query ?? role}${placeLabel(running?.place ?? search.place) ? ` in ${placeLabel(running?.place ?? search.place)}` : ""}…`
         ) : last ? (

@@ -19,6 +19,7 @@ from fastapi import HTTPException
 
 from backend.candidates.parse_defaults import (DEFAULT_RESPONSE_FORMAT, DOCX_INPUT_NOTE, INPUT_NOTE, PDF_INPUT_NOTE,
                                                RESUME)
+from backend.problem import NOT_CONFIGURED, RESUME_READER_FAILED, RESUME_READER_TIMEOUT, Problem
 
 logger = logging.getLogger("jobnavigator.resume_parse")
 
@@ -164,7 +165,7 @@ def extract_text(kind: str, content: bytes) -> str:
 
 def _setup_error(detail: str) -> HTTPException:
     logger.error("The résumé parser isn't set up: %s", detail)
-    return HTTPException(status_code=500, detail=f"The résumé reader isn't set up: {detail}.")
+    return Problem(500, "The résumé reader isn't set up yet. Ask your admin.", NOT_CONFIGURED)   # the row: logged
 
 
 # ── Reading it ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -213,11 +214,11 @@ async def read_resume(text: str, kind: str, db, firm_id=None) -> dict:
                 tracker.record(response)
     except LLMDeadlineError:
         logger.warning("Résumé parse timed out after %ss", ATTEMPT_SECONDS)
-        raise HTTPException(status_code=504, detail="There was an issue while parsing your resume, please try again.")
+        raise Problem(504, "The résumé reader took too long. Try again in a minute.", RESUME_READER_TIMEOUT)
     except Exception as e:
         # The provider's error, never the prompt: it names the status ("502", "No endpoints found"), not the résumé.
         logger.warning("Résumé parse failed after every attempt: %s", str(e)[:300])
-        raise HTTPException(status_code=500, detail="The résumé reader didn't answer. Try again in a minute.")
+        raise Problem(500, "The résumé reader didn't answer. Try again in a minute.", RESUME_READER_FAILED)
     raw = response.get("text") if isinstance(response, dict) else None
     try:
         answer = parse_model_json(raw or "")

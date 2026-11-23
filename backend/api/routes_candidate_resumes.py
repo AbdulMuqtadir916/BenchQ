@@ -45,6 +45,7 @@ from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_tex
 from backend.models.candidates import ResumeParse, file_sha256
 from backend.models.db import get_db
 from backend.models.tenancy import User
+from backend.problem import RESUME_FILE_FAILED, Problem
 
 logger = logging.getLogger("jobnavigator.resume_upload")
 
@@ -231,9 +232,9 @@ def _file_response(content: bytes, mime_type: str, file_name: str, source: str) 
 
 def _not_made(version_id, error: Exception):
     """A file that couldn't be made: logged by its version's id and the error's kind only, and a 503 the extension can
-    try again on."""
+    try again on (`RESUME_FILE_FAILED`, docs/02 §12.1)."""
     logger.warning("Résumé file for version %s couldn't be made: %s", version_id, type(error).__name__)
-    raise HTTPException(status_code=503, detail="This résumé's file couldn't be made. Try again.") from None
+    raise Problem(503, "This résumé's file couldn't be made. Try again.", RESUME_FILE_FAILED) from None
 
 
 async def _printed(page_html: str, page_format) -> bytes:

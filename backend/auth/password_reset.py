@@ -4,6 +4,7 @@ from datetime import timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from backend.problem import NOT_CONFIGURED, Problem
 from backend.auth import ledger
 from backend.auth.sessions import end_all_sessions
 from backend.auth.tokens import hash_token, new_token
@@ -105,7 +106,7 @@ def password_frozen(db: Session, user: User, now=None) -> bool:
 
 def make_reset_link(db: Session, row: PasswordResetRequest, approver) -> str:
     if not PASSWORD_RESET_BASE_URL or (IS_PRODUCTION and not PASSWORD_RESET_BASE_URL.startswith("https://")):
-        raise HTTPException(status_code=503, detail="Password reset links are not configured.")
+        raise Problem(503, "Password reset links aren't set up yet. Ask BenchQ support.", NOT_CONFIGURED)
     raw = new_token()
     row.reset_token_hash = hash_token(raw)
     row.reset_token_expires_at = utcnow() + LINK_LIFETIME

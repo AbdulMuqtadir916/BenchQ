@@ -10,6 +10,8 @@ import { useUpdateWorkHours } from "@/lib/hooks/use-team";
 import { useShowToast } from "@/lib/stores/toast-store";
 import type { Firm } from "@/lib/schemas/session";
 import { SettingRow } from "./setting-row";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 /**
  * The firm's work hours (07 Q67, decided 2026-11-17, Q152–Q174): a work day runs from one start to the next, the
@@ -47,7 +49,7 @@ function WorkHoursForm({ firm, onDone }: { firm: Pick<Firm, "workStart" | "workE
   const [end, setEnd] = useState(firm.workEnd);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const problem = workHoursProblem(start, end);
-  const shown = isSubmitted ? problem ?? (update.error instanceof Error ? update.error.message : null) : null;
+  const shown = isSubmitted ? problem ?? (update.error ? describeError(update.error) : null) : null;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -75,7 +77,7 @@ function WorkHoursForm({ firm, onDone }: { firm: Pick<Firm, "workStart" | "workE
             aria-invalid={shown ? true : undefined} aria-describedby={shown ? "work-hours-error" : undefined} />
         </label>
       </div>
-      {shown ? <p id="work-hours-error" role="alert" className="text-caption text-[var(--color-danger-fg)]">{shown}</p> : null}
+      <ErrorNote id="work-hours-error" text={shown} className="text-caption" />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={onDone} disabled={update.isPending}>Cancel</Button>
         <Button type="submit" size="sm" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save"}</Button>

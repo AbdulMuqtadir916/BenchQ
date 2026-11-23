@@ -10,12 +10,15 @@ from docx import Document
 
 from backend.api import routes_candidate_resumes
 from backend.candidates import resume_file
+from backend.problem import RESUME_FILE_FAILED
+from backend.tests.problem_support import body_of, expected
 from backend.tests.test_candidates_api import world  # noqa: F401  (the fixture)
 from backend.tests.test_resume_versions import ONBOARDING_FILE, _candidate, _pdf, _save, _url, _v, parser  # noqa: F401
 
 LATER_FILE = b"%PDF-1.7 a later resume"
 MADE_PDF = b"%PDF-1.4 made from the text"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+NOT_MADE = expected(503, "This résumé's file couldn't be made. Try again.", RESUME_FILE_FAILED)
 
 
 def _file(client, world, candidate, resume_id, who="owner", kind=None):
@@ -116,7 +119,7 @@ def test_a_file_that_cant_be_made_says_so(anonymous_client, test_db, world, monk
     v1 = _v(anonymous_client, world, c)
     assert _save(anonymous_client, world, c, v1, summary="An edited summary.").status_code == 201
     r = _file(anonymous_client, world, c, _v(anonymous_client, world, c, version=2)["id"])
-    assert (r.status_code, r.json()["detail"]) == (503, "This résumé's file couldn't be made. Try again.")
+    assert (r.status_code, body_of(r)) == (503, NOT_MADE)
 
 
 def test_a_page_that_cant_be_built_says_so_too(anonymous_client, test_db, world, printer, monkeypatch):
@@ -128,7 +131,7 @@ def test_a_page_that_cant_be_built_says_so_too(anonymous_client, test_db, world,
     v1 = _v(anonymous_client, world, c)
     assert _save(anonymous_client, world, c, v1, summary="An edited summary.").status_code == 201
     r = _file(anonymous_client, world, c, _v(anonymous_client, world, c, version=2)["id"])
-    assert (r.status_code, r.json()["detail"]) == (503, "This résumé's file couldn't be made. Try again.")
+    assert (r.status_code, body_of(r)) == (503, NOT_MADE)
     assert printer["pages"] == []
 
 

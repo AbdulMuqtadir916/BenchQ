@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ApplicationStatus } from "@/lib/schemas/enums";
@@ -8,6 +8,8 @@ import { can, canEditProfile, canSearchJobs } from "@/lib/auth/permissions";
 import { useJobSearches, useStartJobSearch } from "@/lib/hooks/use-jobs";
 import { blockedReason, searchRole, type FindJobsSearch } from "@/components/app/candidate/find-jobs";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
+import { useShowErrorToast, useShowToast } from "@/lib/stores/toast-store";
+import { describeError } from "@/lib/api/error-text";
 import { moveFailure, useUpdateApplicationStatus } from "@/lib/hooks/use-applications";
 import { EASE_OUT } from "@/lib/motion";
 import { ErrorState } from "@/components/app/error-state";
@@ -19,7 +21,6 @@ import { SkeletonCard } from "@/components/app/skeleton-card";
 import { CandidateJobsTab } from "@/components/app/candidate/candidate-jobs-tab";
 import { CandidateHeader } from "@/components/app/candidate/candidate-header";
 import { CandidateTabs, isCandidateTab, type CandidateTabId } from "@/components/app/candidate/candidate-tabs";
-import { CandidateToast } from "@/components/app/candidate/candidate-toast";
 import { useCandidateWorkspace, type Suggestion } from "@/components/app/candidate/use-candidate-workspace";
 import type { CandidateActions } from "@/components/app/candidate/candidate-actions";
 import { OverviewTab } from "@/components/app/candidate/overview/overview-tab";
@@ -80,16 +81,14 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   // `?message=` opens one email, e.g. from an application's timeline (Abdul's review on #127).
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(() => searchParams.get("message"));
-  const [toast, setToast] = useState<string | null>(null);
+  // This page's confirmations and failures are the shell's corner toasts (step 4b): a confirmation is announced politely,
+  // a failure as an alert with an unexpected error's reference to copy. Never a toast of the page's own: the page sits
+  // under an ancestor with a filter, so a `fixed` toast here would place against the app frame, behind the drawer.
+  const showToast = useShowToast();
+  const showErrorToast = useShowErrorToast();
   // Each "Find jobs" press starts a matching run; the Jobs tab plays it until it reports done.
   const [matchRun, setMatchRun] = useState(0);
   const [matchDone, setMatchDone] = useState(0);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   // The tab lives in the URL, so back/forward and shared links land on the same view.
   const setTab = useCallback(
@@ -111,16 +110,19 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
       const name = ws.applications.find((a) => a.id === applicationId)?.companyNameAtApply || "Application";
       // Said once the server has the move; a failed move snaps back and says why instead.
       const started = updateStatus.mutate({ id: applicationId, status: to, note }, {
-        onSuccess: () => setToast(`${name} moved to ${STATUS_LABEL[to]}`),
-        onError: (error) => setToast(`${name} didn't move to ${STATUS_LABEL[to]}: ${moveFailure(error)}`),
+        onSuccess: () => showToast(`${name} moved to ${STATUS_LABEL[to]}`),
+        onError: (error) => {
+          const why = moveFailure(error);
+          showErrorToast({ ...why, message: `${name} didn't move to ${STATUS_LABEL[to]}: ${why.message}` });
+        },
       });
       if (!started) {
-        setToast("Saving… wait for the current move of this application to finish.");
+        showToast("Saving… wait for the current move of this application to finish.");
         return false;
       }
       return true;
     },
-    [ws.applications, updateStatus],
+    [ws.applications, updateStatus, showToast, showErrorToast],
   );
 
   // Every "Find jobs" on this page starts the candidate's search in the picked place (their BDE only), then shows the
@@ -151,7 +153,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
     findJobs: canSearch ? findJobs : undefined,
   }), [setTab, moveApplication, canSearch, findJobs]);
   const search: FindJobsSearch | undefined = canSearch
-    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error instanceof Error ? startSearch.error.message : null, place, setPlace: setPickedPlace }
+    ? { run: findJobs, isStarting: startSearch.isPending, refusal: startSearch.error ? describeError(startSearch.error) : null, place, setPlace: setPickedPlace }
     : undefined;
 
   const closeDrawer = useCallback(() => setOpenApplicationId(null), []);
@@ -219,14 +221,13 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
             />
           ) : null}
           {tab === "resumes" ? <ResumesTab candidate={candidate} shelf={ws.shelfQuery.data} isLoading={ws.shelfQuery.isLoading} error={ws.shelfQuery.error} onRetry={() => void ws.shelfQuery.refetch()} canAct={canAct} /> : null}
-          {tab === "details" ? <CandidateDetailsTab candidate={candidate} canEdit={canEditDetails} showSearchTitles={can(principal, "candidate.viewSearchTitles")} onSaved={() => { setToast("Details saved"); setTab("overview"); }} /> : null}
-          {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={setToast} /> : null}
+          {tab === "details" ? <CandidateDetailsTab candidate={candidate} canEdit={canEditDetails} showSearchTitles={can(principal, "candidate.viewSearchTitles")} onSaved={() => { showToast("Details saved"); setTab("overview"); }} /> : null}
+          {tab === "documents" ? <DocumentsTab ws={ws} canAct={canAct} onNotify={showToast} /> : null}
           {tab === "activity" ? <ActivityTab applications={ws.applications} messages={ws.messages} teamName={ws.teamName} onOpenApplication={setOpenApplicationId} /> : null}
         </motion.div>
       </AnimatePresence>
 
       <ApplicationDrawer ws={ws} applicationId={openApplicationId} canAct={canAct} actions={actions} onMove={moveApplication} onClose={closeDrawer} />
-      <CandidateToast message={toast} />
     </div>
   );
 }

@@ -73,7 +73,9 @@ Since 2026-11-22 the tailor runs on its active preset at `/admin/ai-presets` and
   `reasoning: {enabled: false}`, no temperature, `max_tokens` 12,000, no fallback model, a reply cut off at the cap
   retried. Four attempts with 2, 4 and 8 s between them. A reply that isn't JSON is asked for once more.
 - **The checks:** a preset save refuses a broken prompt (`backend/ai/modules.py`), and every run reads its setup through
-  `read_setup`, which raises `TailorSetupError` saying what's missing. part 2 answers that with a 500.
+  `read_setup`, which raises `TailorSetupError` saying what's missing. part 2 answers that with a 500
+  (`NOT_CONFIGURED`, "The résumé tailor isn't set up yet. Ask your admin.") and logs what's missing (step 4b, `docs/02`
+  §12).
 - **A prompt change needs re-testing:** they were measured as written.
 
 ## 4. A version in and out (`stored.py`)
@@ -128,7 +130,7 @@ output tokens across the five calls. It runs in the background (part 2), never i
 | Record | The run's `job_runs` row is its record: `firm_id` (new on `launch_background`), `target_job_id` (the posting), `meta` `{candidate_id, base_resume_id, job_posting_id, user_id}`, then `resume_id` + `counts` or `error_code`, and the heartbeat `seen_at`. No table, no migration. Every check reads these rows, so it holds on any number of workers. |
 | Routes | `POST …/candidates/{c}/resumes/tailor` `{job_posting_id, base_resume_id?}` → 202 `{run_id}`; `GET …/resumes/tailorings` (newest first; `?running=true`); `GET …/resumes/tailorings/{run_id}` → `{status: running\|completed\|failed, resume_id, error_code, …}`. |
 | Who | Starting: the candidate's BDE (`can_manage_resume`, 07 Q55). Reading: anyone who can see the candidate; a support view reads. |
-| Refusals | 404 a posting or base that isn't the candidate's; 409 a hidden base, no active base, no v1, or the same base and job running; 422 a job with no description; 429 the BDE has 5 running (queued ones count); 500 naming the setting when the tailor isn't set up. Checked with the candidate row locked, held across the launch. |
+| Refusals | 404 a posting or base that isn't the candidate's; 409 a hidden base, no active base, no v1, or the same base and job running; 422 a job with no description; 429 the BDE has 5 running (queued ones count); 500 `NOT_CONFIGURED` when the tailor isn't set up (the setting in the log, step 4b). Checked with the candidate row locked, held across the launch. |
 | Limits | The tailor's own gate `resume_tailor`: `resume_tailor_max_concurrent`, 40 per worker (a Super Admin setting). 10 was too few: the gate is per worker and every firm shares it. Before real use, set it under the OpenRouter account's rate limit. Fairness between firms is Uzair's per-firm cap. |
 | Lost | Each process stamps its running and queued tailorings every 30 s (`job_monitor.start_heartbeat`, every run it holds, since production layer step 3; it replaced `runs.keep_stamping`). Not stamped for 2 minutes, or running 30 minutes: failed as `lost`, and its 409 lifts. A row the heartbeat's sweep failed (no code) reads as lost too. |
 | Finish | With the candidate locked: the firm suspended, the candidate, base (deleted or hidden) or posting gone → `gone`, no version; a run already marked lost → stays lost, no version. A candidate handed to another BDE meanwhile still gets the version, credited to the BDE who started it. |

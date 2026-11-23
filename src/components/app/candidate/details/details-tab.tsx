@@ -16,6 +16,8 @@ import { StepWorkRate } from "@/components/app/candidate-wizard/step-work-rate";
 import type { Errors, WizardValues } from "@/components/app/candidate-wizard/model";
 import type { WizardForm } from "@/components/app/candidate-wizard/use-wizard";
 import { detailsValues, isChanged, toUpdate, validateDetails } from "./model";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 const NOTHING_DRAFTED: ReadonlySet<never> = new Set();
 const SETTING_LABEL = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" } as const;
@@ -79,7 +81,7 @@ function DetailsForm({ candidate, showSearchTitles, onSaved }: { candidate: Cand
         </Card>
       ) : null}
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] py-3">
-        {update.error ? <p role="alert" className="mr-auto text-sm text-[var(--color-danger-fg)]">{update.error.message}</p> : null}
+        <ErrorNote text={update.error ? describeError(update.error) : null} className="mr-auto" />
         <Button type="button" variant="ghost" size="sm" disabled={!changed || update.isPending} onClick={() => { setValues(detailsValues(candidate)); setErrors({}); update.reset(); }}>Discard changes</Button>
         <Button type="submit" size="sm" disabled={!changed || update.isPending}>
           {update.isPending ? <LoaderCircle size={13} className="animate-spin" aria-hidden /> : null}Save details

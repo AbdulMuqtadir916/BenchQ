@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { describeError } from "@/lib/api/error-text";
+import { ErrorReference } from "@/components/app/error-reference";
 import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, Building2, Link2, MapPin, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +36,7 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
   // (a disabled entry can't take focus). Choosing it and saving says "Choose the candidate."
   const choices = useMemo<SelectOption[]>(() => [{ value: "", label: "Choose the candidate" }, ...options], [options]);
   const [candidateId, setCandidateId] = useState("");
-  const [problem, setProblem] = useState<{ message: string; jobId?: string } | null>(null);
+  const [problem, setProblem] = useState<{ message: string; jobId?: string; reference?: string | null } | null>(null);
   const chosen = candidateId || (options.length === 1 ? options[0]!.value : "");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -60,8 +62,9 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
         router.push(toHref("jobs.detail", { id: job.id }, { candidate: parsed.data.candidateId }));
       },
       onError: (error) => {
-        if (isDuplicateJob(error)) setProblem({ message: error.message, jobId: error.jobId });
-        else setProblem({ message: error instanceof Error ? error.message : "The job wasn't captured. Try again." });
+        // The duplicate keeps the backend's words, through describeError like every other error (docs/02 §12).
+        const text = describeError(error, { fallback: "The job wasn't captured. Try again." });
+        setProblem(isDuplicateJob(error) ? { message: text.message, jobId: error.jobId } : { message: text.message, reference: text.reference });
       },
     });
   }
@@ -127,6 +130,7 @@ export function JobCaptureForm({ modal = false, onClose }: { modal?: boolean; on
           {problem ? (
             <p role="alert" className="text-sm text-[var(--color-danger-fg)]">
               {problem.message}
+              {problem.reference ? <> <ErrorReference reference={problem.reference} /></> : null}
               {problem.jobId ? <> <Link className="underline" href={toHref("jobs.detail", { id: problem.jobId }, { candidate: chosen })} onClick={() => onClose?.()}>View job</Link></> : null}
             </p>
           ) : <span />}

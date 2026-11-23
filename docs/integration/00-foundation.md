@@ -10,7 +10,8 @@ connection and sign-in came later, in F3 and F6.
 ## Already done (don't redo)
 
 - `src/lib/api/http.ts` — fetch wrapper: relative `/api/...` paths, `credentials: "include"`,
-  FastAPI `{detail}` errors → `ApiError`, Zod check on every response (`SCHEMA_MISMATCH` on drift).
+  FastAPI `{detail}` errors → `ApiError` (the shape changes in production layer step 4b: one Problem Details body
+  with a `code`, `docs/02-DATA-CONTRACTS.md` §12), Zod check on every response (`SCHEMA_MISMATCH` on drift).
 - `src/lib/api/config.ts` — `isLive(module)`, driven by `NEXT_PUBLIC_LIVE_MODULES`.
 - `src/lib/api/dto/shared.ts` — `toIso` / `toIsoOrNull` timestamp normalisation, with tests.
 - `next.config.ts` — proxies `/api/*` and `/health` to `BACKEND_URL` when it's set.

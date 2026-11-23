@@ -5,6 +5,8 @@ import { LoaderCircle } from "lucide-react";
 import { usePastePosting } from "@/lib/hooks/use-jobs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError } from "@/lib/api/error-text";
 
 const MIN_LENGTH = 50;
 const WORD = /[a-z0-9+#]+/g;
@@ -53,7 +55,7 @@ export function PastePostingDialog({ candidateId, job, onClose, onSaved }: Paste
     paste.mutate({ candidateId, jobId: job.id, text: trimmed }, { onSuccess: onSaved });
   }
 
-  const error = problem ?? (paste.error instanceof Error ? paste.error.message : null);
+  const error = problem ?? (paste.error ? describeError(paste.error) : null);
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="paste-posting-title" className="fixed inset-0 z-50 flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--color-overlay)]" aria-hidden="true" />
@@ -71,7 +73,7 @@ export function PastePostingDialog({ candidateId, job, onClose, onSaved }: Paste
         <textarea ref={field} value={text} onChange={(event) => { setText(event.target.value); setProblem(null); }}
           aria-label="The job's posting" aria-invalid={Boolean(error)} aria-describedby={error ? "paste-posting-error" : undefined}
           rows={12} className="bq-input h-auto w-full py-2" placeholder="About the job…" />
-        {error ? <p id="paste-posting-error" role="alert" className="text-sm text-[var(--color-danger-fg)]">{error}</p> : null}
+        <ErrorNote id="paste-posting-error" text={error} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
           <Button type="submit" size="sm" disabled={paste.isPending}>

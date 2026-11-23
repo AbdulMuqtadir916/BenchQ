@@ -6,6 +6,7 @@ import re
 
 import pytest
 
+from backend.tests.problem_support import assert_problem
 from backend.auth.invites import RESERVED_SLUGS
 from backend.tests.auth_support import make_plan
 
@@ -76,7 +77,7 @@ def test_create_logs_firm_created_and_invite_sent_in_the_firms_ledger(api_client
 def test_create_refuses_bad_input_with_the_mocks_messages(api_client, accounts, over, message):
     r = _create(api_client, accounts, **over)
     assert r.status_code == 400
-    assert r.json() == {"detail": message}
+    assert assert_problem(r)["detail"] == message
 
 
 def test_create_refuses_a_hidden_plan(api_client, accounts, test_db):
@@ -85,7 +86,7 @@ def test_create_refuses_a_hidden_plan(api_client, accounts, test_db):
     test_db.commit()
     r = _create(api_client, accounts, plan_id=str(hidden.id))
     assert r.status_code == 400
-    assert r.json() == {"detail": "That plan isn't offered to new firms."}
+    assert assert_problem(r)["detail"] == "That plan isn't offered to new firms."
 
 
 def test_create_refuses_an_unknown_plan(api_client, accounts):
@@ -97,7 +98,7 @@ def test_create_refuses_an_email_that_already_has_an_account(api_client, account
     from backend.models.tenancy import Firm
     r = _create(api_client, accounts, owner_email=email)
     assert r.status_code == 409
-    assert r.json() == {"detail": "Someone with this email already has an account or a pending invite."}
+    assert assert_problem(r)["detail"] == "Someone with this email already has an account or a pending invite."
     assert test_db.query(Firm).filter(Firm.slug == "northwind").count() == 0     # nothing half-made
 
 

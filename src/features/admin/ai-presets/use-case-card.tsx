@@ -11,6 +11,7 @@ import type { AiPreset, AiUseCase } from "@/lib/schemas/ai-presets";
 import { errorMessage } from "../admin-dialog";
 import { PresetDialog } from "./preset-dialog";
 import { TestRunDialog } from "./test-run-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 type Open = { kind: "new" } | { kind: "edit"; preset: AiPreset } | { kind: "test"; preset: AiPreset } | null;
 
@@ -75,7 +76,7 @@ export function UseCaseCard({ useCase, efforts, canEdit }: { useCase: AiUseCase;
             </ul>
           </details>
         ) : null}
-        {error ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{error}</p> : null}
+        <ErrorNote text={error} />
         {isUnreachable ? <Button variant="secondary" size="sm" disabled={activate.isPending} onClick={() => activate.mutate({ id: lastActivated, force: true })}>Make active anyway</Button> : null}
       </div>
       {open?.kind === "test" ? <TestRunDialog useCase={useCase} preset={open.preset} onClose={() => setOpen(null)} /> : null}

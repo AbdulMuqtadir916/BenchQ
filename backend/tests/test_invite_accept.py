@@ -4,6 +4,8 @@ from datetime import timedelta
 
 import pytest
 
+from backend.tests.problem_support import assert_problem, body_of
+
 GOOD = {"name": "Nora North", "password": "a-strong-pass"}
 
 
@@ -91,7 +93,7 @@ def test_a_link_works_once(anonymous_client, owner_invite):
     assert _accept(anonymous_client, token).status_code == 200
     r = _accept(anonymous_client, token)
     assert r.status_code == 410
-    assert r.json() == {"detail": "This invite is no longer valid. This invite has already been accepted."}
+    assert assert_problem(r)["detail"] == "This invite is no longer valid. This invite has already been accepted."
     assert anonymous_client.get(f"/api/invites/{token}").json()["status"] == "ACCEPTED"
 
 
@@ -103,13 +105,13 @@ def test_accept_checks_the_form(anonymous_client, owner_invite, body, message):
     _, _, token = owner_invite
     r = _accept(anonymous_client, token, **body)
     assert r.status_code == 400
-    assert r.json() == {"detail": message}
+    assert assert_problem(r)["detail"] == message
 
 
 def test_accept_of_an_unknown_link_is_410(anonymous_client, accounts):
     r = _accept(anonymous_client, "not-a-token")
     assert r.status_code == 410
-    assert r.json() == {"detail": "This invite link isn't valid."}
+    assert assert_problem(r)["detail"] == "This invite link isn't valid."
 
 
 def test_too_many_accepts_from_one_address_are_429(anonymous_client, owner_invite):
@@ -121,7 +123,7 @@ def test_too_many_accepts_from_one_address_are_429(anonymous_client, owner_invit
     r = anonymous_client.post(f"/api/invites/{token}/accept", json=GOOD, headers=ip)
     assert r.status_code == 429
     assert int(r.headers["Retry-After"]) >= 1
-    assert r.json() == {"detail": "Too many attempts. Try again in a few minutes."}
+    assert assert_problem(r)["detail"] == "Too many attempts. Try again in a few minutes."
     # Another address is unaffected, and the invite is still there to accept.
     assert anonymous_client.post(f"/api/invites/{token}/accept", json=GOOD,
                                  headers={"X-Forwarded-For": "10.0.3.2"}).status_code == 200
@@ -143,7 +145,7 @@ def test_accept_of_a_revoked_or_expired_link_is_410(api_client, anonymous_client
     invite = test_db.get(Invite, invite_id)
     invite.expires_at = invite.expires_at - timedelta(days=8)
     test_db.commit()
-    assert _accept(anonymous_client, token).json() == {"detail": "This invite is no longer valid. This invite has expired."}
+    assert assert_problem(_accept(anonymous_client, token))["detail"] == "This invite is no longer valid. This invite has expired."
 
 
 def test_a_suspended_firms_invite_is_refused_and_stays_pending(anonymous_client, owner_invite, test_db):
@@ -153,7 +155,7 @@ def test_a_suspended_firms_invite_is_refused_and_stays_pending(anonymous_client,
     test_db.commit()
     r = _accept(anonymous_client, token)
     assert r.status_code == 403
-    assert r.json() == {"detail": "Workspace suspended. This invite can't be accepted right now."}
+    assert assert_problem(r)["detail"] == "Workspace suspended. This invite can't be accepted right now."
     test_db.expire_all()
     assert test_db.get(Invite, invite_id).status == "PENDING"
 
@@ -213,7 +215,7 @@ def test_a_firm_user_opens_only_their_own_firm_by_slug(anonymous_client, owner_i
     other = anonymous_client.get("/api/firms/by-slug/northwind", headers=cookie)
     unknown = anonymous_client.get("/api/firms/by-slug/nowhere", headers=cookie)
     assert other.status_code == unknown.status_code == 404
-    assert other.json() == unknown.json()                               # never confirms a firm exists
+    assert body_of(other) == body_of(unknown)                           # never confirms a firm exists
 
 
 def test_a_super_admin_opens_any_firm_by_slug(anonymous_client, owner_invite, accounts):

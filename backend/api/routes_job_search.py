@@ -39,6 +39,7 @@ from pydantic import AfterValidator, BaseModel, StringConstraints
 from sqlalchemy import func, literal, text
 from sqlalchemy.orm import Session as DbSession
 
+from backend.problem import DAILY_LIMIT, SEARCH_NOT_STARTED, Problem
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of, _visible
 from backend.auth import ledger
@@ -103,11 +104,13 @@ class CaptureBody(BaseModel):
 
 
 def _too_many(detail: str) -> HTTPException:
-    return HTTPException(status_code=429, detail=detail)
+    return Problem(429, detail, DAILY_LIMIT)
 
 
 def _resets(db, firm_id, now) -> str:
-    return f"resets {limits.resets_at_text(db, firm_id, now)}"
+    """The second sentence of a daily limit's answer, in the firm's time zone: "It resets at 6:30 PM IST." (as
+    routes_applications.py)."""
+    return f"It resets at {limits.resets_at_text(db, firm_id, now)}."
 
 
 def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: str | None, principal: Principal) -> dict:
@@ -139,9 +142,11 @@ def _admit(db: DbSession, firm_id: uuid.UUID, candidate_id: uuid.UUID, place: st
     if limits.running_search(db, firm_id, candidate.id, now) is not None:
         raise HTTPException(status_code=409, detail="A search for this candidate is already running.")
     if limits.jobs_saved_today(db, firm_id, candidate.id, now) >= limits.JOBS_PER_CANDIDATE_PER_DAY:
-        raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today; {_resets(db, firm_id, now)}.")
+        raise _too_many(f"{limits.JOBS_PER_CANDIDATE_PER_DAY} jobs saved for this candidate today, the most for one "
+                        f"day. {_resets(db, firm_id, now)}")
     if limits.attempts_today(db, firm_id, principal.user_id, now) >= limits.ATTEMPTS_PER_BDE_PER_DAY:
-        raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today; {_resets(db, firm_id, now)}.")
+        raise _too_many(f"You've run {limits.ATTEMPTS_PER_BDE_PER_DAY} searches today, the most for one day. "
+                        f"{_resets(db, firm_id, now)}")
     # One click asks every source the place's mode names (decided 2026-11-17, Q90, Q122): no source picker.
     provider_name = pipeline.ALL_SOURCES
     # The role's titles, searched together (decided 2026-11-16, Q69): "A | B" is two, "GenAI / LLM Engineer" two more.
@@ -194,7 +199,7 @@ async def start_search(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: Search
         await run_in_threadpool(pipeline.discard_batch, db, firm_id, batch_id)
         if isinstance(error, JobAlreadyRunningError):
             raise HTTPException(status_code=409, detail="A search for this candidate is already running.") from None
-        raise HTTPException(status_code=503, detail="The search couldn't start; try again.") from None
+        raise Problem(503, "The search couldn't start; try again.", SEARCH_NOT_STARTED) from None
     await run_in_threadpool(_link_run, db, firm_id, batch_id, run_id)
     return {"batch_id": str(batch_id), "run_id": str(run_id)}
 
@@ -285,7 +290,8 @@ def capture_job(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: CaptureBody, 
 
     def under_the_cap():
         if limits.captures_today(db, firm_id, principal.user_id, now) >= limits.CAPTURES_PER_BDE_PER_DAY:
-            raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today; {_resets(db, firm_id, now)}.")
+            raise _too_many(f"You've captured {limits.CAPTURES_PER_BDE_PER_DAY} jobs today, the most for one day. "
+                            f"{_resets(db, firm_id, now)}")
     posting, created = pipeline.capture(db, firm_id=firm_id, candidate_id=candidate.id, user_id=principal.user_id,
                                         source=body.source, job=body.model_dump(exclude={"source"}),
                                         admit=under_the_cap)

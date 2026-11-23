@@ -269,11 +269,17 @@ def test_a_bde_with_five_running_waits_for_one(anonymous_client, test_db, world,
     assert r.status_code == 429 and "5 tailorings running" in r.json()["detail"]
 
 
-def test_a_tailor_not_set_up_is_a_500_naming_what_is_missing(anonymous_client, test_db, world, launched, setup):
+NOT_SET_UP = "The résumé tailor isn't set up yet. Ask your admin."
+
+
+def test_a_tailor_not_set_up_is_a_500_naming_what_is_missing_in_the_log(anonymous_client, test_db, world, launched,
+                                                                        setup, log):
     from backend.tests.ai_support import set_up_ai
     set_up_ai(test_db, key="")
     r = _start(anonymous_client, world, setup)
-    assert r.status_code == 500 and "API key" in r.json()["detail"] and launched == []
+    body = r.json()
+    assert (r.status_code, body["code"], body["detail"]) == (500, "NOT_CONFIGURED", NOT_SET_UP) and launched == []
+    assert "API key" in log.getvalue()          # what is missing, for the admin; never in the answer
 
 
 # ── Lost runs and the heartbeat ──────────────────────────────────────────────

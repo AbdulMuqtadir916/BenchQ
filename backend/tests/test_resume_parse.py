@@ -19,6 +19,8 @@ RESUME_TEXT = ("Ravi Teja Kommineni\nSenior Java Full Stack Developer\nIrving, T
                "Experience: Capital Payments Inc., Senior Java Developer, Mar 2021 - Present")
 USER_MESSAGE_PDF = (pathlib.Path(__file__).parent / "fixtures/resume_parse/user_message_pdf.txt").read_text(encoding="utf-8")
 
+NOT_SET_UP = "The résumé reader isn't set up yet. Ask your admin."
+
 
 def _pdf(text: str, links: tuple[str, ...] = ()) -> bytes:
     """A one-page PDF with `text` on it and a link annotation per address, built by hand (no PDF library)."""
@@ -226,31 +228,33 @@ def test_16_and_18_the_format_and_the_rules_are_the_handoffs():
 
 
 @pytest.mark.asyncio
-async def test_11_no_key_stops_the_parse_and_never_borrows_another(test_db, model):
+async def test_11_no_key_stops_the_parse_and_never_borrows_another(test_db, model, log):
+    """The BDE reads what to do; what is missing is named in the log, for the admin (docs/02 §12)."""
     set_up_ai(test_db, key="")
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and "API key" in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and "API key" in log.getvalue()
     assert model == []
 
 
 @pytest.mark.asyncio
-async def test_11_no_model_stops_the_parse(test_db, model):
+async def test_11_no_model_stops_the_parse(test_db, model, log):
     edit_active(test_db, "resume_parse", model="")
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and "no active AI preset" in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP)
+    assert "no active AI preset" in log.getvalue()
     assert model == []
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prompt,value,named", [("parse", "Structure this résumé.", "{resume}"),
                                                 ("system", "", "system")])
-async def test_6_a_broken_prompt_is_a_500_and_the_model_is_never_called(test_db, model, prompt, value, named):
+async def test_6_a_broken_prompt_is_a_500_and_the_model_is_never_called(test_db, model, log, prompt, value, named):
     edit_active(test_db, "resume_parse", **{prompt: value})
     with pytest.raises(HTTPException) as refused:
         await _read(test_db)
-    assert refused.value.status_code == 500 and named in refused.value.detail
+    assert (refused.value.status_code, refused.value.detail) == (500, NOT_SET_UP) and named in log.getvalue()
     assert model == []
 
 
@@ -341,7 +345,7 @@ def test_who_may_read_a_resume(anonymous_client, test_db, accounts, model):
 
 
 @pytest.mark.parametrize("failure,status,detail", [
-    ("deadline", 504, "There was an issue while parsing your resume, please try again."),
+    ("deadline", 504, "The résumé reader took too long. Try again in a minute."),
     ("exhausted", 500, "The résumé reader didn't answer. Try again in a minute."),
     ("nonsense", 422, "Couldn't read this résumé. Try another file, or enter the details yourself.")])
 def test_a_failed_parse_is_a_clear_error_and_stores_nothing(anonymous_client, test_db, accounts, model, monkeypatch,

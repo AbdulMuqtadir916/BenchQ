@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { ErrorNote } from "@/components/app/error-note";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
 import { cn } from "@/lib/cn";
 
 /**
@@ -35,8 +37,8 @@ export function AdminDialog({
   tone?: "primary" | "danger";
   isPending?: boolean;
   canConfirm?: boolean;
-  /** The write's failure, shown above the buttons. */
-  error?: string | null;
+  /** The write's failure, shown above the buttons: `errorMessage(mutation.error)`, or the dialog's own words. */
+  error?: ErrorText | string | null;
   onConfirm: () => void;
   wide?: boolean;
 }) {
@@ -76,9 +78,7 @@ export function AdminDialog({
         <h2 id={titleId} className="text-h3 text-[var(--color-text)]">{title}</h2>
         {description ? <div id={bodyId} className="mt-2 space-y-2 text-sm text-[var(--color-text-2)]">{description}</div> : null}
         {children ? <div className="mt-4 space-y-4">{children}</div> : null}
-        {error ? (
-          <p role="alert" className="mt-3 text-sm text-[var(--color-danger-fg)]">{error}</p>
-        ) : null}
+        <ErrorNote text={error} className="mt-3" />
         <div className="mt-5 flex justify-end gap-2">
           <Button ref={cancelRef} type="button" variant="secondary" onClick={onClose} disabled={isPending}>
             Cancel
@@ -141,8 +141,8 @@ export const fieldAria = (id: string, error?: string | null, hasHint = false) =>
   "aria-describedby": error ? `${id}-error` : hasHint ? `${id}-hint` : undefined,
 });
 
-/** The message of a failed write, for the dialog. */
-export function errorMessage(error: unknown): string | null {
+/** What a failed write says, for the dialog or an `ErrorNote` (src/lib/api/error-text.ts picks it). */
+export function errorMessage(error: unknown): ErrorText | null {
   if (!error) return null;
-  return error instanceof Error && error.message ? error.message : "That didn't work. Try again.";
+  return describeError(error, { fallback: "That didn't work. Try again." });
 }

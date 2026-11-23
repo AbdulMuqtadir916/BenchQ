@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { useSaveAiLimits } from "@/lib/hooks/use-ai-presets";
 import type { AiSetup } from "@/lib/schemas/ai-presets";
 import { Field, errorMessage, fieldAria } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 
 const parseLimit = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN);
 const isLimit = (value: number) => Number.isInteger(value) && value >= 1 && value <= 200;
@@ -33,7 +34,7 @@ export function LimitsCard({ limits, canEdit }: { limits: AiSetup["limits"]; can
           </Field>
         </div>
         {!isValid ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">Enter a whole number from 1 to 200.</p> : null}
-        {save.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(save.error)}</p> : null}
+        <ErrorNote text={errorMessage(save.error)} />
         {canEdit ? <Button disabled={!isValid || !isChanged || save.isPending} onClick={() => save.mutate(next)}>{save.isPending ? "Saving…" : "Save limits"}</Button> : null}
       </div>
     </SectionCard>

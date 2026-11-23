@@ -171,8 +171,10 @@ export function BdeDashboard() {
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
               {queue.map(({ job, score, note }) => (
-                <li key={job.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-surface-2)]">
-                  <div className="min-w-0 flex-1">
+                // Wraps so the Tailor note (an item of this row, docs: TailorButton "icon") takes its own line below
+                // it. gap-x-1 between the actions, me-2 after the title and the score keep the old gap-3 spacing.
+                <li key={job.id} className="flex flex-wrap items-center gap-x-1 gap-y-1 px-4 py-3 hover:bg-[var(--color-surface-2)]">
+                  <div className="me-2 min-w-0 flex-1">
                     <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })} className="text-body-strong truncate hover:underline block">
                       {job.title}
                     </Link>
@@ -181,16 +183,14 @@ export function BdeDashboard() {
                       <Tag tone="neutral">{job.remoteMode}</Tag>
                     </div>
                   </div>
-                  {score !== null ? <MatchScore score={score} note={note} className="hidden sm:flex" /> : null}
-                  <div className="flex shrink-0 items-center gap-1">
-                    {topCandidate ? <TailorButton candidate={topCandidate} job={job} variant="icon" /> : null}
-                    <Button asChild variant="ghost" size="icon" aria-label="Mark applied">
-                      <Link href={toHref("jobs.detail", { id: job.id }, { candidate: topCandidate?.id })}><Send size={15} aria-hidden /></Link>
-                    </Button>
-                    <Button asChild variant="ghost" size="icon" aria-label="Open outreach">
-                      <Link href={toHref("outreach")}><Mail size={15} aria-hidden /></Link>
-                    </Button>
-                  </div>
+                  {score !== null ? <MatchScore score={score} note={note} className="me-2 hidden sm:flex" /> : null}
+                  {/* Mark applied and Outreach go in Tailor's group, before its note in the DOM: focus runs Tailor,
+                      picker, Mark applied, Outreach, then the note's Copy and links, as the eye reads it (WCAG 2.4.3). */}
+                  {topCandidate ? (
+                    <TailorButton candidate={topCandidate} job={job} variant="icon" trailing={<RowActions jobId={job.id} candidateId={topCandidate.id} />} />
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-1"><RowActions jobId={job.id} candidateId={undefined} /></div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -206,5 +206,20 @@ export function BdeDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/** A queue row's actions after Tailor: Mark applied (the job's page for this candidate) and Outreach. */
+function RowActions({ jobId, candidateId }: { jobId: string; candidateId: string | undefined }) {
+  const toHref = useHref();
+  return (
+    <>
+      <Button asChild variant="ghost" size="icon" aria-label="Mark applied">
+        <Link href={toHref("jobs.detail", { id: jobId }, { candidate: candidateId })}><Send size={15} aria-hidden /></Link>
+      </Button>
+      <Button asChild variant="ghost" size="icon" aria-label="Open outreach">
+        <Link href={toHref("outreach")}><Mail size={15} aria-hidden /></Link>
+      </Button>
+    </>
   );
 }

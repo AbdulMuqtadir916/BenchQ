@@ -17,6 +17,7 @@ import { queryGroup } from "@/lib/query/query-group";
 import { useHref } from "@/lib/routes/use-href";
 import { useShowToast } from "@/lib/stores/toast-store";
 import { AdminDialog, Field, errorMessage, fieldAria } from "../admin-dialog";
+import { ErrorNote } from "@/components/app/error-note";
 import { SlugField } from "../slug-field";
 import { TIMEZONES } from "../timezones";
 
@@ -81,7 +82,7 @@ export function CreateFirm() {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !document.querySelector("dialog[open]") && !create.isPending) cancel();
+      if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]") && !create.isPending) cancel();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -188,7 +189,7 @@ export function CreateFirm() {
             </div>
           </Card>
 
-          {create.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{errorMessage(create.error)}</p> : null}
+          {create.isError ? <ErrorNote text={errorMessage(create.error)} /> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={cancel} disabled={create.isPending}>Cancel</Button>
             <Button type="submit" disabled={create.isPending || create.isSuccess || activePlans.length === 0}>{create.isPending || create.isSuccess ? "Creating…" : "Create firm and send invite"}</Button>

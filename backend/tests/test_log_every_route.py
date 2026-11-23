@@ -22,6 +22,7 @@ from sqlalchemy import text as sql_text
 
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.tests.log_leak_cases as leak_cases
+from backend.tests.problem_support import LEFTOVER_DEFAULT_CODES, LEFTOVER_SHAPE, assert_problem
 from backend.tests.route_sweep import build_request, seed_every_table, stub_outside
 from backend.tests.test_logging_canary import MARKERS
 
@@ -172,6 +173,10 @@ def test_no_route_writes_planted_values_to_the_log(route, swept, api_client, tes
     else:
         assert not leaked, f"{route} wrote planted values to the log: {leaked}\n{log.getvalue()[-3000:]}"
     reached = response.status_code < 400
+    # The same requests check the error body (docs/team/uzair.md step 4b): every error a route answers is one Problem
+    # Details body with a registered code, but the leftovers' hand-built ones (problem_support.LEFTOVER_SHAPE).
+    if not reached and route not in LEFTOVER_SHAPE and response.status_code != 303:
+        assert_problem(response, route)
     if route in NOT_REACHED:
         assert not reached, f"{route} gets through now: remove it from NOT_REACHED"
     else:
@@ -187,8 +192,10 @@ def test_every_table_is_seeded(swept):
 
 
 def test_the_list_names_only_routes_that_exist():
-    stale = sorted((set(NOT_REACHED) | set(KNOWN_LEAKS)) - set(_routes(backend.main.app)))
-    assert not stale, f"these routes no longer exist; remove them from NOT_REACHED or KNOWN_LEAKS: {stale}"
+    stale = sorted((set(NOT_REACHED) | set(KNOWN_LEAKS) | LEFTOVER_SHAPE | LEFTOVER_DEFAULT_CODES)
+                   - set(_routes(backend.main.app)))
+    assert not stale, (f"these routes no longer exist; remove them from NOT_REACHED, KNOWN_LEAKS or "
+                       f"problem_support's leftover lists: {stale}")
 
 
 # ── The check, measured against log_leak_cases.py ─────────────────────────

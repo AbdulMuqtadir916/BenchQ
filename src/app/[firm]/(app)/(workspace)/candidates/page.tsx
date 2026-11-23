@@ -23,6 +23,7 @@ import { useCandidates } from "@/lib/hooks/use-candidates";
 import { newCandidateBlockReason } from "@/lib/derive/platform";
 import { useApplications } from "@/lib/hooks/use-applications";
 import { useTeam } from "@/lib/hooks/use-team";
+import { describeError } from "@/lib/api/error-text";
 import { can, hasOwnScope, hasTeamScope, scopeCandidates, scopeTeam } from "@/lib/auth/permissions";
 import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { deriveCandidateStats } from "@/lib/derive";
@@ -315,8 +316,10 @@ function CandidatesList() {
  */
 function NewCandidateAction({ href }: { href: string }) {
   const teamQuery = useTeam();
-  const reason = teamQuery.isError
-    ? "Could not load the team."
+  // A system error (busy, offline, out of date) reads as everywhere else; any other keeps this screen's words.
+  const failure = teamQuery.error ? describeError(teamQuery.error, { screenText: () => "Could not load the team." }) : null;
+  const reason = failure
+    ? failure.message
     : !teamQuery.data
       ? "Loading the team…"
       : newCandidateBlockReason(teamQuery.data);
@@ -330,7 +333,7 @@ function NewCandidateAction({ href }: { href: string }) {
   return (
     <>
       <span id="new-candidate-blocked" className="text-sm text-[var(--color-text-2)]">{reason}</span>
-      {teamQuery.isError ? <Button variant="secondary" onClick={() => void teamQuery.refetch()}>Retry</Button> : null}
+      {failure?.canRetry ? <Button variant="secondary" onClick={() => void teamQuery.refetch()}>Retry</Button> : null}
       <Button disabled aria-describedby="new-candidate-blocked"><Plus size={14} aria-hidden />New candidate</Button>
     </>
   );

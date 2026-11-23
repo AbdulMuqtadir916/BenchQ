@@ -46,6 +46,8 @@ import { useHref } from "@/lib/routes/use-href";
 import { useJobMarks, useToggleJobMark } from "@/lib/hooks/use-job-marks";
 import { savedJobKey, usePendingSavedJobs, useToggleSavedJob } from "@/lib/hooks/use-applications";
 import { ApiError } from "@/lib/api/client";
+import { describeError } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import { jobLocation } from "@/lib/format/job";
 import { SourcePreview } from "@/components/app/jobs/source-preview";
 
@@ -223,9 +225,9 @@ export function JobExplorer({
   // A save error belongs to the candidate it was for: another candidate in context never shows it.
   const failedFor = toggleSavedJob.variables && ("save" in toggleSavedJob.variables ? toggleSavedJob.variables.save.candidateId : toggleSavedJob.variables.unsave.candidateId);
   const saveError = toggleSavedJob.error && failedFor === context?.id
-    ? toggleSavedJob.error instanceof ApiError && toggleSavedJob.error.status === 404
-      ? `This job is not in ${context?.fullName ?? "this candidate"}'s job list, so it can't be saved for them yet.`
-      : toggleSavedJob.error.message
+    ? describeError(toggleSavedJob.error, {
+      screenText: (e) => (e instanceof ApiError && e.status === 404 ? `This job is not in ${context?.fullName ?? "this candidate"}'s job list, so it can't be saved for them yet.` : null),
+    })
     : null;
   const activeFilterCount = [remote !== "ALL", Number(scoreFloor) > 0, Boolean(query)].filter(Boolean).length;
 
@@ -308,7 +310,7 @@ export function JobExplorer({
         </div>
       ) : null}
 
-      {saveError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{saveError}</p> : null}
+      <ErrorNote text={saveError} />
 
       <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)] lg:grid lg:h-[calc(100dvh-260px)] lg:min-h-[510px] lg:grid-cols-[minmax(350px,42%)_minmax(0,1fr)]">
         <div className="min-h-[360px] border-b border-[var(--color-border)] lg:min-h-0 lg:border-b-0 lg:border-r">
@@ -472,6 +474,8 @@ function JobDetailHeader({
   const principal = useSignedInPrincipal();
   const canTailor = context ? canManageResume(principal, context) : false;
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl ?? toHref("jobs.detail", { id: job.id }, { candidate: context?.id });
+  const openSource = <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>{openSourceLabel(portalForJob(job))}<ExternalLink size={13} /></a></Button>;
+  const more = <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>;
   return (
     <div className="relative border-b border-[var(--color-border)]">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5">
@@ -487,11 +491,19 @@ function JobDetailHeader({
             {job.rateMax ? <><span>·</span><span className="font-mono">${job.rateMin}–{job.rateMax}/hr</span></> : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>{openSourceLabel(portalForJob(job))}<ExternalLink size={13} /></a></Button>
-          {context && canTailor ? <TailorButton candidate={context} job={job} /> : <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id }, { candidate: context?.id })}>View details<ArrowUpRight size={13} /></Link></Button>}
-          <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>
-        </div>
+        {/* One group that wraps (never wider than the card), Open source and More in the Tailor button's own line, its
+            note under them all; DOM order is the visual order. `align="start"`: once the header wraps (1024, 390) the
+            group sits at the line's start, so the note reads from the same edge; at 1440 the group is pushed to the end
+            but is one line as wide as the note, whose text then starts under its first action. */}
+        {context && canTailor ? (
+          <TailorButton candidate={context} job={job} align="start" leading={openSource} trailing={more} />
+        ) : (
+          <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
+            {openSource}
+            <Button asChild size="sm"><Link href={toHref("jobs.detail", { id: job.id }, { candidate: context?.id })}>View details<ArrowUpRight size={13} /></Link></Button>
+            {more}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-2.5">

@@ -200,7 +200,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </Card>
 
           {linkedId && context && canManageResume(principal, context) ? (
-            <Card><TailorButton candidate={context} job={job} className="items-stretch" /></Card>
+            <Card><TailorButton candidate={context} job={job} align="start" /></Card>
           ) : !linkedId && canAct ? (
             // Opened for no candidate (⌘K, "All candidates"): which candidate's résumé is unknown (part 3 R2-Q6).
             <p className="text-caption text-[var(--color-text-3)]">Open this job from a candidate to tailor their résumé.</p>

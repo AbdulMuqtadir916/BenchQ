@@ -23,6 +23,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import load_only
 
+from backend.problem import DUPLICATE_RESUME, Problem
 from backend.auth import ledger
 from backend.auth.policy import is_lead_role
 from backend.auth.scoping import scoped
@@ -499,8 +500,7 @@ def already_uploaded(db, candidate, parse_row: ResumeParse) -> HTTPException | N
         message = f"This résumé is Base {number} (hidden). Show it again?"
     else:
         message = f"This résumé is already Base {number}."
-    return HTTPException(status_code=409, detail={"message": message, "base_resume_id": str(base.id),
-                                                  "hidden": base.archived_at is not None})
+    return Problem(409, message, DUPLICATE_RESUME, base_resume_id=str(base.id), hidden=base.archived_at is not None)
 
 
 def upload_base(db, actor: User, candidate, parse_row: ResumeParse) -> BaseResume:
