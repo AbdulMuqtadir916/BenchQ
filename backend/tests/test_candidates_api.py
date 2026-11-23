@@ -42,6 +42,8 @@ def _body(world, manager="fatima", bde=None, **over):
     return {"full_name": "Ravi Teja", "primary_role": "Java Developer", "email": "Ravi@Example.com", "work_auth": "H1B",
             "phone": "+1 555 0100", "country": "US", "years_experience": 9, "needs_sponsorship": True,
             "needs_transfer": True, "target_roles": ["Java Developer"],
+            # A place for the job search (decided 2026-11-14: the résumé's city and state, or a preferred location).
+            "preferred_locations": ["Austin, TX"],
             "employment_types": ["C2C"], "manager_id": str(people[manager].id),
             "bde_id": str(people[bde].id) if bde else None, "skills": [{"name": "Java"}],
             "summary": "Nine years of Java.", **over}
@@ -166,14 +168,36 @@ def test_a_create_without_a_mandatory_field_is_refused_naming_the_field(anonymou
     r = anonymous_client.post(f"/api/firms/{world['firm'].id}/candidates", json=_without(world, field),
                               headers=world["as"]["owner"])
     assert r.status_code == 422
-    assert [e["loc"][-1] for e in r.json()["detail"]] == [field]
+    assert [e["loc"][-1] for e in r.json()["errors"]] == [field]
 
 
 @pytest.mark.parametrize("field,blank", [("full_name", "   "), ("primary_role", ""), ("phone", " "), ("country", ""),
                                          ("employment_types", []), ("target_roles", []), ("target_roles", ["  "])])
 def test_a_blank_or_empty_mandatory_field_is_refused(anonymous_client, world, field, blank):
     r = _create(anonymous_client, world, **{field: blank})
-    assert r.status_code == 422 and field in {part for e in r.json()["detail"] for part in e["loc"]}
+    assert r.status_code == 422 and field in {part for e in r.json()["errors"] for part in e["loc"]}
+
+
+def test_a_create_takes_one_target_role(anonymous_client, world):
+    """Decided 2026-11-14 (Q1, Q10): onboarding takes one target role; the job search looks for it."""
+    r = _create(anonymous_client, world, target_roles=["Java Developer", "Backend Engineer"])
+    assert r.status_code == 422 and "target_roles" in {part for e in r.json()["errors"] for part in e["loc"]}
+
+
+@pytest.mark.parametrize("place", [{"city": "Austin", "state": "TX", "preferred_locations": []},
+                                   {"city": None, "state": None, "preferred_locations": ["Dallas, TX"]},
+                                   {"city": None, "state": None, "preferred_locations": ["Remote"]}])
+def test_a_create_with_a_place_for_the_job_search_is_accepted(anonymous_client, world, place):
+    assert _create(anonymous_client, world, **place).status_code == 201
+
+
+@pytest.mark.parametrize("place", [{"city": None, "state": None, "preferred_locations": []},
+                                   {"city": "Austin", "state": None, "preferred_locations": []},   # a city alone
+                                   {"city": " ", "state": "TX", "preferred_locations": ["  "]}])
+def test_a_create_without_a_place_for_the_job_search_is_refused(anonymous_client, world, place):
+    """Decided 2026-11-14 (Q3, Q14): the city and state together, or a preferred location; else nothing to search."""
+    r = _create(anonymous_client, world, **place)
+    assert r.status_code == 400 and "the job search needs a place" in r.json()["detail"]
 
 
 @pytest.mark.parametrize("field", ["needs_sponsorship", "needs_transfer", "years_experience"])
@@ -193,7 +217,7 @@ def test_sponsorship_and_transfer_are_stored_as_sent_whatever_the_work_authoriza
 def test_a_new_work_authorization_in_an_edit_must_carry_both_values(anonymous_client, world):
     c = _create(anonymous_client, world, work_auth="GC", needs_sponsorship=False, needs_transfer=False, bde="adnan").json()
     url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
-    mine = world["as"]["fatima"]                 # the candidate's manager (07 Q56: the profile isn't the BDE's)
+    mine = world["as"]["adnan"]                  # the candidate's BDE (decided 2026-11-14, Q17)
     r = anonymous_client.patch(url, json={"work_auth": "H1B"}, headers=mine)
     assert r.status_code == 400 and "needs_sponsorship and needs_transfer" in r.json()["detail"]
     r = anonymous_client.patch(url, json={"work_auth": "H1B", "needs_sponsorship": True}, headers=mine)
@@ -300,19 +324,106 @@ def test_an_unchanged_assignment_writes_nothing(anonymous_client, test_db, world
 
 # ── Editing ──────────────────────────────────────────────────────────────────
 
-def test_the_owner_and_manager_edit_the_profile_and_the_bde_does_not(anonymous_client, world):
-    """07 Q56: the profile (submission facts) is the owner's and the candidate's manager's; the BDE edits résumés."""
-    mine = _create(anonymous_client, world, bde="adnan").json()
+def _patch(client, world, candidate, who, **changes):
+    return client.patch(f"/api/firms/{world['firm'].id}/candidates/{candidate['id']}", json=changes,
+                        headers=world["as"][who])
+
+
+def test_before_a_bde_is_assigned_the_owner_and_manager_edit_the_details(anonymous_client, world):
+    """Decided 2026-11-14 (Q17, reversing 07 Q56): the résumé rule (Q55)."""
+    queued = _create(anonymous_client, world).json()                                   # Fatima's, no BDE yet
     theirs = _create(anonymous_client, world, manager="priya", bde="vikram").json()
-    url = f"/api/firms/{world['firm'].id}/candidates"
-    r = anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85, "rate_min": 70}, headers=world["as"]["fatima"])
+    r = _patch(anonymous_client, world, queued, "fatima", rate_target=85, rate_min=70)
     assert (r.status_code, r.json()["rate_target"]) == (200, 85.0)
-    assert anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_min": 90},
-                                  headers=world["as"]["fatima"]).status_code == 400
-    assert anonymous_client.patch(f"{url}/{theirs['id']}", json={"rate_target": 85},
-                                  headers=world["as"]["fatima"]).status_code == 404     # another manager's candidate
-    assert anonymous_client.patch(f"{url}/{theirs['id']}", json={"rate_target": 86},
-                                  headers=world["as"]["owner"]).status_code == 200      # the owner: every candidate
-    for who in ("adnan", "rohan"):                                                     # the BDE, the viewer
-        assert anonymous_client.patch(f"{url}/{mine['id']}", json={"rate_target": 85},
-                                      headers=world["as"][who]).status_code == 403
+    assert _patch(anonymous_client, world, queued, "fatima", rate_min=90).status_code == 400
+    assert _patch(anonymous_client, world, queued, "owner", rate_target=86).status_code == 200
+    assert _patch(anonymous_client, world, theirs, "fatima", rate_target=85).status_code == 404   # another manager's
+    assert _patch(anonymous_client, world, queued, "adnan", rate_target=85).status_code == 404    # not his candidate
+    assert _patch(anonymous_client, world, queued, "rohan", rate_target=85).status_code == 403    # the viewer
+
+
+def test_once_a_bde_is_assigned_only_that_bde_edits_the_details(anonymous_client, world):
+    mine = _create(anonymous_client, world, bde="adnan").json()
+    r = _patch(anonymous_client, world, mine, "adnan", rate_target=85)
+    assert (r.status_code, r.json()["rate_target"]) == (200, 85.0)
+    for who in ("fatima", "owner"):                                                    # they view it now
+        r = _patch(anonymous_client, world, mine, who, rate_target=86)
+        assert r.status_code == 403 and "BDE edits their details" in r.json()["detail"]
+    assert _patch(anonymous_client, world, mine, "vikram", rate_target=86).status_code == 404    # another BDE
+    assert _patch(anonymous_client, world, mine, "rohan", rate_target=86).status_code == 403
+
+
+def test_the_details_are_every_onboarding_answer_not_on_the_resume(anonymous_client, world):
+    """Q18: role, years; work authorization; engagement, rates, availability; preferences; notes. The target role is
+    fixed (07 Q68): it keeps what onboarding saved."""
+    c = _create(anonymous_client, world, bde="adnan").json()
+    r = _patch(anonymous_client, world, c, "adnan", primary_role=" Senior Java Developer ",
+               years_experience=10, work_settings=["REMOTE", "REMOTE", "HYBRID"],
+               preferred_locations=[" Dallas, TX ", "", "Dallas, TX", "Remote"], willing_to_relocate=True,
+               preferred_industries=["Banking", " "], deal_breakers=["No travel"], contact_notes="  Calls after 6.  ",
+               employment_types=["W2"], notice_period_days=14)
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert (got["primary_role"], got["target_roles"], got["years_experience"]) == ("Senior Java Developer",
+                                                                                  c["target_roles"], 10)
+    assert (got["work_settings"], got["preferred_locations"]) == (["REMOTE", "HYBRID"], ["Dallas, TX", "Remote"])
+    assert (got["preferred_industries"], got["deal_breakers"], got["contact_notes"]) == (["Banking"], ["No travel"],
+                                                                                         "Calls after 6.")
+    assert (got["employment_types"], got["notice_period_days"], got["willing_to_relocate"]) == (["W2"], 14, True)
+    assert _patch(anonymous_client, world, c, "adnan", contact_notes=None).json()["contact_notes"] is None
+
+
+@pytest.mark.parametrize("changes,status", [({"employment_types": []}, 422), ({"primary_role": "  "}, 422),
+                                            ({"primary_role": None}, 400), ({"years_experience": None}, 400),
+                                            ({"preferred_locations": None}, 400), ({"work_settings": None}, 400)])
+def test_an_edit_follows_onboardings_rules(anonymous_client, world, changes, status):
+    """Q20: at least one engagement type, nothing required emptied."""
+    c = _create(anonymous_client, world, bde="adnan").json()
+    assert _patch(anonymous_client, world, c, "adnan", **changes).status_code == status
+
+
+def test_an_edit_keeps_a_place_for_the_job_search(anonymous_client, world):
+    """Q20: the résumé's city and state together, or a preferred location, after the edit."""
+    only_preferred = _create(anonymous_client, world, bde="adnan", city=None, state=None).json()
+    r = _patch(anonymous_client, world, only_preferred, "adnan", preferred_locations=[" "])
+    assert r.status_code == 400 and "the job search needs a place" in r.json()["detail"]
+    with_home = _create(anonymous_client, world, bde="adnan", city="Austin", state="TX").json()
+    r = _patch(anonymous_client, world, with_home, "adnan", preferred_locations=[])
+    assert (r.status_code, r.json()["preferred_locations"]) == (200, [])
+
+
+def test_the_ledger_names_what_changed(anonymous_client, world, test_db):
+    """One UPDATE entry naming the fields that changed; nothing changed, no entry."""
+    from backend.models.tenancy import ActivityEntry
+    c = _create(anonymous_client, world, bde="adnan", rate_target=80).json()
+    r = _patch(anonymous_client, world, c, "adnan", rate_target=80, notice_period_days=7)
+    assert r.status_code == 200, r.text
+    entry = (test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "UPDATE")
+             .one())
+    assert entry.summary == "Updated notice period days"                                # the rate didn't change
+    _patch(anonymous_client, world, c, "adnan", rate_target=80)
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "UPDATE").count() == 1
+
+
+@pytest.mark.parametrize("fixed", [{"target_roles": ["Data Engineer"]}, {"search_titles": ["AI Engineer"]},
+                                   {"full_name": "Someone Else"}, {"email": "someone@example.com"}])
+def test_the_name_email_target_role_and_search_titles_are_fixed(anonymous_client, world, fixed):
+    """07 Q68 (2026-11-18): fixed once the candidate is added, for everyone: an edit that sends one is refused."""
+    c = _create(anonymous_client, world, bde="adnan").json()
+    assert _patch(anonymous_client, world, c, "adnan", **fixed).status_code == 422
+    assert _patch(anonymous_client, world, c, "adnan", **fixed, contact_notes="x").status_code == 422   # nothing kept
+
+
+def test_a_bde_holds_at_most_three_candidates(anonymous_client, world, test_db):
+    """07 Q70 (2026-11-18): every candidate assigned to the BDE counts, a placed one too, until it is moved."""
+    from backend.models.candidates import Candidate
+    held = [_create(anonymous_client, world, bde="adnan").json() for _ in range(3)]
+    test_db.get(Candidate, held[0]["id"]).status = "PLACED"                        # still holds a slot
+    test_db.commit()
+    r = _create(anonymous_client, world, bde="adnan")
+    assert (r.status_code, r.json()["detail"]) == (409, "This BDE has 3 candidates.")
+    queued = _create(anonymous_client, world).json()                                # the manager's queue: fine
+    r = _assign(anonymous_client, world, "owner", queued, "fatima", bde="adnan")
+    assert (r.status_code, r.json()["detail"]) == (409, "This BDE has 3 candidates.")
+    assert _assign(anonymous_client, world, "owner", held[1], "fatima", bde="sneha").status_code == 200   # moved away
+    assert _assign(anonymous_client, world, "owner", queued, "fatima", bde="adnan").status_code == 200    # the slot's free

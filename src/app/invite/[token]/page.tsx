@@ -7,9 +7,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorNote } from "@/components/app/error-note";
 import { ErrorState } from "@/components/app/error-state";
 import { PageTransition } from "@/components/layout/page-transition";
 import { ApiError } from "@/lib/api/client";
+import { describeError } from "@/lib/api/error-text";
 import type { InviteLookup } from "@/lib/api/invites";
 import { useAcceptInvite, useInviteLookup } from "@/lib/hooks/use-invite";
 import { useSignOut } from "@/lib/hooks/use-session";
@@ -102,7 +104,8 @@ function AcceptForm({ token, invite }: { token: string; invite: InviteDetails })
   const nameError = isSubmitted && !name.trim() ? "Enter your name." : null;
   const passwordError = isSubmitted && password.length < MIN_PASSWORD ? `Use at least ${MIN_PASSWORD} characters.` : null;
   const isBusy = accept.isPending || accept.isSuccess;
-  const failure = accept.isError ? (accept.error instanceof ApiError ? accept.error.message : "Couldn't accept the invite right now. Try again.") : null;
+  // A backend refusal keeps its words; a failure that isn't the backend's answer reads as a plain "try again".
+  const failure = accept.isError ? describeError(accept.error, { screenText: (e) => (e instanceof ApiError ? null : "Couldn't accept the invite right now. Try again.") }) : null;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -157,7 +160,7 @@ function AcceptForm({ token, invite }: { token: string; invite: InviteDetails })
             {passwordError ?? `At least ${MIN_PASSWORD} characters.`}
           </p>
         </div>
-        {failure ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{failure}</p> : null}
+        <ErrorNote text={failure} />
         <Button type="submit" className="bq-primary w-full" disabled={isBusy}>
           {isBusy ? "Joining…" : "Accept and join"}
         </Button>
@@ -175,7 +178,7 @@ function SignOutFirst({ signedInAs, email }: { signedInAs: string; email: string
         You&apos;re signed in as {signedInAs} in this browser. This invite is for <strong>{email}</strong>: sign out to accept it, or
         send the link to that person to open in their own browser.
       </p>
-      {signOut.isError ? <p role="alert" className="text-sm text-[var(--color-danger-fg)]">Couldn&apos;t sign out right now. Try again.</p> : null}
+      <ErrorNote text={signOut.error ? describeError(signOut.error, { screenText: () => "Couldn't sign out right now. Try again." }) : null} />
       <Button type="button" className="w-full" onClick={() => signOut.mutate()} disabled={signOut.isPending}>
         <LogOut size={14} aria-hidden /> {signOut.isPending ? "Signing out…" : "Sign out to accept"}
       </Button>

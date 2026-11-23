@@ -23,9 +23,12 @@ def _number(value: Decimal | None) -> float | None:
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def candidate_json(c: Candidate) -> dict:
+def candidate_json(c: Candidate, principal=None) -> dict:
+    """The candidate as the API sends it. The extra search titles only to whoever may see them (07 Q68): without a
+    principal, or for one who can't, the key is left out."""
+    from backend.auth.policy import can
     email = (c.email or "").strip().lower()
-    return {
+    out = {
         "id": str(c.id), "firm_id": str(c.firm_id),
         "manager_id": str(c.manager_id), "bde_id": str(c.bde_id) if c.bde_id else None,
         "full_name": c.full_name or "", "email": email if _EMAIL.match(email) else None, "phone": c.phone,
@@ -42,3 +45,6 @@ def candidate_json(c: Candidate) -> dict:
         "deal_breakers": list(c.deal_breakers or []),
         "created_at": _iso(c.created_at), "updated_at": _iso(c.updated_at),
     }
+    if principal is not None and can(principal, "candidate.viewSearchTitles"):
+        out["search_titles"] = list(c.search_titles or [])     # the active base's v1 (decided 2026-11-17)
+    return out

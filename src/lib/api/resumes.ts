@@ -95,7 +95,7 @@ const live = {
       const answer = await http.postForm(`${candidatePath(firmId, candidateId)}/upload`, Uploaded, form);
       return { restored: answer.restored, fileName: file.name };
     } catch (error) {
-      const base = error instanceof ApiError && error.status === 409 ? error.details?.base_resume_id : undefined;
+      const base = error instanceof ApiError && error.status === 409 ? error.details?.baseResumeId : undefined;
       if (error instanceof ApiError && typeof base === "string") throw new DuplicateUploadError(error.message, fromBackendId(base), error.details?.hidden === true);
       throw error;
     }

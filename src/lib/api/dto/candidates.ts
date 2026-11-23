@@ -47,6 +47,7 @@ export const CandidateDto = z.object({
   contact_notes: z.string().nullable(),
   preferred_industries: z.array(z.string()),
   deal_breakers: z.array(z.string()),
+  search_titles: z.array(z.string()).optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -95,6 +96,7 @@ export function toCandidate(dto: CandidateDto): Candidate {
     contactNotes: dto.contact_notes,
     preferredIndustries: dto.preferred_industries,
     dealBreakers: dto.deal_breakers,
+    searchTitles: dto.search_titles ?? [],
     // The backend has no answer bank on the candidate since migration 0019 (each résumé version holds its own
     // `autofill`). The Documents tab's Screening answers panel shows its empty state until that section is removed
     // (planned, docs/team/abdul.md §3).
@@ -144,10 +146,12 @@ export function toBackendCreateCandidate(body: CreateCandidate) {
 /** `UpdateCandidate` → UpdateCandidateBody: only the fields being changed (the backend reads unset as "leave it"). */
 export function toBackendUpdateCandidate(patch: UpdateCandidate) {
   const names: Record<keyof UpdateCandidate, string> = {
+    primaryRole: "primary_role", yearsExperience: "years_experience",
     workAuth: "work_auth", needsSponsorship: "needs_sponsorship", needsTransfer: "needs_transfer",
     workAuthExpiry: "work_auth_expiry", rateTarget: "rate_target", rateMin: "rate_min",
     availableFrom: "available_from", noticePeriodDays: "notice_period_days", willingToRelocate: "willing_to_relocate",
-    employmentTypes: "employment_types",
+    employmentTypes: "employment_types", workSettings: "work_settings", preferredLocations: "preferred_locations",
+    preferredIndustries: "preferred_industries", dealBreakers: "deal_breakers", contactNotes: "contact_notes",
   };
   return Object.fromEntries((Object.keys(patch) as (keyof UpdateCandidate)[]).map((key) => [names[key], patch[key]]));
 }

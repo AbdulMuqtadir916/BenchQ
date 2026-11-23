@@ -14,6 +14,8 @@ import { AgentRunPanel } from "@/components/app/ai";
 import { Button } from "@/components/ui/button";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/cn";
+import type { ErrorText } from "@/lib/api/error-text";
+import { ErrorReference } from "@/components/app/error-reference";
 import { STEP_LABELS, runFailure, startRefusal } from "./messages";
 import { readStored, writeStored } from "./stored";
 
@@ -51,7 +53,7 @@ function Panel() {
   // Each failed row's own retry: in progress, or why it was refused (Abdul's review, 2026-11-12: the row kept the old
   // reason when Try again was refused, e.g. with five running).
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [retryRefusals, setRetryRefusals] = useState<Record<string, string>>({});
+  const [retryRefusals, setRetryRefusals] = useState<Record<string, ErrorText>>({});
   const [dismissed, setDismissed] = useState<string[]>(() => readStored(DISMISSED_KEY, Dismissed));
   const [isHidden, setHidden] = useState<boolean>(() => readStored(HIDDEN_KEY, Folded));
   const [openId, setOpenId] = useState<string | null>(null);
@@ -115,7 +117,7 @@ function Panel() {
                     setRetryRefusals((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== run.runId)));
                     retry.mutateAsync({ candidateId: run.candidateId, jobId: run.jobId ?? "", resumeId: run.sourceResumeId ?? undefined }).then(
                       () => dismiss(run.runId),
-                      (error: unknown) => setRetryRefusals((all) => ({ ...all, [run.runId]: startRefusal(error).message })),
+                      (error: unknown) => setRetryRefusals((all) => ({ ...all, [run.runId]: startRefusal(error) })),
                     ).finally(() => setRetrying((current) => (current === run.runId ? null : current)));
                   }}
                   retryRefusal={retryRefusals[run.runId] ?? null}
@@ -132,7 +134,7 @@ function Panel() {
 /** One tailoring in the panel (exported for its test). */
 export function Row({ run, name, now, openHref, onOpenSteps, onRetry, retryRefusal, isRetrying, onDismiss }: {
   run: TailoringRun; name: string | null; now: number; openHref: string | null; onOpenSteps: () => void;
-  onRetry: () => void; retryRefusal: string | null; isRetrying: boolean; onDismiss: () => void;
+  onRetry: () => void; retryRefusal: ErrorText | null; isRetrying: boolean; onDismiss: () => void;
 }) {
   const failure = run.status === "failed" ? runFailure(run.errorCode) : null;
   const title = <span className="block truncate text-sm text-[var(--color-text)]">{run.jobTitle || "A job"}</span>;
@@ -151,7 +153,12 @@ export function Row({ run, name, now, openHref, onOpenSteps, onRetry, retryRefus
             ? <>{run.step ? STEP_LABELS[run.step] : "Waiting to start"} · <span className="tabular">{clock(seconds(run.startedAt, now))}</span></>
             : failure ? failure.message : "Tailored résumé ready."}
         </span>
-        {retryRefusal ? <span role="alert" className="block text-caption text-[var(--color-danger-fg)]">{`Not started again: ${retryRefusal}`}</span> : null}
+        {retryRefusal ? (
+          <span role="alert" className="block text-caption text-[var(--color-danger-fg)]">
+            {`Not started again: ${retryRefusal.message}`}
+            {retryRefusal.reference ? <ErrorReference reference={retryRefusal.reference} className="ml-1" /> : null}
+          </span>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {openHref ? <Button asChild size="sm" variant="secondary"><Link href={openHref}>Open</Link></Button> : null}

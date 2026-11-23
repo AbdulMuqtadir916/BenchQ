@@ -20,7 +20,7 @@ Backend only: the screen (PR 4) is unchanged, and the route stays `/ledger`. No 
 - **New table, `activity_logs`** (model `ActivityEntry`; `ActivityLog` stays the old system log, `activity_log_v2`).
   It has every `ledger_entries` column, plus: `on_behalf_of_user_id`, `actor_role`, `team_manager_id`,
   `candidate_manager_id`, `candidate_bde_id`, `changes`, `request_id`.
-- **Old data copied:** migration 0028 copies every `ledger_entries` row, with its id and date. Their stamps come from
+- **Old data copied:** migration 0033 copies every `ledger_entries` row, with its id and date. Their stamps come from
   today's roles and assignments. `ledger_entries` itself is left as it was; nothing writes or reads it now, and the demo
   reset only clears it. Removing it is Abdul's call. A downgrade puts new rows back into it.
 - **Can't be rewritten:** a database trigger refuses UPDATE and DELETE. The one way past it is the local demo reset, which
@@ -51,7 +51,7 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 | `backend/tests/test_activity_logs.py` | New: stamps, the trigger, each role, time-based history, filters, paging, people, candidates, the migration. |
 | `backend/tests/test_ledger_rules.py` | The rules now watch the new table, and nothing may use the old one but the demo reset. |
 | Other `backend/tests/*` | Read the new model's name. No expectation changed except the entry's shape. |
-| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0028, status. |
+| `docs/integration/01-ledger.md`, `docs/team/README.md`, `docs/team/umamah.md` | The new table, migration number 0033, status. |
 
 ## Brought up to date with main (2026-11-12)
 
@@ -62,9 +62,8 @@ Candidate data comes from `candidates` only; nothing here reads `personas`.
 - **A row not yet saved** has no page marker (`created_at` is empty until it is written).
 - **Main's tests** for job search, résumé versions, tailoring and the autofill screen read the entry from
   `activity_logs` (tailoring and autofill added 2026-11-14).
-- **`test_migration_0025.py`.** Its first test checks the newest migration (`head_revision()`, now 0028). Its refused
-  downgrade still expects 0026, as on main: the test moves the database down to 0026 first, and a refused downgrade
-  leaves it there.
+- **`test_migration_0025.py`.** No change: main's own version already checks the newest migration with
+  `head_revision()` (now 0033), and its refused downgrade still expects 0026.
 - **Capacity.** Main removed the capacity route (07 Q63), so its change here is gone.
 
 ## Review fixes (CodeRabbit and CodeAnt, 2026-11-14)
@@ -108,8 +107,8 @@ Each has a test in `test_activity_logs.py`:
 
 ## Migration number
 
-0028 (renumbered 2026-11-12, after main's 0024 to 0027 (#127, #129); it was 0016, following Zuhair's 0015, #112).
-If another PR takes 0028 first (Zuhair's ATS score module may), this becomes the next free number: rename the file,
+0033, after main's 0028 to 0032 (#150). It was 0016, then 0028 (2026-11-12, after #127 and #129), then 0033
+(2026-11-23). If another PR takes 0033 first, this becomes the next free number: rename the file,
 `revision` / `down_revision`, the number in the tests and the row in the team README. 0015 dropped the ledger's `claim_state` and `evidence_ids`, so `activity_logs`
 doesn't have them either.
 
@@ -117,3 +116,20 @@ doesn't have them either.
 
 Rows copied from the old ledger can't know the past: their stamps are today's assignments, as agreed, and they have no
 before/after. An old assignment is therefore not seen by the side it came from.
+
+## Up to date with main (2026-11-23)
+
+Main's #147 to #151 merged in. What changed here because of them:
+
+- **Migration 0033** (was 0028): main's 0028 to 0032 took the numbers. `down_revision` is 0032; the tests and docs
+  name 0033.
+- **Four of main's new tests read the log:** `test_ai_presets.py`, `test_candidates_api.py` (the edit entry),
+  `test_firm_work_hours.py` and `test_job_search_linkedin.py` now read `ActivityEntry`, as the other tests do since this
+  PR.
+- **Candidate edit and assignment** (`routes_candidates.py`): main now refuses an edit that isn't the BDE's, names only
+  the fields whose value changed, and restarts a new BDE's Days (`workday.assign`). The entry keeps its before and after
+  values on top of that.
+- **`test_migration_0025.py`** is main's again: main made it read `head_revision()` itself, so only this PR's
+  comments were left, and its row in `cross-area-changes.md` is gone.
+- **Résumé versions test:** main replaced the name test (07 Q68: the name and email stay the candidate's); it reads
+  `ActivityEntry`.

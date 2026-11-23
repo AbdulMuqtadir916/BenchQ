@@ -5,33 +5,11 @@ import secrets
 from backend.models.db import SessionLocal, Setting, Company, Search, Resume
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.analyzer.llm_client import REASONING_EFFORTS
-from backend.candidates import parse as resume_parse
-from backend.candidates.parse_defaults import (DEFAULT_PROMPT as RESUME_PARSE_PROMPT,
-                                               DEFAULT_RESPONSE_FORMAT as RESUME_PARSE_RESPONSE_FORMAT,
-                                               DEFAULT_SYSTEM_PROMPT as RESUME_PARSE_SYSTEM_PROMPT,
-                                               OLD_DEFAULT_PROMPT as OLD_RESUME_PARSE_PROMPT)
-from backend.resume_tailor import settings as resume_tailor_settings
 
 logger = logging.getLogger("jobnavigator.seed")
 
 
 DEFAULT_SETTINGS = {
-    # The new-candidate résumé parser (docs/team/resume-versioning.md §2.2), as an AI preset. Its own model, all three
-    # rows required: it never borrows the shared llm_* rows. The key is seeded empty and set on the settings page.
-    "resume_parse_system_prompt": (RESUME_PARSE_SYSTEM_PROMPT, "Résumé parser system prompt (new-candidate flow)."),
-    "resume_parse_prompt": (RESUME_PARSE_PROMPT, "Editable résumé parser prompt for the new-candidate flow. "
-                            "{input_note} (how the text was extracted) and {resume} (the fenced résumé) are filled in; "
-                            "{resume} is required."),
-    "resume_parse_response_format": (RESUME_PARSE_RESPONSE_FORMAT,
-                                     "The parser's strict response format (json_schema, strict: true), sent on every "
-                                     "parse. Its schema must require every section the parser stores."),
-    "resume_parse_llm_provider": ("openrouter", "Résumé parser provider (required; openrouter only)"),
-    "resume_parse_llm_model": ("openai/gpt-6-luna", "Résumé parser model (required)"),
-    "resume_parse_llm_api_key": ("", "OpenRouter API key for the résumé parser (required; until set, every parse "
-                                 "fails naming this row)"),
-    # The résumé tailor (docs/team/tailoring.md), as an AI preset like the parser: its own model (three rows, all
-    # required, the key seeded empty), its nine prompts and four strict response formats.
-    **resume_tailor_settings.DEFAULT_SETTINGS,
     "fit_score_threshold": ("60", "Minimum fit score to trigger Telegram alert"),
     "scrape_interval_minutes": ("60", "How often the job checker runs"),
     "email_check_interval_minutes": ("30", "How often Gmail is polled"),
@@ -65,17 +43,14 @@ DEFAULT_SETTINGS = {
     "scoring_rubric": ("Score each resume using these criteria (each 0-20, sum to 0-100):\n1. SKILLS MATCH (weight: 20): How many required technical skills/tools does the candidate have?\n2. EXPERIENCE LEVEL (weight: 20): Does seniority/years match? (entry-level resume for senior role = low)\n3. DOMAIN FIT (weight: 20): Has the candidate worked in the same industry/domain?\n4. ROLE ALIGNMENT (weight: 20): Does the candidate's career trajectory match this role type?\n5. REQUIREMENTS MET (weight: 20): Does the candidate meet stated requirements (education, certs, clearance)?\n\nUse the FULL 0-100 range. 90+ = perfect match. 50-70 = decent with gaps. Below 30 = poor match.\nAvoid clustering scores — differentiate meaningfully between resumes and jobs.", "Editable resume scoring rubric"),
     "scoring_output_light": ('Return ONLY this JSON:\n{\n  "scores": {CV_NAMES_HERE: 0-100},\n  "best_cv": "CV_NAME"\n}', "Light scoring output schema"),
     "scoring_output_full": ('Return ONLY this JSON:\n{\n  "scores": {CV_NAMES_HERE: 0-100},\n  "best_cv": "CV_NAME",\n  "breakdown": {"skills": 0-20, "experience": 0-20, "domain": 0-20, "role": 0-20, "requirements": 0-20},\n  "summary": "2-3 sentence assessment of candidate-job fit",\n  "requirement_mapping": [\n    {"requirement": "JD requirement text", "cv_match": "matching CV line or null", "matched": true/false, "severity": "required or preferred"}\n  ],\n  "keyword_coverage_pct": 0-100,\n  "matched_keywords": ["keyword1", "keyword2"],\n  "missing_keywords": ["keyword3", "keyword4"],\n  "hard_blockers": ["blocker if any"],\n  "ats_tip": "one actionable ATS optimization suggestion"\n}', "Full scoring output schema with keyword analysis"),
-    "llm_provider": ("claude_api", "LLM provider: claude_api, claude_code, codex_cli, antigravity_cli, openai, ollama, lmstudio, openrouter"),
-    "llm_model": ("claude-sonnet-5", "LLM model name"),
-    "llm_api_key": ("", "API key for API-backed providers (not needed for subscription CLIs or Ollama)"),
+    "llm_provider": ("openrouter", "LLM provider: claude_api, claude_code, codex_cli, antigravity_cli, openai, ollama, lmstudio, openrouter"),
+    "llm_model": ("anthropic/claude-sonnet-5", "The default model of older AI code outside the AI presets"),
     "llm_effort": ("", "Reasoning effort for the Primary model (empty = the model's default; values depend on the provider)"),
     "llm_fallback_provider": ("", "Fallback LLM provider (empty = no fallback)"),
     "llm_fallback_model": ("", "Fallback model name"),
-    "llm_fallback_api_key": ("", "API key for fallback provider (OpenAI)"),
     "llm_fallback_effort": ("", "Reasoning effort for the fallback model (empty = the model's default; values depend on the provider)"),
     "scoring_llm_provider": ("", "Resume scoring provider override (empty = use Primary)"),
     "scoring_llm_model": ("", "Resume scoring model override (empty = use Primary)"),
-    "scoring_llm_api_key": ("", "API key for the scoring provider override"),
     "scoring_llm_effort": ("", "Reasoning effort for the scoring override (empty = the Primary's on the same provider, else the model's default)"),
     "llm_models_list": (json.dumps([
         {"provider": "claude_api", "model": "claude-sonnet-5"},
@@ -159,6 +134,7 @@ DEFAULT_SETTINGS = {
     ]), "Known LLM models per provider (JSON array, user can add custom entries)"),
     "scoring_max_concurrent": ("5", "Max parallel scoring jobs (others queue until a slot opens)"),
     "tailoring_max_concurrent": ("2", "Max concurrent cover-letter LLM calls (the old tailoring's gate)"),
+    "resume_parse_max_concurrent": ("10", "Max résumé parses running at once per backend process; more wait."),
     "resume_tailor_max_concurrent": ("40", "Max résumé tailorings running at once per backend worker; more queue. "
                                      "Keep it under the tailor's OpenRouter account rate limit (docs/team/tailoring.md)"),
     "tailor_auto_quick_score": ("light", "After tailoring finishes, auto-launch a score chain. Values: 'off' | 'light' | 'full'. Default 'light'. Legacy 'true'='light', 'false'='off'."),
@@ -171,7 +147,6 @@ DEFAULT_SETTINGS = {
     "email_llm_enabled": ("false", "Enable LLM second pass for ambiguous email classification"),
     "email_llm_provider": ("", "LLM provider for email classification (empty = use primary llm_provider)"),
     "email_llm_model": ("", "LLM model for email classification (empty = use primary llm_model)"),
-    "email_llm_api_key": ("", "API key for email LLM provider"),
     "email_llm_effort": ("", "Reasoning effort for email classification (empty = the Primary's on the same provider, else the model's default)"),
     "email_llm_confidence_threshold": ("70", "Min confidence (0-100) to auto-act on LLM email classification"),
     "email_llm_prompt": ("Classify this email and match it to one active application if possible.\n\nRules:\n- match_index: pick from the numbered applications below (1-based), or null if no match\n- status: one of: interview, offer, rejected, no_change\n- confidence: 0-100 how sure you are about classification AND match combined\n- summary: one sentence describing what the email is about\n\nActive applications:\n{applications}\n\nEmail:\nFrom: {from}\nSubject: {subject}\nBody:\n{body}\n\nReturn ONLY this JSON:\n{\"match_index\": null, \"status\": \"no_change\", \"confidence\": 0, \"summary\": \"\"}", "Editable email classification LLM prompt template"),
@@ -198,7 +173,6 @@ DEFAULT_SETTINGS = {
     ]), "Subject terms to exclude from Gmail search query"),
     "cover_letter_llm_provider": ("", "LLM provider for cover-letter generation (empty = use primary llm_provider)"),
     "cover_letter_llm_model": ("", "LLM model for cover-letter generation (empty = use primary llm_model)"),
-    "cover_letter_llm_api_key": ("", "API key for cover-letter LLM provider"),
     "cover_letter_llm_effort": ("", "Reasoning effort for cover-letter generation (empty = the Primary's on the same provider, else the model's default)"),
     "cover_letter_prompt": ("Write a cover letter for the candidate, targeting the job described below.\n\nGround everything in the candidate's resume (provided above) and the persona preferences. Do NOT invent experience, employers, titles, metrics, or skills the resume does not contain. Pull concrete achievements from the resume; reframe them toward what the job needs.\n\nStructure:\n- A short greeting line (use the recipient/company if known, else a neutral 'Dear Hiring Team,').\n- 3 body paragraphs: (1) a hook that connects the candidate to this specific role/company, (2) the strongest 2-3 proof points from the resume mapped to the job's needs, (3) a brief close on motivation/fit and a call to talk.\n- A closing line ('Sincerely,') and the candidate's name as signature.\n\nStyle:\n- {voice_instruction}\n- Length: {length_instruction}\n- First person. No corporate cliches, no 'I am writing to apply'. No em-dashes or unicode; ASCII only. Do NOT fabricate.\n\nJob:\n{job_description}\n\nReturn ONLY this JSON:\n{\"greeting\": \"Dear ...,\", \"body_paragraphs\": [\"...\", \"...\", \"...\"], \"closing\": \"Sincerely,\", \"signature\": \"Candidate Name\"}", "Editable cover-letter generation LLM prompt. Placeholders: {voice_instruction}, {length_instruction}, {job_description}."),
     "cover_letter_voice_presets": (json.dumps([
@@ -311,7 +285,7 @@ DEFAULT_SETTINGS = {
     "tracer_links_base_url": ("", "Public base URL for tracer links (e.g., https://yourdomain.com)"),
     "tracer_links_url_style": ("path", "URL format: path or param. Token: random or job_id. Combinations: path, param, path_jobid, param_jobid"),
     # Job search (backend/job_search/providers/): the source every firm's BDE searches; one of the registered providers.
-    "job_search_provider": ("freehire", "The job source a BDE's search uses, the same for every firm: one of the registered providers (backend/job_search/providers/)"),
+    "job_search_provider": ("indeed", "The job source a BDE's search uses, the same for every firm: one of the registered providers (backend/job_search/providers/)"),
     "dedup_tracking_params": (json.dumps([
         "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "mode",
         "src", "source", "ref", "refid", "refsrc", "refsource",
@@ -340,7 +314,6 @@ DEFAULT_SETTINGS = {
     ]), "URL query params stripped before dedup hashing — tracking/referral noise"),
     "autofill_llm_provider": ("", "LLM provider for application autofill (empty = use primary llm_provider)"),
     "autofill_llm_model": ("", "LLM model for application autofill (empty = use primary llm_model)"),
-    "autofill_llm_api_key": ("", "API key for the autofill LLM (empty = use the primary llm_api_key)"),
     "autofill_llm_effort": ("", "Reasoning effort for application autofill (empty = the Primary's on the same provider, else the model's default)"),
     "autofill_default_length": ("250", "Default target character length for autofill answers when a field has no maxlength"),
     "autofill_prompt": (
@@ -378,11 +351,6 @@ DEFAULT_SETTINGS = {
 # Settings the app writes at runtime but never seeds. PATCH /api/settings rejects
 # keys outside DEFAULT_SETTINGS, so these have to be listed explicitly.
 RUNTIME_SETTING_KEYS = {
-    "candidate_email_llm_provider",
-    "candidate_email_llm_model",
-    "candidate_email_llm_api_key",
-    "candidate_email_llm_effort",
-    "candidate_email_instructions",
 
     "gmail_processed_ids",   # email_monitor/gmail_client.py — processed-message dedup
     "gmail_refresh_token",   # Gmail OAuth setup (gmail_oauth_setup.py)
@@ -446,10 +414,6 @@ ENUM_SETTING_VALUES = {
     "email_llm_provider": _LLM_PROVIDERS,
     "cover_letter_llm_provider": _LLM_PROVIDERS,
     "autofill_llm_provider": _LLM_PROVIDERS,
-    # The parser sends a strict format and reasoning-off, which only its openrouter call carries.
-    "resume_parse_llm_provider": {"openrouter"},
-    # The tailor too (backend/resume_tailor/settings.py).
-    resume_tailor_settings.PROVIDER_ROW: {resume_tailor_settings.PROVIDER},
     "llm_effort": _EFFORTS,
     "llm_fallback_effort": _EFFORTS,
     "scoring_llm_effort": _EFFORTS,
@@ -518,7 +482,7 @@ def invalid_setting_values(updates: dict) -> list:
                 problems.append(f"{key}: must be one of {shown} (got {value!r})")
     # The parser's response format and prompt: a broken one would fail every parse (candidates/parse.py); the
     # tailor's prompts and formats would fail every tailoring (resume_tailor/settings.py).
-    return problems + resume_parse.setting_problems(updates) + resume_tailor_settings.setting_problems(updates)
+    return problems
 
 
 SEED_COMPANIES = [
@@ -557,7 +521,7 @@ def seed_settings(db):
         if key not in existing:
             db.add(Setting(key=key, value=value, description=desc))
     db.commit()
-    upgrade_resume_parse_prompt(db)
+    retire_job_search_provider(db)
     # One-shot: a DB that already holds a mock account keeps signing in with it;
     # every other DB starts on the personal account.
     if "linkedin_use_mock_account" not in existing:
@@ -573,16 +537,16 @@ def seed_settings(db):
         db.commit()
 
 
-def upgrade_resume_parse_prompt(db):
-    """Seeding never replaces a row, so a database seeded with the onboarding parser's prompt would keep it. Replace
-    it with the base-résumé parser's only while it is still that old default; an edited prompt is left alone (the
-    save check and the parse's own check name it if it lacks {resume}). Idempotent, so every worker may run it."""
-    row = db.query(Setting).filter(Setting.key == "resume_parse_prompt").first()
-    if row is not None and (row.value or "").strip() == OLD_RESUME_PARSE_PROMPT.strip():
-        row.value = RESUME_PARSE_PROMPT
-        row.description = DEFAULT_SETTINGS["resume_parse_prompt"][1]
+def retire_job_search_provider(db):
+    """Seeding never replaces a row, so a database that chose a source later retired would keep naming it (freehire.me
+    was retired 2026-11-14 and is back since 2026-11-16): searches already fall back to the default (`providers.active`), but the Settings page would show a
+    value it can't save back. A name that isn't a registered provider becomes the default. Idempotent."""
+    from backend.job_search.providers import DEFAULT_PROVIDER, REGISTRY
+    row = db.query(Setting).filter(Setting.key == "job_search_provider").first()
+    if row is not None and (row.value or "").strip() not in REGISTRY:
+        logger.info("job_search_provider %r is not a registered provider; set to %s", row.value, DEFAULT_PROVIDER)
+        row.value = DEFAULT_PROVIDER
         db.commit()
-        logger.info("resume_parse_prompt upgraded to the base-résumé parser's default")
 
 
 def seed_companies(db):
@@ -862,6 +826,8 @@ def run_seeds():
         # Schema changes are Alembic revisions now (backend/db_schema.py); this only seeds and
         # tidies data.
         seed_settings(db)
+        from backend.ai.store import seed_defaults as seed_ai_defaults
+        seed_ai_defaults(db)                # the provider row, default models and each use case's first preset
         migrate_dedup_tracking_params(db)
         migrate_autofill_dicts(db)
         seed_companies(db)

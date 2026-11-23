@@ -6,6 +6,7 @@ import { Play, Square } from "lucide-react";
 import { AgentRunPanel, TypewriterText } from "@/components/app/ai";
 import { DataTable } from "@/components/app/data-table";
 import { Button } from "@/components/ui/button";
+import { errorSentence } from "@/lib/api/error-text";
 import type { AgentRunStatus } from "@/components/app/ai";
 
 interface DemoRow {
@@ -101,7 +102,7 @@ export function StageOneShowcase() {
         return;
       }
       setStatus("fallback");
-      setDraft(error instanceof Error ? error.message : "Continue with the manual editor.");
+      setDraft(errorSentence(error, { fallback: "Continue with the manual editor." }));
     }
   }
 

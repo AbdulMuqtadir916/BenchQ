@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageTransition } from "@/components/layout/page-transition";
-import { ApiError } from "@/lib/api/client";
+import { INVALID_SIGN_IN as INVALID, signInError } from "@/lib/auth/sign-in-error";
+import { ErrorNote } from "@/components/app/error-note";
 import { GateSkeleton } from "@/components/routes/gate-screen";
 import { useCurrentSession, useSignIn } from "@/lib/hooks/use-session";
 import { safeReturnTo, signedInRedirect } from "@/lib/routes/landing";
@@ -42,17 +43,6 @@ function SignedOutOnly() {
 
   if (target) return <GateSkeleton label="Opening BenchQ" />;
   return <SignInForm />;
-}
-
-/** Any failed sign-in reads the same, so the page never reveals which emails have an account (docs/07 L1). */
-const INVALID = "Email or password is incorrect.";
-/** Locked out by the backend's throttle (429): trying again at once only keeps the lock, so say to wait. */
-const RATE_LIMITED = "Too many sign-in attempts. Wait a few minutes, then try again.";
-
-function signInError(error: Error): string {
-  if (!(error instanceof ApiError) || error.status === 401) return INVALID;
-  if (error.code === "RATE_LIMITED") return RATE_LIMITED;
-  return "Couldn't sign in right now. Try again.";
 }
 
 /**
@@ -97,7 +87,7 @@ function SignInForm() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              aria-invalid={error === INVALID || undefined}
+              aria-invalid={error?.message === INVALID || undefined}
               aria-describedby={error ? errorId : undefined}
               className="bq-input"
             />
@@ -114,16 +104,12 @@ function SignInForm() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
-              aria-invalid={error === INVALID || undefined}
+              aria-invalid={error?.message === INVALID || undefined}
               aria-describedby={error ? errorId : undefined}
               className="bq-input"
             />
           </div>
-          {error ? (
-            <p id={errorId} role="alert" className="text-sm text-[var(--color-danger-fg)]">
-              {error}
-            </p>
-          ) : null}
+          <ErrorNote id={errorId} text={error} />
           <Button type="submit" className="bq-primary w-full mt-4" disabled={isBusy || !email || !password}>
             {isBusy ? "Signing in..." : "Sign in"}
           </Button>

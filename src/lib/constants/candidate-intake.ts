@@ -6,19 +6,18 @@
 /** Step 1: the résumé file the parser accepts (06-backend.md §4, the same limits). */
 export const RESUME_FILE = {
   maxBytes: 10 * 1024 * 1024,
-  extensions: [".pdf", ".doc", ".docx"],
+  extensions: [".pdf", ".docx"],
   mimeTypes: [
     "application/pdf",
-    "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ],
 } as const;
 
-/** Why a file can't be read, before it is sent; null when it can. Word and PDF only, up to 10 MB. */
+/** Why a file can't be read, before it is sent; null when it can. PDF and DOCX only (2026-11-17, Q108), up to 10 MB. */
 export function resumeFileProblem(file: { name: string; size: number; type: string }): string | null {
   const name = file.name.toLowerCase();
   const isKnownType = (RESUME_FILE.mimeTypes as readonly string[]).includes(file.type) || RESUME_FILE.extensions.some((extension) => name.endsWith(extension));
-  if (!isKnownType) return "PDF or Word only.";
+  if (!isKnownType) return "PDF or DOCX only.";
   if (file.size > RESUME_FILE.maxBytes) return "Resume too large, please provide one below 10MB.";
   return null;
 }
@@ -26,7 +25,8 @@ export function resumeFileProblem(file: { name: string; size: number; type: stri
 /** Step 4: common US hubs for preferred locations. */
 export const LOCATION_SUGGESTIONS = ["Dallas, TX", "Austin, TX", "Charlotte, NC", "New Jersey", "Chicago, IL", "Bay Area, CA"] as const;
 
-export const INDUSTRY_SUGGESTIONS = ["Banking", "Healthcare", "Insurance", "Retail", "Telecom", "Public sector"] as const;
+// Banking and Insurance were taken out on 2026-11-17 (Q100): not suggested anywhere. A candidate's saved values stay.
+export const INDUSTRY_SUGGESTIONS = ["Healthcare", "Retail", "Telecom", "Public sector"] as const;
 
 export const DEAL_BREAKER_SUGGESTIONS = ["No 100% onsite", "No contracts under 6 months", "No night shifts", "No relocation"] as const;
 

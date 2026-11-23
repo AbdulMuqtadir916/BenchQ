@@ -4,6 +4,8 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
+import { describeError } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import { useStartSupportView } from "@/lib/hooks/use-support-view";
 import type { Firm } from "@/lib/schemas/session";
 import { SUPPORT_VIEW_MINUTES } from "@/lib/schemas/tenancy";
@@ -45,7 +47,7 @@ export function SupportStartForm({ firm, secondary, autoFocus = false }: { firm:
         The firm will see your name and this reason in its activity log. The view is read-only and ends after {SUPPORT_VIEW_MINUTES} minutes.
       </p>
       {start.isError ? (
-        <p role="alert" className="text-sm text-[var(--color-danger-fg)]">{start.error instanceof ApiError ? start.error.message : "Couldn't start the support view. Try again."}</p>
+        <ErrorNote text={describeError(start.error, { screenText: (e) => (e instanceof ApiError ? null : "Couldn't start the support view. Try again.") })} />
       ) : null}
       <div className="flex flex-wrap justify-end gap-2">
         {secondary}

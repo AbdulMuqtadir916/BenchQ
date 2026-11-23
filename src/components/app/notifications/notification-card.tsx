@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { describeError, type ErrorText } from "@/lib/api/error-text";
+import { ErrorNote } from "@/components/app/error-note";
 import type { NotificationItem } from "@/lib/api/password-recovery";
 import { isPendingRequest, useDecidePasswordReset, useReissueResetLink } from "@/lib/hooks/use-notifications";
 import { ResetLinkPanel } from "./reset-link-panel";
@@ -21,24 +23,24 @@ export function NotificationCard({ item }: { item: NotificationItem }) {
   const decide = useDecidePasswordReset();
   const reissue = useReissueResetLink();
   const [shared, setShared] = useState<{ link: string; createdAt: Date } | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorText | null>(null);
   const isReset = item.type === "PASSWORD_RESET";
   const isPending = isPendingRequest(item);
   const isBusy = decide.isPending || reissue.isPending;
 
   function onDecide(approve: boolean) {
-    setError("");
+    setError(null);
     decide.mutate({ id: item.id, approve }, {
       onSuccess: (result) => setShared(result.resetLink ? { link: result.resetLink, createdAt: new Date() } : null),
-      onError: (e) => setError(e instanceof Error ? e.message : "Couldn't update this request."),
+      onError: (e) => setError(describeError(e, { fallback: "Couldn't update this request." })),
     });
   }
 
   function onReissue() {
-    setError("");
+    setError(null);
     reissue.mutate(item.id, {
       onSuccess: (result) => setShared({ link: result.resetLink, createdAt: new Date() }),
-      onError: (e) => setError(e instanceof Error ? e.message : "Couldn't create a reset link."),
+      onError: (e) => setError(describeError(e, { fallback: "Couldn't create a reset link." })),
     });
   }
 
@@ -65,7 +67,7 @@ export function NotificationCard({ item }: { item: NotificationItem }) {
       {isReset && item.canReissue && item.resolvedAt ? (
         <Button type="button" className="bq-secondary mt-3" disabled={isBusy} onClick={onReissue}>Create fresh link</Button>
       ) : null}
-      {error ? <p role="alert" className="mt-2 text-sm text-[var(--color-danger-fg)]">{error}</p> : null}
+      <ErrorNote text={error} className="mt-2" />
     </article>
   );
 }

@@ -10,7 +10,7 @@ import { FirmRole } from "./enums";
 export const RESERVED_SLUGS = [
   "admin", "api", "health", "sign-in", "sign-up", "forgot-password", "reset-password", "invite", "dev",
   "_next", "static", "assets", "favicon.ico", "robots.txt", "sitemap.xml", "www", "app", "support",
-  "help", "status", "settings", "new",
+  "help", "status", "settings", "new", "privacy",
 ] as const;
 
 /**

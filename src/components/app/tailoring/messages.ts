@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api/client";
+import { describeError, isSystemError, type ErrorText } from "@/lib/api/error-text";
 import type { TailoringRun, TailoringStep } from "@/lib/schemas/tailoring";
 
 /** What each step is called while it runs (part 3 R2-Q1: the run's real step, never a guess). */
@@ -25,16 +26,35 @@ export function runFailure(code: string | null): { message: string; canRetry: bo
   }
 }
 
-/** Why a start was refused (the backend's answer), in one sentence; `needsBase` adds a link to the résumés. */
-export function startRefusal(error: unknown): { message: string; needsBase: boolean } {
-  const status = error instanceof ApiError ? error.status : 0;
-  const said = error instanceof Error ? error.message : "";
-  if (status === 422) return { message: "This job has no description to tailor to.", needsBase: false };
-  if (status === 429) return { message: "You have 5 tailorings running. Wait for one to finish.", needsBase: false };
-  if (status === 500) return { message: "Tailoring isn't set up yet. Tell your admin.", needsBase: false };
-  if (status === 404) return { message: "This job or résumé isn't this candidate's.", needsBase: false };
-  if (status === 409) return { message: said || "This résumé can't be tailored now.", needsBase: /no active base/i.test(said) };
-  return { message: "Tailoring didn't start. Try again.", needsBase: false };
+const DIDNT_START = "Tailoring didn't start. Try again.";
+
+/**
+ * The tailor's own words for a refused start, by the body's code (docs/02 §12.1), never by status: the codes the start
+ * sends (backend/resume_tailor/runs.py, backend/api/routes_resume_tailoring.py). Reached only for a non-system error
+ * (the throttle, busy, a crash read as everywhere else). Any other refusal keeps the backend's own sentence: "This job
+ * has no description to tailor the résumé to." (its 422), "This résumé is already being tailored for this job." (a
+ * 409), and so on. An error that isn't the backend's at all (a bug) says the start didn't happen.
+ */
+function refusalText(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return DIDNT_START;
+  switch (error.backendCode) {
+    case "TAILORINGS_RUNNING":
+      return "You have 5 tailorings running. Wait for one to finish.";
+    case "NOT_CONFIGURED":
+      return "Tailoring isn't set up yet. Tell your admin.";
+    case "NOT_FOUND": // the backend's is a bare "Not found." (no 404 names what is missing: docs/02 §12.2, rule 1)
+      return "This job or résumé isn't this candidate's.";
+    default:
+      return null;
+  }
+}
+
+/** Why a start was refused, in one sentence (src/lib/api/error-text.ts picks it); `needsBase` adds a link to the
+ * résumés. */
+export function startRefusal(error: unknown): ErrorText & { needsBase: boolean } {
+  const text = describeError(error, { screenText: refusalText, fallback: DIDNT_START });
+  const isNoBase = !isSystemError(error) && error instanceof ApiError && error.status === 409 && /no active base/i.test(error.message);
+  return { ...text, needsBase: isNoBase };
 }
 
 /** Of the tailorings a Focus run started: how many saved a résumé, and how many still run (Abdul's review, 2026-11-12:

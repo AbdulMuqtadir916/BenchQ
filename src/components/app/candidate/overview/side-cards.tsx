@@ -36,13 +36,13 @@ export function BaseResumeCard({ base, onOpenResumes }: { base: CandidateWorkspa
   );
 }
 
-export function TopMatches({ candidateId, matches, onFindJobs, failed = false, onRetry }: { /** Whose matches: the job page opens for them. */ candidateId: string; matches: Array<{ job: Job; score: number }>; onFindJobs?: () => void; /** The jobs didn't load: said, with Retry, not "no matches". */ failed?: boolean; onRetry?: () => void }) {
+export function TopMatches({ candidateId, matches, onFindJobs, failed = false, onRetry }: { /** Whose matches: the job page opens for them. */ candidateId: string; matches: Array<{ job: Job; score: number | null; note?: string | null }>; onFindJobs?: () => void; /** The jobs didn't load: said, with Retry, not "no matches". */ failed?: boolean; onRetry?: () => void }) {
   const toHref = useHref();
   return (
     <Card className="p-0">
       <h2 className="border-b border-[var(--color-border)] px-4 py-3 text-h3 text-[var(--color-text)]">Best new matches</h2>
       <ul className="divide-y divide-[var(--color-border)]">
-        {matches.map(({ job, score }) => (
+        {matches.map(({ job, score, note }) => (
           <li key={job.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
             <Link href={toHref("jobs.detail", { id: job.id }, { candidate: candidateId })} className="flex min-w-0 items-center gap-2.5 hover:underline">
               <PortalLogo portal="COMPANY" domain={job.company.domain} size={28} />
@@ -51,7 +51,7 @@ export function TopMatches({ candidateId, matches, onFindJobs, failed = false, o
                 <span className="block truncate text-caption text-[var(--color-text-3)]">{job.company.name}</span>
               </span>
             </Link>
-            <MatchScore score={score} />
+            {score !== null ? <MatchScore score={score} note={note} /> : null}
           </li>
         ))}
         {failed ? (

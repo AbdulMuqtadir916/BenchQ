@@ -127,6 +127,7 @@ function common(element: HTMLElement, id: string, kind: FieldKind, label: string
     hints: collapse(`${element.getAttribute("name") ?? ""} ${element.id}`), clues: fieldClues(element),
     autocomplete: element.getAttribute("autocomplete") ?? "",
     maxLength: null, inAccountForm: accountForm(element),
+    ...(kind === "file" ? { accept: element.getAttribute("accept") ?? "" } : {}),
   };
 }
 
