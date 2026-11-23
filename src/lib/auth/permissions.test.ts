@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Principal } from "@/lib/schemas/tenancy";
-import { can, canAssignTo, canChangeResume, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
+import { can, canAssignTo, canChangeResume, canEditProfile, canManageResume, dashboardFor, hasOwnScope, hasTeamScope, isSupportView, scopeApplications, scopeByCandidate, scopeCandidates, scopeLedger, scopeOf, scopeTeam, type FirmAction } from "./permissions";
 
 const firmUser = (role: "OWNER" | "MANAGER" | "BDE" | "VIEWER"): Principal => ({ kind: "firm", userId: `u_${role}`, firmId: "f", role });
 const admin: Principal = { kind: "platform", userId: "padm", role: "PLATFORM_ADMIN", support: null };
@@ -192,6 +192,20 @@ describe("canChangeResume and canManageResume (07 Q55)", () => {
       expect(canChangeResume(principal, candidate)).toBe(false);
       expect(canManageResume(principal, candidate)).toBe(false);
     }
+  });
+});
+
+describe("canEditProfile: the résumé rule (decided 2026-11-14, Q17; reverses 07 Q56)", () => {
+  const roles = ["OWNER", "MANAGER", "BDE", "VIEWER"] as const;
+
+  it("before a BDE is assigned the OWNER and a MANAGER edit the details; once one is, only that BDE", () => {
+    expect(roles.map((role) => canEditProfile(firmUser(role), { bdeId: null }))).toEqual([true, true, false, false]);
+    expect(roles.map((role) => canEditProfile(firmUser(role), { bdeId: "u_BDE" }))).toEqual([false, false, true, false]);
+    expect(canEditProfile(firmUser("BDE"), { bdeId: "b2" })).toBe(false);
+  });
+
+  it("a support view and a platform admin never", () => {
+    for (const principal of [support, admin]) for (const bdeId of [null, "u_BDE"]) expect(canEditProfile(principal, { bdeId })).toBe(false);
   });
 });
 

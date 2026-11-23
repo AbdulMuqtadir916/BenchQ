@@ -107,7 +107,6 @@ KNOWN = {
     ("api/routes_searches.py", "test_search"): "Zuhair: search name",
     ("scraper/orchestrator.py", "run_all"): "Zuhair: search name",
     ("scraper/orchestrator.py", "_run_search_by_id"): "Zuhair: search name",
-    ("scraper/sources/freehire.py", "run"): "Zuhair: search name",
     ("scraper/sources/jobright.py", "run"): "Zuhair: search name",
     ("scraper/sources/jobspy.py", "_run_sync"): "Zuhair: search name",
     ("scraper/sources/levelsfyi.py", "run"): "Zuhair: search name",

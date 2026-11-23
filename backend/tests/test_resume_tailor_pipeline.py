@@ -77,7 +77,7 @@ def test_the_prompts_carry_his_rules_and_the_resume_not_a_profile(monkeypatch):
     _fake_model(monkeypatch, seen)
     _run()
     draft_prompt = seen[1]["prompt"]
-    for rule in ("4-6 bullets for the most recent role", "matched or honestly gapped", "interview backtrack test",
+    for rule in ("Exactly 6 bullets for the most recent role", "matched or honestly gapped", "interview backtrack test",
                  "NO em-dashes", "elevator pitch", "Cut by signal, not by section"):
         assert rule in draft_prompt
     assert "ROLE 1" in draft_prompt and "JOB POSTING" in draft_prompt
@@ -147,7 +147,7 @@ def test_the_verify_step_checks_counts_repetition_and_verbs(monkeypatch):
     _fake_model(monkeypatch, seen)
     _run()
     verify = seen[4]["prompt"]
-    assert "Bullet counts: at most 6" in verify and "No repetition" in verify and "Participated in code reviews" in verify
+    assert "Bullet counts: exactly 6" in verify and "No repetition" in verify and "Participated in code reviews" in verify
     assert "(2 bullets)" in verify
 
 
@@ -376,5 +376,7 @@ def test_a_replay_gives_the_same_copy_and_report(monkeypatch):
         return copy
     first, second = once(), once()
     assert first == second
+    # The latest role gets a third bullet from its own résumé lines: it holds 3, under the 6 asked (2026-11-17).
     assert first["experience"][0]["bullets"] == ["Built REST APIs with Python on AWS for 40 internal teams.",
-                                                 "Provisioned AWS environments with CloudFormation templates."]
+                                                 "Provisioned AWS environments with CloudFormation templates.",
+                                                 "Built event-driven workers with RabbitMQ."]

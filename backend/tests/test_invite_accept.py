@@ -14,7 +14,7 @@ def owner_invite(api_client, accounts):
     """A new firm's OWNER invite, created through the Super Admin's endpoint: (firm id, invite id, token)."""
     body = api_client.post("/api/admin/firms", json={
         "name": "Northwind Staffing", "slug": "northwind", "plan_id": str(accounts.plan_id),
-        "owner_name": "Nora", "owner_email": "nora@northwind.test"}).json()
+        "work_start": "18:30", "work_end": "04:00", "owner_name": "Nora", "owner_email": "nora@northwind.test"}).json()
     return body["firm"]["id"], body["invite"]["id"], body["invite_token"]
 
 

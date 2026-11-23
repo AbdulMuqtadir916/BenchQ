@@ -32,7 +32,9 @@ export function useCandidateWorkspace(candidateId: string) {
   const applicationsQuery = useApplications(candidateId);
   const recordQuery = useRecord(candidateId);
   const shelfQuery = useResumeShelf(candidateId);
-  const jobsQuery = useJobs({ limit: 400, candidateId }); // the candidate's own jobs (docs/02 §6.z)
+  // The candidate's own jobs (docs/02 §6.z), best Match first: the first page, for Overview's best matches and the
+  // matching sequence; the Jobs tab's list reads every job itself, 100 at a time (decided 2026-11-14).
+  const jobsQuery = useJobs({ limit: 100, candidateId, sort: "match" });
   const inboxQuery = useCandidateInbox(candidateId);
   const reviewsQuery = useEmailReviews(candidateId);
   const documentsQuery = useCandidateDocuments(candidateId);

@@ -156,6 +156,6 @@ def test_first_base_drops_invalid_parser_links(link):
     from backend.candidates.first_base import first_base
 
     upload = SimpleNamespace(id=uuid.uuid4(), parse={"header": {"linkedin": link, "github": link}})
-    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate")
+    candidate = SimpleNamespace(id=uuid.uuid4(), firm_id=uuid.uuid4(), full_name="Candidate", email="candidate@example.com")
     _, version = first_base(upload, candidate, None, uuid.uuid4())
     assert version.linkedin is None and version.github is None

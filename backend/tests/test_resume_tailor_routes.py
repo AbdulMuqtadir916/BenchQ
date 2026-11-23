@@ -24,9 +24,9 @@ def launched(monkeypatch, test_db):
     from backend import job_monitor
     from backend.api import routes_resume_tailoring
     from backend.seed import seed_settings
+    from backend.tests.ai_support import set_up_ai
     seed_settings(test_db)
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value="test-key"))
-    test_db.commit()
+    set_up_ai(test_db)
     calls = []
 
     def launch(job_type, coro_func, *, scope_key=None, meta=None, target_job_id=None, firm_id=None,
@@ -128,6 +128,16 @@ def test_a_retailor_is_the_next_version_and_carries_what_the_bde_typed(anonymous
     second = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
     row = test_db.get(Resume, uuid.UUID(second["resume_id"]))
     assert row.version == 2 and row.autofill == typed
+
+
+def test_a_tailored_version_has_its_match_against_its_job(anonymous_client, test_db, world, launched, setup,
+                                                         monkeypatch):
+    """Decided 2026-11-14 (Q39): the "Resume sent" tag's Match, worked out when the tailoring writes the version."""
+    _start(anonymous_client, world, setup)
+    done = _status(anonymous_client, world, setup, _drive(test_db, launched, list(REPLIES), monkeypatch)).json()
+    test_db.expire_all()
+    row = test_db.get(Resume, uuid.UUID(done["resume_id"]))
+    assert 0 <= row.match_score <= 100 and len(row.match_basis) == 64
 
 
 def test_a_step_that_fails_writes_no_version(anonymous_client, test_db, world, launched, setup, monkeypatch):
@@ -262,14 +272,14 @@ def test_a_bde_with_five_running_waits_for_one(anonymous_client, test_db, world,
 NOT_SET_UP = "The résumé tailor isn't set up yet. Ask your admin."
 
 
-def test_a_tailor_not_set_up_is_a_500_naming_the_row_in_the_log(anonymous_client, test_db, world, launched, setup,
-                                                                 log):
-    test_db.merge(Setting(key=tailor_settings.KEY_ROW, value=""))
-    test_db.commit()
+def test_a_tailor_not_set_up_is_a_500_naming_what_is_missing_in_the_log(anonymous_client, test_db, world, launched,
+                                                                        setup, log):
+    from backend.tests.ai_support import set_up_ai
+    set_up_ai(test_db, key="")
     r = _start(anonymous_client, world, setup)
     body = r.json()
     assert (r.status_code, body["code"], body["detail"]) == (500, "NOT_CONFIGURED", NOT_SET_UP) and launched == []
-    assert "resume_tailor_llm_api_key" in log.getvalue()          # the row, for the admin; never in the answer
+    assert "API key" in log.getvalue()          # what is missing, for the admin; never in the answer
 
 
 # ── Lost runs and the heartbeat ──────────────────────────────────────────────

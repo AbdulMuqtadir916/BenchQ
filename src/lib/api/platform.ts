@@ -19,6 +19,9 @@ export interface CreateFirmInput {
   planId: string;
   primaryTimezone: string;
   clientTimezone: string;
+  /** Required, no default (07 Q67): "HH:MM" in `primaryTimezone`. */
+  workStart: string;
+  workEnd: string;
   contactPhone: string | null;
   ownerName: string;
   ownerEmail: string;
@@ -41,7 +44,7 @@ const live = {
     create: async (input: CreateFirmInput) => {
       const body = {
         name: input.name, slug: input.slug, plan_id: toBackendId(input.planId), primary_timezone: input.primaryTimezone,
-        client_timezone: input.clientTimezone, contact_phone: input.contactPhone, owner_name: input.ownerName, owner_email: input.ownerEmail,
+        client_timezone: input.clientTimezone, work_start: input.workStart, work_end: input.workEnd, contact_phone: input.contactPhone, owner_name: input.ownerName, owner_email: input.ownerEmail,
       };
       return toFirm((await http.post("/api/admin/firms", CreatedFirmDto, { body })).firm);
     },

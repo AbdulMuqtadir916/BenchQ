@@ -45,6 +45,11 @@ const PATTERNS: readonly RegExp[] = [
  */
 const ALLOWLIST: ReadonlyArray<{ file: string; expression: string; reason: string }> = [
   {
+    file: "features/admin/ai-presets/preset-dialog.tsx",
+    expression: "error.message",
+    reason: "`edit.error`'s 409 text is tested for \"Save anyway\" to offer the unreachable-model save, not shown (its words show through errorMessage)",
+  },
+  {
     file: "app/sign-in/page.tsx",
     expression: "error?.message",
     reason: "`error` here is the ErrorText from signInError (which calls describeError); compared to INVALID_SIGN_IN for aria-invalid, not shown",

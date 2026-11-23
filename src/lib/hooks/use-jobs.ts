@@ -1,7 +1,8 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
 import { jobsApi, type JobListParams } from "@/lib/api/jobs";
+import { jobPageSize } from "@/lib/derive/job-pages";
 import { queryKeys } from "@/lib/query/keys";
 import type { CaptureJob } from "@/lib/schemas/job";
 import type { JobSearches } from "@/lib/schemas/job-search";
@@ -25,6 +26,22 @@ export function useJobs(params?: JobListParams, { isEnabled = true }: { isEnable
   });
 }
 
+/**
+ * A job list 100 at a time (decided 2026-11-14, Q28, Q29): every job the params' list holds, sorted and filtered by the
+ * backend, the next page on `fetchNextPage` ("Load more"). Under the jobs' list keys, so a capture or a search's end
+ * refreshes it like any list.
+ */
+export function useJobPages(params: Omit<JobListParams, "offset" | "limit">, { isEnabled = true }: { isEnabled?: boolean } = {}) {
+  const firmId = useFirmId();
+  return useInfiniteQuery({
+    queryKey: queryKeys.jobs.list(firmId, { ...params, paged: true }),
+    queryFn: ({ pageParam }) => jobsApi.page(firmId, { ...params, limit: jobPageSize(pageParam), offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
+    enabled: isEnabled,
+  });
+}
+
 /** One job. With `candidateId`, read as that candidate's own job (not-found when it isn't theirs). */
 export function useJob(id: string, candidateId?: string) {
   const firmId = useFirmId();
@@ -36,6 +53,20 @@ export function useJob(id: string, candidateId?: string) {
 }
 
 /** Capture a job for one candidate (docs/02 §6.z). The new job leads the lists; the usage and the ledger refresh. */
+/** The posting text a BDE pasted for a job that came without it (a LinkedIn job, decided 2026-11-17, Q107). */
+export function usePastePosting() {
+  const firmId = useFirmId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ candidateId, jobId, text }: { candidateId: string; jobId: string; text: string }) =>
+      jobsApi.pastePosting(firmId, candidateId, jobId, text),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all(firmId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all(firmId) });
+    },
+  });
+}
+
 export function useCaptureJob() {
   const firmId = useFirmId();
   const queryClient = useQueryClient();
@@ -49,14 +80,14 @@ export function useCaptureJob() {
   });
 }
 
-/** The longest a timer may wait (setTimeout's limit is ~24.8 days; an hour is plenty for the 6:30 PM reset). */
+/** The longest a timer may wait (setTimeout's limit is ~24.8 days; an hour is plenty for the work day's reset). */
 const MAX_WAIT_MS = 60 * 60 * 1000;
 
 /**
  * A candidate's searches and today's usage, as query options (exported for its tests). Read every 3 s while one runs,
  * and while a search this tab started hasn't been read back finished: a fast search can end before the first read
  * sees it running (bot review on #135). When a search ends, the job lists and the ledger are read again. Idle, it is
- * read again just after the day resets (6:30 PM IST), so a limit reached today lifts without a reload; a tab in the
+ * read again just after the firm's work day resets (its start, `resetsAt`), so a limit reached today lifts without a reload; a tab in the
  * background then misses that timer, so coming back to it reads again once the reset has passed (Abdul on #135).
  */
 export function jobSearchesQuery(queryClient: QueryClient, firmId: string, candidateId: string) {
@@ -97,13 +128,13 @@ export function useJobSearches(candidateId: string, enabled = true) {
   return useQuery({ ...jobSearchesQuery(queryClient, firmId, candidateId), enabled: enabled && !!candidateId });
 }
 
-/** "Find jobs": start a search for the candidate (their BDE only). The searches are read again at once, and the search
- * is remembered until its outcome is read. */
+/** "Find jobs": start a search of the candidate's target role in one of their places, on the source picked (their BDE
+ * only). The searches are read again at once, and the search is remembered until its outcome is read. */
 export function useStartJobSearch(candidateId: string) {
   const firmId = useFirmId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (query: string) => jobsApi.startSearch(firmId, candidateId, query),
+    mutationFn: ({ place }: { place: string }) => jobsApi.startSearch(firmId, candidateId, place),
     onSuccess: (batchId) => queryClient.setQueryData(queryKeys.jobs.startedSearch(firmId, candidateId), batchId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.jobs.searches(firmId, candidateId) }),
   });

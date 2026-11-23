@@ -143,6 +143,7 @@ export function createHttp(target: HttpTarget = {}) {
     /** multipart/form-data, for file uploads (the résumé parser). */
     postForm: <T>(path: string, schema: ZodType<T>, form: FormData, options?: Omit<RequestOptions, "body">) => request(target, "POST", path, schema, { ...options, body: form }),
     patch: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "PATCH", path, schema, options),
+    put: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => request(target, "PUT", path, schema, options),
     delete: <T>(path: string, schema: ZodType<T>, options?: Omit<RequestOptions, "body">) => request(target, "DELETE", path, schema, options),
   };
 }

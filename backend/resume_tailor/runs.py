@@ -34,6 +34,7 @@ from backend.problem import TAILORINGS_RUNNING, Problem
 from backend.auth import ledger
 from backend.auth.scoping import scoped
 from backend.candidates import autofill, versions
+from backend.match import store as match_store
 from backend.candidates.values import text
 from backend.job_monitor import get_all_running, mark_run_failed
 from backend.job_search import providers
@@ -373,7 +374,8 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
             base = versions.base_for_tailoring(db, actor, candidate, source)
         except HTTPException:
             raise _Stop(HIDDEN)               # the base made from this version was hidden meanwhile
-        content = versions._with_ids(versions.content_of(source), tailored.content)
+        content = {**versions._with_ids(versions.content_of(source), tailored.content),
+                   **versions.fixed_identity(candidate)}     # the candidate's name and email (07 Q68)
         group = scoped(db, Resume, firm_id).filter(Resume.base_resume_id == base.id, Resume.category == "TAILORED",
                                                    Resume.job_id == posting.id)
         latest = group.with_entities(func.max(Resume.version)).scalar() or 0
@@ -385,6 +387,7 @@ def _finish(run_id, firm_id, candidate_id, source_resume_id, job_posting_id, use
                      autofill=copy.deepcopy(autofill.entries_of(newest or source)), **content)
         db.add(row)
         db.flush()
+        match_store.score_tailored(db, candidate, row, posting)    # its Match against the job (decided 2026-11-14, Q39)
         number = versions.base_numbers(db, candidate)[base.id]
         entry = ledger.record(db, actor=actor, action="CREATE", entity_type="resume",
                               entity_id=row.id,

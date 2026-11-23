@@ -86,6 +86,8 @@ _LIMIT_SOURCES: dict[str, tuple[Optional[str], int]] = {
     # A résumé tailoring (backend/resume_tailor/): five model calls, about a minute, waiting on the model. It holds no
     # database connection while it waits, so the limit is the model account's (decided 2026-11-12: 40 per worker).
     "resume_tailor": ("resume_tailor_max_concurrent", 40),
+    # One résumé parse: one model call. Ten at once per backend process; the rest wait (decided 2026-11-22).
+    "resume_parse": ("resume_parse_max_concurrent", 10),
 }
 
 # Which gate a launch_background job_type belongs to. Anything absent runs

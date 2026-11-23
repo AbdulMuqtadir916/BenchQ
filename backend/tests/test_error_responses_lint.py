@@ -15,17 +15,17 @@ SKIPPED = {"problem.py"}
 # "file:line" -> why it stays. JobNavigator leftovers no BenchQ screen or the extension calls, until Abdul's clean-up
 # track (docs/02 §12.1): the "already running" 409s. Delete an entry when its call goes; the stale check fails until.
 KNOWN = {
-    "main.py:424": "POST /api/scrape/run-all, already running",
-    "main.py:446": "POST /api/email/check-now, already running",
-    "main.py:473": "POST /api/h1b/refresh, already running",
-    "main.py:528": "POST /api/analyze/{job_id}, already running",
-    "main.py:564": "POST /api/db/cleanup, already running",
-    "main.py:605": "POST /api/auto-reject/run, already running",
-    "main.py:656": "POST /api/jobs/backfill-descriptions, already running",
-    "main.py:704": "POST /api/db/backup, already running",
-    "main.py:726": "POST /api/telegram/digest, already running",
-    "main.py:779": "POST /api/scrape/company/{company_id}, already running",
-    "main.py:861": "POST /api/telegram/test, already running",
+    "main.py:448": "POST /api/scrape/run-all, already running",
+    "main.py:470": "POST /api/email/check-now, already running",
+    "main.py:497": "POST /api/h1b/refresh, already running",
+    "main.py:552": "POST /api/analyze/{job_id}, already running",
+    "main.py:588": "POST /api/db/cleanup, already running",
+    "main.py:629": "POST /api/auto-reject/run, already running",
+    "main.py:680": "POST /api/jobs/backfill-descriptions, already running",
+    "main.py:728": "POST /api/db/backup, already running",
+    "main.py:750": "POST /api/telegram/digest, already running",
+    "main.py:803": "POST /api/scrape/company/{company_id}, already running",
+    "main.py:885": "POST /api/telegram/test, already running",
     "api/routes_searches.py:244": "POST /api/searches/{search_id}/run, already running",
     "api/routes_cover_letters.py:411": "POST /api/cover-letters/generate, already running",
 }

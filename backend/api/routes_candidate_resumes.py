@@ -25,7 +25,7 @@ from datetime import date
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.exc import IntegrityError
@@ -35,15 +35,19 @@ from backend.api.render_shared import _get_browser
 from backend.api.routes_auth import current_principal
 from backend.api.routes_candidates import _candidate, _member_of
 from backend.auth.policy import can_change_resume, can_manage_resume, require
+from backend.match import store as match_store
 from backend.auth.sessions import Principal
 from backend.candidates import autofill as autofill_answers
-from backend.candidates import resume_file, versions
+from backend.candidates import identity_check
+from backend.candidates import resume_file, upload_limit, versions
 from backend.candidates.profile_links import ProfileLink
 from backend.candidates.parse import DOCX_MIME, MAX_BYTES, PDF_MIME, extract_text, file_kind, read_resume
 from backend.models.candidates import ResumeParse, file_sha256
 from backend.models.db import get_db
 from backend.models.tenancy import User
 from backend.problem import RESUME_FILE_FAILED, Problem
+
+logger = logging.getLogger("jobnavigator.resume_upload")
 
 router = APIRouter(prefix="/firms/{firm_id}/candidates/{candidate_id}/resumes", tags=["candidate résumés"])
 logger = logging.getLogger(__name__)
@@ -289,52 +293,67 @@ async def get_resume_file(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id
 
 @router.post("/{resume_id}/save", status_code=201, summary="Save an edit as the résumé's next version")
 def save_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, body: ContentIn,
-                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+                background: BackgroundTasks, principal: Principal = Depends(require("resume.edit")),
+                db: DbSession = Depends(get_db)):
     """`resume_id` is the version the edit was made from. The answer's `notice` says when another version was saved
     meanwhile (both are kept; the new one doesn't include the other's changes)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
     source = versions.candidate_version(db, candidate, resume_id)
     saved = versions.save_version(db, actor, candidate, source, body.stored())
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # its Match scores (decided 2026-11-14, Q35)
     return {**versions.version_json(saved.row, with_content=True), "notice": saved.notice}
 
 
 @router.post("/{resume_id}/use-as-base", summary="Make this version the base the workflow uses")
-def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID,
+def use_resume_as_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, resume_id: uuid.UUID, background: BackgroundTasks,
                        principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
     """A base's v1: that base becomes active. Any other version: copied as v1 of a new base, which becomes active; if
     a base was already made from it, that one becomes active instead."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_change_resume)
     base = versions.use_as_base(db, actor, candidate, versions.candidate_version(db, candidate, resume_id))
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # a new active résumé (Q34, Q35)
     return versions.base_json(base, versions.base_numbers(db, candidate)[base.id])
 
 
 @router.post("/upload", status_code=201, summary="Upload a later résumé as the candidate's new base")
-async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, file: UploadFile = File(...),
-                        principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
-    """PDF or Word, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
+async def upload_resume(firm_id: uuid.UUID, candidate_id: uuid.UUID, background: BackgroundTasks,
+                        file: UploadFile = File(...), principal: Principal = Depends(require("resume.edit")),
+                        db: DbSession = Depends(get_db)):
+    """PDF or DOCX, up to 10 MB. The same file the candidate already has is answered (409) before the parser runs,
     with the base it is; if that base was deleted, it comes back instead (its v1, `restored` true, no parser run).
-    Otherwise the parser reads it and one transaction keeps the file and writes a new active base with its v1.
+    Otherwise the file's text must hold the candidate's name and email (07 Q69; refused with 400 before the parser
+    runs), then the parser reads it and one transaction keeps the file and writes a new active base with its v1.
     Nothing is saved if the parse fails (§4.6). The database work runs off the event loop
     (`asyncio.to_thread`): waiting for the candidate lock would otherwise hold up every request on the worker."""
-    await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
+    identity = await asyncio.to_thread(_may_upload, db, firm_id, principal, candidate_id)
     content = await file.read(MAX_BYTES + 1)
     kind = file_kind(file.filename or "", content)
     sha256 = file_sha256(content)
     parse = None
     if await asyncio.to_thread(_is_new_file, db, firm_id, principal, candidate_id, sha256):
         text = await asyncio.to_thread(extract_text, kind, content)
+        code, refusal = identity_check.check(text, *identity)
+        if refusal is not None:
+            logger.info("resume upload refused candidate=%s check=%s", candidate_id, code)   # ids and a code only
+            raise HTTPException(status_code=400, detail=refusal)
         parse = await read_resume(text, kind, db, firm_id=firm_id)
-    return await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
+    kept = await asyncio.to_thread(_keep_upload, db, firm_id, principal, candidate_id, file.filename or "", kind,
                                    content, sha256, parse)
+    match_store.rescore_later(background, firm_id, candidate_id)    # a new active résumé (Q34, Q35)
+    return kept
 
 
-def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> None:
+def _may_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID) -> tuple[str, str]:
+    """The candidate's name and email, which the file must hold (07 Q69), once the principal may upload."""
     _member_of(firm_id, principal)
-    if not can_manage_resume(principal, _candidate(db, firm_id, principal, candidate_id)):
+    candidate = _candidate(db, firm_id, principal, candidate_id)
+    if not can_manage_resume(principal, candidate):
         raise _forbidden()                   # refused before the file is parsed or kept (its bytes have arrived)
+    identity = (candidate.full_name or "", candidate.email or "")
     db.commit()
+    return identity
 
 
 def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candidate_id: uuid.UUID,
@@ -346,6 +365,7 @@ def _is_new_file(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         if (answer := versions.already_uploaded(db, candidate, kept)) is not None:
             raise answer
         return False
+    upload_limit.refuse_past_limit(db, candidate)      # before the paid parse, under the candidate's lock
     db.commit()                              # no lock, and no connection, held while the parser works
     return True
 
@@ -370,6 +390,7 @@ def _keep_upload(db: DbSession, firm_id: uuid.UUID, principal: Principal, candid
         if kept is not None:                 # the same file, uploaded meanwhile
             raise versions.already_uploaded(db, candidate, kept) or HTTPException(status_code=409,
                                                                                   detail="Upload it again.")
+        upload_limit.refuse_past_limit(db, candidate)  # two uploads may have passed the first check together
         parse_row = ResumeParse(firm_id=firm_id, uploaded_by_user_id=actor.id, candidate_id=candidate.id,
                                 file_name=file_name[:255], mime_type=PDF_MIME if kind == "pdf" else DOCX_MIME,
                                 size_bytes=len(content), content=content, parse=parse, expires_at=None)
@@ -396,13 +417,15 @@ def base_removal(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID
 
 
 @router.delete("/bases/{base_id}", summary="Delete a base, or hide it if something uses it")
-def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, keep_used: bool = False,
-                principal: Principal = Depends(require("resume.edit")), db: DbSession = Depends(get_db)):
+def delete_base(firm_id: uuid.UUID, candidate_id: uuid.UUID, base_id: uuid.UUID, background: BackgroundTasks,
+                keep_used: bool = False, principal: Principal = Depends(require("resume.edit")),
+                db: DbSession = Depends(get_db)):
     """`keep_used=true`: a base that is in use is hidden and what nothing uses is deleted with it (the `rest` of the
     preview); without it the base is only hidden (docs/team/resume-versioning.md §4.7)."""
     candidate, actor = _writer(db, firm_id, principal, candidate_id, can_manage_resume)
     removal = versions.delete_base(db, actor, candidate, versions.candidate_base(db, candidate, base_id), keep_used)
     db.commit()
+    match_store.rescore_later(background, firm_id, candidate_id)    # the active résumé may have changed (Q35)
     return removal.json()
 
 
