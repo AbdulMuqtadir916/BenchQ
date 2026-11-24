@@ -58,10 +58,10 @@ describe("the ledger on the live backend", () => {
   it("maps the people list, translating seeded ids back", async () => {
     answer = { status: 200, body: { timezone: "Asia/Kolkata", actor_types: ["USER", "AGENT"], total: 4, matching: 2, people: [
       { user_id: demoIds.user_imran, name: "Imran", role: "OWNER", manager_id: null, is_former: false, actions: 2 },
-    ] } };
+    ], team_actions: [{ manager_id: demoIds.user_imran, actions: 3 }] } };
     await expect(ledgerApi.people("firm_hts")).resolves.toEqual({ actorTypes: ["USER", "AGENT"], total: 4, matching: 2, people: [
       { userId: "user_imran", name: "Imran", role: "OWNER", managerId: null, isFormer: false, actions: 2 },
-    ] });
+    ], teamActions: { user_imran: 3 } });
   });
 
   it("reads the candidates to pick and the days with activity", async () => {
