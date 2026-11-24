@@ -14,6 +14,7 @@ under way) calls `did_nothing(request)`.
 What goes in the entry: what was done, the id in the path, and for a change the *names* of the fields in the request body.
 Never their values (a setting can hold a key or a token), and never the body.
 """
+import contextvars
 import json
 import logging
 from functools import partial
@@ -111,8 +112,10 @@ def logs_platform_action(summary: str, *, entity_type: str, action: str = "STATE
             return                                      # a change that changes no field is not an action
         if names:
             text += f": {', '.join(names)}"
-        # Written by PlatformActionLog once the answer is known to be a success.
-        request.scope.setdefault("state", {}).setdefault(PENDING, []).append(partial(
+        # Written by PlatformActionLog once the answer is known to be a success. That is after RequestLog has reset the
+        # request id, so the entry runs in a copy of this request's context and keeps the id (issue #160).
+        context = contextvars.copy_context()
+        request.scope.setdefault("state", {}).setdefault(PENDING, []).append(partial(context.run, partial(
             _write, principal, action=action, entity_type=entity_type, entity_id=record_id or entity_type,
-            summary=text + "."))
+            summary=text + ".")))
     return dependency

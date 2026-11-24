@@ -12,3 +12,5 @@ const fromBackend: Readonly<Record<string, string>> = Object.fromEntries(Object.
 
 export const toBackendId = (id: string): string => toBackend[id] ?? id;
 export const fromBackendId = (id: string): string => fromBackend[id] ?? id;
+/** Whether `id` is a seeded row's fixture id (`user_adnan`), which `toBackendId` turns into its UUID. */
+export const isSeededFixtureId = (id: string): boolean => id in toBackend;

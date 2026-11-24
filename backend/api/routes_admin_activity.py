@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
 from backend.api.routes_auth import current_principal
-from backend.api.routes_ledger import SORTS, Filters, candidate_options, people_in_view
+from backend.api.routes_ledger import SORTS, Filters, candidate_options, people_in_view, team_counts
 from backend.auth import support
 from backend.auth.serialize import ledger_entry_json
 from backend.auth.sessions import Principal
@@ -90,7 +90,8 @@ def people(firm_id: uuid.UUID, filters: Filters = Depends(), db: DbSession = Dep
     view = View(firm_id=firm_id)
     entries = _rows(db, view, filters, person=False)
     return {"timezone": ZONE, "actor_types": list(ACTIVITY_ACTOR_TYPES), "total": entries.count(),
-            "matching": _rows(db, view, filters).count(), "people": people_in_view(db, firm_id, entries)}
+            "matching": _rows(db, view, filters).count(), "people": people_in_view(db, firm_id, entries),
+            "team_actions": team_counts(entries)}
 
 
 @router.get("/days", summary="The days with activity, in IST")

@@ -9,6 +9,7 @@ Routes the sweep's request doesn't get through (a 4xx) are in test_log_every_rou
 tests cover their logging. Routes in test_ledger_rules.py's NOT_LOGGED are left out by design, each with its reason.
 """
 import uuid
+from datetime import datetime, timezone
 
 import backend.main
 import pytest
@@ -48,6 +49,14 @@ NO_ENTRY: dict[str, str] = {
 }
 
 
+# "METHOD path" -> rows to set first, so the request does real work here (as ROUTE_STATE does in the log sweep).
+CHANGE_STATE = {
+    # Restoring a preset that isn't archived changes nothing; restore an archived one, which logs (issue #159).
+    "POST /api/admin/ai/presets/{preset_id}/restore":
+        {"ai_presets": {"is_active": False, "archived_at": datetime(2026, 11, 1, tzinfo=timezone.utc)}},
+}
+
+
 def _file(module: str) -> str:
     return module.removeprefix("backend.").replace(".", "/") + ".py"
 
@@ -70,7 +79,7 @@ def _count(test_db) -> int:
 @pytest.mark.parametrize("route", _logged_routes())
 def test_a_route_that_changes_data_leaves_an_entry(route, swept, api_client, test_db):
     ids, _ = swept
-    for table, values in ROUTE_STATE.get(route, {}).items():
+    for table, values in {**ROUTE_STATE.get(route, {}), **CHANGE_STATE.get(route, {})}.items():
         test_db.execute(sql_text(f'UPDATE "{table}" SET ' + ", ".join(f"{k} = :{k}" for k in values)), values)
     test_db.commit()
     before = _count(test_db)

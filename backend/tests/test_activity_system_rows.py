@@ -111,6 +111,23 @@ async def test_a_manual_email_check_or_digest_reports_what_its_worker_did(api_cl
     assert await started["run"]() == summary
 
 
+@pytest.mark.parametrize("sent,summary,rows", [(0, "No digest sent", 0), (2, "2 alerts", 1)])
+async def test_the_scheduled_digest_says_what_it_sent_and_logs_only_a_send(test_db, monkeypatch, sent, summary, rows):
+    """Issue #157: the scheduled digest that sent nothing reads "No digest sent", as the manual one does, and leaves no
+    Scheduler row."""
+    from backend import scheduler
+    from backend.models.db import JobRun
+
+    async def did(*args, **kwargs):
+        return sent
+    monkeypatch.setattr("backend.notifier.telegram.send_digest", did)
+    await scheduler.send_daily_digest()
+    test_db.expire_all()
+    run = test_db.query(JobRun).filter(JobRun.job_type == "daily_digest").order_by(JobRun.started_at.desc()).first()
+    assert run.result_summary == summary
+    assert len(_rows(test_db, entity_type="job_run", actor_name="Scheduler")) == rows
+
+
 async def test_a_digest_telegram_refused_is_not_counted_as_sent(test_db, monkeypatch):
     from backend.notifier import telegram
 

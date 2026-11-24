@@ -9,6 +9,7 @@ from backend.auth import throttle
 from backend.auth.passwords import hash_password
 from backend.models.tenancy import ActivityEntry, Firm, PlatformUser, User
 from backend.tests.auth_support import TEST_PASSWORD, make_firm, make_plan, make_user
+from backend.tests.problem_support import body_of
 from backend.tests.resume_support import make_version
 
 PASSWORD = "A-long-test-password-2026"
@@ -67,7 +68,9 @@ def test_a_deactivated_account_gets_the_same_answer_and_its_own_reason(anonymous
     bde.is_active = False
     test_db.commit()
     refused = _sign_in(anonymous_client, bde.email, TEST_PASSWORD)
-    assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+    # The same public answer: each response has its own request id, so the body is compared without it (#158).
+    assert (refused.status_code, body_of(refused)) == (wrong.status_code, body_of(wrong))
+    assert refused.json()["request_id"] and refused.json()["request_id"] != wrong.json()["request_id"]
     assert "Account deactivated" in {e.summary for e in _failed(test_db)}
 
 
@@ -301,6 +304,8 @@ def test_a_firms_people_come_with_their_counts(anonymous_client, test_db, people
     client = _as_admin(anonymous_client)
     body = client.get("/api/admin/activity/people", params={"firm_id": str(firm.id)}).json()
     assert next(p for p in body["people"] if p["user_id"] == str(bde.id))["actions"] == 1
+    # Teams counted by the team on each row, as the firm's own people list does (issue #156).
+    assert body["team_actions"] == ([{"manager_id": str(bde.manager_id), "actions": 1}] if bde.manager_id else [])
     assert client.get("/api/admin/activity/people", params={"firm_id": str(uuid.uuid4())}).status_code == 404
 
 

@@ -141,6 +141,8 @@ export const LedgerPeopleSchema = z.object({
   /** Rows on show, with the person or team picked. */
   matching: z.number().int(),
   people: z.array(LedgerPersonSchema),
+  /** Each team's rows by manager id, counted by the team on each row when it was written (issue #156). */
+  teamActions: z.record(z.string(), z.number().int()),
 });
 export type LedgerPeople = z.infer<typeof LedgerPeopleSchema>;
 
