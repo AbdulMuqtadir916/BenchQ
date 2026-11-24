@@ -4,14 +4,19 @@ import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format, isValid, parseISO } from "date-fns";
 import { z } from "zod";
+import { fromBackendId, isSeededFixtureId } from "@/lib/api/dto/demo-ids";
 
 /** A real calendar day: `2026-02-30` and `2026-99-99` have the shape but are dropped. */
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const date = parseISO(value);
   return isValid(date) && format(date, "yyyy-MM-dd") === value;
 });
-/** The log's people and candidates come from the backend, which only takes UUIDs. */
-const id = z.uuid();
+/**
+ * A person, team or candidate in the URL, as the rest of the screen names it: a UUID, or a seeded row's fixture id
+ * (`user_adnan`), which the people list uses and the API layer turns back into its UUID (issue #155). A seeded UUID
+ * typed by hand becomes its fixture id, so it matches the list. Anything else is dropped.
+ */
+const id = z.union([z.uuid(), z.string().refine(isSeededFixtureId)]).transform(fromBackendId);
 
 /** Everything the log shows lives in the URL. A value that doesn't parse is dropped rather than an error. */
 export const ActivityParamsSchema = z.object({

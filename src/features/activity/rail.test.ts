@@ -20,6 +20,9 @@ const people = [
   person("old", "BDE", "mira", 2, true),
 ];
 
+/** The server's counts: all rows, and each team's by the team stamped on the row. */
+const counts = { total: 30, teamActions: { zed: 10, mira: 8 } };
+
 const owner: Viewer = { userId: "owner", scope: "firm" };
 const mira: Viewer = { userId: "mira", scope: "team" };
 const bea: Viewer = { userId: "bea", scope: "own" };
@@ -29,7 +32,7 @@ const teamRail = (rail: Rail) => { if (rail.level !== "team") throw new Error(ra
 
 describe("the people list", () => {
   it("starts an owner at the firm: managers busiest first, with their team's actions", () => {
-    const rail = firmRail(buildRail(people, owner, {}, 30));
+    const rail = firmRail(buildRail(people, owner, {}, counts));
     expect(rail.managers.map((row) => [row.person.userId, row.bdes, row.actions])).toEqual([["zed", 1, 10], ["mira", 2, 8]]);
     expect(rail.owner?.userId).toBe("owner");
     expect(rail.you).toBeNull();
@@ -39,30 +42,39 @@ describe("the people list", () => {
   });
 
   it("shows a Viewer the owner at the top, and themself under You", () => {
-    const rail = firmRail(buildRail(people, { userId: "viewer", scope: "firm" }, {}, 30));
+    const rail = firmRail(buildRail(people, { userId: "viewer", scope: "firm" }, {}, counts));
     expect(rail.owner?.userId).toBe("owner");
     expect(rail.you?.userId).toBe("viewer");
   });
 
   it("opening a manager hides the other managers", () => {
-    const rail = teamRail(buildRail(people, owner, { team: "mira" }, 30));
+    const rail = teamRail(buildRail(people, owner, { team: "mira" }, counts));
     expect(rail.manager.userId).toBe("mira");
     expect(rail.bdes.map((row) => row.userId)).toEqual(["bea", "ben"]);
     expect(rail.actions).toBe(8);
   });
 
+  it("counts a team by the team on each row, not by who is in it today (issue #156)", () => {
+    // Bea did ten actions under Mira, moved to Zed, then one more: the badges read what each team's rows say.
+    const moved = people.map((row) => (row.userId === "bea" ? { ...row, managerId: "zed", actions: 11 } : row));
+    const byStamp = { total: 30, teamActions: { mira: 10, zed: 1 } };
+    const rail = firmRail(buildRail(moved, owner, {}, byStamp));
+    expect(Object.fromEntries(rail.managers.map((row) => [row.person.userId, row.actions]))).toEqual({ mira: 10, zed: 1 });
+    expect(teamRail(buildRail(moved, owner, { team: "zed" }, byStamp)).actions).toBe(1);
+  });
+
   it("keeps a BDE's team listed when one of them is picked", () => {
-    expect(teamRail(buildRail(people, owner, { person: "ben" }, 30)).bdes.map((row) => row.userId)).toEqual(["bea", "ben"]);
+    expect(teamRail(buildRail(people, owner, { person: "ben" }, counts)).bdes.map((row) => row.userId)).toEqual(["bea", "ben"]);
   });
 
   it("stays at the firm for the owner's own actions and an unassigned BDE", () => {
-    expect(buildRail(people, owner, { person: "owner" }, 30).level).toBe("firm");
-    expect(buildRail(people, owner, { person: "nia" }, 30).level).toBe("firm");
+    expect(buildRail(people, owner, { person: "owner" }, counts).level).toBe("firm");
+    expect(buildRail(people, owner, { person: "nia" }, counts).level).toBe("firm");
   });
 
   it("starts a manager at their own team, and a BDE at one row", () => {
-    expect(teamRail(buildRail(people, mira, {}, 30)).isOwnTeam).toBe(true);
-    expect(buildRail(people, bea, {}, 30)).toEqual({ level: "own", me: people[4] });
+    expect(teamRail(buildRail(people, mira, {}, counts)).isOwnTeam).toBe(true);
+    expect(buildRail(people, bea, {}, counts)).toEqual({ level: "own", me: people[4] });
   });
 });
 
@@ -82,7 +94,7 @@ describe("a URL outside the reader's view", () => {
 });
 
 describe("going back", () => {
-  const step = (viewer: Viewer, selection: { team?: string; person?: string }) => backStep(buildRail(people, viewer, selection, 30), viewer, selection);
+  const step = (viewer: Viewer, selection: { team?: string; person?: string }) => backStep(buildRail(people, viewer, selection, counts), viewer, selection);
 
   it("climbs one level, never above the root", () => {
     expect(step(owner, { person: "bea" })).toEqual({ label: "Mira Rao's team", to: { team: "mira" } });
@@ -117,7 +129,7 @@ describe("the actor list", () => {
 });
 
 describe("titles", () => {
-  const title = (viewer: Viewer, selection: { team?: string; person?: string }) => viewTitle(buildRail(people, viewer, selection, 30), viewer, selection, people);
+  const title = (viewer: Viewer, selection: { team?: string; person?: string }) => viewTitle(buildRail(people, viewer, selection, counts), viewer, selection, people);
 
   it("names the view", () => {
     expect(title(owner, {})).toBe("Whole firm activity");

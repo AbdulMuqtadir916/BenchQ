@@ -14,6 +14,7 @@ import { useSignedInPrincipal } from "@/lib/stores/session-store";
 import { useFirm } from "@/lib/tenancy/firm-context";
 import { cn } from "@/lib/cn";
 import { activityColumns } from "./activity-columns";
+import { candidateOptions } from "./candidate-label";
 import { ActivityRail } from "./activity-rail";
 import { DateRangeFilter, rangeLabel, type DateRange } from "./date-range-filter";
 import { actorOptions, backStep, buildRail, resolveSelection, viewSubtitle, viewTitle, type Selection, type Viewer } from "./rail";
@@ -70,11 +71,11 @@ export function ActivityPage() {
   );
   const candidatesQuery = useLedgerCandidates({ ...viewFilters, candidateId: undefined, actorId: params.person, teamId: params.team });
 
-  const rail = useMemo(() => (isReady ? buildRail(people, viewer, selection, peopleQuery.data?.total ?? 0) : null), [isReady, people, viewer, selection, peopleQuery.data]);
+  const rail = useMemo(() => (isReady ? buildRail(people, viewer, selection, { total: peopleQuery.data?.total ?? 0, teamActions: peopleQuery.data?.teamActions ?? {} }) : null), [isReady, people, viewer, selection, peopleQuery.data]);
   const back = rail ? backStep(rail, viewer, selection) : null;
   const columns = useMemo(() => activityColumns(Boolean(params.from)), [params.from]);
   const actors = useMemo(() => actorOptions(people, viewer, peopleQuery.data?.actorTypes ?? []), [people, viewer, peopleQuery.data]);
-  const candidates = useMemo(() => [{ value: "ALL", label: "All candidates" }, ...(candidatesQuery.data ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))], [candidatesQuery.data]);
+  const candidates = useMemo(() => candidateOptions(candidatesQuery.data ?? [], params.candidate, ledgerQuery.data ?? []), [candidatesQuery.data, params.candidate, ledgerQuery.data]);
 
   const select = (next: Selection) => update({ team: next.team, person: next.person });
   const setDates = ({ from, to }: DateRange) => update({ from, to });

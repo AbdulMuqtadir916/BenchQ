@@ -17,6 +17,7 @@ export const LedgerPeopleDto = z.object({
     is_former: z.boolean(),
     actions: z.number(),
   })),
+  team_actions: z.array(z.object({ manager_id: z.string(), actions: z.number() })),
 });
 
 /** GET /api/firms/{id}/ledger/candidates. */
@@ -35,6 +36,7 @@ export function toLedgerPeople(dto: z.infer<typeof LedgerPeopleDto>): LedgerPeop
       isFormer: person.is_former,
       actions: person.actions,
     })),
+    teamActions: Object.fromEntries(dto.team_actions.map((team) => [fromBackendId(team.manager_id), team.actions])),
   });
 }
 
