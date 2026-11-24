@@ -221,7 +221,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/admin/ai/presets/{preset_id}/restore": A,
     "POST /api/admin/ai/presets/{preset_id}/test-run": A,
     "PATCH /api/admin/ai/limits": A,
-    "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data
     "POST /api/companies/auto-create-from-jobs": A,

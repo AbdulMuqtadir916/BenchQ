@@ -34,7 +34,30 @@ def test_audit_lists_platform_and_firm_entries_newest_first(api_client, accounts
     entries = api_client.get("/api/admin/audit").json()
     assert [(e["action"], e["firm_id"]) for e in entries[:2]] == [("CREATE", None), ("LOGIN", str(accounts.firm_id))]
     assert "claim_state" not in entries[0] and entries[0]["actor_user_id"] is None
-    assert len(api_client.get("/api/admin/audit", params={"limit": 1}).json()) == 1
+
+
+def _audit_row(test_db, created_at, firm_id=None, actor_type="USER", action="UPDATE", summary="row"):
+    from backend.models.tenancy import ActivityEntry
+    test_db.add(ActivityEntry(firm_id=firm_id, actor_type=actor_type, actor_name="test", entity_type="firm", entity_id="x",
+                              entity_label="x", action=action, summary=summary, created_at=created_at))
+
+
+def test_background_rows_never_push_a_firms_numbers_out_of_the_audit(api_client, accounts, test_db):
+    """The Firms page's Last activity, plan history and open support views come from this list."""
+    from backend.models.db import utcnow
+    now = utcnow()
+    _audit_row(test_db, now - timedelta(days=30), accounts.firm_id, summary="Latest in this firm")
+    _audit_row(test_db, now - timedelta(days=60), accounts.firm_id, action="PLAN_CHANGED", summary="Old plan change")
+    _audit_row(test_db, now - timedelta(days=60), accounts.firm_id, action="ADMIN_ACCESS", summary="Old support view")
+    for minutes in range(120):
+        _audit_row(test_db, now - timedelta(minutes=minutes), actor_type="SYSTEM", action="CREATE", summary="Background")
+    _audit_row(test_db, now - timedelta(minutes=1), actor_type="PLATFORM_ADMIN", action="LOGIN", summary="Newest")
+    test_db.commit()
+    entries = api_client.get("/api/admin/audit", params={"limit": 1}).json()
+    summaries = [e["summary"] for e in entries]
+    assert summaries.count("Background") == 100
+    assert {"Newest", "Latest in this firm", "Old plan change", "Old support view"} <= set(summaries)
+    assert [e["created_at"] for e in entries] == sorted((e["created_at"] for e in entries), reverse=True)
 
 
 @pytest.mark.parametrize("path", ["/api/admin/users", "/api/admin/team", "/api/admin/audit", "/api/admin/candidate-usage"])
