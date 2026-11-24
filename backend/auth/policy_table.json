@@ -11,6 +11,7 @@
   "actions": {
     "ai.manage": "- - - - Y Y",
     "application.move": "Y Y Y - - -",
+    "billing.edit": "- - - - Y Y",
     "candidate.assign": "Y Y - - - -",
     "candidate.create": "Y Y - - - -",
     "candidate.edit": "Y Y Y - - -",

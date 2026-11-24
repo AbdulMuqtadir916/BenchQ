@@ -4,7 +4,7 @@ import { allUsers, firms } from "@/mocks/team";
 import { FIXTURE_NOW, invitesAt } from "@/mocks/tenancy";
 import type { LedgerEntry } from "@/lib/schemas/analytics";
 import {
-  firmsByStatus, firmsOnPlan, hasCustomLimits, lastActivityAt, needsAttention, openSupportViews, ownerStatus, planHistory, seatBlockReason, seatTotals, slugProblem, suggestSlug,
+  firmsByStatus, firmsOnPlan, lastActivityAt, needsAttention, openSupportViews, ownerStatus, planHistory, seatBlockReason, seatTotals, slugProblem, suggestSlug,
 } from "./platform";
 
 const NOW = FIXTURE_NOW;
@@ -69,12 +69,8 @@ describe("firm rows (docs/04 §14.3, §14.5)", () => {
     expect(lastActivityAt("firm_nope", data.ledger)).toBeNull();
   });
 
-  it("plan history and the custom-limits mark (07 Q30): set by a limits adjustment, cleared by a later plan change", () => {
+  it("plan history is the firm's PLAN_CHANGED entries", () => {
     expect(planHistory("firm_cbw", data.ledger).map((item) => item.summary)).toEqual(["Growth → Starter, seats 10 → 4, candidates 100 → 25"]);
-    expect(hasCustomLimits("firm_cbw", data.ledger)).toBe(false);
-    const adjusted = [entry({ id: "a", entityType: "firm_limits", createdAt: later(1).toISOString() })];
-    expect(hasCustomLimits("firm_stl", adjusted)).toBe(true);
-    expect(hasCustomLimits("firm_stl", [...adjusted, entry({ id: "b", entityType: "firm", createdAt: later(2).toISOString() })])).toBe(false);
   });
 
   it("counts firms on a plan", () => {

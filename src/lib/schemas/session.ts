@@ -23,12 +23,19 @@ export const FirmSchema = z.object({
   planId: z.string(),
   /** Effective limits, copied from the plan when it is assigned (A3). Usage is derived, never stored. `seatLimit` counts BDE seats (07 Q44). */
   seatLimit: z.number().int().positive(),
-  candidateLimit: z.number().int().positive(),
+  /** A count the Super Admin sets by hand, 0 included (07 Q77). */
+  candidateLimit: z.number().int().nonnegative(),
   /** The only profile addition (A6). The OWNER is the primary contact, derived. */
   contactPhone: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 export type Firm = z.infer<typeof FirmSchema>;
+
+/** A firm as the Super Admin reads it: adds the price per BDE, which no firm-side response carries (docs/02 §3.6). */
+export const AdminFirmSchema = FirmSchema.extend({
+  /** USD cents per BDE per 30-day period. */
+  priceCentsPerSeat: z.number().int().nonnegative(),
+});
 
 /** A firm user's fields, without the cross-field rule, so `.pick` / `.extend` keep working (as `InviteBaseSchema`). */
 export const UserBaseSchema = z.object({

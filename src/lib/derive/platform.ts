@@ -91,11 +91,6 @@ export function planHistory(firmId: string, ledger: readonly LedgerEntry[]): Led
   return firmLedger(firmId, ledger).filter((entry) => entry.action === "PLAN_CHANGED");
 }
 
-/** docs/07 Q30: "custom limits" while the firm's latest PLAN_CHANGED is a limits adjustment. */
-export function hasCustomLimits(firmId: string, ledger: readonly LedgerEntry[]): boolean {
-  return planHistory(firmId, ledger)[0]?.entityType === ENTITY.firmLimits;
-}
-
 /**
  * Support views open now (docs/04 §14.2): an ADMIN_ACCESS with no later ADMIN_ACCESS_END for the
  * same view (entityId), started less than 60 minutes ago (A12). Support views start in P4.

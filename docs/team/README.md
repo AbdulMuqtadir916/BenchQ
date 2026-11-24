@@ -127,4 +127,5 @@ it. Everyone else reads it.
 | 0033 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0032 (#150) | `activity-log/pr3-new-table-and-endpoints` |
 | 0034 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0033 | `activity-logs/pr6-signin-events-and-super-admin` |
 | 0035 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries` after copying their rows into `activity_logs`. Follows 0034 | `activity-logs/pr7-remove-old-log-tables` |
-| 0036+ | — | Claim the next number here in your PR | — |
+| 0036 | Abdul | Billing records: `plans.price_cents_per_seat`, `firms.price_cents_per_seat`, `firm_billing_periods` (07 Q74–Q76). Follows 0035 | `feat/billing-records` |
+| 0037+ | — | Claim the next number here in your PR | — |

@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, CirclePause, CircleDashed, SlidersHorizontal } from "lucide-react";
+import { CircleAlert, CircleCheck, CirclePause, CircleDashed } from "lucide-react";
 import { Tag, type TagTone } from "@/components/ui/tag";
 import type { FirmStatus } from "@/lib/schemas/tenancy";
 
@@ -27,16 +27,6 @@ export function OverLimitBadge() {
     <Tag tone="red">
       <CircleAlert size={12} aria-hidden />
       Over limit
-    </Tag>
-  );
-}
-
-/** 07 Q30: the firm's limits were adjusted away from its plan's. */
-export function CustomLimitsBadge() {
-  return (
-    <Tag tone="violet">
-      <SlidersHorizontal size={12} aria-hidden />
-      Custom limits
     </Tag>
   );
 }

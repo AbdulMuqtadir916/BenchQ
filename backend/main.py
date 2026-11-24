@@ -35,6 +35,7 @@ from backend.api.routes_autofill import router as autofill_router
 from backend.api.routes_llm import router as llm_router
 from backend.api.routes_auth import router as auth_router
 from backend.api.routes_admin import router as admin_router
+from backend.api.routes_billing import router as billing_router
 from backend.api.routes_admin_activity import router as admin_activity_router
 from backend.api.routes_ai_presets import router as ai_presets_router
 from backend.api.routes_firms import router as firms_router
@@ -219,6 +220,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(routes_inbox.router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
 app.include_router(admin_activity_router, prefix="/api")
 app.include_router(ai_presets_router, prefix="/api")
 app.include_router(firms_router, prefix="/api")

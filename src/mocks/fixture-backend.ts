@@ -78,9 +78,10 @@ export function stubBackendReads(): void {
   vi.spyOn(platformApi.firms, "get").mockImplementation(async (firmId) => {
     const firm = firms.find((item) => item.id === firmId);
     if (!firm) throw new ApiError("Not found.", "NOT_FOUND", 404);
-    return mockResult(firm);
+    return mockResult({ ...firm, priceCentsPerSeat: 3500 });
   });
-  vi.spyOn(platformApi.firms, "list").mockImplementation(() => mockResult(firms));
+  vi.spyOn(platformApi.firms, "list").mockImplementation(() => mockResult(firms.map((firm) => ({ ...firm, priceCentsPerSeat: 3500 }))));
+  vi.spyOn(platformApi.billing, "list").mockImplementation(() => mockResult([]));
   // Candidate usage is the backend's counts (GET /api/admin/candidate-usage): the test candidates' firm, status and BDE.
   vi.spyOn(platformApi.candidates, "usage").mockImplementation(() => {
     injectedFailure("platform.candidates.usage");

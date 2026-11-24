@@ -48,6 +48,7 @@ const TABLE: ReadonlyArray<readonly [Action, string]> = [
   ["firm.suspend", "- - - - Y Y"],
   ["firm.viewWorkspace", "- - - - Y Y"],
   ["plan.edit", "- - - - Y Y"],
+  ["billing.edit", "- - - - Y Y"],
   ["ai.manage", "- - - - Y Y"],
   ["invite.resend", "- - - - Y Y"],
   ["invite.revoke", "- - - - Y Y"],
