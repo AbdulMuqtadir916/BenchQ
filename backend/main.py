@@ -11,13 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db_schema import check_schema_at_head
 from backend.models.db import SessionLocal, Setting, JobRun, engine
-from backend import problem, statement_timeout
+from backend import problem, startup_checks, statement_timeout
 from backend.seed import run_seeds
 from backend.auth.access import enforce as enforce_access, route_key
 from backend.auth import throttle
 from backend.body_limit import BodySizeLimit
 from backend.logging_setup import configure_logging
 from backend.request_log import HEADER as REQUEST_ID_HEADER, NO_ROUTE, RequestLog
+from backend.security_headers import SecurityHeaders
 from backend.auth.scoping import reader_firm_id, scoped, scoped_jobs
 from backend.config import ALLOWED_ORIGINS, TELEGRAM_BOT_TOKEN
 from backend.job_monitor import launch_background, JobAlreadyRunningError, get_all_active, start_heartbeat, sanitize_run_error
@@ -69,13 +70,10 @@ async def lifespan(app: FastAPI):
     (backend/scripts/db_upgrade.py). The scheduler is not started here: it runs in its own process,
     `python -m backend.worker` (production layer step 3), so the API never runs a scheduled job."""
     logger.info("Starting JobNavigator backend...")
+    # The settings first (backend/startup_checks.py: the reset link's origin, the Gmail key, the AI key's secret, …),
+    # then the schema.
+    startup_checks.require_config("api")
     check_schema_at_head()
-    from backend.config import CANDIDATE_GMAIL_ENABLED
-    if CANDIDATE_GMAIL_ENABLED:
-        from backend.inbox.google_oauth import _fernet
-        _fernet()
-    from backend.auth.password_reset import require_reset_base_url
-    require_reset_base_url()
     run_seeds()
     _require_ai_secret()
     # The job search's scraping library, loaded once before any search can run: two sources loading it at once fail.
@@ -137,13 +135,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow dashboard frontend (configurable via ALLOWED_ORIGINS env var)
+# CORS (docs/team/uzair.md, step 6). The site calls the backend through the Next proxy, same origin, and the extension
+# from its own pages with host permissions, which should let it past CORS; so this is narrowed now and removed in a
+# later PR, once a manual extension test confirms that. The one origin list, also the Origin check's
+# (backend/auth/access.py); production refuses to start with an entry that isn't exactly https://host[:port] or
+# chrome-extension://<id>.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", REQUEST_ID_HEADER],
+    expose_headers=["Retry-After", REQUEST_ID_HEADER],
+    max_age=600,
 )
 
 
@@ -207,6 +211,12 @@ async def _oauth_browser_result(request: Request, call_next):
 # Added last, so it runs first: the request id covers every line of the request, and the access line times and
 # reports everything, a 413 or 401 from the middleware above included.
 app.add_middleware(RequestLog)
+
+
+# ── Security headers (docs/team/uzair.md, step 6) ────────────────────────────
+# Added after the request log, so it is the outermost: every answer the middleware above makes gets them too. The
+# crash 500 is answered outside it; backend/problem.py adds the same set there.
+app.add_middleware(SecurityHeaders)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────

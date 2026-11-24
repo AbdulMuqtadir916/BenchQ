@@ -249,6 +249,24 @@ def test_a_success_clears_the_count(anonymous_client, accounts):
         assert _sign_in(anonymous_client, "owner@acme.test", "wrong-password").status_code == 401
 
 
+def test_a_success_does_not_reset_the_ip_count(anonymous_client, accounts):
+    """A success forgets the email's failures only (docs/team/uzair.md, step 6). Otherwise anyone with an account
+    could guess at other accounts nine times, sign in to their own to reset the IP's count, and go on for ever.
+
+    The trade-off, accepted: people behind one address (an office's NAT) share the IP's count, so their failures add
+    up until the window (1 minute) passes, and a colleague's success no longer clears them. The email lock is
+    unchanged, and the proxy's own per-IP limit is meant to be no tighter (uzair.md §1)."""
+    ip = {"X-Forwarded-For": "10.0.3.9"}
+    for i in range(9):
+        assert _sign_in(anonymous_client, f"nobody{i}@acme.test", "wrong-password", headers=ip).status_code == 401
+    assert _sign_in(anonymous_client, "owner@acme.test", headers=ip).status_code == 200
+    assert _sign_in(anonymous_client, "nobody9@acme.test", "wrong-password", headers=ip).status_code == 401
+    r = _sign_in(anonymous_client, "nobody10@acme.test", "wrong-password", headers=ip)
+    assert r.status_code == 429                     # the tenth failure locked the IP: the success didn't reset it
+    # The email's own count was cleared by the success.
+    assert _sign_in(anonymous_client, "owner@acme.test", headers={"X-Forwarded-For": "10.0.3.10"}).status_code == 200
+
+
 def test_the_lock_expires(anonymous_client, accounts, monkeypatch):
     import backend.auth.throttle as throttle_mod
     for _ in range(5):

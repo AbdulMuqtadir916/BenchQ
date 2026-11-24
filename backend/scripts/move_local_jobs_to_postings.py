@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, text
 
+from backend import startup_checks
 from backend.applications.postings import LEGACY, job_hash
 from backend.config import DATABASE_URL
 
@@ -120,6 +121,8 @@ def main(argv=None) -> None:
     parser.add_argument("--dry-run", action="store_true", help="say what it would do; write nothing")
     parser.add_argument("--undo", action="store_true", help="point back at the old jobs and drop the copies")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
     if urlparse(DATABASE_URL.replace("postgresql+psycopg2", "postgresql")).hostname not in LOCAL_HOSTS:
         _refuse("this is for a database on this machine only.")
     engine = create_engine(DATABASE_URL)

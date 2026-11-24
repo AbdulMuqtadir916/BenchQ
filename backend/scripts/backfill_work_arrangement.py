@@ -11,6 +11,7 @@ import collections
 import logging
 import sys
 
+from backend import startup_checks
 from backend.analyzer.work_arrangement import HYBRID, ONSITE, REMOTE, extract_arrangement
 from backend.models.db import Job, SessionLocal
 
@@ -76,6 +77,8 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=None,
                         help="stop after this many unresolved jobs")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     report = run(commit=args.commit, limit=args.limit)

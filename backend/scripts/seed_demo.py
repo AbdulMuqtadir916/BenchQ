@@ -1,4 +1,4 @@
-"""Load the frontend mocks' world into the database, outside production only (07-auth F5, 07 Q38).
+"""Load the frontend mocks' world into the database, in development only (07-auth F5, 07 Q38).
 
     python -m backend.scripts.seed_demo            # add what's missing; running it twice changes nothing
     python -m backend.scripts.seed_demo --reset    # delete the demo rows (and their sessions and ledger), reseed
@@ -25,10 +25,11 @@ import uuid
 
 from sqlalchemy import or_
 
+from backend import startup_checks
 from backend.job_search import workday
 from backend.auth.passwords import hash_password
 from backend.auth.tokens import hash_token, new_token
-from backend.config import IS_PRODUCTION
+from backend.config import BENCHQ_ENV, IS_PRODUCTION
 from backend.models.db import SessionLocal, utcnow, Resume
 from backend.models.candidates import BaseResume, Candidate, ResumeParse
 from backend.models.job_search import JobPosting, ScrapeJob
@@ -175,11 +176,15 @@ def seed(db, now: datetime | None = None) -> dict[str, int]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Load the frontend mocks' demo data (outside production only).")
+    parser = argparse.ArgumentParser(description="Load the frontend mocks' demo data (development only).")
     parser.add_argument("--reset", action="store_true", help="delete the demo rows first, then seed")
     args = parser.parse_args(argv)
-    if IS_PRODUCTION:
-        print("Not seeded: BENCHQ_ENV is production. The demo data never goes into production.", file=sys.stderr)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
+    # Development only, by name: anything else (production, or a typo) never seeds the demo password's accounts.
+    if IS_PRODUCTION or BENCHQ_ENV != "development":
+        print("Not seeded: BENCHQ_ENV isn't development. The demo data never goes into production, or anywhere but "
+              "development.", file=sys.stderr)
         return 1
     db = SessionLocal()
     try:

@@ -14,6 +14,7 @@ import sys
 
 from fastapi import HTTPException
 
+from backend import startup_checks
 from backend.auth.invites import normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.auth.sessions import end_all_sessions
@@ -29,8 +30,8 @@ class Refused(Exception):
 def reset_password(db, *, email: str, password: str) -> User | PlatformUser:
     try:
         address = normal_email(email)
-    except HTTPException:
-        raise Refused("Enter a valid email address.")
+    except HTTPException as refused:               # not an email, or (production) a testing domain's
+        raise Refused(refused.detail)
     if len(password) < MIN_PASSWORD_LENGTH:
         raise Refused(f"Use at least {MIN_PASSWORD_LENGTH} characters for the password.")
     account = (db.query(User).filter(User.email == address).first()
@@ -74,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--email", required=True)
     parser.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
     db = SessionLocal()
     try:
         account = reset_password(db, email=args.email, password=_read_password(args.password_stdin))

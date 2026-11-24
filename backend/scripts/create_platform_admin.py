@@ -13,6 +13,7 @@ import sys
 
 from fastapi import HTTPException
 
+from backend import startup_checks
 from backend.auth.invites import account_exists, normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.models.db import SessionLocal
@@ -26,8 +27,8 @@ class Refused(Exception):
 def create_platform_admin(db, *, email: str, name: str, password: str) -> PlatformUser:
     try:
         address = normal_email(email)
-    except HTTPException:
-        raise Refused("Enter a valid email address.")
+    except HTTPException as refused:               # not an email, or (production) a testing domain's
+        raise Refused(refused.detail)
     name = name.strip()
     if not name:
         raise Refused("Enter a name.")
@@ -61,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", required=True)
     parser.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
     db = SessionLocal()
     try:
         admin = create_platform_admin(db, email=args.email, name=args.name,

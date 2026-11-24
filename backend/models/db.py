@@ -39,7 +39,10 @@ _engine_kwargs = {"pool_pre_ping": True, "hide_parameters": True}
 if not DATABASE_URL.startswith("sqlite"):
     _engine_kwargs.update(pool_size=20, max_overflow=10, pool_timeout=5, pool_recycle=1800,
                           connect_args={"connect_timeout": 5, "options": "-c statement_timeout=60s"})
-engine = create_engine(DATABASE_URL, **_engine_kwargs)
+# DATABASE_URL unset: the start-up check refuses to start with the variable's name (backend/startup_checks.py). The
+# engine still builds, so importing the models never crashes first; a `.invalid` host never resolves, so nothing can
+# connect anywhere by accident.
+engine = create_engine(DATABASE_URL or "postgresql://database-url-unset.invalid/unset", **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

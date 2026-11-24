@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import HTTPException
 from starlette.responses import JSONResponse, Response
 
+from backend import security_headers
 from backend.logging_setup import request_id
 
 MEDIA_TYPE = "application/problem+json"
@@ -110,7 +111,11 @@ def problem_response(status: int, detail: str, code: str | None = None, headers:
     for name, value in extensions.items():
         if name not in body:
             body[name] = value
-    return JSONResponse(status_code=status, content=body, headers=headers, media_type=MEDIA_TYPE)
+    response = JSONResponse(status_code=status, content=body, headers=headers, media_type=MEDIA_TYPE)
+    # The security headers (backend/security_headers.py) on the body itself: the crash 500 is sent outside every user
+    # middleware, so the middleware can't add them to it.
+    security_headers.add_missing(response.headers)
+    return response
 
 
 def from_http_exception(exc, request=None) -> Response:
