@@ -76,3 +76,10 @@ Main's #147 to #151 merged in. Main deleted the old pool's freehire.me scraper (
 so this part's one-line change there goes with it. Main's #147 moved the scheduler into its own worker process and
 replaced the start-up clean-up with a heartbeat (`job_monitor.py`); a scheduled run that did something or failed still
 writes its one Scheduler row when it finishes (`_log_run`), now from the worker.
+
+## Abdul's review issues (2026-11-24)
+
+- **#157, the scheduled digest.** A scheduled digest that sent nothing (Telegram off, no chat, or the message refused)
+  was summed up as "Digest sent", so it wrote a Scheduler row for a send that didn't happen. It now says "No digest
+  sent", as the manual digest does, and leaves no row (`scheduler.send_daily_digest`). Test:
+  `test_the_scheduled_digest_says_what_it_sent_and_logs_only_a_send`.

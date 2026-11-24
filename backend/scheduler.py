@@ -284,7 +284,9 @@ async def send_daily_digest():
             logger.info("Sending daily digest...")
             from backend.notifier.telegram import send_digest
             alerts = await send_digest()
-            run.summary = _count_summary(alerts, "alert") or "Digest sent"
+            # Nothing sent (Telegram off, no chat, or the message refused) says so, as the manual digest does, so the run
+            # writes no Scheduler row (issue #157).
+            run.summary = _count_summary(alerts, "alert") or "No digest sent"
     except JobAlreadyRunningError as e:
         logger.warning(f"Scheduler skipped: {e}")
 
