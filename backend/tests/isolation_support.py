@@ -207,8 +207,8 @@ def build_firm(db, firm, owner, tag: str) -> dict:
     invite, _ = send_invite(db, inviter=owner, firm=firm, email=f"bde@{tag.lower()}.test", role="BDE",
                             invitee_name=f"{tag} invitee", summary=f"Invited a BDE to {tag}", now=utcnow(),
                             manager_id=manager.id)
-    ledger.record(db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=uuid.uuid4(),
-                  entity_label=f"{tag} candidate", summary=f"{tag} edited a candidate", firm_id=firm.id)
+    ledger.record(db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=candidate.id,
+                  entity_label=f"{tag} candidate", summary=f"{tag} edited a candidate", firm_id=firm.id, candidate_id=candidate.id)
     # A dedicated pending-review application exercises the review command independently.
     from backend.models.db import ApplicationReview
     review_job = Job(external_id=f"{tag}-review", title=f"{tag} review role", company=f"{tag} Corp", source="manual")

@@ -84,7 +84,7 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
     is_firm_user = isinstance(account, User)
     ledger.record(db, actor=account, action="LOGIN", entity_type="user" if is_firm_user else "platform_user",
                   entity_id=account.id, entity_label=account.name, summary=f"{account.name} signed in",
-                  firm_id=account.firm_id if is_firm_user else None)
+                  firm_id=account.firm_id if is_firm_user else None, candidate_id=None)
     db.commit()
 
     response.set_cookie(value=token, **cookie_kwargs(row.expires_at))
