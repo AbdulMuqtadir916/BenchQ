@@ -66,7 +66,7 @@ def edit_plan(plan_id: uuid.UUID, body: PlanBody, principal: Principal = Depends
         plan.price_cents_per_seat = body.price_cents_per_seat
     if changes:
         ledger.record(db, actor=admin, action="PLAN_CHANGED", entity_type="plan", entity_id=plan.id,
-                      entity_label=plan.name, summary="Edited the plan: " + "; ".join(changes), firm_id=None)
+                      entity_label=plan.name, summary="Edited the plan: " + "; ".join(changes), firm_id=None, candidate_id=None)
     db.commit()
     return plan_json(plan)
 
@@ -102,17 +102,17 @@ def set_seats(firm_id: uuid.UUID, body: SeatsBody, principal: Principal = Depend
     if (body.seat_limit, firm.candidate_limit) != (old_seats, old_candidates):
         ledger.record(db, actor=admin, action="PLAN_CHANGED", entity_type="firm_limits", entity_id=firm.id,
                       entity_label=firm.name, firm_id=firm.id,
-                      summary=f"BDE seats {old_seats} → {firm.seat_limit}, candidates {old_candidates} → {firm.candidate_limit}")
+                      summary=f"BDE seats {old_seats} → {firm.seat_limit}, candidates {old_candidates} → {firm.candidate_limit}", candidate_id=None)
     if price != old_price:        # a price is billing: platform-only, never in the firm's own ledger (Q76)
         ledger.record(db, actor=admin, action="PLAN_CHANGED", entity_type="billing_terms", entity_id=firm.id,
                       entity_label=firm.name, firm_id=None,
-                      summary=f"Price per BDE {dollars(old_price)} → {dollars(price)} for {firm.name}")
+                      summary=f"Price per BDE {dollars(old_price)} → {dollars(price)} for {firm.name}", candidate_id=None)
     period = sync_current_period(db, firm, today_ist(utcnow()))
     if period is not None:
         ledger.record(db, actor=admin, action="UPDATE", entity_type="billing_period", entity_id=period.id,
                       entity_label=firm.name, firm_id=None,
                       summary=f"Period {period.starts_on} to {period.ends_on} for {firm.name} now "
-                              f"{period.seat_limit} BDEs, {dollars(period.amount_cents)}, {period.status.lower()}")
+                              f"{period.seat_limit} BDEs, {dollars(period.amount_cents)}, {period.status.lower()}", candidate_id=None)
     db.commit()
     return admin_firm_json(firm)
 
@@ -138,7 +138,7 @@ def suspend_firm(firm_id: uuid.UUID, body: SuspendBody, principal: Principal = D
                        else "Only an active firm can be suspended.")
     firm.status = "SUSPENDED"
     ledger.record(db, actor=admin, action="FIRM_SUSPENDED", entity_type="firm", entity_id=firm.id,
-                  entity_label=firm.name, summary=f"Suspended {firm.name}", note=reason, firm_id=firm.id)
+                  entity_label=firm.name, summary=f"Suspended {firm.name}", note=reason, firm_id=firm.id, candidate_id=None)
     db.commit()
     return admin_firm_json(firm)
 
@@ -154,7 +154,7 @@ def reactivate_firm(firm_id: uuid.UUID, principal: Principal = Depends(require("
         raise conflict("This firm isn't suspended.")
     firm.status = "ACTIVE"
     ledger.record(db, actor=admin, action="FIRM_REACTIVATED", entity_type="firm", entity_id=firm.id,
-                  entity_label=firm.name, summary=f"Reactivated {firm.name}", firm_id=firm.id)
+                  entity_label=firm.name, summary=f"Reactivated {firm.name}", firm_id=firm.id, candidate_id=None)
     db.commit()
     return admin_firm_json(firm)
 
@@ -197,7 +197,7 @@ def start_period(firm_id: uuid.UUID, body: StartPeriodBody, principal: Principal
     ledger.record(db, actor=admin, action="CREATE", entity_type="billing_period", entity_id=period.id,
                   entity_label=firm.name, firm_id=None,
                   summary=f"Started {period.starts_on} to {period.ends_on} for {firm.name}: {period.seat_limit} BDEs, "
-                          f"{dollars(period.amount_cents)}")
+                          f"{dollars(period.amount_cents)}", candidate_id=None)
     db.commit()
     return period_json(period)
 
@@ -221,7 +221,7 @@ def edit_period(period_id: uuid.UUID, body: PeriodBody, principal: Principal = D
     ledger.record(db, actor=admin, action="UPDATE", entity_type="billing_period", entity_id=period.id,
                   entity_label=firm.name, firm_id=None,
                   summary=f"Period {period.starts_on} to {period.ends_on} for {firm.name} is "
-                          f"{period.status.lower()} ({dollars(period.amount_cents)})")
+                          f"{period.status.lower()} ({dollars(period.amount_cents)})", candidate_id=None)
     db.commit()
     return period_json(period)
 

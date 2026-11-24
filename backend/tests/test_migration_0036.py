@@ -1,4 +1,4 @@
-"""Migration 0033 (07 Q65-Q67): a price per BDE on plans and firms, and the billing periods table. A firm copies its
+"""Migration 0036 (07 Q65-Q67): a price per BDE on plans and firms, and the billing periods table. A firm copies its
 plan's price; existing firms get no period; the database refuses an amount that isn't count times price."""
 import pytest
 from sqlalchemy import inspect, text
@@ -13,28 +13,28 @@ def _columns(engine, table) -> set[str]:
 
 def test_upgrade_adds_prices_and_periods_and_downgrade_removes_them(scratch_db):
     name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0032"))
+    _ok(_alembic(name, "upgrade", "0035"))
     assert "price_cents_per_seat" not in _columns(engine, "plans")
     assert "firm_billing_periods" not in inspect(engine).get_table_names()
-    _ok(_alembic(name, "upgrade", "0033"))
+    _ok(_alembic(name, "upgrade", "0036"))
     assert "price_cents_per_seat" in _columns(engine, "plans") and "price_cents_per_seat" in _columns(engine, "firms")
     assert "firm_billing_periods" in inspect(engine).get_table_names()
-    _ok(_alembic(name, "downgrade", "0032"))
+    _ok(_alembic(name, "downgrade", "0035"))
     assert "price_cents_per_seat" not in _columns(engine, "firms")
     assert "firm_billing_periods" not in inspect(engine).get_table_names()
-    _ok(_alembic(name, "upgrade", "0033"))
+    _ok(_alembic(name, "upgrade", "0036"))
 
 
 def test_existing_firms_copy_their_plans_price_and_start_with_no_period(scratch_db):
     name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0032"))
+    _ok(_alembic(name, "upgrade", "0035"))
     with engine.begin() as conn:
         conn.execute(text("INSERT INTO plans (id, name, seat_limit, candidate_limit) "
                           "VALUES ('00000000-0000-4000-8000-0000000000a1', 'Old', 4, 40)"))
         conn.execute(text("INSERT INTO firms (id, name, slug, plan_id, seat_limit, candidate_limit, work_start, work_end) "
                           "VALUES ('00000000-0000-4000-8000-0000000000b1', 'Old Co', 'oldco', "
                           "'00000000-0000-4000-8000-0000000000a1', 4, 40, '18:30', '04:00')"))
-    _ok(_alembic(name, "upgrade", "0033"))
+    _ok(_alembic(name, "upgrade", "0036"))
     with engine.connect() as conn:
         assert conn.execute(text("SELECT price_cents_per_seat FROM firms WHERE slug = 'oldco'")).scalar() == 3500
         assert conn.execute(text("SELECT count(*) FROM firm_billing_periods")).scalar() == 0
@@ -47,7 +47,7 @@ def test_existing_firms_copy_their_plans_price_and_start_with_no_period(scratch_
 ])
 def test_the_database_refuses_inconsistent_periods(scratch_db, values):
     name, engine = scratch_db
-    _ok(_alembic(name, "upgrade", "0033"))
+    _ok(_alembic(name, "upgrade", "0036"))
     with engine.connect() as conn:
         firm = conn.execute(text("SELECT id FROM firms LIMIT 1")).scalar()
         assert firm is not None

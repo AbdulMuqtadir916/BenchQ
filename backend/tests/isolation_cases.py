@@ -167,6 +167,9 @@ CASES: dict[str, Case] = {
 
     # ── Ledger (track 01) ────────────────────────────────────────────────────
     "GET /api/firms/{firm_id}/ledger": Case(shows_rows=True),
+    "GET /api/firms/{firm_id}/ledger/people": Case(),
+    "GET /api/firms/{firm_id}/ledger/candidates": Case(),
+    "GET /api/firms/{firm_id}/ledger/days": Case(),
 
     # ── Jobs (track 02): the firm's links in firm_jobs ───────────────────────
     "GET /api/jobs": Case(shows_rows=True),

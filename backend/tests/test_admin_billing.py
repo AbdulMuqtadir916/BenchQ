@@ -8,7 +8,7 @@ import pytest
 from backend.auth.billing import today_ist
 from backend.job_search.limits import JOBS_PER_CANDIDATE_PER_DAY
 from backend.models.db import utcnow
-from backend.models.tenancy import BillingPeriod, Firm, LedgerEntry, Plan
+from backend.models.tenancy import BillingPeriod, Firm, ActivityEntry, Plan
 from backend.tests.auth_support import make_firm, make_user
 
 SEATS = "/api/admin/firms/{}/seats"
@@ -60,7 +60,7 @@ def test_the_count_may_go_below_what_the_firm_uses_and_nothing_is_removed(api_cl
 
 def test_a_count_change_is_in_the_firms_ledger_as_counts_only(api_client, accounts, test_db):
     api_client.patch(SEATS.format(_firm(accounts)), json={"seat_limit": 12, "candidate_limit": 120})
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == accounts.firm_id, LedgerEntry.entity_type == "firm_limits").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == accounts.firm_id, ActivityEntry.entity_type == "firm_limits").one()
     assert entry.action == "PLAN_CHANGED"
     assert entry.summary == "BDE seats 10 → 12, candidates 100 → 120"
 
@@ -68,15 +68,15 @@ def test_a_count_change_is_in_the_firms_ledger_as_counts_only(api_client, accoun
 def test_a_price_change_is_logged_platform_only(api_client, accounts, test_db):
     api_client.patch(SEATS.format(_firm(accounts)), json={"seat_limit": 10, "price_cents_per_seat": 4000})
     assert test_db.get(Firm, accounts.firm_id).price_cents_per_seat == 4000
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "billing_terms").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "billing_terms").one()
     assert entry.firm_id is None
     assert "$35.00 → $40.00" in entry.summary
 
 
 def test_an_unchanged_count_writes_nothing(api_client, accounts, test_db):
-    before = test_db.query(LedgerEntry).count()
+    before = test_db.query(ActivityEntry).count()
     assert api_client.patch(SEATS.format(_firm(accounts)), json={"seat_limit": 10}).status_code == 200
-    assert test_db.query(LedgerEntry).count() == before
+    assert test_db.query(ActivityEntry).count() == before
 
 
 @pytest.mark.parametrize("body", [{"seat_limit": 0}, {"seat_limit": 1001}, {"seat_limit": 5, "price_cents_per_seat": -1}])
@@ -194,7 +194,7 @@ def test_editing_the_plan_changes_new_firms_not_existing_ones(api_client, accoun
     assert (r.json()["seat_limit"], r.json()["candidate_limit"], r.json()["price_cents_per_seat"]) == (8, 80, 4000)
     firm = test_db.get(Firm, accounts.firm_id)
     assert (firm.seat_limit, firm.candidate_limit, firm.price_cents_per_seat) == (10, 100, 3500)
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "plan").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "plan").one()
     assert entry.firm_id is None
 
 
@@ -213,7 +213,7 @@ def test_create_firm_takes_a_bde_count_and_copies_the_price(api_client, accounts
 def test_suspend_and_reactivate(api_client, accounts, test_db):
     r = api_client.post(f"/api/admin/firms/{_firm(accounts)}/suspend", json={"reason": "  Unpaid since October  "})
     assert r.status_code == 200 and r.json()["status"] == "SUSPENDED"
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.action == "FIRM_SUSPENDED").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.action == "FIRM_SUSPENDED").one()
     assert (entry.firm_id, entry.note) == (accounts.firm_id, "Unpaid since October")
     assert api_client.post(f"/api/admin/firms/{_firm(accounts)}/suspend", json={"reason": "again"}).status_code == 409
     r = api_client.post(f"/api/admin/firms/{_firm(accounts)}/reactivate")

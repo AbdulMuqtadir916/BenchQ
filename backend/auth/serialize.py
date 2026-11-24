@@ -1,11 +1,12 @@
 """The session's wire shape: the frontend's `SessionSchema` (src/lib/schemas/session.ts) in snake_case, mapped
 by src/lib/api/dto/session.ts (07-auth F3). Usage (seats, active candidates) is derived elsewhere, never here."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session as DbSession
 
+from backend.auth.ledger import agent_person
 from backend.auth.sessions import Principal
-from backend.models.tenancy import Firm, LedgerEntry, PlatformUser, SupportView, User
+from backend.models.tenancy import Firm, ActivityEntry, PlatformUser, SupportView, User
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -55,6 +56,16 @@ def support_view_json(view: SupportView) -> dict:
     }
 
 
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _cursor(entry: ActivityEntry) -> str | None:
+    """The page marker for reading on after this row (routes_ledger `cursor`); none for a row not yet saved."""
+    if entry.created_at is None:
+        return None
+    return f"{(entry.created_at - EPOCH) // timedelta(microseconds=1)}_{entry.id}"
+
+
 # What a platform admin reading the ledger (the audit, or a support view) sees instead of a firm's own content:
 # entity_type → (label, or None to keep it; summary). The entry still says what happened, to whom, by whom and when.
 # A job search's role and country, and a job's title and company, are the firm's business (job search PR 1,
@@ -66,10 +77,13 @@ _RESTRICTED = {
 }
 
 
-def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
-    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case. `hide_email`: the reader is a platform
-    admin, so a restricted entry's content is replaced (`_RESTRICTED`)."""
+def ledger_entry_json(entry: ActivityEntry, *, hide_email: bool = False, candidate_name: str | None = None,
+                      person_name: str | None = None) -> dict:
+    """The frontend's LedgerEntry (src/lib/schemas/analytics.ts) in snake_case, with what the log adds to it.
+    `hide_email`: the reader is a platform admin, so a restricted entry's content is replaced (`_RESTRICTED`) and its
+    before/after values are left out."""
     restricted = _RESTRICTED.get(entry.entity_type) if hide_email else None
+    hidden = restricted is not None
     # A hand-off's note is what the firm wrote about its candidate: not for a platform admin (CodeAnt on #135, done at
     # Abdul's request). The entry itself (who was moved where) stays.
     note = None if restricted or (hide_email and entry.action == "ASSIGN") else entry.note
@@ -83,7 +97,17 @@ def ledger_entry_json(entry: LedgerEntry, *, hide_email: bool = False) -> dict:
         "summary": restricted[1] if restricted else entry.summary,
         "note": note,
         "model_id": entry.model_id, "prompt_version": entry.prompt_version,
-        "created_at": _iso(entry.created_at),
+        "created_at": _iso(entry.created_at), "cursor": _cursor(entry), "candidate_name": candidate_name,
+        "actor_role": entry.actor_role, "attempt_count": entry.attempt_count,
+        "on_behalf_of_user_id": str(entry.on_behalf_of_user_id) if entry.on_behalf_of_user_id else None,
+        # An agent named "AI agent (Name)" carries the name it had when written; another (the email classifier) is
+        # shown as the person it worked for, as they are now.
+        "on_behalf_of_name": ((agent_person(entry.actor_name) if entry.actor_name.startswith("AI agent (") else person_name)
+                              if entry.on_behalf_of_user_id else None),
+        "team_manager_id": str(entry.team_manager_id) if entry.team_manager_id else None,
+        "candidate_manager_id": str(entry.candidate_manager_id) if entry.candidate_manager_id else None,
+        "candidate_bde_id": str(entry.candidate_bde_id) if entry.candidate_bde_id else None,
+        "changes": None if hidden else entry.changes,
     }
 
 
