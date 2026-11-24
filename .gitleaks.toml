@@ -1,0 +1,64 @@
+# Secret scanning for BenchQ (CI job "gitleaks" in .github/workflows/ci.yml).
+# The default gitleaks rules, plus allowlists for values that look like secrets but are not.
+# Keep every entry narrow: an exact value, and the files it may appear in when that is known. Never allowlist a
+# whole file or folder: a real key pasted next to a test value would then pass unseen. A real secret that was
+# committed is rotated, not allowlisted.
+
+[extend]
+useDefault = true
+
+# The seeded demo accounts' password (backend/scripts/seed_demo.py). Local demo data, quoted in the README, docs and
+# tests on purpose (CLAUDE.md: "not secrets to build on"). Exact value only, wherever it appears.
+[[allowlists]]
+description = "Demo password for the seeded local accounts"
+regexes = ['''^benchq-demo-2026$''']
+
+# The test suite's fixed encryption keys (backend/tests/conftest.py): base64 of "0123456789abcdef..." and of
+# thirty-two zeros, set only for the disposable test database. gitleaks also decodes base64 and checks the result,
+# so the decoded forms are listed too.
+[[allowlists]]
+description = "Fixed test-only Fernet keys in the test conftest"
+condition = "AND"
+paths = ['''^backend/tests/conftest\.py$''']
+regexes = [
+  '''^MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=$''',
+  '''^MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=$''',
+  '''^(0123456789abcdef){2}$''',
+  '''^0{32}$''',
+]
+
+# The logging canary plants a fake password and token and asserts they never reach a log
+# (backend/tests/test_logging_canary.py, docs/team/uzair.md section 1, step 4a).
+[[allowlists]]
+description = "Planted values in the logging canary test"
+condition = "AND"
+paths = ['''^backend/tests/test_logging_canary\.py$''']
+regexes = [
+  '''^Wombat-Lantern-Pass-77$''',
+  '''^cAnArYtOkEn7Qx9Lp2Wm4Rt8Yb6Nv3Hj5Kd1Fs0Gz$''',
+]
+
+# The production-config test plants a fake database password and asserts the startup check never prints it
+# (backend/tests/test_production_config.py, arriving with the production-hardening PR; docs/team/uzair.md step 6).
+[[allowlists]]
+description = "Planted database password in the production-config test"
+condition = "AND"
+paths = ['''^backend/tests/test_production_config\.py$''']
+regexes = ['''^s3cr3t-db-pass-91f2$''']
+
+# Mock e-mail tracer ids in the résumé fixtures ("trc_<id>"): fixture ids, not credentials. The fixtures lived in
+# src/mocks/data and are moving to src/test/fixtures.
+[[allowlists]]
+description = "Mock tracer ids in the résumé fixtures"
+condition = "AND"
+paths = ['''^src/(mocks/data|test/fixtures)/[^/]+\.json$''']
+regexes = ['''^trc_[a-z0-9_]+$''']
+
+# The local and test Postgres credentials (user jobnavigator, password "password") that docker-compose, the CI
+# service, the .env.example templates and the docs use for disposable local databases. Matched on the whole
+# connection string, so any other password in a database URL is still reported. The .env.example templates get no
+# path allowlist of their own: they hold only empty values today, and a real key pasted into one must be caught.
+[[allowlists]]
+description = "Local and test database credentials in connection strings"
+regexTarget = "match"
+regexes = ['''jobnavigator:password@(localhost|db|db-test)[:/]''']
