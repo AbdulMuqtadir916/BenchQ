@@ -21,3 +21,11 @@ describe("Activity URL ids (issue #155)", () => {
     expect(parse("person=not-an-id").person).toBeUndefined();
   });
 });
+
+describe("the Super Admin's Activity URL ids (issue #155)", () => {
+  it("keeps a seeded firm, and the seeded Super Admin for Your actions", () => {
+    expect(parse("firm=firm_hts").firm).toBe("firm_hts");
+    expect(parse(`firm=${toBackendId("firm_hts")}`).firm).toBe("firm_hts");
+    expect(parse("person=padm_sana").person).toBe("padm_sana");
+  });
+});

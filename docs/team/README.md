@@ -125,4 +125,5 @@ it. Everyone else reads it.
 | 0030 | Zuhair | `resumes.search_titles` (JSONB, null): the job search's extra titles on the active base's v1. Additive. Follows 0029 | `feat/job-search-indeed-and-candidate-details` |
 | 0031 | Zuhair (firms and candidates columns: Abdul approves) | `firms.work_start`, `work_end` (required; existing firms 18:30–04:00), `candidates.bde_assigned_at`, `bde_day_one`, `scrape_jobs.work_date` (filled from the rows). Follows 0030 | `feat/job-search-indeed-and-candidate-details` |
 | 0033 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0032 (#150) | `activity-log/pr3-new-table-and-endpoints` |
-| 0034+ | — | Claim the next number here in your PR | — |
+| 0034 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0033 | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0035+ | — | Claim the next number here in your PR | — |

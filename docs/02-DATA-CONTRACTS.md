@@ -2362,6 +2362,12 @@ export const LedgerEntrySchema = z.object({
   actorRole: z.enum([...FirmRole.options, 'PLATFORM_ADMIN']).nullable().optional(),  // the role when written
   onBehalfOfUserId: z.string().nullable().optional(),   // the person an AI agent worked for
   onBehalfOfName: z.string().nullable().optional(),
+  // Activity logs PR 6 (2026-11-24, issue #154; for Abdul's sign-off): sign-out, failed sign-ins and lockouts.
+  // actorType also takes 'UNKNOWN' (a failed sign-in for an email with no account: "Email not shown", nothing typed
+  // kept), and action also takes 'LOGOUT', 'SIGN_IN_FAILED' and 'LOCKED_OUT'; the last two are the Super Admin's
+  // alone, served to no firm reader.
+  attemptCount: z.number().int().optional(),            // tries one failed sign-in row stands for (same IP, 10 s)
+  firmName: z.string().nullable().optional(),           // on the Super Admin's log
 });
 
 // The Activity screen's side lists (GET /api/firms/{id}/ledger/people, /ledger/candidates, /ledger/days). Counts are

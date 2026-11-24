@@ -202,6 +202,12 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
+    "GET /api/admin/activity": A,
+    "GET /api/admin/activity/overview": A,
+    "GET /api/admin/activity/people": A,
+    "GET /api/admin/activity/days": A,
+    "GET /api/admin/activity/candidates": A,
+    "GET /api/admin/activity/{entry_id}/ip": A,
     # The Super Admin's AI setup (docs/integration/08-ai-presets.md).
     "GET /api/admin/ai": A,
     "GET /api/admin/ai/available-models": A,
