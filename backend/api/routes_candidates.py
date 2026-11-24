@@ -328,10 +328,10 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: 
     db.flush()
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
-                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
+                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}", candidate_id=candidate.id)
     ledger.record(db, actor=actor, action="ASSIGN", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=_assign_summary(manager, bde, None),
-                  note=_clean(body.handoff_note))
+                  note=_clean(body.handoff_note), candidate_id=candidate.id)
     db.commit()
     # The job search's 2 extra titles for the target role, after the answer (decided 2026-11-17, Q131).
     from backend.job_search import search_titles
@@ -383,7 +383,7 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if changed:
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}")
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}", candidate_id=candidate.id)
         db.commit()
         if set(changed) & _SCORED:
             match_store.rescore_later(background, firm_id, candidate_id)   # what the Match reads (Q35)
@@ -413,6 +413,6 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
         workday.assign(candidate, new_bde_id, utcnow(), workday.of(firm))
     ledger.record(db, actor=db.get(User, principal.user_id), action="ASSIGN", entity_type="candidate",
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note))
+                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note), candidate_id=candidate.id)
     db.commit()
     return candidate_json(candidate, principal)

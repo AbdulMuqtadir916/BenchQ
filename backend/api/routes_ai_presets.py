@@ -175,7 +175,7 @@ def _refuse_removed_model(db: DbSession, module: PresetModule, model_id: str) ->
 def _log(db: DbSession, principal: Principal, action: str, entity_type: str, entity_id, label: str, summary: str) -> None:
     admin = db.get(PlatformUser, principal.user_id)
     ledger.record(db, actor=admin, action=action, entity_type=entity_type, entity_id=entity_id, entity_label=label,
-                  summary=summary, firm_id=None)
+                  summary=summary, firm_id=None, candidate_id=None)
 
 
 def _preset(db: DbSession, preset_id: uuid.UUID) -> AiPreset:
