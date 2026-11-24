@@ -267,15 +267,15 @@ def test_the_name_and_email_stay_the_candidates_whatever_a_later_upload_or_save_
                                                                                     parser):
     """07 Q68 (2026-11-18): fixed once the candidate is added. A later upload takes the candidate's name and email, not
     the parser's, and a save that sends another name or email is refused; the ledger keeps the one name."""
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _candidate(anonymous_client, test_db, world, bde="adnan")         # the form's name: Ravi Teja
     assert anonymous_client.post(_url(world, c, "/upload"), files=_pdf(), headers=world["as"]["adnan"]).status_code == 201
     profile_url = f"/api/firms/{world['firm'].id}/candidates/{c['id']}"
     profile = anonymous_client.get(profile_url, headers=world["as"]["owner"]).json()
     assert (profile["full_name"], profile["email"]) == (c["full_name"], c["email"])     # not the file's "Ravi T"
-    upload = test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == uuid.UUID(c["id"]),
-                                               LedgerEntry.action == "CREATE", LedgerEntry.entity_type == "resume") \
-        .order_by(LedgerEntry.created_at.desc()).first()
+    upload = test_db.query(ActivityEntry).filter(ActivityEntry.candidate_id == uuid.UUID(c["id"]),
+                                               ActivityEntry.action == "CREATE", ActivityEntry.entity_type == "resume") \
+        .order_by(ActivityEntry.created_at.desc()).first()
     assert upload.entity_label == f"{c['full_name']} · Base 2"
     v1 = _v(anonymous_client, world, c, base_number=2, who="adnan")
     for changed in ({"full_name": "Ravi Teja Kumar"}, {"email": "someone@example.com"}):
@@ -434,8 +434,8 @@ def test_picking_a_version_whose_promoted_base_was_deleted_brings_that_base_back
     again = anonymous_client.post(_url(world, c, f"/{v2['id']}/use-as-base"), headers=as_bde)
     assert again.status_code == 200 and again.json()["id"] == base2["id"] and again.json()["is_active"]
     assert len(_listing(anonymous_client, world, c)["bases"]) == 2            # no third copy: the same base is back
-    from backend.models.tenancy import LedgerEntry
-    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == base2["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    from backend.models.tenancy import ActivityEntry
+    last = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == base2["id"]).order_by(ActivityEntry.created_at.desc()).first()
     assert last.summary == "Restored Base 2 (its v1) by using Base 1 v2 again; the workflow uses it"   # not "the same file"
 
 

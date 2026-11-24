@@ -121,18 +121,19 @@ export function Sidebar({
 function SidebarItem({ route, isActive, pendingRequestCount }: { route: RouteDef; isActive: boolean; pendingRequestCount: number }) {
   const toHref = useHref();
   const Icon = route.nav?.icon;
+  const label = route.nav?.label ?? route.title;
 
   return (
     <li>
       <Link
         href={toHref(route)}
         aria-current={isActive ? "page" : undefined}
-        title={route.title}
-        aria-label={pendingRequestCount ? `${route.title}, ${pendingRequestCount} pending password reset requests` : route.title}
+        title={label}
+        aria-label={pendingRequestCount ? `${label}, ${pendingRequestCount} pending password reset requests` : label}
         className="bq-nav-item relative text-body"
       >
         {Icon ? <Icon size={16} aria-hidden="true" className="shrink-0" /> : null}
-        <span className="sidebar-label flex-1 truncate">{route.title}</span>
+        <span className="sidebar-label flex-1 truncate">{label}</span>
         <CountBadge count={pendingRequestCount} className="absolute right-2 top-1/2 -translate-y-1/2" />
       </Link>
     </li>

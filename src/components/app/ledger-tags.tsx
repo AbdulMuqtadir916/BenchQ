@@ -22,6 +22,9 @@ export const ACTION_TONE: Record<LedgerEntry["action"], TagTone> = {
   INVITE_ACCEPTED: "green",
   INVITE_REVOKED: "amber",
   ASSIGN: "teal",
+  LOGOUT: "neutral",
+  SIGN_IN_FAILED: "red",
+  LOCKED_OUT: "red",
 };
 
 export const ACTOR_TONE: Record<LedgerEntry["actorType"], TagTone> = {
@@ -29,14 +32,15 @@ export const ACTOR_TONE: Record<LedgerEntry["actorType"], TagTone> = {
   SYSTEM: "neutral",
   AGENT: "amber",
   PLATFORM_ADMIN: "violet",
+  UNKNOWN: "neutral",
 };
 
-export const actionLabel = (action: LedgerEntry["action"]) => action.replaceAll("_", " ").toLowerCase();
+export const actionLabel = (action: LedgerEntry["action"]) => (action === "LOGOUT" ? "sign out" : action.replaceAll("_", " ").toLowerCase());
 
 export function ActionTag({ action }: { action: LedgerEntry["action"] }) {
   return <Tag tone={ACTION_TONE[action]}>{actionLabel(action)}</Tag>;
 }
 
 export function ActorTag({ type }: { type: LedgerEntry["actorType"] }) {
-  return <Tag tone={ACTOR_TONE[type]}>{type.replaceAll("_", " ").toLowerCase()}</Tag>;
+  return <Tag tone={ACTOR_TONE[type]}>{type === "AGENT" ? "AI agent" : type.replaceAll("_", " ").toLowerCase()}</Tag>;
 }

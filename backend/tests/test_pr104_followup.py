@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 from backend.models.candidates import CandidateGoogleOAuthAttempt, InboxMessage
-from backend.models.tenancy import LedgerEntry, User
+from backend.models.tenancy import ActivityEntry, User
 from backend.models.db import utcnow
 from backend.tests.test_candidate_mailbox import (mailbox_case, offline_mailbox_provider, import_provider,
     email, oauth, base)
@@ -69,12 +69,12 @@ def test_confirmation_attestation_survives_cleanup_and_contains_address(api_clie
     candidate, _, _, mailbox = mailbox_case
     attempt_id = pending(api_client, monkeypatch, candidate, mailbox.address)
     assert api_client.post(base(candidate) + '/mailbox/confirm/' + attempt_id).status_code == 200
-    entry = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
+    entry = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).one()
     assert mailbox.address in entry.summary
     assert 'v1' in entry.summary
     test_db.delete(test_db.get(CandidateGoogleOAuthAttempt, uuid.UUID(attempt_id)))
     test_db.commit()
-    assert test_db.get(LedgerEntry, entry.id).candidate_id == candidate.id
+    assert test_db.get(ActivityEntry, entry.id).candidate_id == candidate.id
 
     old_address = mailbox.address
     assert api_client.delete(base(candidate) + '/mailbox').status_code == 200
@@ -119,7 +119,7 @@ def test_import_batches_have_one_ledger_result(test_db, monkeypatch, mailbox_cas
         return api(http, path, token, params)
     monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
     assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == 300
-    rows = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    rows = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert len(rows) == 1
     assert '300' in rows[0].summary
 
@@ -133,7 +133,7 @@ def test_partial_import_audits_saved_total(test_db, monkeypatch, mailbox_case, i
         return api(http, path, token, params)
     monkeypatch.setattr(jobs.gmail, '_api_get', fetch)
     assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == -1
-    entries = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    entries = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert len(entries) == 1 and '20' in entries[0].summary
     assert 'partial' in entries[0].summary.lower()
 
@@ -401,7 +401,7 @@ def test_interrupted_worker_keeps_one_durable_partial_audit_and_recovers(test_db
     monkeypatch.setattr(jobs.gmail, '_api_get', interrupted)
     with pytest.raises(WorkerStopped): jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at)
     test_db.expire_all()
-    entries = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    entries = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert entries == []
     from backend.models.db import JobRun
     assert test_db.query(JobRun).filter_by(job_type='candidate_gmail_import').one().meta['imported'] == 10
@@ -413,9 +413,9 @@ def test_interrupted_worker_keeps_one_durable_partial_audit_and_recovers(test_db
     monkeypatch.setattr(jobs.gmail, '_api_get', retry)
     assert jobs.run_import(candidate.firm_id, candidate.id, mailbox.connected_at) == 0
     test_db.expire_all()
-    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 1
+    assert test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).count() == 1
     assert mailbox.sync_state == 'IDLE'
-    entry = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
+    entry = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).one()
     assert '10' in entry.summary and 'partial' in entry.summary.lower()
 
 
@@ -427,7 +427,7 @@ def test_concurrent_read_marks_do_not_write_business_ledger(api_client, test_db,
     with ThreadPoolExecutor(max_workers=2) as workers:
         results = list(workers.map(lambda _:api_client.patch(path), range(2)))
     assert [response.status_code for response in results] == [200, 200]
-    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 0
+    assert test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).count() == 0
 
 
 def test_provider_denial_returns_to_inbox_without_exchanging_grant(api_client, test_db, monkeypatch, mailbox_case):

@@ -207,15 +207,17 @@ def _apply_llm_result_to_app(db, matched_app, llm_result: dict, body: str, subje
     )
 
 
-async def check_emails():
-    """Poll Gmail for recruiter responses and update application statuses."""
+async def check_emails() -> int:
+    """Poll Gmail for recruiter responses and update application statuses. Returns the replies read."""
     access_token = await _get_access_token()
     if not access_token:
-        return
+        return 0
 
+    replies = 0
     db = SessionLocal()
     try:
         processed_ids = _load_processed_ids(db)
+        already_handled = len(processed_ids)
         query = _build_gmail_query(db)
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -229,7 +231,7 @@ async def check_emails():
 
             if resp.status_code != 200:
                 logger.error(f"Gmail list messages failed: {resp.text}")
-                return
+                return replies
 
             messages = resp.json().get("messages", [])
             logger.info(f"Gmail: found {len(messages)} messages from known domains")
@@ -277,6 +279,7 @@ async def check_emails():
                     if matched_app:
                         _apply_email_to_app(db, matched_app, class_type, body, subject)
                     processed_ids.add(msg_id)
+                    replies += 1
                     continue
 
                 # Low confidence or ambiguous — try LLM pass 2 (max 5 per run)
@@ -318,6 +321,7 @@ async def check_emails():
 
                         # Status + confidence only — a summary paraphrasing the recruiter's email
                         # body is not something we want persisted in activity_log.
+                        replies += 1
                         from backend.activity import log_activity
                         log_activity(
                             "email",
@@ -326,6 +330,7 @@ async def check_emails():
                             db=db,
                         )
                     else:
+                        replies += 1
                         from backend.activity import log_activity
                         log_activity(
                             "email",
@@ -338,8 +343,12 @@ async def check_emails():
         _save_processed_ids(db, processed_ids)
 
         from backend.activity import log_activity
-        log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db)
+        # A row when this check handled a message (read a reply, skipped an auto-reply, or could not classify one, which
+        # is then not looked at again); a check that only saw messages it had handled before leaves none.
+        log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db,
+                     is_empty=len(processed_ids) == already_handled)
         db.commit()
+        return replies
 
     except Exception as e:
         logger.error(f"Email check failed: {e}")

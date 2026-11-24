@@ -182,7 +182,7 @@ def test_an_added_question_said_again_in_other_words_changes_its_answer_and_can_
 def test_a_save_reaches_the_rest_of_the_resume_that_answers_the_same_unless_only_this_job(anonymous_client, test_db,
                                                                                           world):
     from backend.models.candidates import Candidate
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _candidate(anonymous_client, test_db, world, bde="adnan")
     v1 = _v(anonymous_client, world, c, who="adnan")
     v2 = _save(anonymous_client, world, c, v1, "adnan", summary="An edited summary.").json()       # the newest
@@ -215,7 +215,7 @@ def test_a_save_reaches_the_rest_of_the_resume_that_answers_the_same_unless_only
 
     # One activity entry per save: the questions, never the answers.
     test_db.expire_all()
-    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == v2["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    last = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == v2["id"]).order_by(ActivityEntry.created_at.desc()).first()
     assert '"What is your professional title?"' in last.summary and "Lead Engineer" not in last.summary
 
 
