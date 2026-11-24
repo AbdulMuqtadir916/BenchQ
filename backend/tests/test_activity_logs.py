@@ -446,6 +446,19 @@ def _people(client, world, user, query=""):
     return body, {p["name"]: p for p in body["people"]}
 
 
+def test_each_team_is_counted_by_the_team_on_its_rows(anonymous_client, test_db, world):
+    """Issue #156: Bea's rows under Mira stay Mira's team's after she moves to Zed, as the team view shows them."""
+    for _ in range(3):
+        _log(test_db, world.bea, "Under Mira")
+    world.bea.manager_id = world.zed.id
+    test_db.commit()
+    _log(test_db, world.bea, "Under Zed")
+    teams = {t["manager_id"]: t["actions"] for t in _people(anonymous_client, world, world.owner)[0]["team_actions"]}
+    assert (teams[str(world.mira.id)], teams[str(world.zed.id)]) == (3, 1)
+    assert len(_summaries(anonymous_client, world, world.owner, f"?team_id={world.mira.id}")) == 3
+    assert len(_summaries(anonymous_client, world, world.owner, f"?team_id={world.zed.id}")) == 1
+
+
 def test_the_owner_gets_everyone_with_derived_counts(anonymous_client, test_db, world):
     _log(test_db, world.bea, "One")
     _log(test_db, world.bea, "Two")

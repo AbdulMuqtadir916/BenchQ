@@ -196,8 +196,12 @@ def ledger_people(firm_id: uuid.UUID, filters: Filters = Depends(), principal: P
                            "manager_id": str(user.manager_id) if user.manager_id else None,
                            "is_former": not in_view, "actions": counts[user.id]})
     types = [] if bde is not None else [t for t in LEDGER_ACTOR_TYPES if manager is None or t in ("USER", "AGENT")]
+    # Each team's rows as the team view filters them: by the team stamped on the row when it was written, so work a
+    # BDE did under an earlier manager stays that manager's (issue #156).
+    teams = entries.filter(ActivityEntry.team_manager_id.isnot(None))         .with_entities(ActivityEntry.team_manager_id, func.count()).group_by(ActivityEntry.team_manager_id).all()
     return {"timezone": db.get(Firm, my_firm).primary_timezone, "actor_types": types, "total": entries.count(),
-            "matching": _visible(db, principal, my_firm, filters).count(), "people": people}
+            "matching": _visible(db, principal, my_firm, filters).count(), "people": people,
+            "team_actions": [{"manager_id": str(team), "actions": count} for team, count in sorted(teams, key=str)]}
 
 
 @router.get("/ledger/days", summary="The days with activity the reader can see, in the firm's time zone")
