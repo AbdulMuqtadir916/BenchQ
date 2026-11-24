@@ -455,12 +455,10 @@ async def trigger_all_scrapes():
 async def trigger_email_check():
     """Poll Gmail for new emails. Returns immediately with a run_id."""
     async def _do():
-        from datetime import datetime as _dt, timezone as _tz
-        from backend.scheduler import _activity_summary
-        started = _dt.now(_tz.utc)
+        from backend.scheduler import _count_summary
         from backend.email_monitor.gmail_client import check_emails
-        await check_emails()
-        return _activity_summary(started, "email", "reply", "replies") or "No new replies"
+        replies = await check_emails()
+        return _count_summary(replies, "reply", "replies") or "No new replies"
 
     try:
         run_id = launch_background("email_check", _do, trigger="manual")
@@ -735,12 +733,10 @@ async def trigger_db_backup():
 async def trigger_digest():
     """Send the daily Telegram digest immediately. Returns immediately with a run_id."""
     async def _do():
-        from datetime import datetime as _dt, timezone as _tz
-        from backend.scheduler import _activity_summary
-        started = _dt.now(_tz.utc)
+        from backend.scheduler import _count_summary
         from backend.notifier.telegram import send_digest
-        await send_digest()
-        return _activity_summary(started, "telegram", "alert") or "Digest sent"
+        alerts = await send_digest()
+        return _count_summary(alerts, "alert") or "No digest sent"
 
     try:
         run_id = launch_background("daily_digest", _do, trigger="manual")
