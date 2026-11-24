@@ -2355,7 +2355,37 @@ export const LedgerEntrySchema = z.object({
   promptVersion: z.string().nullable(),
   // No evidenceIds or claimState: the ledger's columns are dropped in migration 0015 (Abdul, 2026-11-06).
   createdAt: z.string().datetime(),
+  // Activity logs PRs 3–4 (2026-11-24, issue #154; for Abdul's sign-off). Optional: the Super Admin's audit leaves some out.
+  firmId: z.string().nullable(),                         // null only for platform-only events (A13)
+  candidateId: z.string().nullable().optional(),        // the candidate the entry is about
+  candidateName: z.string().nullable().optional(),      // their name now (07 Q57)
+  actorRole: z.enum([...FirmRole.options, 'PLATFORM_ADMIN']).nullable().optional(),  // the role when written
+  onBehalfOfUserId: z.string().nullable().optional(),   // the person an AI agent worked for
+  onBehalfOfName: z.string().nullable().optional(),
 });
+
+// The Activity screen's side lists (GET /api/firms/{id}/ledger/people, /ledger/candidates, /ledger/days). Counts are
+// derived on the server from the rows the reader may see (07 Q52, Q65), never stored.
+export const LedgerPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: FirmRole,
+  managerId: z.string().nullable(),
+  isFormer: z.boolean(),          // left the firm or the reader's team, and still has rows to show
+  actions: z.number().int(),      // their rows in the view, an AI's counted towards the person it worked for
+});
+
+export const LedgerPeopleSchema = z.object({
+  actorTypes: z.array(z.enum(['USER', 'SYSTEM', 'AGENT', 'PLATFORM_ADMIN'])),  // what this reader may filter by
+  total: z.number().int(),        // rows in the view, whoever is picked
+  matching: z.number().int(),     // rows on show, with the person or team picked
+  people: z.array(LedgerPersonSchema),
+  teamActions: z.record(z.string(), z.number().int()),  // by manager id, counted by the team stamped on each row
+});
+
+export const LedgerCandidateSchema = z.object({ id: z.string(), name: z.string() });
+// GET …/ledger/candidates: the candidates with a row the reader could read by picking them (07 Q52, Q65).
+// GET …/ledger/days: the firm-time-zone days ('YYYY-MM-DD') with rows in the view, for the calendar.
 
 /** Merged activity stream for a candidate. */
 export const TimelineEventSchema = z.object({
