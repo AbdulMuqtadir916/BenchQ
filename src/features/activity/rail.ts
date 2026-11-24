@@ -55,21 +55,25 @@ function openManager(people: LedgerPerson[], viewer: Viewer, selection: Selectio
   return isManagerRow(person) ? person : find(person.managerId);
 }
 
-export function buildRail(people: LedgerPerson[], viewer: Viewer, selection: Selection, total: number): Rail {
+/** The counts the rail shows, from the server: all rows in view, and each team's by the team on the row (issue #156). */
+export interface RailCounts {
+  total: number;
+  teamActions: Readonly<Record<string, number>>;
+}
+
+export function buildRail(people: LedgerPerson[], viewer: Viewer, selection: Selection, { total, teamActions }: RailCounts): Rail {
+  const teamCount = (managerId: string) => teamActions[managerId] ?? 0;
   if (viewer.scope === "own") return { level: "own", me: people.find((person) => person.userId === viewer.userId) ?? null };
   const manager = openManager(people, viewer, selection);
   if (manager) {
     const bdes = currentBdesOf(people, manager.userId);
     const former = people.filter((person) => person.isFormer && isBdeRow(person) && (viewer.scope === "team" || person.managerId === manager.userId));
-    const actions = [manager, ...bdes, ...former].reduce((sum, person) => sum + person.actions, 0);
-    return { level: "team", manager, bdes, former, actions, isOwnTeam: manager.userId === viewer.userId };
+    return { level: "team", manager, bdes, former, actions: teamCount(manager.userId), isOwnTeam: manager.userId === viewer.userId };
   }
   const managers = people.filter((person) => isManagerRow(person) && !person.isFormer)
     .map((person) => {
-      const bdes = currentBdesOf(people, person.userId);
-      // The same people the open team adds up: its manager, its BDEs and its former BDEs.
-      const former = people.filter((row) => row.isFormer && isBdeRow(row) && row.managerId === person.userId);
-      return { person, bdes: bdes.length, actions: [person, ...bdes, ...former].reduce((sum, row) => sum + row.actions, 0) };
+      // The same rows the open team shows: those stamped with this manager's team, whoever is in it today.
+      return { person, bdes: currentBdesOf(people, person.userId).length, actions: teamCount(person.userId) };
     })
     .sort(byActions);
   const owner = people.find((person) => isOwnerRow(person) && !person.isFormer) ?? null;

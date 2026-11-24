@@ -133,3 +133,14 @@ Main's #147 to #151 merged in. What changed here because of them:
   comments were left, and its row in `cross-area-changes.md` is gone.
 - **Résumé versions test:** main replaced the name test (07 Q68: the name and email stay the candidate's); it reads
   `ActivityEntry`.
+
+## Abdul's review issues (2026-11-24)
+
+- **#152, the candidate picker.** `GET /ledger/candidates` listed only candidates with a row the reader sees without
+  picking one, so a candidate whose readable history matched the search only through a row someone else wrote while
+  it was theirs (the Owner's edit on Bea's candidate) was missing. The list now reads each candidate as if it were
+  picked (`_visible(..., any_candidate=True)`), with the other filters. Test:
+  `test_the_candidate_list_keeps_a_candidate_whose_history_the_reader_can_open`.
+- **#153, the candidate edit test.** Main lets only the candidate's BDE edit their details (07 Q17), so the test now
+  edits as Bea, and sends a preferred location because an edit needs a place (Q20). It also checks that the entry is
+  Bea's.
