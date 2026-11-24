@@ -212,15 +212,38 @@ describe("LinkedIn postings inside BenchQ (frame-rules.ts, decided 2026-11-17)",
       { header: "sec-fetch-site", operation: "set", value: "none" }]);
   });
 
-  it("the panel's switch takes the rules away and puts them back", async () => {
+  it("the panel's switch takes the rules away and puts them back, each in one call", async () => {
     const { setupFrameRules } = await import("./frame-rules");
     fake.declarativeNetRequest.updateSessionRules.mockClear();
     fake.sync.set("previewUnblock", false);
     await setupFrameRules();
-    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenCalledTimes(1);           // removed only
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenCalledTimes(1);
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenLastCalledWith({ removeRuleIds: [1, 2], addRules: [] });
     fake.sync.set("previewUnblock", true);
     await setupFrameRules();
-    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenLastCalledWith(
-      expect.objectContaining({ addRules: expect.any(Array) }));
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenCalledTimes(2);
+    expect(fake.declarativeNetRequest.updateSessionRules).toHaveBeenLastCalledWith({
+      removeRuleIds: [1, 2], addRules: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })] });
+  });
+
+  it("two setups at once, as the worker's start and its install listener run, leave the rules in place", async () => {
+    const { setupFrameRules } = await import("./frame-rules");
+    // As Chrome does: within one call it removes before it adds, and refuses an id that is already there.
+    const installed = new Set<number>();
+    fake.declarativeNetRequest.updateSessionRules.mockImplementation(async ({ removeRuleIds = [], addRules = [] }) => {
+      await Promise.resolve();
+      for (const id of removeRuleIds) installed.delete(id);
+      for (const { id } of addRules as { id: number }[]) {
+        if (installed.has(id)) throw new Error(`Rule with id ${id} does not have a unique ID.`);
+        installed.add(id);
+      }
+    });
+    try {
+      fake.sync.set("previewUnblock", true);
+      await expect(Promise.all([setupFrameRules(), setupFrameRules()])).resolves.toHaveLength(2);
+      expect([...installed].sort()).toEqual([1, 2]);
+    } finally {
+      fake.declarativeNetRequest.updateSessionRules.mockImplementation(async () => undefined);
+    }
   });
 });
