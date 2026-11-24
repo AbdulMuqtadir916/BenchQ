@@ -141,3 +141,18 @@ Main's #147 to #151 merged in. One conflict: main's #149 made queries wait what 
 `src/lib/query/retry.ts`) in `provider.tsx`, where this PR builds the client in `createQueryClient`
 (`src/lib/query/client.ts`). The client now has `retryDelay` too, so main's retry rules and this PR's Activity refresh
 both hold. Typecheck and the Activity, query and API tests pass.
+
+## Abdul's review issues (2026-11-24)
+
+- **#155, seeded people and teams.** The people list names seeded users by their fixture ids (`user_adnan`), but the
+  URL only kept UUIDs, so picking a seeded person or team was dropped. The URL now keeps a seeded fixture id (the API
+  layer already turns it back into its UUID), and a seeded UUID typed by hand becomes its fixture id, so it matches the
+  list (`use-activity-params.ts`, `use-activity-params.test.ts`).
+- **#156, team badges.** A manager's badge added up their current BDEs' totals, while the team view shows the rows
+  stamped with that team when they were written, so a BDE who moved took their old work with them. `GET …/ledger/people`
+  now returns `team_actions`, each team's rows counted by the team on the row, and the rail shows those
+  (`buildRail(..., { total, teamActions })`). Tests: `test_each_team_is_counted_by_the_team_on_its_rows` and the rail
+  test with a BDE who moved.
+- **#152, the picker's label.** A candidate picked but not in the picker's list left the picker reading "All
+  candidates" while the log was narrowed to them. The picked candidate is now always an option, named from the rows on
+  show (`candidateOptions`). The backend half is in PR 3.

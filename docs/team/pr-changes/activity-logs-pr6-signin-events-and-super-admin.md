@@ -153,3 +153,16 @@ Main's #147 to #151 merged in.
   Admin's Activity page shows them and no firm reader does. The one that saves nothing, the test run, is in
   `NOT_LOGGED` (PR 2), so the sweep leaves it out. The sidebar keeps Activity at 4; main's AI presets item is 7.
 - `test_activity_logs.py`'s copy test still upgrades to `head`, as this PR set it.
+
+## Abdul's review issues (2026-11-24)
+
+- **#158, the deactivated-account test.** Two answers each have their own request id, so the test compared whole bodies
+  that could never match. It now compares them without the id (`problem_support.body_of`) and checks each has its own.
+- **#159, the sweep's preset restore.** The sweep restored a preset that wasn't archived, which rightly changes nothing.
+  The sweep now archives it first (`CHANGE_STATE`), so it checks a real restore and its entry.
+- **#160, the request id on Super Admin entries.** `PlatformActionLog` writes the entries after `RequestLog` has reset
+  the request id, so they had none. Each queued entry now runs in a copy of its request's context
+  (`logs_platform_action`), and keeps the id. Test: `test_a_platform_entry_carries_its_requests_id`.
+- **#155 and #156 on the Super Admin's page.** The page shares the firm page's URL rules and rail, so a seeded firm or
+  the seeded Super Admin's own id now stays in the URL, and `GET /api/admin/activity/people` returns `team_actions`
+  (the shared `team_counts`) for its team badges.

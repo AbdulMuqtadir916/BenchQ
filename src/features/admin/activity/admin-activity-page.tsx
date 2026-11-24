@@ -48,7 +48,7 @@ export function AdminActivityPage() {
   }, [isUnknownFirm, update]);
 
   const selection = useMemo(() => (peopleQuery.data ? resolveSelection(people, FIRM_READER, params) : {}), [peopleQuery.data, people, params]);
-  const rail = useMemo(() => (params.firm && peopleQuery.data ? buildRail(people, FIRM_READER, selection, peopleQuery.data.total) : null), [params.firm, peopleQuery.data, people, selection]);
+  const rail = useMemo(() => (params.firm && peopleQuery.data ? buildRail(people, FIRM_READER, selection, { total: peopleQuery.data.total, teamActions: peopleQuery.data.teamActions }) : null), [params.firm, peopleQuery.data, people, selection]);
   const firmBack = rail ? backStep(rail, FIRM_READER, selection) ?? { label: "All firms", to: ALL_FIRMS } : null;
   const selectInFirm = (next: Selection) => (next === ALL_FIRMS ? update({ firm: undefined, team: undefined, person: undefined }) : update({ team: next.team, person: next.person }));
   useEscapeBack(firmBack ? () => selectInFirm(firmBack.to) : isFailed || params.person ? () => update({ view: undefined, person: undefined }) : null);

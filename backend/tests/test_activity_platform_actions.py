@@ -94,6 +94,15 @@ def test_a_settings_change_is_an_entry_with_the_field_names_only(api_client, tes
     assert entry.summary == "Changed settings: scrape_interval_minutes." and "17" not in entry.summary
 
 
+def test_a_platform_entry_carries_its_requests_id(api_client, test_db):
+    """Issue #160: the entry is written after the answer, once RequestLog has reset the id; it still carries it."""
+    response = api_client.patch("/api/settings", json={"scrape_interval_minutes": "18"},
+                                headers={"X-Request-ID": "platform-req-160"})
+    assert response.status_code == 200 and response.headers["X-Request-ID"] == "platform-req-160"
+    (entry,) = _platform_entries(test_db)
+    assert entry.request_id == "platform-req-160"
+
+
 def test_a_company_is_created_changed_and_deleted_and_a_missing_one_writes_nothing(api_client, test_db):
     created = api_client.post("/api/companies", json={"name": "Entry Corp"})
     assert created.status_code == 200, created.text
