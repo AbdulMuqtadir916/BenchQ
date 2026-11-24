@@ -308,7 +308,7 @@ class ActivityEntry(Base):
     actor_type = Column(String, nullable=False)
     actor_user_id = Column(UUID(as_uuid=True), nullable=True)
     actor_name = Column(String, nullable=False)
-    actor_role = Column(String, nullable=True)            # at the time; null for SYSTEM and AGENT
+    actor_role = Column(String, nullable=True)            # at the time; an AGENT has its person's, SYSTEM none
     on_behalf_of_user_id = Column(UUID(as_uuid=True), nullable=True)   # the person an AI agent worked for
     team_manager_id = Column(UUID(as_uuid=True), nullable=True)        # the actor's team at the time
     entity_type = Column(String, nullable=False)          # lowercase: firm, invite, user, support_view… (07 Q30)

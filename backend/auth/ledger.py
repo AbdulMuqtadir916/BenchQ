@@ -88,17 +88,40 @@ def record(db: DbSession, *, actor: User | PlatformUser, action: str, entity_typ
 
 def record_automated(db: DbSession, *, actor_type: str, actor_name: str, action: str,
                      entity_type: str, entity_id: uuid.UUID | str, entity_label: str,
-                     summary: str, firm_id: uuid.UUID, candidate_id: uuid.UUID,
-                     at: datetime | None = None, on_behalf_of: User | None = None) -> ActivityEntry:
+                     summary: str, firm_id: uuid.UUID, candidate_id: uuid.UUID | None,
+                     at: datetime | None = None, on_behalf_of: User | None = None,
+                     model_id: str | None = None, changes: dict | None = None) -> ActivityEntry:
     """Internal worker audit; automated decisions never borrow a human identity. `on_behalf_of` is the person an AI
-    agent worked for: the entry counts towards them and their team, but its actor stays the agent."""
+    agent worked for: the entry counts towards them and their team, but its actor stays the agent. An AI agent working
+    on a candidate (the email classifier on an application, say) works for that candidate's BDE, so it is theirs, and
+    their manager's, unless the caller says otherwise. `changes` comes from `diff`."""
     if actor_type not in {"SYSTEM", "AGENT"}:
         raise ValueError("Automated ledger actor must be SYSTEM or AGENT.")
+    if on_behalf_of is None and actor_type == "AGENT" and candidate_id is not None:
+        candidate = db.get(Candidate, candidate_id)
+        if candidate is not None and candidate.bde_id is not None:
+            on_behalf_of = db.get(User, candidate.bde_id)
     entry = ActivityEntry(firm_id=firm_id, candidate_id=candidate_id, actor_type=actor_type,
-        actor_user_id=None, actor_name=actor_name, action=action, entity_type=entity_type,
-        entity_id=str(entity_id), entity_label=entity_label, summary=summary,
+        actor_user_id=None, actor_name=actor_name, actor_role=on_behalf_of.role if on_behalf_of else None,
+        action=action, entity_type=entity_type,
+        entity_id=str(entity_id), entity_label=entity_label, summary=summary, model_id=model_id, changes=changes,
         on_behalf_of_user_id=on_behalf_of.id if on_behalf_of else None, **_stamps(db, candidate_id, on_behalf_of))
     if at is not None:
         entry.created_at = at
     db.add(entry)
     return entry
+
+
+def agent_person(actor_name: str) -> str:
+    """The person's name inside an agent's actor name, as it was when the entry was written (`record_agent`)."""
+    return actor_name.removeprefix("AI agent (").removesuffix(")")
+
+
+def record_agent(db: DbSession, *, person: User, action: str, entity_type: str, entity_id: uuid.UUID | str,
+                 entity_label: str, summary: str, candidate_id: uuid.UUID | None,
+                 model_id: str | None = None) -> ActivityEntry:
+    """What an AI agent did for `person`: the actor is the agent, named for them, and it counts towards them."""
+    return record_automated(db, actor_type="AGENT", actor_name=f"AI agent ({person.name})", action=action,
+                            entity_type=entity_type, entity_id=entity_id, entity_label=entity_label,
+                            summary=f"{summary} on behalf of {person.name}", firm_id=person.firm_id,
+                            candidate_id=candidate_id, on_behalf_of=person, model_id=model_id)

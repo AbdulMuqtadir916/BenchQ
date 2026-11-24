@@ -18,6 +18,12 @@ from backend.seed import DEFAULT_SETTINGS
 PROMPT = DEFAULT_SETTINGS["autofill_prompt"][0]
 
 
+@pytest.fixture(autouse=True)
+def _no_activity_entry(monkeypatch):
+    """These call the routes directly, with nobody signed in; test_activity_applications.py covers the entry."""
+    monkeypatch.setattr("backend.api.routes_autofill._log_answer", lambda *args, **kwargs: None)
+
+
 def _seed(db, *, prompt=PROMPT, default_len="250", persona=True):
     if prompt is not None:
         db.add(Setting(key="autofill_prompt", value=prompt))
@@ -237,7 +243,7 @@ async def test_stream_emits_deltas_then_done(test_db, monkeypatch):
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
                         fake_stream, raising=True)
 
-    events = await _collect(await autofill_answer_stream({**BODY, "max_chars": 200}))
+    events = await _collect(await autofill_answer_stream({**BODY, "max_chars": 200}, None))
     assert events == [
         'data: {"delta": "Because "}\n\n',
         'data: {"delta": "payments."}\n\n',
@@ -266,7 +272,7 @@ async def test_stream_never_emits_a_json_envelope_char(test_db, monkeypatch):
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
                         fake_stream, raising=True)
 
-    events = await _collect(await autofill_answer_stream(BODY))
+    events = await _collect(await autofill_answer_stream(BODY, None))
     deltas = [json.loads(e[len("data: "):])["delta"]
               for e in events if e.startswith('data: {"delta"')]
     assert "".join(deltas) == "Because payments."
@@ -288,7 +294,7 @@ async def test_stream_unwraps_a_fenced_json_envelope_split_mid_escape(test_db, m
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
                         fake_stream, raising=True)
 
-    events = await _collect(await autofill_answer_stream(BODY))
+    events = await _collect(await autofill_answer_stream(BODY, None))
     deltas = [json.loads(e[len("data: "):])["delta"]
               for e in events if e.startswith('data: {"delta"')]
     assert "".join(deltas) == 'She said "go", and left.'
@@ -310,7 +316,7 @@ async def test_stream_appends_refinements_in_order(test_db, monkeypatch):
                         fake_stream, raising=True)
 
     await _collect(await autofill_answer_stream(
-        {**BODY, "refinements": ["shorter", "  ", "mention fintech work", ""]}))
+        {**BODY, "refinements": ["shorter", "  ", "mention fintech work", ""]}, None))
 
     assert "Apply these changes the candidate requested, in order:" in seen["prompt"]
     assert "- shorter\n- mention fintech work" in seen["prompt"]
@@ -348,7 +354,7 @@ async def test_stream_reports_a_provider_failure_as_an_error_event(test_db, monk
     monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
                         fake_stream, raising=True)
 
-    events = await _collect(await autofill_answer_stream(BODY))
+    events = await _collect(await autofill_answer_stream(BODY, None))
     assert events[0] == 'data: {"delta": "partial"}\n\n'
     assert json.loads(events[-1][len("data: "):]) == {"error": "autofill generation failed"}
     assert "sk-ant-secret" not in "".join(events)
