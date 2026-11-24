@@ -129,13 +129,19 @@ def test_a_long_value_is_left_out_and_no_change_is_none():
     assert ledger.diff({"city": "Pune"}, {"city": "Pune"}) is None
 
 
-def test_editing_a_candidate_logs_what_changed(api_client, test_db, world):
-    response = api_client.patch(f"/api/firms/{world.id}/candidates/{world.asha.id}", json={"notice_period_days": 30})
+def test_editing_a_candidate_logs_what_changed(anonymous_client, test_db, world):
+    # Asha is Bea's: her BDE edits her details (07 Q17); the Owner would be refused. An edit needs a place (Q20), and
+    # Asha has none yet, so it comes with one.
+    response = anonymous_client.patch(f"/api/firms/{world.id}/candidates/{world.asha.id}",
+                                      json={"notice_period_days": 30, "preferred_locations": ["Austin, TX"]},
+                                      headers=_as_session(world, world.bea))
     assert response.status_code == 200, response.text
     test_db.expire_all()
     entry = test_db.query(ActivityEntry).filter(ActivityEntry.candidate_id == world.asha.id,
                                                 ActivityEntry.action == "UPDATE").one()
-    assert entry.changes == {"notice_period_days": {"before": None, "after": 30}}
+    assert entry.actor_user_id == world.bea.id
+    assert entry.changes["notice_period_days"] == {"before": None, "after": 30}
+    assert entry.changes["preferred_locations"]["after"] == ["Austin, TX"]
     assert entry.request_id
 
 
@@ -521,6 +527,21 @@ def test_the_candidate_list_is_what_the_reader_can_see_narrowed_by_person(anonym
     assert names(world.owner, f"?team_id={world.mira.id}") == ["Asha"]
     assert names(world.mira) == ["Asha"]
     assert names(world.cara) == ["Ravi"]
+
+
+def test_the_candidate_list_keeps_a_candidate_whose_history_the_reader_can_open(anonymous_client, test_db, world):
+    """Issue #152: a row another person wrote on Asha while she was Bea's is Bea's to read once she picks Asha, so the
+    picker lists Asha when only that row matches the search."""
+    _log(test_db, world.bea, "Bea's own row", world.asha)
+    _log(test_db, world.owner, "Unique owner edit", world.asha)
+    names = lambda user, query="": [c["name"] for c in _read(anonymous_client, world, user, query, "/candidates")]
+    assert _summaries(anonymous_client, world, world.bea, f"?candidate_id={world.asha.id}&q=Unique") == ["Unique owner edit"]
+    assert names(world.bea, "?q=Unique") == ["Asha"]
+    assert names(world.cara, "?q=Unique") == []                       # not hers, then or now
+    world.asha.bde_id = world.ben.id                                   # after the move, Ben's rows are his own
+    test_db.commit()
+    assert names(world.ben, "?q=Unique") == []
+    assert names(world.bea, "?q=Unique") == ["Asha"]                   # Bea still reads the time she had Asha
 
 
 @pytest.mark.parametrize("path", ["/people", "/candidates"])

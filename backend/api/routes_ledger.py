@@ -110,8 +110,9 @@ def _limit_to_reader(entries, db: DbSession, principal: Principal, firm_id: uuid
 
 
 def _visible(db: DbSession, principal: Principal, firm_id: uuid.UUID, filters: Filters, *, person: bool = True,
-             candidate: bool = True):
-    picked = candidate and filters.candidate_id is not None
+             candidate: bool = True, any_candidate: bool = False):
+    """`any_candidate`: read as if each candidate were picked (the picker's own list), without filtering to one."""
+    picked = any_candidate or (candidate and filters.candidate_id is not None)
     entries = _limit_to_reader(scoped(db, ActivityEntry, firm_id), db, principal, firm_id, picked=picked)
     return filters.apply(entries, db, firm_id, hide_email=principal.support_view_id is not None, person=person,
                          candidate=candidate)
@@ -194,10 +195,11 @@ def _has_history(db: DbSession, principal: Principal, firm_id: uuid.UUID, user_i
 def ledger_candidates(firm_id: uuid.UUID, filters: Filters = Depends(),
                       principal: Principal = Depends(current_principal), my_firm: uuid.UUID = Depends(reader_firm_id),
                       db: DbSession = Depends(get_db)):
-    """The candidates with a row the reader can see, narrowed by the person or team picked."""
+    """The candidates with a row the reader can see once that candidate is picked (their history from while it was
+    theirs included), narrowed by the other filters. The candidate already picked doesn't narrow its own list."""
     if firm_id != my_firm:
         raise HTTPException(status_code=404, detail="Not found.")
-    entries = _visible(db, principal, my_firm, filters, candidate=False)
+    entries = _visible(db, principal, my_firm, filters, candidate=False, any_candidate=True)
     ids = entries.filter(ActivityEntry.candidate_id.isnot(None)).with_entities(ActivityEntry.candidate_id).distinct()
     rows = scoped(db, Candidate, my_firm).filter(Candidate.id.in_(ids.scalar_subquery())).all()
     profile.prime(db, my_firm, rows)
