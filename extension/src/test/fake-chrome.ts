@@ -23,7 +23,7 @@ export function fakeChrome() {
     session,
     sync,
     tabs_open: tabs,
-    declarativeNetRequest: { updateSessionRules: vi.fn(async () => undefined) },
+    declarativeNetRequest: { updateSessionRules: vi.fn<(options: { removeRuleIds?: number[]; addRules?: unknown[] }) => Promise<void>>(async () => undefined) },
     runtime: {
       id: "extension-id", onInstalled: new FakeEvent(), onStartup: new FakeEvent(), onMessage: new FakeEvent(),
       sendMessage: vi.fn(async () => ({ ok: true })), reload: vi.fn(),
