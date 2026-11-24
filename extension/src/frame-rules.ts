@@ -59,10 +59,12 @@ export function frameRules(host: string) {
   ];
 }
 
-/** Install the rules, or take them away when the switch is off. Safe to run again (it replaces them). */
+/** Install the rules, or take them away when the switch is off. One call removes the old rules and adds the new ones,
+ * and Chrome removes before it adds within a call, so it is safe to run again and to run twice at once, as the worker's
+ * start and its install or startup listener do. Two calls (remove, then add) raced into "Rule with id 1 does not have
+ * a unique ID". */
 export async function setupFrameRules(): Promise<void> {
   const settings = await chrome.storage.sync.get([PREVIEW_KEY]);
-  await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: RULE_IDS });
-  if (settings[PREVIEW_KEY] === false) return;
-  await chrome.declarativeNetRequest.updateSessionRules({ addRules: frameRules(benchqHost()) });
+  const addRules = settings[PREVIEW_KEY] === false ? [] : frameRules(benchqHost());
+  await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: RULE_IDS, addRules });
 }

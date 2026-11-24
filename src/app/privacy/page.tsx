@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <p className="text-display text-[var(--color-text)]">BenchQ</p>
           <h1 className="mt-5 text-h1 text-[var(--color-text)]">BenchQ Apply privacy policy</h1>
           <p className="mt-2 text-caption text-[var(--color-text-3)]">
-            Last updated <time dateTime="2026-11-23">23 November 2026</time>
+            Last updated <time dateTime="2026-11-24">24 November 2026</time>
           </p>
         </header>
 
@@ -74,9 +74,13 @@ export default function PrivacyPage() {
                 the last candidate you picked (an ID, not their details), and when it last reloaded itself after an
                 update.
               </li>
+              <li>
+                In Chrome&apos;s synced settings: whether Posting preview is on or off, which follows your Chrome sign-in
+                to your other computers if Chrome sync is on.
+              </li>
               <li>A file you pick yourself is held only in the open panel&apos;s memory, and is gone when the panel closes.</li>
             </ul>
-            <p>Nothing else is stored, and none of it leaves the device.</p>
+            <p>Nothing else is stored, and none of it is sent to BenchQ.</p>
           </Section>
 
           <Section title="Your control">
