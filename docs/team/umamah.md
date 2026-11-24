@@ -10,16 +10,16 @@ contract changes and the migration number with Abdul.
 ## Status
 
 **Activity logs (from 2026-11-05):** the ledger plan, agreed with Abdul, runs as one branch per PR named `activity/…`.
-PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q64).
+PR 1 (`activity/pr1-role-access-on-server`): each role reads only its own part of the ledger on the server (07 Q65).
 Change document: [pr-changes/activity-pr1-role-access-on-server.md](./pr-changes/activity-pr1-role-access-on-server.md).
 Next: PR 2, the ledger rules as tests.
 
-**Activity logs, ready to raise (2026-11-12):** PRs 1–7 brought up to date with `main` (up to #136) by merging, not
-rebasing, and stacked one on the next: PR 1, PR 2, PR 3, PR 4, PR 5 parts 1–2 (two PRs), PR 6, PR 7. PR 5 part 3
+**Activity logs, ready to raise (2026-11-23):** PRs 2–7 brought up to date with `main` (up to #151) by merging, not
+rebasing, and stacked one on the next: PR 2, PR 3, PR 4, PR 5 parts 1–2 (two PRs), PR 6, PR 7. PR 5 part 3
 (cover letters) is dropped: cover letters are being removed from BenchQ. The
-manager-ledger decision is Q65 (`main` took Q56, Q59 and Q64). The migrations are 0028 (`activity_logs`), 0029 (sign-in
-events) and 0030 (old tables removed): `main` has 0027 (#127 and #129 merged), so 0028 follows `main`'s
-0027; another PR that takes 0028 first moves ours up. PR 1 (#113) is merged. PR 2 is #115 (base `main`, Abdul's three
+manager-ledger decision is Q65 (`main` took Q56, Q59 and Q64). The migrations are 0033 (`activity_logs`), 0034 (sign-in
+events) and 0035 (old tables removed): `main` has 0032 (#150), so 0033 follows `main`'s 0032; another PR that takes
+0033 first moves ours up. PR 1 (#113) is merged. PR 2 is #115 (base `main`, Abdul's three
 review points fixed 2026-11-14). PR 3 to PR 7 are #141 (PR 3), #142 (PR 4), #143 (PR 5 part 1), #144 (PR 5 part 2),
 #145 (PR 6) and #146 (PR 7), each based on the one before.
 
@@ -87,6 +87,11 @@ Abdul (07 Q61). A manager now has only the Activity dashboard, with a per-BDE st
 writes no ledger entry (unless listed in `NOT_LOGGED` with a reason), a ledger write without `candidate_id`, and a ledger
 read outside the role-limited routes. No behaviour change. Change document:
 [pr-changes/activity-pr2-ledger-rules-as-tests.md](./pr-changes/activity-pr2-ledger-rules-as-tests.md).
+
+**Activity log PR 3 (2026-11-06):** `activity-log/pr3-new-table-and-endpoints`, built on PR 1 and PR 2, not pushed yet.
+The new `activity_logs` table with the old rows copied in, history that stays with the manager and BDE at the time, and
+the reads the screen needs. Change document:
+[pr-changes/activity-log-pr3-new-table-and-endpoints.md](./pr-changes/activity-log-pr3-new-table-and-endpoints.md).
 
 ## 1. Notifications inbox
 
