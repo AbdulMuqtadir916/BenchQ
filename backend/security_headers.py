@@ -4,7 +4,8 @@ cached or sniffed.
 
 The outermost user middleware (added after RequestLog in backend/main.py), so every answer the app makes gets them: a
 route's, a 401 or 403 from the access check, a 413, a 429, a busy 503. Set only when absent, so a route that sets its
-own keeps it (the posting reader's sandboxed CSP, the notifications' `private, no-store`). The crash 500 is answered
+own keeps it (the posting reader's sandboxed CSP, the notifications' `private, no-store`). A route's own Cache-Control
+still says `no-store` (the route sweep checks every route: backend/tests/header_support.py). The crash 500 is answered
 by Starlette outside every user middleware, so `backend/problem.py` adds the same set to every error body it builds.
 """
 from starlette.datastructures import MutableHeaders

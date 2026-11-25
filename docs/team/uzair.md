@@ -26,8 +26,11 @@ per-scraper throttles
 3. **The scheduler out of the API process,** so the API can run more than one worker.
 4. **Errors and logging:** structured logs with a request id, no secrets or personal data in logs, one error shape.
 5. **Health and readiness** endpoints for the deployment (agreed with Abdul).
-6. **Security headers and CORS** for production; server secrets come only from the environment, and stored
-   credentials are encrypted with a key from the environment (step 6 below).
+6. **Security headers and CORS** for production; server secrets come only from the environment, and BenchQ's own
+   stored credentials (the AI key, candidate Gmail tokens) are encrypted with a key from the environment (step 6
+   below). The JobNavigator leftover settings secrets (`linkedin_password`, `jobright_password`,
+   `linkedin_mock_password`, `telegram_webhook_secret`, the legacy `gmail_refresh_token`) are plain `Setting.value`
+   and on Abdul's clean-up list.
 
 ### Decisions and what's deferred (agreed with Abdul, 2026-10-31)
 

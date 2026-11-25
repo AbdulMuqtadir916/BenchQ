@@ -125,6 +125,25 @@ def test_the_notifications_keep_their_cache_control(api_client):
     assert r.headers["cache-control"] == "private, no-store"
 
 
+def test_the_autofill_stream_is_never_cached(api_client, test_db, monkeypatch):
+    """The drafted answer streams with its own headers: `no-store` (it was `no-cache`, which a cache may keep and
+    revalidate), and X-Accel-Buffering so a proxy doesn't hold the stream back."""
+    from backend.models.db import Setting
+    from backend.seed import seed_persona
+    seed_persona(test_db)
+    test_db.add(Setting(key="autofill_prompt", value="{persona} {qa_bank} {question} {company} {position} {max_chars}"))
+    test_db.commit()
+
+    async def chunks(*args, **kwargs):
+        yield "I have five years."
+    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream", chunks, raising=False)
+    r = api_client.post("/api/autofill/answer/stream", json={"question": "Why?", "company": "Acme", "position": "PM"})
+    assert r.status_code == 200 and "[DONE]" in r.text
+    assert_security_headers(r, "POST /api/autofill/answer/stream")
+    assert (r.headers["cache-control"], r.headers["x-accel-buffering"]) == ("no-store", "no")
+    assert r.headers["content-type"].startswith("text/event-stream")
+
+
 def test_a_route_that_sets_its_own_csp_keeps_it_and_decides_its_framing():
     """The posting reader (routes_jobs.py `_READER_CSP`) is framed by the app: its sandboxed CSP stays, and no
     X-Frame-Options is added on top."""

@@ -17,10 +17,17 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 # refused at start (backend/startup_checks.py).
 BENCHQ_ENV = (os.getenv("BENCHQ_ENV") or "production").strip().lower() or "production"
 IS_PRODUCTION = BENCHQ_ENV == "production"
-# The session cookie is Secure in production; browsers drop Secure cookies over plain http://localhost.
-# An empty value counts as unset, so `SESSION_COOKIE_SECURE=` can't switch it off in production.
-SESSION_COOKIE_SECURE = (os.getenv("SESSION_COOKIE_SECURE")
-                         or ("true" if IS_PRODUCTION else "false")).strip().lower() == "true"
+
+
+def session_cookie_secure(raw: str | None, is_production: bool) -> bool:
+    """The session cookie is Secure in production; browsers drop Secure cookies over plain http://localhost. An empty
+    or whitespace-only value counts as unset, as backend/startup_checks.py reads it, so `SESSION_COOKIE_SECURE= ` can't
+    switch it off in production."""
+    value = (raw or "").strip().lower()
+    return (value or ("true" if is_production else "false")) == "true"
+
+
+SESSION_COOKIE_SECURE = session_cookie_secure(os.getenv("SESSION_COOKIE_SECURE"), IS_PRODUCTION)
 
 
 def parse_origins(raw: str) -> list[str]:
@@ -41,9 +48,11 @@ def _int_env(name: str, default: int) -> int:
 # The app's own origins: CORS, and the Origin check on unsafe requests (07 Q37). Local development has a default;
 # production has none, and the start-up check refuses an unset or malformed list.
 DEV_ALLOWED_ORIGINS = "http://localhost,http://localhost:3000,http://localhost:80"
-ALLOWED_ORIGINS = parse_origins(os.getenv("ALLOWED_ORIGINS") or ("" if IS_PRODUCTION else DEV_ALLOWED_ORIGINS))
-PASSWORD_RESET_BASE_URL = (os.getenv("PASSWORD_RESET_BASE_URL") or
-                           ("" if IS_PRODUCTION else "http://localhost:3000")).strip().rstrip("/")
+# A whitespace-only value counts as unset here too, as the start-up check reads it.
+ALLOWED_ORIGINS = parse_origins((os.getenv("ALLOWED_ORIGINS") or "").strip()
+                                or ("" if IS_PRODUCTION else DEV_ALLOWED_ORIGINS))
+PASSWORD_RESET_BASE_URL = ((os.getenv("PASSWORD_RESET_BASE_URL") or "").strip() or
+                           ("" if IS_PRODUCTION else "http://localhost:3000")).rstrip("/")
 # How many proxies in front of the backend append to X-Forwarded-For (the load balancer: 1). The client's address
 # is that many entries from the right; anything further left was sent by the client and can be forged.
 TRUSTED_PROXY_HOPS = max(0, _int_env("TRUSTED_PROXY_HOPS", 1))

@@ -102,3 +102,35 @@ def test_development_is_unchanged(anonymous_client, accounts, test_db):
     invite = anonymous_client.post(f"/api/firms/{accounts.firm_id}/invites", json={"email": "x@acme.benchq.test",
                                    "role": "VIEWER"}, headers=_cookie(accounts.firm_token))
     assert invite.status_code == 201, invite.text
+
+
+def test_production_treats_a_stored_test_address_invite_as_an_unknown_link(anonymous_client, accounts, test_db,
+                                                                            monkeypatch):
+    """An invite to a test address made before the rule (or in development, before the database moved) opens nothing
+    in production: lookup and accept answer as for an unknown link, no account is made and no session starts."""
+    from backend.models.tenancy import Invite, User
+    made = anonymous_client.post(f"/api/firms/{accounts.firm_id}/invites", json={"email": "x@acme.benchq.test",
+                                 "role": "VIEWER"}, headers=_cookie(accounts.firm_token))
+    assert made.status_code == 201, made.text
+    token = made.json()["invite_token"]
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+
+    assert anonymous_client.get(f"/api/invites/{token}").json() == {"status": "INVALID"}
+    unknown = anonymous_client.post("/api/invites/not-a-token/accept",
+                                    json={"name": "X", "password": "a-strong-pass"})
+    r = anonymous_client.post(f"/api/invites/{token}/accept", json={"name": "X", "password": "a-strong-pass"})
+    assert r.status_code == 410
+    assert _without_id(r) == _without_id(unknown)
+    assert "bq_session" not in r.headers.get("set-cookie", "")
+    test_db.expire_all()
+    assert test_db.query(User).filter(User.email == "x@acme.benchq.test").first() is None
+    assert test_db.get(Invite, made.json()["invite"]["id"]).status == "PENDING"
+
+
+def test_production_still_opens_an_invite_to_a_real_address(anonymous_client, accounts, monkeypatch):
+    made = anonymous_client.post(f"/api/firms/{accounts.firm_id}/invites", json={"email": "x@acme-staffing.com",
+                                 "role": "VIEWER"}, headers=_cookie(accounts.firm_token))
+    assert made.status_code == 201, made.text
+    token = made.json()["invite_token"]
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+    assert anonymous_client.get(f"/api/invites/{token}").json()["status"] == "VALID"

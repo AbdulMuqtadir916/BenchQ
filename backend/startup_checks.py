@@ -1,5 +1,7 @@
 """What production refuses to start with (docs/team/uzair.md, step 6): server secrets come only from the environment,
-and stored credentials are encrypted with a key from the environment.
+and BenchQ's own stored credentials (the AI key, candidate Gmail tokens) are encrypted with a key from the environment.
+The JobNavigator leftover settings secrets (`linkedin_password`, `jobright_password` and the like, plain
+`Setting.value`) are not; they are on Abdul's clean-up list.
 
 `check_production_config(env, role)` is pure: it reads the mapping it is given (`os.environ`), opens no database and
 reloads no module, and returns the problems, one line each, naming the variable, never its value. `require_config`
@@ -17,15 +19,16 @@ restart): in production no invite goes to a testing domain and no account on one
 """
 import re
 from collections.abc import Mapping
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 ROLES = ("api", "worker")
 
 # An origin the app may be called from: the site over https, or the extension by its 32-letter id (Chrome's ids use the
 # letters a to p). Compared lower-case; nothing else: no `*`, `null`, http, path or trailing slash. A port only if it
-# isn't 443: a browser leaves the default port out of the Origin it sends, so `:443` would never match.
+# isn't 443: a browser leaves the default port out of the Origin it sends, so `:443` would never match. No leading
+# zero and no port 0 either: a browser sends `:81`, never `:00081`.
 _LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
-_HTTPS_ORIGIN = re.compile(rf"https://{_LABEL}(?:\.{_LABEL})*(?::(\d{{1,5}}))?")
+_HTTPS_ORIGIN = re.compile(rf"https://{_LABEL}(?:\.{_LABEL})*(?::([1-9]\d{{0,4}}))?")
 _EXTENSION_ORIGIN = re.compile(r"chrome-extension://[a-p]{32}")
 # The password docker-compose and the old fallback use for local Postgres.
 _DEFAULT_DB_PASSWORD = "password"
@@ -44,10 +47,25 @@ def _is_true(env: Mapping, name: str) -> bool:
 
 
 def _origin_of(url: str) -> str | None:
-    parts = urlsplit(url)
+    """`scheme://host[:port]` of `url`, or None when it has none or doesn't parse (`https://[` raises in urlsplit)."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
     if not parts.scheme or not parts.netloc:
         return None
     return f"{parts.scheme}://{parts.netloc}".lower()
+
+
+def _database_password(url: str) -> str | None:
+    """The password the driver would use, decoded as SQLAlchemy and libpq decode it (`%70assword` is `password`):
+    the URL's, or else a `?password=` query parameter. None when there is none. Raises ValueError for a URL that
+    doesn't parse."""
+    parts = urlsplit(url)
+    if parts.password is not None:
+        return unquote(parts.password)
+    query = parse_qs(parts.query).get("password")
+    return query[-1] if query else None
 
 
 def valid_origin(origin: str) -> bool:
@@ -115,7 +133,7 @@ def check_production_config(env: Mapping, role: str) -> list[str]:
         # empty one or the local default is never right. No test or CI run uses SQLite (conftest forces Postgres), so
         # nothing is exempt. The URL and the password are never in the message.
         try:
-            password = urlsplit(database_url).password
+            password = _database_password(database_url)
         except ValueError:
             problems.append("DATABASE_URL is not a valid URL")
         else:
@@ -154,11 +172,21 @@ def check_production_config(env: Mapping, role: str) -> list[str]:
     reset_url = _get(env, "PASSWORD_RESET_BASE_URL").rstrip("/")
     if not reset_url.lower().startswith("https://"):
         problems.append("PASSWORD_RESET_BASE_URL must be the frontend's public https:// address")
-    elif _origin_of(reset_url) not in origins:
-        problems.append("PASSWORD_RESET_BASE_URL's origin is not in ALLOWED_ORIGINS")
-    if gmail_enabled and redirect.lower().startswith("https://") and _origin_of(redirect) not in origins:
-        problems.append("CANDIDATE_GMAIL_REDIRECT_URI's origin is not in ALLOWED_ORIGINS")
+    else:
+        _origin_problem(problems, "PASSWORD_RESET_BASE_URL", reset_url, origins)
+    if gmail_enabled and redirect.lower().startswith("https://"):
+        _origin_problem(problems, "CANDIDATE_GMAIL_REDIRECT_URI", redirect, origins)
     return problems
+
+
+def _origin_problem(problems: list[str], name: str, url: str, origins: list[str]) -> None:
+    """An https:// setting whose origin must be one of ALLOWED_ORIGINS; a URL that doesn't parse is named, never
+    shown."""
+    origin = _origin_of(url)
+    if origin is None:
+        problems.append(f"{name} is not a valid URL")
+    elif origin not in origins:
+        problems.append(f"{name}'s origin is not in ALLOWED_ORIGINS")
 
 
 def require_config(role: str, env: Mapping | None = None) -> None:

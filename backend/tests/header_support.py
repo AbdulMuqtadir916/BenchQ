@@ -22,7 +22,9 @@ def assert_security_headers(response, where: str = "", production: bool = False)
     headers = response.headers
     for name, value in FIXED.items():
         assert headers.get(name) == value, f"{label}: {name} is {headers.get(name)!r}"
-    assert headers.get("cache-control"), f"{label}: no Cache-Control"
+    # A route may set its own Cache-Control (`private, no-store`), but never one a cache may keep (`no-cache` only
+    # revalidates): every API answer is private data or an error.
+    assert "no-store" in headers.get("cache-control", ""), f"{label}: Cache-Control {headers.get('cache-control')!r}"
     csp = headers.get("content-security-policy")
     if where in OWN_CSP and csp != API_CSP:
         assert csp, f"{label}: no CSP"

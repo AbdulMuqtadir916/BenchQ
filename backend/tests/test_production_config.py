@@ -109,6 +109,28 @@ def test_production_refuses_no_database_password(url):
     assert "db.internal" not in " ".join(problems)
 
 
+@pytest.mark.parametrize("encoded", ["%70assword", "pass%77ord", "%70%61%73%73%77%6F%72%64"])
+def test_production_refuses_the_default_password_percent_encoded(encoded):
+    """SQLAlchemy and libpq decode the URL's password, so `%70assword` is `password`: the check decodes it too."""
+    problems = check_production_config(_with(DATABASE_URL=f"postgresql://benchq:{encoded}@db.internal/benchq"), "api")
+    assert problems == ["DATABASE_URL uses the local default database password"]
+    assert encoded not in " ".join(problems)
+
+
+@pytest.mark.parametrize("query", ["?password=password", "?sslmode=require&password=%70assword"])
+def test_production_refuses_the_default_password_as_a_query_parameter(query):
+    url = f"postgresql://benchq@db.internal/benchq{query}"
+    assert check_production_config(_with(DATABASE_URL=url), "api") == [
+        "DATABASE_URL uses the local default database password"]
+
+
+def test_a_percent_encoded_real_password_passes():
+    real = DB_SECRET.replace("-", "%2D")
+    assert check_production_config(_with(DATABASE_URL=f"postgresql://benchq:{real}@db.internal/benchq"), "api") == []
+    assert check_production_config(_with(DATABASE_URL=f"postgresql://benchq@db.internal/b?password={real}"), "api") \
+        == []
+
+
 def test_development_keeps_the_compose_database_url():
     assert check_production_config(DEV, "worker") == []
 
@@ -116,6 +138,60 @@ def test_development_keeps_the_compose_database_url():
 def test_empty_values_count_as_unset():
     assert check_production_config(_with(BENCHQ_ENV="", SESSION_COOKIE_SECURE=""), "api") == []
     assert any(p.startswith("ALLOWED_ORIGINS") for p in check_production_config(_with(ALLOWED_ORIGINS=""), "api"))
+
+
+@pytest.mark.parametrize("raw", [None, "", "   ", "\t", "true", " TRUE "])
+def test_a_blank_session_cookie_secure_is_secure_in_production_in_config_and_the_check(raw):
+    """Whitespace is unset in both readers: the cookie is Secure (backend/config.py) and the check passes."""
+    from backend import config
+    assert config.session_cookie_secure(raw, is_production=True) is True
+    assert check_production_config(_with(SESSION_COOKIE_SECURE=raw), "api") == []
+
+
+@pytest.mark.parametrize("raw, secure", [(None, False), ("   ", False), ("true", True), ("false", False)])
+def test_session_cookie_secure_in_development(raw, secure):
+    from backend import config
+    assert config.session_cookie_secure(raw, is_production=False) is secure
+
+
+@pytest.mark.parametrize("origin", [f"{SITE}:00081", f"{SITE}:081", f"{SITE}:0", f"{SITE}:00000", f"{SITE}:65536",
+                                    f"{SITE}:99999", f"{SITE}:0443"])
+def test_an_origin_port_a_browser_never_sends_is_refused(origin):
+    """A browser sends `:81`, never `:00081`; port 0 and ports past 65535 don't exist."""
+    assert not startup_checks.valid_origin(origin)
+    problems = check_production_config(_with(ALLOWED_ORIGINS=origin), "api")
+    assert any(p.startswith("ALLOWED_ORIGINS") for p in problems), problems
+
+
+@pytest.mark.parametrize("port", ["1", "81", "8443", "65535"])
+def test_an_origin_with_a_real_port_passes(port):
+    assert startup_checks.valid_origin(f"{SITE}:{port}")
+
+
+MALFORMED = "https://["
+
+
+@pytest.mark.parametrize("changes, problem", [
+    ({"PASSWORD_RESET_BASE_URL": MALFORMED}, "PASSWORD_RESET_BASE_URL is not a valid URL"),
+    ({**GMAIL, "CANDIDATE_GMAIL_REDIRECT_URI": f"{MALFORMED}/cb"}, "CANDIDATE_GMAIL_REDIRECT_URI is not a valid URL"),
+    ({"DATABASE_URL": f"postgresql://benchq:{DB_SECRET}@[db/benchq"}, "DATABASE_URL is not a valid URL"),
+])
+def test_a_url_that_does_not_parse_is_named_not_a_traceback(changes, problem):
+    problems = check_production_config({**GOOD, **changes}, "api")
+    assert problem in problems
+    assert "[" not in " ".join(problems) and DB_SECRET not in " ".join(problems)
+
+
+def test_the_cli_names_a_url_that_does_not_parse(monkeypatch, capsys):
+    from backend.scripts import check_config
+    for name, value in {**GOOD, "BENCHQ_ENV": "production", "CANDIDATE_GMAIL_ENABLED": "false",
+                        "PASSWORD_RESET_BASE_URL": MALFORMED}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    assert check_config.main(["--role", "api"]) == 1
+    err = capsys.readouterr().err
+    assert "PASSWORD_RESET_BASE_URL is not a valid URL" in err
+    assert MALFORMED not in err and "Traceback" not in err
 
 
 def test_the_worker_skips_what_only_the_api_uses():
