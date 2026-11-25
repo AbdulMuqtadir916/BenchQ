@@ -19,6 +19,7 @@ type AddJobCardProps = {
   knownUrls: readonly string[];
   /** The candidate's jobs: a page showing one of them (the same company and role) isn't offered, whatever its link. */
   knownJobs?: readonly KnownJob[];
+  onPageTitle?: (id: string, title: string) => void;
   onAdded: (application: Application) => void;
   /** Connects this tab to the saved job it shows (#130): offered instead of adding it again. */
   onUseTab?: (job: KnownJob) => void;
@@ -168,28 +169,25 @@ export const looksLikeJobPage = (url: string) => isJobLink(url);
 
 /**
  * Add the job on this page to the candidate's jobs (the add-job plan, decided 2026-11-11). Shown only on a job's page
- * (`readJob`: JobPosting data, or a job link with an Apply button), and the BDE confirms first. BenchQ saves it as one of
+ * (`readJob`: JobPosting data, or a job link with an Apply button), and the BDE explicitly saves it for the named candidate. BenchQ saves it as one of
  * the candidate's jobs and a Saved application at once; the same job again is the one they have. Then the tab connects
  * to it, ready for Autofill. On a site BenchQ may not read yet (#126) it first asks, on a link that looks like a job's
  * page, and reads the page once the BDE allows it.
  */
-export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab }: AddJobCardProps) {
-  const tabId = tab && offersPage(tab.url, knownUrls) ? tab.id : null;
+export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
+  // Re-read only legacy placeholders whose saved URL identifies this exact posting.
+  const legacy = knownJobs.find(known => tab && known.url === tab.url
+    && /^(?:view job|job details?|job description)$/i.test(known.title?.trim() ?? ""));
+  const legacyId = legacy?.id;
+  const legacyUrl = legacy?.url;
+  const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
-  const [state, setState] = useState<{ status: "idle" | "confirming" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
+  const [state, setState] = useState<{ status: "idle" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
   // The site, while BenchQ may not read it: the page is read once the BDE allows it (`allowed` counts the grants).
   const [access, setAccess] = useState<SiteAccess | null>(null);
   const [isDenied, setIsDenied] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [allowed, setAllowed] = useState(0);
-  // The posting "Yes, add it" was asked about: when the card moves on to another posting (the tab showed another one
-  // with the same title), the question closes, so a click never adds a posting the BDE didn't see (PR #140's review).
-  const [askedUrl, setAskedUrl] = useState<string | null>(null);
-  if (state.status === "confirming" && job && askedUrl !== null && job.url !== askedUrl) {
-    setAskedUrl(null);
-    setState({ status: "idle" });
-  }
-
   useEffect(() => {
     if (tabId === null) return;
     let timers: ReturnType<typeof setTimeout>[] = [];
@@ -198,6 +196,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     // look, and the card takes that fuller reading of the same job.
     const look = () => void readJobPage(tabId).then((found) => {
       if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
+      if (legacyId && legacyUrl && found.url === legacyUrl) onPageTitle?.(legacyId, found.title);
       // The same page (or the same title) read more fully: its JobPosting may also name the job better than the page's
       // heading did, so the title may change. Another page's reading never replaces this one (PR #140's review).
       setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && isFuller(found, shown)) ? found : shown));
@@ -216,7 +215,7 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
       isLive = false;
       timers.forEach(clearTimeout);
     };
-  }, [tabId, allowed]);
+  }, [tabId, allowed, legacyId, legacyUrl, onPageTitle]);
 
   /** Chrome's own prompt, which it shows only from a click: asked before anything is awaited. */
   const allow = async () => {
@@ -236,17 +235,17 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
     || (job ? knownJobs.find((known) => isSavedJob(job, known)) : undefined);
   if (saved) {
     return onUseTab && (saved.status ?? "saved") === "saved" ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
-      <h2 id="use-tab-title" className="text-sm font-[550]">{candidateName}&apos;s job is on this page</h2>
-      <p className={SOFT_TEXT}>{[saved.title, saved.company].filter(Boolean).join(" · ")}</p>
+      <h2 id="use-tab-title" className="text-h3 wrap-anywhere">{saved.title}</h2>
+      <p className={SOFT_TEXT}>{[saved.company, `Saved for ${candidateName}`].filter(Boolean).join(" · ")}</p>
       <button type="button" data-slot="use-tab-run" className={button("primary")} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>
     </section> : null;
   }
   if (tabId !== null && access) {
     return looksLikeJobPage(tab!.url) ? <section data-slot="add-job-access" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-access-title">
-      <h2 id="add-job-access-title" className="text-sm font-[550]">A job on this page?</h2>
+      <h2 id="add-job-access-title" className="text-sm font-[550]">Read this job for {candidateName}?</h2>
       <p className={SOFT_TEXT}>
         To add it to {candidateName}&apos;s Saved jobs, BenchQ needs to read <strong className="font-[550]">{access.host}</strong>.
-        Chrome asks you once for this site. You can turn it off later in Chrome&apos;s settings for extensions.
+        Choose Allow when Chrome asks.
       </p>
       {isDenied && <p role="alert" className={ALERT}>Not allowed. BenchQ can&apos;t read {access.host}, so it can&apos;t add this job from here.</p>}
       <button type="button" data-slot="add-job-allow" className={button("primary")} disabled={isAsking} onClick={() => void allow()}>
@@ -257,7 +256,6 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   if (tabId === null || !job) return null;
 
   const details = detailsOf(job);
-  const cancel = () => setState({ status: "idle" });
   const add = async () => {
     setState({ status: "adding" });
     try {
@@ -270,26 +268,17 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   };
 
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
-    <h2 id="add-job-title" className="text-sm font-[550]">A job on this page</h2>
-    <p className={SOFT_TEXT}>{[job.title, job.company, job.location].filter(Boolean).join(" · ")}</p>
-    {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+    <h2 id="add-job-title" className="text-h3 wrap-anywhere">{job.title}</h2>
+    <p className={SOFT_TEXT}>{[job.company, job.location].filter(Boolean).join(" · ")}</p>
+    {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
       {details.map(([name, value]) => <Fragment key={name}>
         <dt className="text-[var(--color-text-3)]">{name}</dt>
         <dd className="min-w-0 text-[var(--color-text-2)] wrap-anywhere">{value}</dd>
       </Fragment>)}
     </dl>}
-    {state.status === "confirming"
-      ? <div role="group" aria-labelledby="add-job-ask" className="grid gap-2"
-        onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); cancel(); } }}>
-        <p id="add-job-ask">Add this job to {candidateName}&apos;s Saved jobs?</p>
-        <div className="flex gap-2">
-          <button type="button" data-slot="add-job-confirm" className={button("primary")} autoFocus onClick={() => void add()}>Yes, add it</button>
-          <button type="button" data-slot="add-job-cancel" className={button("secondary")} onClick={cancel}>Cancel</button>
-        </div>
-      </div>
-      : <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => { setAskedUrl(job.url); setState({ status: "confirming" }); }}>
-        {state.status === "adding" ? <>{SPINNER_ICON}Adding…</> : `Add this job for ${candidateName}`}
-      </button>}
+    {state.status !== "added" && <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => void add()}>
+      {state.status === "adding" ? <>{SPINNER_ICON}Saving…</> : `Save job for ${candidateName}`}
+    </button>}
     {state.status === "added" && <p role="status" className={`flex items-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}
     {state.status === "error" && <p role="alert" className={ALERT}>{state.text}</p>}
   </section>;

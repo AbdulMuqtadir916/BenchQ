@@ -20,6 +20,7 @@ const eslintConfig = defineConfig([
     ".swarm/**",
     // The extension's build output.
     "extension/dist/**",
+    "extension/generated/**",
   ]),
 ]);
 

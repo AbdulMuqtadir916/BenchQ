@@ -2,7 +2,7 @@ import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
-import { asksForCode, derivedAnswer, inTheUs, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
+import { asksForCode, derivedAnswer, countryIn, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
 import { asksForSelfRating, fieldTypeFor, matchBank, sameAsk } from "./match";
 import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
 import { authorizedIn, sponsorshipIn, sponsorshipWordsIn, statusAnswer, statusOptionFor } from "./authorization";
@@ -164,8 +164,8 @@ function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, an
   if (type === "phone") return phoneRow(base, entry, answer);
   const row = rowFor(base, shaped(type, answer, base.field), entry);
   // A "location" dropdown can be a list of countries.
-  const isCountryList = type === "city-state" && row.status === "manual" && base.field.options.length > 0 && inTheUs(entry.answer);
-  return isCountryList ? rowFor(base, "United States", entry) : row;
+  const country = type === "city-state" && row.status === "manual" && base.field.options.length > 0 ? countryIn(entry.answer) : null;
+  return country && base.field.options.some(option => option.label.toLowerCase() === country.toLowerCase()) ? rowFor(base, country, entry) : row;
 }
 
 /** Saved answers that disagree. A dropdown can still settle it: when the answers that fit its options all fit the same

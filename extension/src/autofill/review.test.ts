@@ -309,6 +309,12 @@ describe("answers the bank holds inside another", () => {
       .toMatchObject({ status: "ready", proposed: "United States", source: { question: "Current location" }, write: { optionId: "o1" } });
   });
 
+  it("selects the saved country for a generic Location field and leaves an unknown city for review", () => {
+    const locationField = field("Location", { kind: "select", options: [{ id: "ca", label: "Canada" }, { id: "us", label: "United States" }] });
+    expect(review(locationField, [entry("Current location", "Toronto, Canada")])).toMatchObject({ status: "ready", write: { optionId: "ca" } });
+    expect(review(locationField, [entry("Current location", "London")]).status).toBe("manual");
+  });
+
   it("names the country a place ends with, and says nothing of one it can't place", () => {
     expect(review(field("Country"), [entry("Current location", "Hyderabad, India")]).proposed).toBe("India");
     expect(review(field("Country"), [entry("Current location", "London, UK")]).proposed).toBe("United Kingdom");

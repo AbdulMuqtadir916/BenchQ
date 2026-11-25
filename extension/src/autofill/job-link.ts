@@ -45,6 +45,7 @@ function endsAtList(parts: string[]): boolean {
 export function isJobLink(url: string): boolean {
   const link = linkOf(url);
   if (!link) return false;
+  if (/(?:^|\.)adzuna\.com$/i.test(link.hostname) && /^\/details\/\d+\/?$/.test(link.pathname)) return true;
   if (namesJobInQuery(link)) return true;
   const parts = partsOf(link);
   if (endsAtList(parts)) return false;

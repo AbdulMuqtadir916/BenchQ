@@ -30,6 +30,10 @@ function linkOf(url: string): URL | null {
   }
 }
 
+function isAdzunaDetail(link: URL | null): boolean {
+  return Boolean(link && /(?:^|\.)adzuna\.com$/i.test(link.hostname) && /^\/details\/\d+\/?$/.test(link.pathname));
+}
+
 function partsOf(link: URL): string[] {
   const parts = link.pathname.split("/").filter(Boolean);
   while (parts.length > 0 && LANGUAGE.test(parts[0]!)) parts.shift();
@@ -51,6 +55,7 @@ function endsAtList(parts: string[]): boolean {
 export function isJobLink(url: string): boolean {
   const link = linkOf(url);
   if (!link) return false;
+  if (isAdzunaDetail(link)) return true;
   if (namesJobInQuery(link)) return true;
   const parts = partsOf(link);
   if (endsAtList(parts)) return false;
@@ -168,7 +173,7 @@ function postingsOn(doc: Document): JsonRecord[] {
 function fromPosting(posting: JsonRecord): Omit<PageJob, "url" | "isJobPage"> {
   const organisation = posting.hiringOrganization;
   return {
-    title: text(posting.title),
+    title: roleTitle(text(posting.title)),
     company: companyOf(typeof organisation === "string" ? collapse(organisation) : text((organisation as JsonRecord | undefined)?.name)),
     description: typeof posting.description === "string" ? posting.description.trim() : "",
     location: placeOf(posting) || null,
@@ -235,17 +240,36 @@ function descriptionOf(lines: string[], title: string): string {
   return lines.slice(start, end > start ? end : undefined).join("\n");
 }
 
+/** Job boards reuse navigation labels in headings, metadata and sometimes even JobPosting.title. */
+function roleTitle(value: string | undefined): string {
+  const title = collapse(value ?? "");
+  const generic = /^(?:view job|job (?:details?|description|overview)|apply(?: now)?|overview|careers?|skills|description|requirements)[:.!]?$/i;
+  const genericPageTitle = title.split(/\s*(?:[|–—]|\s-\s)\s*/).some(part => /^(?:view job|job details?)$/i.test(part));
+  return genericPageTitle || generic.test(title) ? "" : title;
+}
+
 function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"> {
   const meta = (property: string) => collapse(doc.querySelector(`meta[property='${property}']`)?.getAttribute("content") ?? "");
-  const heading = Array.from(doc.querySelectorAll("h1")).find((h1) => collapse(textOf(h1)));
   const main = doc.querySelector("main, [role='main'], article") ?? doc.body;
-  const title = (heading ? collapse(textOf(heading)) : "") || meta("og:title") || collapse(doc.title);
+  const lines = main ? linesOf(main) : [];
+  const heading = (selector: string) => Array.from(main?.querySelectorAll(selector) ?? [], el => roleTitle(textOf(el))).find(Boolean);
+  const labelled = lines.map(line => roleTitle(/^(?:job title|position|role)\s*:\s*(.+)$/i.exec(line)?.[1])).find(Boolean);
+  const applyLine = lines.findIndex(line => /^apply(?: now)?$/i.test(line));
+  const preceding = lines[applyLine - 1] ?? "";
+  const metadataTitle = roleTitle(meta("og:title")) || roleTitle(doc.title);
+  const outerHeading = doc.querySelector("h1");
+  // Metadata can be a portal name. Only use it if it corroborates a visible listing line.
+  const supportedLine = lines.find(line => roleTitle(line) && titleLine([line], metadataTitle) === 0);
+  const itemTitle = main?.querySelector('[itemprop="title"], [data-automation-id="jobPostingHeader"]');
+  const title = labelled || (itemTitle && roleTitle(textOf(itemTitle))) || heading("h1")
+    || (preceding.length <= 100 && !/[.!?:]$/.test(preceding) ? roleTitle(preceding) : "")
+    || supportedLine || heading("h2") || (outerHeading && roleTitle(textOf(outerHeading))) || "";
   const siteName = meta("og:site_name");
   return {
     title,
     company: (JOB_SITES.test(siteName) ? "" : companyOf(siteName)) || companyFromTitle(collapse(doc.title), title) || logoCompany(doc)
       || new URL(url).hostname.replace(/^www\./, ""),
-    description: descriptionOf(main ? linesOf(main) : [], title),
+    description: descriptionOf(lines, title),
     location: null,
   };
 }
@@ -264,7 +288,11 @@ export function readJob(doc: Document, url = doc.URL): PageJob {
   });
   const found = postings.length === 1 ? fromPosting(postings[0]!) : null;
   const isList = postings.length > 1 || isJobListLink(url);
-  const isJobPage = !isList && (Boolean(found?.title) || (isJobLink(url) && hasApply(doc)));
+  const apply = !isList && hasApply(doc);
+  const body = !isList && !found && !isJobLink(url) && apply ? (doc.body ? linesOf(doc.body).join("\n") : "") : "";
+  const listingFacts = /\b(?:job|requisition)\s*(?:id|number|#)\s*[:#]/i.test(body) && /\b(?:location|experience|posted date)\s*:/i.test(body);
+  const hasPosting = postings.length === 1 && Boolean(text(postings[0]!.title));
+  const isJobPage = !isList && (hasPosting || (apply && (isJobLink(url) || listingFacts)) || isAdzunaDetail(linkOf(url)));
   if (!isJobPage) return { title: "", company: "", description: "", location: null, url, isJobPage };
   const page = fromPage(doc, url);
   const title = (found?.title || page.title).slice(0, MAX_LINE);

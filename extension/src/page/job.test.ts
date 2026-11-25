@@ -31,6 +31,24 @@ describe("telling a job's page", () => {
     expect(readJob(pageOf(one), "https://acme.com/careers").isJobPage).toBe(false);
   });
 
+  it("uses the visible role on a region-restricted Adzuna listing", () => {
+    const doc = pageOf("<main><h1>View Job</h1><p>Sorry, this job is not available in your region</p><p>Position: Salesforce Developer</p></main>");
+    doc.title = "View Job | Adzuna";
+    expect(readJob(doc, "https://www.adzuna.com/details/5961900552")).toMatchObject({ isJobPage: true, title: "Salesforce Developer" });
+  });
+
+  it("uses the role above Apply even when the metadata repeats View Job", () => {
+    const doc = pageOf('<script type="application/ld+json">{"@type":"JobPosting","title":"View Job"}</script><main><p>Salesforce Developer</p><button>Apply</button><h2>Overview:</h2></main>');
+    doc.title = "View Job";
+    expect(readJob(doc, "https://example.org/jobs/12407").title).toBe("Salesforce Developer");
+  });
+
+  it("finds a role above Apply on a custom portal URL with a branded tab title", () => {
+    const doc = pageOf("<main><div>Salesforce Developer</div><button>Apply</button><p>Location: Mount Laurel, NJ</p><p>Job Id: PDT - 12407</p></main>");
+    doc.title = "Purpledrive recruiting portal";
+    expect(readJob(doc, "https://purpledrive.oorwin.com/public/open/12407")).toMatchObject({ isJobPage: true, title: "Salesforce Developer" });
+  });
+
   it("sets aside JobPosting data an app kept from the job it showed before, and reads this one's", () => {
     const stale = `<script type="application/ld+json">{"@type":"JobPosting","title":"Old Role","url":"https://jobs.acme.com/jobs/111111","hiringOrganization":"Acme","description":"<p>Old.</p>"}</script>`;
     const body = "<main><h1>QA Engineer</h1><p>Test the payments API end to end, every day.</p><button>Apply now</button></main>";

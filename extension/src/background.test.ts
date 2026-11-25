@@ -262,6 +262,15 @@ it("checks site access before injecting a job detector", async () => {
   await settle();
   expect(fake.scripting.executeScript).not.toHaveBeenCalled();
 });
+it("offers Chrome site access for a listing URL before inspecting the page", async () => {
+  fake.permissions.contains.mockResolvedValue(false);
+  const url = "https://example.test/jobs/developer";
+  fake.webNavigation.onCompleted.fire({ frameId: 0, tabId: 8, url });
+  await settle();
+  expect(fake.permissions.addHostAccessRequest).toHaveBeenCalledWith({ tabId: 8, pattern: url });
+  expect(fake.scripting.executeScript).not.toHaveBeenCalled();
+  expect(fake.sidePanel.open).not.toHaveBeenCalled();
+});
 it("uses the source click to open the panel and bind the destination to the saved candidate job", async () => {
   const api = await import("./api");
   const url = "https://jobs.example.test/apply/42";

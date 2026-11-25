@@ -93,6 +93,9 @@ function App() {
     () => localStorage.getItem("benchq-selected-candidate") || "",
   );
   const [jobs, setJobs] = useState<Application[]>([]);
+  const showPageTitle = useCallback((id: string, title: string) => {
+    setJobs(current => current.map(job => job.id === id ? { ...job, title } : job));
+  }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -391,6 +394,7 @@ function App() {
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
     <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
+      onPageTitle={showPageTitle}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         loadJobs(selectedCandidate.id).catch(() => undefined);
@@ -472,11 +476,11 @@ function App() {
         <div className="flex min-w-0 items-center gap-2 text-h3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            className="block size-[var(--control-sm)] rounded-[var(--radius-md)] object-cover"
+            className="block size-6 shrink-0 rounded-[var(--radius-md)] object-cover"
             src="/icons/icon128.png"
             alt=""
           />
-          <span>BenchQ Autofill Apply</span>
+          <span className="whitespace-nowrap">BenchQ</span>
         </div>
         <div className="flex min-w-0 flex-none items-center gap-1.5">
           <button
@@ -509,10 +513,11 @@ function App() {
           <button
             className={button("secondary", "small")}
             onClick={togglePreview}
+            aria-label="LinkedIn posting preview"
             aria-pressed={isPreviewOn}
             title="Show LinkedIn postings inside BenchQ"
           >
-            <span>Posting preview: {isPreviewOn ? "On" : "Off"}</span>
+            <span>Preview {isPreviewOn ? "on" : "off"}</span>
           </button>
           <button
             className={ICON_BUTTON_RAISED}

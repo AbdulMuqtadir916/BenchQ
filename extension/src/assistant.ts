@@ -1,4 +1,5 @@
 import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
+import { isJobLink } from "./autofill/job-link";
 import { connectionFor, connectionKey } from "./autofill/connection-store";
 
 async function connectSource(tabId: number, source: URL, jobId: string, candidateId: string) {
@@ -23,7 +24,13 @@ async function connectSource(tabId: number, source: URL, jobId: string, candidat
 
 async function detect({ tabId, frameId, url }: FrameDetails & { url?: string }) {
   if (frameId !== 0 || !url?.startsWith("https://") || new URL(url).origin === BENCHQ_URL) return;
-  if (!await chrome.permissions.contains({ origins: [new URL(url).origin + "/*"] })) return;
+  if (!await chrome.permissions.contains({ origins: [new URL(url).origin + "/*"] })) {
+    if (isJobLink(url)) {
+      // Chrome owns this indicator. Limit it to this listing, including its query on single-page boards.
+      await chrome.permissions.addHostAccessRequest?.({ tabId, pattern: url.split("#")[0]! });
+    }
+    return;
+  }
   await chrome.scripting.executeScript({ target: { tabId }, files: ["page.js", "assistant.js"] });
 }
 
@@ -31,10 +38,16 @@ export function installAssistant() {
   const onPage = (details: FrameDetails & { url?: string }) => { void detect(details).catch(() => undefined); };
   chrome.webNavigation.onCompleted.addListener(onPage);
   chrome.webNavigation.onHistoryStateUpdated.addListener(onPage);
-  chrome.tabs.onActivated.addListener(({ tabId }) => {
+  const checkTab = ({ tabId }: { tabId: number }) => {
     void chrome.webNavigation.getAllFrames({ tabId }).then(frames => {
       const page = frames?.find(frame => frame.frameId === 0);
       if (page) onPage({ tabId, ...page });
+    }).catch(() => undefined);
+  };
+  chrome.tabs.onActivated.addListener(checkTab);
+  chrome.permissions.onAdded.addListener(() => {
+    void chrome.tabs.query({ active: true }).then(tabs => {
+      for (const tab of tabs) if (tab.id !== undefined) checkTab({ tabId: tab.id });
     }).catch(() => undefined);
   });
   chrome.runtime.onMessage.addListener((value, sender, respond) => {

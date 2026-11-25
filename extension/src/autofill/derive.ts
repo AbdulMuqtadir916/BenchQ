@@ -114,7 +114,7 @@ function addressParts(address: string): AddressParts | null {
 
 /** The country a saved location or address is in, as a form's country list names it: the country its last part names,
  * else "United States" for a US state. */
-function countryIn(text: string): string | null {
+export function countryIn(text: string): string | null {
   const address = addressParts(text);
   if (address) return address.country || (isUsState(canonical(address.region)) ? "United States" : null);
   const parts = withoutNotes(text).split(",").map((part) => withoutPostal(part.trim())).filter(Boolean);

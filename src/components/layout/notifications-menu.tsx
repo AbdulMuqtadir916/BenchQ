@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { Bell, BriefcaseBusiness, KeyRound, MessageSquareText, type LucideIcon } from "lucide-react";
+import { Bell, KeyRound, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { CountBadge } from "@/components/ui/count-badge";
@@ -20,8 +20,7 @@ type Notification = {
   query?: RouteQuery;
   icon: LucideIcon;
   tone: "blue" | "green" | "amber";
-  /** A backend request: its read state is the server's. Absent for the demo items. */
-  isRequestUnread?: boolean;
+  isRequestUnread: boolean;
 };
 
 function relativeTime(iso: string): string {
@@ -32,27 +31,6 @@ function relativeTime(iso: string): string {
   return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
 }
 
-const NOTIFICATIONS: Notification[] = [
-  {
-    id: "new-job-match",
-    title: "New 98% job match",
-    detail: "Senior Java Developer at Brillio LLC.",
-    time: "12m",
-    route: "jobs",
-    icon: BriefcaseBusiness,
-    tone: "green",
-  },
-  {
-    id: "candidate-response",
-    title: "Candidate response received",
-    detail: "Rajesh replied to your latest outreach.",
-    time: "38m",
-    route: "outreach",
-    icon: MessageSquareText,
-    tone: "blue",
-  },
-];
-
 const TONE_CLASS: Record<Notification["tone"], string> = {
   blue: "bg-[var(--color-primary-subtle)] text-[var(--color-primary)]",
   green: "bg-[var(--color-success-bg)] text-[var(--color-success-fg)]",
@@ -61,7 +39,7 @@ const TONE_CLASS: Record<Notification["tone"], string> = {
 
 /**
  * The bell. Password-reset requests waiting for this person's decision come from the backend (07 Q54) and open the
- * Requests inbox; the firm's other updates are still demo data. The admin variant shows only the requests.
+ * Requests inbox; both variants show the requests returned for the signed-in user.
  */
 export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "admin" }) {
   const toHref = useHref();
@@ -70,7 +48,7 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
   const markRequestRead = useMarkNotificationRead();
   const inboxRoute: RouteId = variant === "admin" ? "admin.notifications" : "notifications";
   const requestsRoute: RouteId = variant === "admin" ? "admin.notifications.requests" : "notifications.requests";
-  const requests: Notification[] = (useNotifications().data ?? []).filter(isPendingRequest).map((item) => ({
+  const notifications: Notification[] = (useNotifications().data ?? []).filter(isPendingRequest).map((item) => ({
     id: item.id,
     title: item.title,
     detail: item.detail,
@@ -80,12 +58,11 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
     tone: "amber",
     isRequestUnread: item.readAt === null,
   }));
-  const notifications = [...requests, ...(variant === "firm" ? NOTIFICATIONS : [])];
   const reduceMotion = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-  const isUnread = (n: Notification) => (n.isRequestUnread ?? true) && !readIds.has(n.id);
+  const isUnread = (n: Notification) => n.isRequestUnread && !readIds.has(n.id);
   const unreadCount = notifications.filter(isUnread).length;
 
   useEffect(() => {
@@ -111,7 +88,7 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
 
   function markAllRead() {
     setReadIds(new Set(notifications.map(({ id }) => id)));
-    for (const request of requests) if (request.isRequestUnread) markRequestRead.mutate(request.id);
+    for (const request of notifications) if (request.isRequestUnread) markRequestRead.mutate(request.id);
   }
 
   return (

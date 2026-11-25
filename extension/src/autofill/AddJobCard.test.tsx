@@ -68,25 +68,22 @@ describe("adding the job on this page", () => {
     expect(host.querySelector("[data-slot='add-job']")).toBeNull();
   });
 
-  it("asks first, then adds the job for the candidate and hands back its application", async () => {
+  it("adds on an explicit save click the job for the candidate and hands back its application", async () => {
     vi.mocked(readJobPage).mockResolvedValue(page);
     vi.mocked(addJob).mockResolvedValue({ id: "app-1", status: "saved", job_created: true, application_created: true } as never);
     const onAdded = await show();
-    expect(host.textContent).toContain("Senior QA Engineer · Acme Bank · Atlanta, GA");
-    await click("add-job-run");
+    expect(host.querySelector("h2")?.textContent).toBe(page.title);
+    expect(host.textContent).toContain("Acme Bank · Atlanta, GA");
     expect(addJob).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Add this job to Priya's Saved jobs?");
-    await click("add-job-confirm");
+    await click("add-job-run");
     expect(addJob).toHaveBeenCalledWith("cand-1", page);
     expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ id: "app-1" }));
     expect(host.querySelector("[role='status']")?.textContent).toBe("Added to Priya's Saved jobs.");
   });
 
-  it("adds nothing when the BDE cancels", async () => {
+  it("adds nothing until the BDE chooses Save", async () => {
     vi.mocked(readJobPage).mockResolvedValue(page);
     await show();
-    await click("add-job-run");
-    await click("add-job-cancel");
     expect(addJob).not.toHaveBeenCalled();
     expect(host.querySelector("[data-slot='add-job-run']")).not.toBeNull();
   });
@@ -142,6 +139,20 @@ describe("adding the job on this page", () => {
     expect(readJobPage).not.toHaveBeenCalled();
   });
 
+  it("recovers a previously saved View Job title only from that exact listing", async () => {
+    const onPageTitle = vi.fn();
+    vi.mocked(readJobPage).mockResolvedValue(page);
+    const saved = { ...page, id: "app-9", title: "View Job" };
+    host = document.createElement("div");
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(<AddJobCard tab={{ id: 7, url: page.url }} candidateId="cand-1" candidateName="Priya"
+        knownUrls={[page.url]} knownJobs={[saved]} onAdded={vi.fn()} onPageTitle={onPageTitle} />);
+    });
+    expect(onPageTitle).toHaveBeenCalledWith("app-9", page.title);
+    expect(addJob).not.toHaveBeenCalled();
+  });
+
   it("doesn't look at a page that is already one of the candidate's jobs", async () => {
     await show(vi.fn(), [page.url]);
     expect(readJobPage).not.toHaveBeenCalled();
@@ -164,7 +175,7 @@ describe("a site BenchQ may not read yet (#126)", () => {
     expect(requestAccess).toHaveBeenCalledWith(site);
     expect(readJobPage).toHaveBeenCalledWith(7);
     expect(host.querySelector("[data-slot='add-job-access']")).toBeNull();
-    expect(host.querySelector("[data-slot='add-job']")?.textContent).toContain("Senior QA Engineer · Acme Bank");
+    expect(host.querySelector("[data-slot='add-job']")?.textContent).toContain("Senior QA Engineer");
   });
 
   it("says so when the BDE doesn't allow it, and asks again on the next click", async () => {
@@ -216,7 +227,7 @@ describe("a fuller reading of the same page (PR #140 review)", () => {
       vi.mocked(readJobPage).mockResolvedValueOnce(page).mockResolvedValueOnce(fuller)
         .mockResolvedValue({ ...fuller, url: "https://boards.example.test/acme/jobs/999", title: "Data Engineer", employmentType: "Full-time", location: "Remote" });
       await show();
-      expect(host.textContent).toContain("Senior QA Engineer · Acme Bank");
+      expect(host.textContent).toContain("Senior QA Engineer");
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(host.textContent).toContain("Senior QA Engineer II");
       await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
@@ -247,7 +258,7 @@ describe("what the card says the page stated, before the BDE adds the job", () =
 });
 
 describe("a later reading of the page (PR #140, second review)", () => {
-  it("takes the whole description when only the description grew, and closes Add this job? when the card moves to another posting", async () => {
+  it("takes the whole description when only the description grew, and saves the posting currently displayed", async () => {
     vi.mocked(missingAccess).mockResolvedValue(null);
     vi.useFakeTimers();
     try {
@@ -257,14 +268,12 @@ describe("a later reading of the page (PR #140, second review)", () => {
         .mockResolvedValue({ ...whole, url: "https://boards.example.test/acme/jobs/456", location: "Remote", employmentType: "Contract" });
       await show();
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-      await click("add-job-run");
-      expect(host.querySelector("[data-slot='add-job-confirm']")).not.toBeNull();
+      expect(addJob).not.toHaveBeenCalled();
       // The same title on another posting, read more fully: the card shows it, and the question asked about the first closes.
       await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
       expect(host.textContent).toContain("Remote");
       expect(host.querySelector("[data-slot='add-job-confirm']")).toBeNull();
       await click("add-job-run");
-      await click("add-job-confirm");
       expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ url: "https://boards.example.test/acme/jobs/456" }));
     } finally {
       vi.useRealTimers();

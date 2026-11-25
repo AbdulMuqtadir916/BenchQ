@@ -45,6 +45,8 @@ export function fakeChrome() {
     },
     // Every site is allowed unless a test says otherwise.
     permissions: {
+      addHostAccessRequest: vi.fn(async () => undefined),
+      onAdded: new FakeEvent(),
       contains: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(async () => true),
       request: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(async () => true),
     },
