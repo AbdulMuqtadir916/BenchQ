@@ -184,6 +184,9 @@ function accepted(entry: Entry, write: FieldWrite): boolean {
   if (write.type === "text") {
     const value = control.value.trim();
     const wanted = write.value.trim();
+    if (entry.field.kind === "number") {
+      return value !== "" && wanted !== "" && Number.isFinite(Number(value)) && Number(value) === Number(wanted);
+    }
     return value === wanted || (PHONE_LIKE.test(wanted) && samePhone(value, wanted)) || sameValue(value, wanted);
   }
   if (write.type === "check") {

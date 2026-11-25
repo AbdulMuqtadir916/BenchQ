@@ -82,7 +82,7 @@ const ROUTE_DEFS = [
   { id: "forgot-password", path: "/forgot-password", title: "Forgot password", area: "public", shell: "auth", access: PUBLIC },
   { id: "reset-password", path: "/reset-password", title: "Reset password", area: "public", shell: "auth", access: PUBLIC },
   { id: "invite", path: "/invite/[token]", title: "Accept invite", area: "public", shell: "auth", access: PUBLIC },
-  // BenchQ Apply's privacy policy: public, because the Chrome Web Store listing links to it (docs/extension-store.md §4).
+  // BenchQ Autofill Apply's privacy policy: public, because the Chrome Web Store listing links to it (docs/extension-store.md §4).
   { id: "privacy", path: "/privacy", title: "Privacy policy", area: "public", shell: "auth", access: PUBLIC },
   { id: "welcome", path: "/[firm]/welcome", title: "Welcome", area: "firm", shell: "auth", access: firm(roles("full", "none", "none", "none"), "none"), onDenied: "landing" },
 

@@ -426,7 +426,7 @@ export function JobExplorer({
                 onHide={canMark ? () => toggleHidden(selected.job.id) : null}
                 onOpenSource={onOpenSource}
               />
-              <SourcePreview job={selected.job} portal={selected.portal} onOpenSource={onOpenSource} />
+              <SourcePreview candidateId={context?.id} job={selected.job} portal={selected.portal} onOpenSource={onOpenSource} />
             </motion.div>
           ) : (
             <div className="flex h-full min-h-[520px] items-center justify-center p-8 text-center">
@@ -478,7 +478,7 @@ function JobDetailHeader({
   const principal = useSignedInPrincipal();
   const canTailor = context ? canManageResume(principal, context) : false;
   const sourceUrl = job.provenance.sourceUrl ?? job.applyUrl ?? toHref("jobs.detail", { id: job.id }, { candidate: context?.id });
-  const openSource = <Button asChild variant="secondary" size="sm"><a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>{openSourceLabel(portalForJob(job))}<ExternalLink size={13} /></a></Button>;
+  const openSource = <Button asChild variant="secondary" size="sm"><a data-benchq-job={job.id} data-candidate={context?.id} href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)}>{openSourceLabel(portalForJob(job))}<ExternalLink size={13} /></a></Button>;
   const more = <Button variant="secondary" size="icon" aria-label="More job actions" aria-expanded={menuOpen} onClick={onMenuToggle}><MoreHorizontal size={15} /></Button>;
   return (
     <div className="relative border-b border-[var(--color-border)]">
@@ -521,7 +521,7 @@ function JobDetailHeader({
         {menuOpen ? (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.985 }} transition={POPOVER_TRANSITION} className="absolute right-5 top-16 z-30 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-md)]">
             <button type="button" onClick={onCopy} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Link copied" : "Copy job link"}</button>
-            <a href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
+            <a data-benchq-job={job.id} data-candidate={context?.id} href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => onOpenSource?.(job)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-sm text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"><ExternalLink size={14} />Open in new tab</a>
             {onHide ? (
               <button type="button" onClick={onHide} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-sm text-[var(--color-danger-fg)] hover:bg-[var(--color-danger-bg)]">{isHidden ? <><Eye size={14} />Unhide this job</> : <><EyeOff size={14} />Hide this job</>}</button>
             ) : null}

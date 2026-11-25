@@ -14,11 +14,12 @@ declare const chrome: {
   };
   runtime: {
     id: string;
+    getContexts(filter: {contextTypes: string[]; windowIds: number[]}): Promise<unknown[]>;
     onInstalled: ChromeEvent<() => void>;
     onStartup: ChromeEvent<() => void>;
     onMessage: ChromeEvent<(
       message: unknown,
-      sender: { id?: string; tab?: ChromeTab },
+      sender: { url?: string; frameId?: number; id?: string; tab?: ChromeTab },
       sendResponse: (response: unknown) => void,
     ) => boolean>;
     sendMessage(message: unknown): Promise<unknown>;
@@ -30,7 +31,7 @@ declare const chrome: {
   };
   commands: { onCommand: ChromeEvent<(command: string, tab?: ChromeTab) => void> };
   tabs: {
-    create(options: { url: string }): Promise<ChromeTab>;
+    create(options: { url: string; windowId?: number }): Promise<ChromeTab>;
     query(info: { active: boolean; currentWindow: boolean }): Promise<ChromeTab[]>;
     /** The tab this extension page runs in; undefined in the side panel. */
     getCurrent(): Promise<ChromeTab | undefined>;

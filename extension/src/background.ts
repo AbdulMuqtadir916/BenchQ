@@ -1,3 +1,4 @@
+import { installAssistant } from "./assistant";
 import { connectionKey } from "./autofill/connection-store";
 import { hostOf, isConfirmedHost } from "./autofill/job-check";
 import { PREVIEW_KEY, setupFrameRules } from "./frame-rules";
@@ -137,3 +138,5 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, frameId, url, transitionT
     if (host !== hostOf(connection.job.url) && !isConfirmedHost(connection.confirmedHosts, host)) void removeConnection(tabId);
   });
 });
+
+installAssistant();

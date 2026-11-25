@@ -476,7 +476,7 @@ function App() {
             src="/icons/icon128.png"
             alt=""
           />
-          <span>BenchQ</span>
+          <span>BenchQ Autofill Apply</span>
         </div>
         <div className="flex min-w-0 flex-none items-center gap-1.5">
           <button
@@ -583,7 +583,7 @@ function App() {
           {!hasAutofillPermissions() && (
             <p data-slot="error" className={`mb-2.5 ${ALERT}`}>
               Autofill is off because Chrome hasn&apos;t reloaded this
-              extension. Open chrome://extensions and click Reload on BenchQ
+              extension. Open chrome://extensions and click Reload on BenchQ Autofill
               Apply.
             </p>
           )}

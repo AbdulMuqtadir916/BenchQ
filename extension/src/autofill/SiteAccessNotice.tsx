@@ -5,7 +5,7 @@ import type { SiteAccess } from "./site-access";
 const REASSURANCES = [
   { title: "Reads only this tab's form", detail: "To fill it for you, and to record what was filled when you mark the job applied." },
   { title: "Asks once for this site", detail: "Chrome remembers your answer, so you won't see this again here." },
-  { title: "Yours to take back", detail: "Remove it any time in chrome://extensions, under BenchQ Apply, Site access." },
+  { title: "Yours to take back", detail: "Remove it any time in chrome://extensions, under BenchQ Autofill Apply, Site access." },
 ];
 
 /** BenchQ can't read a site until Chrome has been told it may. This says why before Chrome asks, in plain words and at the

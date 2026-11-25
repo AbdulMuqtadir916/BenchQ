@@ -466,7 +466,11 @@ export function derivedAnswer(type: EngineFieldType, { label, kind }: Asked, sav
     case "address-postal": return postalCode(saved);
     case "address-country": return country ? { answer: country.country, source: country.source } : null;
     // Where the candidate lives, from the saved address when no location is saved: "Hyderabad, Telangana".
-    case "city-state": return fromPlace(found && found.place.region ? `${found.place.city}, ${found.place.region}` : "");
+    case "city-state": {
+      const city = saved("address-city");
+      if (city) return { answer: [city.answer, saved("address-region")?.answer, saved("address-country")?.answer].filter(Boolean).join(", "), source: city };
+      return fromPlace(found && found.place.region ? `${found.place.city}, ${found.place.region}` : "");
+    }
     // Only a yes: "Do you live and work in North America?" is the same question, and a Canadian's answer to it isn't no.
     case "lives-in-us": return country?.country === "United States" ? { answer: "Yes", source: country.source } : null;
     case "phone-country-code": return phoneCountry(saved);

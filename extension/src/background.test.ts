@@ -247,3 +247,18 @@ describe("LinkedIn postings inside BenchQ (frame-rules.ts, decided 2026-11-17)",
     }
   });
 });
+it("opens the assistant from a page without issuing an autofill command", async () => {
+  const reply = vi.fn();
+  fake.runtime.onMessage.fire({ type: "assistant-open" }, { id: "extension-id", frameId: 0, tab: { id: 8, windowId: 4 } }, reply);
+  await settle();
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(reply).toHaveBeenCalledWith(true);
+  expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
+});
+
+it("checks site access before injecting a job detector", async () => {
+  fake.permissions.contains.mockResolvedValue(false);
+  fake.webNavigation.onCompleted.fire({ frameId: 0, tabId: 8, url: "https://example.test/jobs" });
+  await settle();
+  expect(fake.scripting.executeScript).not.toHaveBeenCalled();
+});
