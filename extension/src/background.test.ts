@@ -262,3 +262,20 @@ it("checks site access before injecting a job detector", async () => {
   await settle();
   expect(fake.scripting.executeScript).not.toHaveBeenCalled();
 });
+it("uses the source click to open the panel and bind the destination to the saved candidate job", async () => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  const reply = await new Promise(resolve => fake.runtime.onMessage.fire(
+    { type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(reply).toBe(true);
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(stored(101)).toMatchObject({ candidateId: "candidate-1", applicationId: "app-1", userId: "user-1" });
+  expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
+  vi.restoreAllMocks();
+});
