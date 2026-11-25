@@ -2,14 +2,16 @@ import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
 import { isJobLink } from "./autofill/job-link";
 import { connectionFor, connectionKey } from "./autofill/connection-store";
 
-async function connectSource(tabId: number, source: URL, jobId: string, candidateId: string) {
+async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string) {
   const { principal } = await getSession();
   if (principal.kind !== "firm" || principal.role !== "BDE") return;
   // The website saves the application concurrently with opening the source link.
   for (const delay of [0, 300, 1000, 2500]) {
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     const jobs = await getSavedApplications(candidateId);
-    const job = jobs.find(item => item.job_id === jobId && item.candidate_id === candidateId && item.status === "saved");
+    const matches = jobs.filter(item => item.candidate_id === candidateId && item.status === "saved"
+      && (jobId ? item.job_id === jobId : item.url === source.href));
+    const job = matches.length === 1 ? matches[0] : undefined;
     if (!job) continue;
     const connection = connectionFor(job, principal.user_id);
     const frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -35,6 +37,13 @@ async function detect({ tabId, frameId, url }: FrameDetails & { url?: string }) 
 }
 
 export function installAssistant() {
+  // Static content scripts only run on navigation. Attach the click listener to BenchQ tabs already open on install or reload.
+  chrome.runtime.onInstalled.addListener(() => {
+    void chrome.tabs.query({ url: BENCHQ_URL + "/*" }).then(tabs => Promise.allSettled(tabs.map(tab =>
+      tab.id !== undefined && tab.url && new URL(tab.url).origin === BENCHQ_URL
+        ? chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["source-click.js"] })
+        : undefined))).catch(() => undefined);
+  });
   const onPage = (details: FrameDetails & { url?: string }) => { void detect(details).catch(() => undefined); };
   chrome.webNavigation.onCompleted.addListener(onPage);
   chrome.webNavigation.onHistoryStateUpdated.addListener(onPage);
@@ -62,10 +71,11 @@ export function installAssistant() {
       let source: URL;
       try { source = new URL(message.url); } catch { return false; }
       if (!["http:", "https:"].includes(source.protocol) || source.username || source.password) return false;
-      void chrome.sidePanel.open({ windowId }).catch(() => undefined);
-      void chrome.tabs.create({ windowId, url: source.href }).then(async tab => {
-        if (tab.id !== undefined && typeof message.jobId === "string" && typeof message.candidateId === "string") {
-          await connectSource(tab.id, source, message.jobId, message.candidateId).catch(() => undefined);
+      // Consume the trusted click immediately and let Chrome finish opening the panel before switching tabs.
+      void chrome.sidePanel.open({ windowId }).catch(() => undefined)
+        .then(() => chrome.tabs.create({ windowId, url: source.href })).then(async tab => {
+        if (tab.id !== undefined && typeof message.candidateId === "string") {
+          await connectSource(tab.id, source, typeof message.jobId === "string" ? message.jobId : undefined, message.candidateId).catch(() => undefined);
         }
         respond(true);
       }, () => respond(false));

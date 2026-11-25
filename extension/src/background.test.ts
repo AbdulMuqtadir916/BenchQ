@@ -288,3 +288,26 @@ it("uses the source click to open the panel and bind the destination to the save
   expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
   vi.restoreAllMocks();
 });
+
+it("attaches the click listener to an existing BenchQ tab when the extension is installed", async () => {
+  const { BENCHQ_URL } = await import("./api");
+  fake.tabs.query.mockResolvedValue([{ id: 12, windowId: 1, url: BENCHQ_URL + "/firm/jobs" }]);
+  fake.runtime.onInstalled.fire();
+  await settle();
+  expect(fake.scripting.executeScript).toHaveBeenCalledWith({ target: { tabId: 12 }, files: ["source-click.js"] });
+});
+
+it("keeps the original click tab active until the panel has opened", async () => {
+  const { BENCHQ_URL } = await import("./api");
+  let opened!: () => void;
+  fake.sidePanel.open.mockImplementationOnce(() => new Promise<undefined>(resolve => { opened = () => resolve(undefined); }));
+  const reply = vi.fn();
+  fake.runtime.onMessage.fire({ type: "source-click", url: "https://jobs.example.test/42" },
+    { id: "extension-id", frameId: 0, tab: { id: 7, windowId: 4 }, url: BENCHQ_URL + "/firm/jobs" }, reply);
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(fake.tabs.create).not.toHaveBeenCalled();
+  opened();
+  await settle();
+  expect(fake.tabs.create).toHaveBeenCalledTimes(1);
+  expect(reply).toHaveBeenCalledWith(true);
+});
