@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.candidates import CandidateMailbox, CandidateGoogleOAuthAttempt, InboxMessage
 from backend.models.db import Application, ApplicationStatusEvent, utcnow
-from backend.models.tenancy import Firm, LedgerEntry, User
+from backend.models.tenancy import Firm, ActivityEntry, User
 from backend.tests.test_candidate_application_status import _saved_candidate_application
 
 
@@ -90,7 +90,7 @@ def test_oauth_state_is_encrypted_bound_and_one_use(api_client, test_db, account
     assert attempt.code_verifier_ciphertext == b''
     test_db.refresh(mailbox)
     assert mailbox.refresh_token_ciphertext == b'encrypted-test-value'
-    entries = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    entries = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert len(entries) == 1 and entries[0].actor_user_id == accounts.user_id
     result = api_client.get(base(candidate) + '/inbox')
     assert result.status_code == 200
@@ -196,7 +196,7 @@ def test_read_disconnect_idempotency_and_safe_audit(api_client, test_db, account
     test_db.refresh(mailbox)
     assert message.source_address == 'old-account@example.test'
     assert mailbox.refresh_token_ciphertext is None and mailbox.history_id is None
-    rows = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).all()
+    rows = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).all()
     assert len(rows) == 1 and all(row.actor_user_id == accounts.user_id for row in rows)
     assert all(message.subject not in row.summary and message.body not in row.summary for row in rows)
     result = api_client.get(base(candidate) + '/inbox').json()
@@ -251,7 +251,7 @@ def test_import_fetch_does_not_hold_mailbox_lock_and_encrypts_content(test_db, m
     row = test_db.query(InboxMessage).one()
     assert row.body.startswith('bqenc1:') and 'Private imported body' not in row.body
     assert mailbox.sync_state == 'IDLE' and mailbox.history_id == '2'
-    audit = test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).one()
+    audit = test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).one()
     assert audit.actor_type == 'SYSTEM' and audit.actor_user_id is None
 
 
@@ -390,7 +390,7 @@ def test_delete_content_keeps_history_reference_and_prevents_reimport(api_client
     assert message.body is None and message.snippet == '' and message.deleted_at is not None
     assert review.inbox_message_id == message.id
     assert message.provider_message_id == 'synthetic-message'
-    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 1
+    assert test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).count() == 1
 
 
 def test_bde_cannot_delete_content(api_client, test_db, accounts, mailbox_case):
@@ -427,7 +427,7 @@ def test_oauth_requires_explicit_confirmation_before_replacing_credentials(api_c
     attempt = test_db.query(CandidateGoogleOAuthAttempt).one()
     assert attempt.pending_address == mailbox.address and attempt.pending_token_ciphertext is not None
     assert attempt.confirmed_at is None
-    assert test_db.query(LedgerEntry).filter_by(candidate_id=candidate.id).count() == 0
+    assert test_db.query(ActivityEntry).filter_by(candidate_id=candidate.id).count() == 0
 
 
 def test_duplicate_mailbox_confirmation_does_not_reveal_other_candidate(api_client, test_db, accounts, monkeypatch, mailbox_case, jobs_in_default_firm):

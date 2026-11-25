@@ -34,6 +34,7 @@ NOT_SECRET = {
     "tests/conftest.py:CANDIDATE_GMAIL_ENCRYPTION_KEY": "a synthetic test-only Fernet key, never a real one",
     "tests/auth_support.py:TEST_PASSWORD": "the test accounts' password, in the disposable test database",
     "tests/test_logging_canary.py:PASSWORD": "a planted canary value the log must never show",
+    "tests/test_activity_sign_in_events.py:PASSWORD": "a test Super Admin's password, in the disposable test database",
     "tests/test_logging_canary.py:TOKEN": "a planted canary value the log must never show",
     "tests/test_production_config.py:DB_SECRET": "a planted value the start-up check's message must never show",
 }

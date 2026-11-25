@@ -80,6 +80,17 @@ def test_production_refuses_a_demo_account_at_sign_in_as_a_wrong_password(anonym
         assert r.status_code == 401
         assert _without_id(r) == _without_id(wrong) == WRONG_PASSWORD     # confirms nothing
         assert "bq_session" not in r.headers.get("set-cookie", "")
+    # Counted and logged like a wrong password (activity logs PR 6): a real account, so its entry names it, and the
+    # reason (the Super Admin's alone) says why.
+    from backend.auth import throttle
+    from backend.models.tenancy import ActivityEntry
+    assert all(len(throttle._hits.get(f"email:{email}", [])) == 1 for email in (DEMO, "sana@admin.benchq.test"))
+    test_db.expire_all()
+    failed = {e.entity_label: e for e in test_db.query(ActivityEntry).filter(ActivityEntry.action == "SIGN_IN_FAILED",
+                                                                                ActivityEntry.ip_address == "10.0.5.2")}
+    assert set(failed) == {"Imran Shaikh", "Sana Admin"}
+    assert {e.summary for e in failed.values()} == {"Test account, refused in production"}
+    assert failed["Imran Shaikh"].firm_id == accounts.firm_id and failed["Sana Admin"].firm_id is None
 
 
 def test_development_is_unchanged(anonymous_client, accounts, test_db):

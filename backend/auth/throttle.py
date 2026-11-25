@@ -72,10 +72,16 @@ def check(request: Request, email: str) -> None:
         _refuse_if_over(key, limit, now)
 
 
-def record_failure(request: Request, email: str) -> None:
+def record_failure(request: Request, email: str) -> tuple[str, tuple[int, float]] | None:
+    """Returns which budget this failure used up, `("email", limit)` or `("ip", limit)`, if it did: the email's when both,
+    as that is the one that locks the account."""
     now = time.monotonic()
-    for key, _ in _sign_in_buckets(request, email):
+    reached = None
+    for key, limit in _sign_in_buckets(request, email):
         _hits.setdefault(key, []).append(now)
+        if len(_recent(key, limit[1], now)) == limit[0]:
+            reached = (key.split(":", 1)[0], limit)
+    return reached
 
 
 def clear(request: Request, email: str) -> None:

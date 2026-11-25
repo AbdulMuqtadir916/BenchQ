@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.auth import ledger
 from backend.models.candidates import Candidate, CandidateJob, CandidateMailbox, FavoriteJob, InboxMessage
 from backend.models.db import Application, Job, Search, utcnow
-from backend.models.tenancy import Firm, LedgerEntry, User
+from backend.models.tenancy import Firm, ActivityEntry, User
 from backend.tests.auth_support import make_user
 from backend.tests.resume_support import make_posting, make_version
 
@@ -86,11 +86,11 @@ def test_the_ledger_knows_the_candidate_an_entry_is_about(test_db, world):
     """07 Q53h: an entry about a candidate gets it; another write passes it; the rest have none."""
     owner, candidate = world["owner"], world["candidate"]
     about = ledger.record(test_db, actor=owner, action="UPDATE", entity_type="candidate", entity_id=candidate.id,
-                          entity_label="Asha", summary="Edited", firm_id=world["firm"].id)
+                          entity_label="Asha", summary="Edited", firm_id=world["firm"].id, candidate_id=None)
     passed = ledger.record(test_db, actor=owner, action="CREATE", entity_type="application", entity_id=candidate.id,
                            entity_label="Acme", summary="Applied", firm_id=world["firm"].id, candidate_id=candidate.id)
     neither = ledger.record(test_db, actor=owner, action="UPDATE", entity_type="firm", entity_id=world["firm"].id,
-                            entity_label="Acme", summary="Settings", firm_id=world["firm"].id)
+                            entity_label="Acme", summary="Settings", firm_id=world["firm"].id, candidate_id=None)
     test_db.flush()
     assert (about.candidate_id, passed.candidate_id, neither.candidate_id) == (candidate.id, candidate.id, None)
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.candidate_id == candidate.id).count() == 2
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.candidate_id == candidate.id).count() == 2

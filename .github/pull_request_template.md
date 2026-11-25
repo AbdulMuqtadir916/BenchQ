@@ -13,5 +13,6 @@
 - [ ] One migration at most, with a real `downgrade()` (schema changes)
 - [ ] No new entity, field or contract without product-owner sign-off
 - [ ] No new inline role checks; permissions only through the policy
+- [ ] Every route that changes data writes a ledger entry stating `candidate_id` (or is in `NOT_LOGGED` with the reason)
 - [ ] Both themes and the skeleton / empty / error states checked (UI changes)
 - [ ] The module board or status line updated, if this changes status

@@ -328,10 +328,10 @@ def create_candidate(firm_id: uuid.UUID, body: CreateCandidateBody, background: 
     db.flush()
     actor = db.get(User, principal.user_id)
     ledger.record(db, actor=actor, action="CREATE", entity_type="candidate", entity_id=candidate.id,
-                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}")
+                  entity_label=candidate.full_name, firm_id=firm_id, summary=f"Added {candidate.full_name}", candidate_id=candidate.id)
     ledger.record(db, actor=actor, action="ASSIGN", entity_type="candidate", entity_id=candidate.id,
                   entity_label=candidate.full_name, firm_id=firm_id, summary=_assign_summary(manager, bde, None),
-                  note=_clean(body.handoff_note))
+                  note=_clean(body.handoff_note), candidate_id=candidate.id)
     db.commit()
     # The job search's 2 extra titles for the target role, after the answer (decided 2026-11-17, Q131).
     from backend.job_search import search_titles
@@ -364,6 +364,7 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if not can_edit_profile(principal, candidate):
         raise HTTPException(status_code=403, detail="This candidate's BDE edits their details; you can view them.")
     changes = _edited(body.model_dump(exclude_unset=True))
+    before = {field: getattr(candidate, field) for field in changes}
     for field, value in changes.items():
         if value is None and field in _NOT_NULL:
             raise _bad(f"{field} can't be empty.")
@@ -383,7 +384,8 @@ def update_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: UpdateCa
     if changed:
         ledger.record(db, actor=db.get(User, principal.user_id), action="UPDATE", entity_type="candidate",
                       entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}")
+                      summary=f"Updated {', '.join(f.replace('_', ' ') for f in changed)}", candidate_id=candidate.id,
+                      changes=ledger.diff(before, changes))
         db.commit()
         if set(changed) & _SCORED:
             match_store.rescore_later(background, firm_id, candidate_id)   # what the Match reads (Q35)
@@ -407,12 +409,14 @@ def assign_candidate(firm_id: uuid.UUID, candidate_id: uuid.UUID, body: AssignBo
     if new_bde_id is not None and candidate.bde_id != new_bde_id:
         _check_bde_limit(db, firm_id, new_bde_id)   # 07 Q70: the BDE it goes to
     previous = _firm_user(db, firm_id, candidate.bde_id) or _firm_user(db, firm_id, candidate.manager_id)
+    before = {"manager_id": candidate.manager_id, "bde_id": candidate.bde_id}
     candidate.manager_id = manager.id
     if candidate.bde_id != new_bde_id:
         # A new BDE starts again at Day 1; no BDE has no Days (decided 2026-11-17, Q154, Q155, Q174).
         workday.assign(candidate, new_bde_id, utcnow(), workday.of(firm))
     ledger.record(db, actor=db.get(User, principal.user_id), action="ASSIGN", entity_type="candidate",
                   entity_id=candidate.id, entity_label=candidate.full_name, firm_id=firm_id,
-                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note))
+                  summary=_assign_summary(manager, bde, previous.name if previous else None), note=_clean(body.note), candidate_id=candidate.id,
+                  changes=ledger.diff(before, {"manager_id": manager.id, "bde_id": new_bde_id}))
     db.commit()
     return candidate_json(candidate, principal)
