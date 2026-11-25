@@ -142,8 +142,9 @@ jobs:
       - run: python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
 
   # Secret scan of the PR's own commits with the pinned gitleaks release (not the Marketplace action), rules and
-  # allowlists in .gitleaks.toml. Runs on every PR, whatever the paths. To bump: change GITLEAKS_VERSION and
-  # GITLEAKS_SHA256 together, the hash taken from that release's gitleaks_<version>_checksums.txt (linux_x64 line).
+  # allowlists in the base branch's .gitleaks.toml. Runs on every PR, whatever the paths. To bump: change
+  # GITLEAKS_VERSION and GITLEAKS_SHA256 together, the hash taken from that release's gitleaks_<version>_checksums.txt
+  # (linux_x64 line).
   gitleaks:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -173,10 +174,26 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        # Exits non-zero on any finding; --redact keeps secret values out of the log.
+        # The policy comes from the BASE branch, never from the PR's checkout, so a PR cannot weaken the scan of its
+        # own commits (disable a rule, allowlist its own secret). A PR that changes .gitleaks.toml is scanned with
+        # main's policy; its new allowlist only takes effect after it merges. When the base has no .gitleaks.toml
+        # (before the first one merges) the scan uses gitleaks' built-in rules alone. --config is passed in both
+        # cases: without it gitleaks would load ./.gitleaks.toml, the PR's copy. For the same reason the PR's
+        # .gitleaksignore is deleted from the working copy (the scan reads commits, not files on disk) and inline
+        # "gitleaks:allow" comments are ignored. Exits non-zero on any finding; --redact keeps secret values out of
+        # the log.
         run: |
-          "$RUNNER_TEMP/gitleaks/gitleaks" git --config .gitleaks.toml --redact --no-banner --verbose \
-            --log-opts="${BASE_SHA}..${HEAD_SHA}" .
+          config="$RUNNER_TEMP/gitleaks.toml"
+          if git cat-file -e "${BASE_SHA}:.gitleaks.toml" 2>/dev/null; then
+            git show "${BASE_SHA}:.gitleaks.toml" > "$config"
+            echo "Policy: .gitleaks.toml from the base branch (${BASE_SHA})."
+          else
+            printf '[extend]\nuseDefault = true\n' > "$config"
+            echo "::notice::The base branch (${BASE_SHA}) has no .gitleaks.toml: scanning with gitleaks' built-in rules only, no allowlists."
+          fi
+          rm -f .gitleaksignore
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --config "$config" --ignore-gitleaks-allow --redact --no-banner \
+            --verbose --log-opts="${BASE_SHA}..${HEAD_SHA}" .
 
   required:
     name: CI required

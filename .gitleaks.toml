@@ -3,6 +3,15 @@
 # Keep every entry narrow: an exact value, and the files it may appear in when that is known. Never allowlist a
 # whole file or folder: a real key pasted next to a test value would then pass unseen. A real secret that was
 # committed is rotated, not allowlisted.
+#
+# How an entry matches: gitleaks tests each `regexes` entry against the entry's regexTarget, "secret" by default (the
+# captured secret only; "match" is the rule's whole match, "line" the whole line), and it searches, it does not match
+# the whole string. So every entry here is anchored, ^...$, to the exact secret: an unanchored fragment would also
+# pass a finding that contains the fragment plus a real credential. With condition = "AND", the path must match too.
+#
+# CI scans a PR with the base branch's copy of this file, never the PR's own (.github/workflows/ci.yml, job
+# "gitleaks"). A PR that changes this file is scanned with main's policy; its new allowlist takes effect only after it
+# merges. Changes here need the code owner's review (.github/CODEOWNERS).
 
 [extend]
 useDefault = true
@@ -11,6 +20,7 @@ useDefault = true
 # tests on purpose (CLAUDE.md: "not secrets to build on"). Exact value only, wherever it appears.
 [[allowlists]]
 description = "Demo password for the seeded local accounts"
+regexTarget = "secret"
 regexes = ['''^benchq-demo-2026$''']
 
 # The test suite's fixed encryption keys (backend/tests/conftest.py): base64 of "0123456789abcdef..." and of
@@ -18,6 +28,7 @@ regexes = ['''^benchq-demo-2026$''']
 # so the decoded forms are listed too.
 [[allowlists]]
 description = "Fixed test-only Fernet keys in the test conftest"
+regexTarget = "secret"
 condition = "AND"
 paths = ['''^backend/tests/conftest\.py$''']
 regexes = [
@@ -31,6 +42,7 @@ regexes = [
 # (backend/tests/test_logging_canary.py, docs/team/uzair.md section 1, step 4a).
 [[allowlists]]
 description = "Planted values in the logging canary test"
+regexTarget = "secret"
 condition = "AND"
 paths = ['''^backend/tests/test_logging_canary\.py$''']
 regexes = [
@@ -42,6 +54,7 @@ regexes = [
 # (backend/tests/test_production_config.py, arriving with the production-hardening PR; docs/team/uzair.md step 6).
 [[allowlists]]
 description = "Planted database password in the production-config test"
+regexTarget = "secret"
 condition = "AND"
 paths = ['''^backend/tests/test_production_config\.py$''']
 regexes = ['''^s3cr3t-db-pass-91f2$''']
@@ -50,15 +63,11 @@ regexes = ['''^s3cr3t-db-pass-91f2$''']
 # src/mocks/data and are moving to src/test/fixtures.
 [[allowlists]]
 description = "Mock tracer ids in the résumé fixtures"
+regexTarget = "secret"
 condition = "AND"
 paths = ['''^src/(mocks/data|test/fixtures)/[^/]+\.json$''']
 regexes = ['''^trc_[a-z0-9_]+$''']
 
-# The local and test Postgres credentials (user jobnavigator, password "password") that docker-compose, the CI
-# service, the .env.example templates and the docs use for disposable local databases. Matched on the whole
-# connection string, so any other password in a database URL is still reported. The .env.example templates get no
-# path allowlist of their own: they hold only empty values today, and a real key pasted into one must be caught.
-[[allowlists]]
-description = "Local and test database credentials in connection strings"
-regexTarget = "match"
-regexes = ['''jobnavigator:password@(localhost|db|db-test)[:/]''']
+# No entry for the local and test database URLs (postgresql://jobnavigator:password@localhost/db/db-test, in
+# docker-compose, the CI service, the .env.example templates and the docs): no gitleaks rule reports them, so there is
+# nothing to allow. If a rule starts reporting one, add the exact secret it reports, anchored, with the paths it is in.

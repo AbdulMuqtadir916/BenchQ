@@ -13,3 +13,5 @@
 /docs/02-DATA-CONTRACTS.md         @AbdulMuqtadir916
 /docs/07-ROUTES-AND-RBAC.md        @AbdulMuqtadir916
 /.github/                          @AbdulMuqtadir916
+# The secret-scanning policy (CI scans each PR with the base branch's copy).
+/.gitleaks.toml                    @AbdulMuqtadir916
