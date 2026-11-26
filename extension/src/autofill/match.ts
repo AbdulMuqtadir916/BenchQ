@@ -61,9 +61,9 @@ export function matchBank(label: string, bank: BankEntry[]): BankMatch {
 
 /** What a field can ask for, and the labels that ask it. */
 const LABELS: [EngineFieldType, string[]][] = [
-  ["first-name", ["first name", "given name"]],
+  ["first-name", ["first name", "legal first name", "given name", "given names", "given name s"]],
   ["last-name", ["last name", "surname", "family name"]],
-  ["full-name", ["name", "full name", "your name", "legal name"]],
+  ["full-name", ["name", "full name", "your name", "legal name", "first and last name"]],
   ["preferred-name", ["preferred name", "preferred first name", "preferred full name", "preferred first and last name",
     "chosen name", "nickname", "name you go by"]],
   ["email", ["email", "e mail"]],

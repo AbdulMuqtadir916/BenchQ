@@ -3,6 +3,7 @@ import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
   isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
+import { LEVER_LOCATION } from "./choice";
 import { hostOf, queryDeep } from "./shadow";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
@@ -83,6 +84,7 @@ function isPlaceholder(option: HTMLOptionElement): boolean {
 
 function kindOf(element: HTMLElement): FieldKind {
   if (isAriaChoice(element)) return element.getAttribute("role") === "radio" ? "radio" : "checkbox";
+  if (element.matches(LEVER_LOCATION)) return "combobox";
   if (element.getAttribute("role") === "combobox" || element.getAttribute("aria-haspopup") === "listbox") return "combobox";
   const custom = element.hasAttribute("aria-autocomplete") || element.hasAttribute("aria-haspopup")
     || (element as HTMLInputElement).readOnly === true;
@@ -454,7 +456,15 @@ export function scanDocument(doc: Document, scanId: number, isTop: boolean): { r
     const id = `f${entries.size}`;
     const entry = build(id);
     entry.field.current = readCurrent(entry);
-    entry.field.stableId = stableIdOf(entry.controls[0]!);
+    const control = entry.controls[0]!;
+    const form = (control as HTMLInputElement).form ?? closestThrough(control, "form, [role='form']");
+    if (form && /newsletter|subscribe/i.test([form.id, form.getAttribute("name"), form.getAttribute("aria-label")].join(" "))) return;
+    if (form) entry.field.formId = stableIdOf(form);
+    const tracked = (globalThis as { __benchqDraftEdits?: WeakSet<Element> }).__benchqDraftEdits;
+    if (entry.field.current && isInput(control) && (control.matches(":autofill") || (tracked && !tracked.has(control)))) {
+      entry.field.prefilledIdentity = true;
+    }
+    entry.field.stableId = stableIdOf(control);
     entries.set(id, entry);
   };
   const { slots, custom } = formControls(doc);

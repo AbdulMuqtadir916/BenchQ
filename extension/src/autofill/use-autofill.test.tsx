@@ -240,7 +240,7 @@ describe("the picked résumé", () => {
     await pickResume("res-2");
     expect(getResumeAnswers).toHaveBeenLastCalledWith("firm-1", "cand-1", "res-2");
     expect(hook.answeredFrom).toBe("res-2");
-    expect(statuses()).toEqual([["a", "same"], ["b", "ready"]]);
+    expect(statuses()).toEqual([["a", "kept"], ["b", "ready"]]);
     expect(hook.rows![1]!.proposed).toBe("Dallas");
   });
 });
@@ -503,7 +503,7 @@ describe("the refill loop", () => {
     await run(() => hook.autofill());
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "someone@else.test"), field("b", "City", "text", "Phoenix")]));
     await run(() => hook.rescan());
-    expect(statuses()![0]).toEqual(["a", "same"]);
+    expect(statuses()![0]).toEqual(["a", "kept"]);
     expect(hook.fillCount).toBe(0);
   });
 
@@ -526,7 +526,7 @@ describe("the refill loop", () => {
     await run(() => hook.rescan());
     vi.mocked(getResumeAnswers).mockResolvedValue([custom("Email", "priya@example.test"), custom("City", "Tempe"), custom("Do you need sponsorship?", "Yes")]);
     await run(() => hook.rescan());
-    expect(statuses()![1]).toEqual(["b", "same"]);
+    expect(statuses()![1]).toEqual(["b", "kept"]);
   });
 
   it("offers it again if the BDE empties it", async () => {
@@ -708,7 +708,7 @@ describe("following the form", () => {
     await mount();
     typed(["0:a", "mine@example.test"], ["0:b", ""]);
     await finalForm();
-    expect(statuses()).toEqual([["a", "same"], ["b", "ready"]]);
+    expect(statuses()).toEqual([["a", "kept"], ["b", "ready"]]);
     expect(hook.fillCount).toBe(1);
     await run(() => hook.autofill());
     expect(vi.mocked(fillField).mock.calls.map(([, , request]) => request.fieldId)).toEqual(["b"]);
@@ -719,7 +719,7 @@ describe("following the form", () => {
     await act(async () => { root.unmount(); });
     vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email", "text", "mine@example.test"), field("b", "City")]));
     await mount();
-    expect(statuses()).toEqual([["a", "same"], ["b", "ready"]]);
+    expect(statuses()).toEqual([["a", "kept"], ["b", "ready"]]);
   });
 
   it("takes back a field it handed over once the BDE fills it", async () => {
@@ -729,7 +729,7 @@ describe("following the form", () => {
     expect(hook.rows![0]).toMatchObject({ status: "manual", reason: "The form didn't accept this value." });
     typed(["0:a", "mine@example.test"], ["0:b", ""]);
     await finalForm();
-    expect(hook.rows![0]!.status).toBe("same");
+    expect(hook.rows![0]!.status).toBe("kept");
   });
 
   it("offers a field again when the BDE empties it", async () => {

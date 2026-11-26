@@ -204,6 +204,7 @@ const SITE_WORDS = String.raw`(?:candidate experience(?:\s+(?:page|site))?|caree
  * Acme. The site's words go only after a space or a separator, so a name that ends in one keeps it ("AcmeJobs"), and a
  * name that is only those words is no company (PR #140's review). */
 export function companyOf(name: string): string {
+  if (/^company(?: logo)?$/i.test(name.trim())) return "";
   const named = name.replace(/\.(?:jobs|careers|com|io|co)$/i, "").replace(/^(?:careers|jobs)\s+(?:at|with)\s+/i, "").trim();
   if (new RegExp(`^${SITE_WORDS}$`, "i").test(named)) return "";
   return named.replace(new RegExp(String.raw`(?:\s*[-–|:·]\s*|\s+)${SITE_WORDS}\s*$`, "i"), "").trim();
@@ -213,7 +214,7 @@ export function companyOf(name: string): string {
 function logoCompany(doc: Document): string {
   for (const image of Array.from(doc.querySelectorAll("img[alt]"))) {
     const name = /^(.{2,60}?)\s+logo$/i.exec(collapse(image.getAttribute("alt") ?? ""))?.[1];
-    if (name && !JOB_SITES.test(name)) return name;
+    if (name && companyOf(name) && !JOB_SITES.test(name)) return name;
   }
   return "";
 }
@@ -243,7 +244,7 @@ function descriptionOf(lines: string[], title: string): string {
 /** Job boards reuse navigation labels in headings, metadata and sometimes even JobPosting.title. */
 /** Labels and section headings that never name a role, so a listing's "Responsibilities" heading isn't its title. */
 const GENERIC_TITLE = new RegExp(`^(?:${[
-  "view job", "job (?:details?|description|overview|summary|requirements|responsibilities|duties)", "apply(?: now)?", "how to apply",
+  "(?:set|manage) your cookie preferences", "cookie (?:preferences|settings|policy|consent)", "view job", "job (?:details?|description|overview|summary|requirements|responsibilities|duties)", "apply(?: now)?", "how to apply",
   "overview", "summary", "careers?", "skills", "description", "requirements", "(?:key )?responsibilities", "duties",
   "(?:minimum |basic |preferred |required )?qualifications", "benefits", "perks(?: (?:and|&) benefits)?",
   "about (?:us|the (?:role|job|position|team|company)|this (?:role|job|position))",
@@ -333,4 +334,25 @@ export function readJob(doc: Document, url = doc.URL): PageJob {
     ids: [...new Set([...(found?.ids ?? []), ...idsInText(doc)].map((id) => id.toLowerCase()))].slice(0, MAX_IDS),
     links: [...new Set([...(found?.links ?? []), ...linksOf(doc)])].slice(0, MAX_IDS),
   };
+}
+
+/** The application may omit posting details that its own public listing still serves. */
+export async function readJobForSave(doc: Document): Promise<PageJob> {
+  const original = doc.URL;
+  const page = readJob(doc, original);
+  const parent = new URL(original);
+  const lever = /^jobs(?:\.eu)?\.lever\.co$/.test(parent.hostname) && /^\/[^/]+\/[\da-f-]{36}\/apply\/?$/i.test(parent.pathname);
+  const workable = parent.hostname === "apply.workable.com" && /^\/[^/]+\/j\/[a-z0-9]+\/apply\/?$/i.test(parent.pathname);
+  if ((!lever && !workable) || (page.isJobPage && page.title && page.description)) return page;
+  parent.pathname = parent.pathname.replace(/apply\/?$/, "");
+  if (lever) parent.pathname = parent.pathname.replace(/\/$/, "");
+  parent.search = parent.hash = "";
+  try {
+    const response = await fetch(parent, { mode: "same-origin", credentials: "omit", signal: AbortSignal.timeout(5000) });
+    if (!response.ok || new URL(response.url).pathname.replace(/\/$/, "") !== parent.pathname.replace(/\/$/, "")) return page;
+    const listing = readJob(new DOMParser().parseFromString(await response.text(), "text/html"), response.url);
+    return doc.URL === original && listing.isJobPage && listing.title ? { ...listing, url: original } : page;
+  } catch {
+    return page;
+  }
 }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resumeStudioUrl, type Application } from "../api";
 import { ALERT, button, CARD, FITTED_BUTTONS, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON, WARNING } from "../ui";
 import { sendToBackground } from "./connection-store";
+import { confirmsSmartApplication, smartApplication } from "./smart-application";
 import { isOtherJobOnSite } from "./AddJobCard";
 import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
@@ -90,7 +91,20 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const [keptUrl, setKeptUrl] = useState<string | null>(null);
   // The tab moved on to another job's page on the job's own site, and the BDE hasn't said to keep it connected there:
   // the panel asks first, and nothing fills, on its own or queued, until they answer (PR #140's review).
-  const movedAway = Boolean(tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
+  const [verified, setVerified] = useState<{ posting: string; form: string } | null>(null);
+  useEffect(() => {
+    const target = smartApplication(job.url, tabUrl);
+    if (!target || !tabUrl) return;
+    const controller = new AbortController();
+    void confirmsSmartApplication(job.url, target, controller.signal).then(matches => {
+      if (matches && !controller.signal.aborted) setVerified({ posting: job.url, form: tabUrl });
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [job.url, tabUrl]);
+  const verifiedForm = verified?.posting === job.url && verified.form === tabUrl ? tabUrl : null;
+  const reviewConnection = useMemo(() => verifiedForm
+    ? { ...connection, job: { ...connection.job, url: verifiedForm } } : connection, [connection, verifiedForm]);
+  const movedAway = Boolean(!verifiedForm && tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
   const { resumes, pick, retry, refresh, refreshFailed, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
     jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
@@ -110,7 +124,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const pickedFile = own.file;
   const isReadingOwnFile = own.isReading;
   const [ownFileError, setOwnFileError] = useState<string | null>(null);
-  const state = useAutofill({ connection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway || isReadingOwnFile });
+  const state = useAutofill({ connection: reviewConnection, firmId, resumeId, fileName, pickedFile, onSessionExpired, onAccessLost, isHeld: movedAway || isReadingOwnFile });
   const { rows, scanning, error, filling, run, outcome, undoable, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
   // A pick, or another application linked to this tab, waits for its own résumé's review, then fills the form so

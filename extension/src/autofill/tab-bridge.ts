@@ -80,7 +80,7 @@ export async function addEntryIn(tabId: number, kind: "education" | "work", shou
 /** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
 export async function readJobPage(tabId: number): Promise<PageJob | null> {
   await chrome.scripting.executeScript({ target: { tabId, frameIds: [MAIN_FRAME] }, files: [PAGE_SCRIPT] });
-  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJob", []);
+  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJobForSave", []);
   return found?.result ?? null;
 }
 
@@ -199,7 +199,12 @@ export async function fillChoice(tabId: number, frameId: number, request: Choice
     const parts = (racePartsFor(answer, list.options) ?? answer.split(PARTS)).map((part) => part.trim()).filter(Boolean);
     if (parts.length > 1) return pickEach(target, request, list.options, parts, shouldStop);
   }
-  const optionId = fits(list) ?? (list.status === "open" ? fits(await ask("searchChoices")) : null);
+  let optionId = fits(list) ?? (list.status === "open" ? fits(await ask("searchChoices")) : null);
+  if (!optionId && request.searchHint && request.searchHint !== request.search) {
+    if (shouldStop()) return stopIn(target, request);
+    // Search by a distinctive word, but still match each returned option against the full saved answer.
+    optionId = fits(await askList(target, "searchChoices", { ...request, search: request.searchHint }));
+  }
   if (!optionId) {
     await inFrames<boolean>(target, "closeChoices", [request]);
     const reason = list.status === "open" ? pickOneReason(answer, list.options) : null;

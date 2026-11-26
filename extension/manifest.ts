@@ -66,7 +66,8 @@ export function buildManifest({ benchqUrl, isStore }: ManifestOptions) {
   const manifest = {
     ...base,
     web_accessible_resources: [{ resources: ["icons/icon48.png"], matches: ["https://*/*"] }],
-    content_scripts: [{ matches: [`${origin}/*`], js: ["source-click.js"], run_at: "document_start" }],
+    content_scripts: [{ matches: [`${origin}/*`], js: ["source-click.js"], run_at: "document_start" },
+      { matches: ["https://apply.workable.com/*"], js: ["draft-edits.js"], run_at: "document_start" }],
     host_permissions: [`${origin}/*`, ...KNOWN_SITES],
     optional_host_permissions: ["https://*/*"],
   };

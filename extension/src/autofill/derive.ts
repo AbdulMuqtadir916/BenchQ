@@ -241,6 +241,7 @@ export function shaped(type: EngineFieldType | null, answer: string, asked: Aske
   const { label, kind } = asked;
   const asks = normalize(label);
   if (type === "phone") return phoneFor(answer, asked);
+  if (type === "middle-name" && /\bmiddle initial\b/.test(asks)) return Array.from(answer.trim())[0] ?? "";
   if (type === "city-state") return placeWithoutPostal(answer);
   if (type === "address-line1" && STREET_ONLY.test(asks)) return addressParts(answer)?.street || answer;
   if (HANDLE.test(asks) && PROFILE_URL.test(answer.trim())) return profileHandle(answer.trim());

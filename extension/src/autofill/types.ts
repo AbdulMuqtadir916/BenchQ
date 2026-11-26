@@ -42,6 +42,8 @@ export type ScannedField = {
   /** The same control keeps this id across scans of one page load, so what the panel remembers about it stays with it
    * when fields come or go above it. */
   stableId?: string;
+  formId?: string;
+  prefilledIdentity?: boolean;
 };
 
 export type TabField = ScannedField & { frameId: number; pageUrl: string };
@@ -85,7 +87,7 @@ export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "
 export type UndoResult = { restored: number; kept: number; skipped: number };
 
 /** A custom dropdown's options exist only once it's open, so its answer is matched at fill time. */
-export type ChoiceRequest = { scanId: number; fieldId: string; current: string; search: string };
+export type ChoiceRequest = { scanId: number; fieldId: string; current: string; search: string; searchHint?: string };
 export type PickRequest = ChoiceRequest & { optionId: string };
 /** `multiple`: the dropdown keeps several choices, like a "mark all that apply" list. */
 export type ChoiceList = { status: "open"; options: FieldOption[]; multiple?: boolean } | { status: "empty" | "stale" | "changed" };
@@ -110,6 +112,7 @@ export type PageJob = {
 export type PageApi = {
   version: string;
   readJob(): PageJob;
+  readJobForSave(): Promise<PageJob>;
   /** Clicks the form's "Add another" for a kind of history entry (#132): whether one was found. */
   addEntry(kind: "education" | "work"): boolean;
   scan(): Promise<FrameScan>;

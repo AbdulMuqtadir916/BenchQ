@@ -875,3 +875,14 @@ describe("self-identification stays out of the saved form (CodeRabbit #129)", ()
     expect(review(field("Pronouns")).isUnsaved).toBe(true);
   });
 });
+
+describe("ATS identity fields", () => {
+  const full = entry("Full name", "John Kiran Rao");
+  it.each([["Middle Initial", "K"], ["Given name(s)", "John"], ["First and Last Name", "John Kiran Rao"], ["Preferred First Name", "John"]])("shapes %s", (label, answer) => {
+    expect(review(field(label), [full]).proposed).toBe(answer);
+  });
+  it("scopes repeat protection to the owning form", () => {
+    const rows = buildReview([field("First Name", { formId: "a" }), field("First Name", { formId: "b" })], [full]);
+    expect(rows.map(row => row.status)).toEqual(["ready", "ready"]);
+  });
+});

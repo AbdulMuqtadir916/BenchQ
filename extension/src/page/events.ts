@@ -18,6 +18,19 @@ function setNativeValue(control: HTMLInputElement | HTMLTextAreaElement, value: 
 }
 
 export function setText(control: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const doc = control.ownerDocument;
+  if (value && /(?:^|\.)adp\.com$/.test(doc.location?.hostname ?? "") && typeof doc.execCommand === "function"
+    && (control.tagName === "TEXTAREA" || /^(?:text|email|tel|search|url)$/.test(control.type))) {
+    control.focus({ preventScroll: true });
+    if (doc.activeElement === control || control.matches(":focus")) {
+      control.select();
+      if (doc.execCommand("insertText", false, value) && control.value === value) {
+        control.dispatchEvent(new Event("change", { bubbles: true }));
+        control.blur();
+        return;
+      }
+    }
+  }
   setNativeValue(control, value);
   fireEvents(control);
 }

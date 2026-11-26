@@ -206,7 +206,9 @@ function rememberedRow(row: ReviewRow, memory: TabMemory, resume: string | null,
   // an upload, another file, even one of the same name (#148).
   const offered = row.write?.type === "file" ? fileKey(row.write) : row.proposed ?? "";
   const isNewAnswer = wrote.has(key) && wrote.get(key) !== offered;
-  if ((settled.get(key) === current && !isOtherResumes && !isNewAnswer) || (current && edited.has(key))) return { ...row, status: "same" as const };
+  if (settled.get(key) === current && !isOtherResumes && !isNewAnswer) return { ...row, status: "same" as const };
+  if (current && edited.has(key)) return { ...row, status: row.write?.type === "text" ? "kept" : "same" };
+  if (row.field.prefilledIdentity && ["first-name", "last-name", "full-name", "email", "phone"].includes(typeOf(row.field) ?? "")) return row;
   if (current && found.has(key) && !settled.has(key)) return { ...row, status: "kept" as const };
   const reason = handedBack.get(key);
   if (!reason) return row;
@@ -619,7 +621,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       const scanId = frames.current.scanIds.get(field.frameId);
       const request = { scanId: scanId ?? 0, fieldId: field.id, current: field.current };
       const fill = write.type === "choice"
-        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim() }, write.value, write.also, () => held.current)
+        ? fillChoice(tabId, field.frameId, { ...request, search: write.value.split(",")[0]!.trim(),
+            ...(/^(?:school|discipline)(?:\s*[*✱])?$/i.test(field.label.trim()) ? {
+              searchHint: write.value.split(/[^\p{L}\p{N}]+/u).filter(word => word.length > 2 && !/^(?:university|college|the|and|institute)$/i.test(word))
+                .sort((a, b) => b.length - a.length)[0],
+            } : {}) }, write.value, write.also, () => held.current)
         : fillField(tabId, field.frameId, { ...request, write });
       const result = scanId === undefined ? STALE : await fill.catch(() => STALE);
       if (result.status === "stale") {

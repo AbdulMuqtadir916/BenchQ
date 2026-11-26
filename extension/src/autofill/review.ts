@@ -419,7 +419,7 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (sameType.length > 1) return tied(base, sameType, type, answerOf);
   if (sameType[0]) return fromSaved(sameType[0]);
   const derived = type ? derivedAnswer(type, asked, saved) : null;
-  if (derived) return rowFor(base, derived.answer, derived.source);
+  if (derived) return rowFor(base, type === "middle-name" ? shaped(type, derived.answer, asked) : derived.answer, derived.source);
   const entry = closestBankEntry(asked.label, bank, answers);
   if (entry) return fromSaved(entry);
   if (fallback) return fallback;
@@ -439,7 +439,7 @@ function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
     if (!row.source || !row.proposed || row.isUnsaved || (row.status !== "ready" && row.status !== "same")) return row;
     const asked = normalize(row.field.label).replace(ENTRY_MARKER, " ").replace(/\s+/g, " ").trim();
     if (!asked) return row;
-    const repeat = `${row.source.id}\u0000${normalize(row.proposed)}\u0000${asked}`;
+    const repeat = `${row.field.frameId}:${row.field.formId ?? ""}:${row.source.id}\u0000${normalize(row.proposed)}\u0000${asked}`;
     if (!answered.has(repeat)) {
       answered.add(repeat);
       return row;
@@ -454,10 +454,11 @@ export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | nu
   const review: Review = { bank, byType: indexBankByType(bank), job };
   // A question about someone else is that person's: it doesn't make the candidate's own "Company" a repeat, whose saved
   // answer would then be held back.
+  const questionKey = (field: TabField) => `${field.frameId}:${field.formId ?? ""}:${normalize(field.label)}`;
   const counts = new Map<string, number>();
   for (const field of fields) {
     if (isSomeoneElses(field)) continue;
-    const label = normalize(field.label);
+    const label = questionKey(field);
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   const seen = new Map<string, number>();
@@ -466,6 +467,6 @@ export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | nu
     const index = seen.get(label) ?? 0;
     seen.set(label, index + 1);
     const key = `${field.frameId}:${field.kind}:${label}:${index}`;
-    return reviewField({ key, field }, Boolean(label) && (counts.get(label) ?? 0) > 1, review);
+    return reviewField({ key, field }, Boolean(label) && (counts.get(questionKey(field)) ?? 0) > 1, review);
   }));
 }
