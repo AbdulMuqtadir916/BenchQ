@@ -211,7 +211,9 @@ function multiSelectEntry(select: HTMLSelectElement, id: string): Entry {
 function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
   const label = groupLabel(aria);
   const field = common(aria[0]!, id, kind, label);
-  field.required = isRequired(aria, label);
+  // The input toggle buttons keep their answer in can be all that says the question is required.
+  const answer = answerInputOf(aria[0]!);
+  field.required = isRequired(answer ? [...aria, answer] : aria, label);
   const options: Entry["options"] = new Map();
   field.options = aria.map((element, index) => {
     options.set(`o${index}`, element);
@@ -225,19 +227,29 @@ function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
  * an input beside them are a form's question wherever they are: Ashby's Yes/No has no <form> around it. */
 function isAriaQuestion(element: HTMLElement): boolean {
   return isVisible(element) && element.getAttribute("aria-disabled") !== "true" && !element.querySelector("input, select, textarea")
-    && (closestThrough(element, FORM_AREA) !== null || keepsAnswerBeside(element)) && closestThrough(element, NOT_A_QUESTION) === null;
+    && (closestThrough(element, FORM_AREA) !== null || answerInputOf(element) !== null) && closestThrough(element, NOT_A_QUESTION) === null;
 }
 
-/** Toggle buttons side by side, with the input that keeps their answer among them (Ashby's Yes/No). */
-function keepsAnswerBeside(element: HTMLElement): boolean {
-  const group = element.hasAttribute("aria-pressed") ? element.parentElement : null;
-  return Boolean(group && group.querySelector(":scope > input") && group.querySelectorAll(":scope > [aria-pressed]").length > 1);
+/** An input people don't use themselves: hidden, or taken out of the tab order for the page's script to keep. */
+const isOutOfReach = (input: HTMLInputElement) => input.type === "hidden" || input.tabIndex < 0;
+
+/** Toggle buttons side by side: the element they share, or null for a toggle that stands alone. */
+function toggleRowOf(element: Element): HTMLElement | null {
+  const row = element.hasAttribute("aria-pressed") ? element.parentElement : null;
+  return row && row.querySelectorAll(":scope > [aria-pressed]").length > 1 ? row : null;
 }
 
-/** The input those toggles keep their answer in: the buttons are the question, so it isn't one of its own. */
+/** The input toggle buttons keep their answer in: one beside them that people can't reach themselves (Ashby's Yes/No
+ * keeps it in a checkbox with tabindex -1). A box people can tab to is a question of its own, even beside toggles. */
+function answerInputOf(toggle: Element): HTMLInputElement | null {
+  const row = toggleRowOf(toggle);
+  return (row ? Array.from(row.children).filter(isInput) : []).find(isOutOfReach) ?? null;
+}
+
+/** That input: the buttons are the question, so it isn't one of its own. */
 function isToggleAnswer(input: HTMLInputElement): boolean {
-  const toggle = input.parentElement?.querySelector<HTMLElement>(":scope > [aria-pressed]");
-  return Boolean(toggle && keepsAnswerBeside(toggle));
+  const toggle = input.parentElement?.querySelector(":scope > [aria-pressed]");
+  return Boolean(toggle && answerInputOf(toggle) === input);
 }
 
 /** `closest()` through the components an element sits in: a choice inside a component under a form is in that form,
@@ -274,9 +286,22 @@ function optionSet(element: HTMLInputElement): HTMLFieldSetElement | null {
   return boxes.length > 1 && boxes.every(isNamedForItself) ? set : null;
 }
 
-/** A site's own "Autofill from resume" box (Ashby's): it reads a résumé to fill the form itself. It isn't the
- * application's résumé, so nothing is attached there, or the form would show the résumé twice. */
-const isResumeReader = (input: HTMLInputElement) => /\bauto-?fill\b/i.test(labelOf(input));
+/** Words that ask for the résumé, as documents.ts reads an upload: page.js has to stand alone, so it keeps its own. */
+const RESUME_WORDS = /\b(?:resume|cv|curriculum vitae)\b/;
+
+/** Whether an upload asks for the résumé: its label, name or id says so ("Resume/CV", "_systemfield_resume"). */
+const isResumeUpload = (input: HTMLInputElement) => RESUME_WORDS.test(`${labelOf(input)} ${input.name} ${input.id}`
+  .replace(/([a-z])([A-Z])/g, "$1 $2").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " "));
+
+/** A site's own "Autofill from resume" box (Ashby's) reads a résumé to fill the form itself. On a form with a résumé
+ * upload of its own, the box isn't the application's résumé: it's left out, so the résumé is attached once. A form's
+ * only résumé upload stays, whatever its label says. */
+function withoutResumeReader(slots: Slot[]): Slot[] {
+  const uploads = slots.filter((slot): slot is HTMLInputElement => !Array.isArray(slot) && !("aria" in slot) && isFileInput(slot));
+  const readers = new Set<Slot>(uploads.filter((upload) => /\bauto-?fill\b/i.test(labelOf(upload))));
+  return readers.size > 0 && uploads.some((upload) => !readers.has(upload) && isResumeUpload(upload))
+    ? slots.filter((slot) => !readers.has(slot)) : slots;
+}
 
 /** The form's controls in page order, radios and same-named checkboxes gathered where the first of them stands. */
 function collectSlots(doc: Document): Slot[] {
@@ -337,11 +362,9 @@ function collectSlots(doc: Document): Slot[] {
         groups.set(key, fresh);
         slots.push(fresh);
       }
-    } else if (isFileInput(element) && isResumeReader(element)) {
-      continue;
     } else if (isVisible(element) || (isFileInput(element) && isUploadShown(element))) slots.push(element);
   }
-  return slots;
+  return withoutResumeReader(slots);
 }
 
 /** Dropdowns built from <div>s or buttons, which `input, textarea, select` can't find. */

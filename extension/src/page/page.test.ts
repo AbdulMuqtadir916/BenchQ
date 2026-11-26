@@ -83,6 +83,13 @@ describe("reading labels", () => {
     // A lone toggle outside a form, like a site's Save button, still isn't a question.
     expect(scan(`<div><button aria-pressed="false">Save</button><input type="checkbox" tabindex="-1"></div>`).scan.fields
       .filter((field) => field.kind === "radio")).toEqual([]);
+    // The box can be all that says the question is required.
+    expect(scan(`<div><button aria-pressed="false">Yes</button><button aria-pressed="false">No</button>
+      <input type="checkbox" tabindex="-1" aria-required="true"></div>`).scan.fields).toMatchObject([{ kind: "radio", required: true }]);
+    // A box people can tab to is a question of its own, even beside toggle buttons.
+    expect(scan(`<form><div><button type="button" aria-pressed="false">Remote</button><button type="button" aria-pressed="false">Onsite</button>
+      <input type="checkbox" id="move" name="move"><label for="move">Open to relocating</label></div></form>`).scan.fields
+      .map(({ kind }) => kind)).toEqual(["radio", "checkbox"]);
   });
 
   it("reads whether a group is required from the group itself", () => {
@@ -282,6 +289,8 @@ describe("a résumé upload behind a styled button (07 Q53)", () => {
     const reader = `<div><p>Autofill from resume</p><p>Upload your resume here to autofill key application fields.</p><button type="button">Upload file</button><span data-hidden><input type="file"></span></div>`;
     const fields = fieldsOf(`${reader}<div><label for="_systemfield_resume">Resume</label><input type="file" id="_systemfield_resume"></div>`);
     expect(fields.map((field) => field.label)).toEqual(["Resume"]);
+    // A form's only résumé upload stays, whatever its label says.
+    expect(fieldsOf(`<div><label for="r">Resume (autofill supported)</label><input type="file" id="r"></div>`)).toHaveLength(1);
   });
 
   it("isn't, when the whole upload is hidden", () => {
@@ -1158,12 +1167,9 @@ describe("an upload that doesn't say what it's for", () => {
     expect(fields.map(({ label, required }) => [label, required])).toEqual([["Resume/CV", true], ["Cover Letter", false]]);
   });
 
-  it("goes by a heading in its block", () => {
-    expect(labelled(`<h2>Location</h2><div role="presentation"><input type="file" tabindex="-1"><div><h3>Cover letter</h3><p>Upload your cover letter here.</p><button>Upload file</button></div></div>`))
-      .toEqual(["Cover letter"]);
-    // Ashby's Autofill from resume box reads a résumé for the site itself: it isn't a field (no second résumé).
+  it("goes by a heading in its block, as with Ashby's Autofill from resume", () => {
     expect(labelled(`<h2>Location</h2><div role="presentation"><input type="file" tabindex="-1"><div><h3>Autofill from resume</h3><p>Upload your resume here.</p><button>Upload file</button></div></div>`))
-      .toEqual([]);
+      .toEqual(["Autofill from resume"]);
   });
 
   it("keeps an upload's own clear label, as with Ashby's Resume", () => {
