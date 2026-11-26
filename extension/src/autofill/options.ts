@@ -1,4 +1,5 @@
 import { statusOptionFor } from "./authorization";
+import { countryNamed } from "./countries";
 import { polarity } from "./polarity";
 import { raceOptionFor } from "./race";
 import type { FieldOption } from "./types";
@@ -75,10 +76,19 @@ export function numberIn(answer: string): string | null {
 
 /** "Dallas, TX" in a city lookup: what names both, and of those the city itself, not "Dallas County, Texas". */
 function placeFor(answer: string, options: FieldOption[]): string | null {
-  const wanted = canonical(answer);
+  // A country at the end is the option's country however each writes it: "Baltimore, MD, USA" is Lever's "Baltimore,
+  // Maryland, United States". A state code there ("Dallas, TX") is the state, never a country with the same code.
+  const parts = answer.split(",").map((part) => part.trim()).filter(Boolean);
+  const countryOf = (place: string) => {
+    const last = place.split(",").pop()!.trim();
+    return isUsState(canonical(last)) ? null : countryNamed(last);
+  };
+  const country = parts.length > 1 ? countryOf(answer) : null;
+  const wanted = canonical(country ? parts.slice(0, -1).join(", ") : answer);
   const words = wanted.split(" ").map((word) => US_STATES[word] ?? word);
-  if (words.length < 2 && words[0] === wanted) return null;
-  const named = options.filter((option) => words.every((word) => hasPhrase(canonical(option.label), word)));
+  if (!country && words.length < 2 && words[0] === wanted) return null;
+  const named = options.filter((option) => words.every((word) => hasPhrase(canonical(option.label), word))
+    && (!country || [null, country].includes(countryOf(option.label))));
   if (named.length < 2) return named[0]?.id ?? null;
   const city = canonical(answer.split(",")[0]!);
   const plain = named.filter((option) => canonical(option.label.split(",")[0]!) === city);

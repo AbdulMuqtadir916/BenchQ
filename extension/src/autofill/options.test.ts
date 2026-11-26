@@ -16,6 +16,15 @@ describe("polarity", () => {
 });
 
 describe("optionFor", () => {
+  it("matches a place whose country the list spells out, as Lever's location list does", () => {
+    const lever = [{ id: "a", label: "Baltimore County, Maryland, United States" }, { id: "b", label: "Baltimore, Maryland, United States" },
+      { id: "c", label: "Baltimore, Ohio, United States" }];
+    expect(optionFor("Baltimore, MD, USA", lever)).toBe("b");
+    expect(optionFor("Baltimore, MD", lever)).toBe("b");
+    expect(optionFor("Atlanta, GA, USA", [{ id: "a", label: "Atlanta, Georgia, United States" }])).toBe("a");
+    expect(optionFor("Hyderabad, India", [{ id: "a", label: "Hyderabad, Sindh, Pakistan" }, { id: "b", label: "Hyderabad, Telangana, India" }])).toBe("b");
+  });
+
   it("picks the option the answer names", () => {
     expect(optionFor("Two weeks", options("One week", "Two weeks"))).toBe("o1");
   });
