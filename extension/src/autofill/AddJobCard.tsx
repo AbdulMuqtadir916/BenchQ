@@ -47,9 +47,12 @@ function siteOf(hostname: string): string {
 function jobKeyOf(url: string) {
   try {
     const link = new URL(url);
+    const site = siteOf(link.hostname);
+    const path = link.pathname.toLowerCase().replace(/\/+$/, "");
     return {
-      site: siteOf(link.hostname),
-      path: link.pathname.toLowerCase().replace(/\/+$/, ""),
+      site,
+      // Adzuna's tracked link (/land/ad/<id>) opens the listing (/details/<id>): one job at two addresses.
+      path: site === "adzuna.com" ? path.replace(/^\/land\/ad\/(\d+)$/, "/details/$1") : path,
       ids: new Map([...link.searchParams].filter(([key]) => JOB_KEYS.test(key)).map(([key, value]) => [key.toLowerCase(), value])),
     };
   } catch {

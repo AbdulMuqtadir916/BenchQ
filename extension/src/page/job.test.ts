@@ -43,6 +43,19 @@ describe("telling a job's page", () => {
     expect(readJob(doc, "https://example.org/jobs/12407").title).toBe("Salesforce Developer");
   });
 
+  it("prefers the line the tab title confirms over the line above Apply", () => {
+    const doc = pageOf("<main><div>QA Engineer</div><div>Remote</div><button>Apply</button></main>");
+    doc.title = "QA Engineer";
+    expect(readJob(doc, "https://acme.com/jobs/42").title).toBe("QA Engineer");
+  });
+
+  it.each([
+    ["the page's h1 over a section heading", "<h1>QA Engineer</h1><main><h2>Responsibilities</h2><p>Test the API.</p></main><button>Apply</button>", "QA Engineer"],
+    ["the role heading over a site-name h1", "<h1>Acme</h1><main><h2>QA Engineer</h2><p>Test the API.</p></main><button>Apply</button>", "QA Engineer"],
+  ])("takes %s", (_name, body, title) => {
+    expect(readJob(pageOf(body), "https://acme.com/jobs/42").title).toBe(title);
+  });
+
   it("finds a role above Apply on a custom portal URL with a branded tab title", () => {
     const doc = pageOf("<main><div>Salesforce Developer</div><button>Apply</button><p>Location: Mount Laurel, NJ</p><p>Job Id: PDT - 12407</p></main>");
     doc.title = "Purpledrive recruiting portal";

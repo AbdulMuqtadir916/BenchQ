@@ -26,7 +26,7 @@ export function fakeChrome() {
     declarativeNetRequest: { updateSessionRules: vi.fn<(options: { removeRuleIds?: number[]; addRules?: unknown[] }) => Promise<void>>(async () => undefined) },
     runtime: {
       id: "extension-id", onInstalled: new FakeEvent(), onStartup: new FakeEvent(), onMessage: new FakeEvent(),
-      sendMessage: vi.fn(async () => ({ ok: true })), reload: vi.fn(),
+      sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(async () => ({ ok: true })), reload: vi.fn(),
     },
     sidePanel: { setPanelBehavior: vi.fn(async () => undefined), open: vi.fn(async () => undefined) },
     commands: { onCommand: new FakeEvent() },
@@ -37,6 +37,7 @@ export function fakeChrome() {
         return { id: nextTab, windowId: 1 };
       }),
       query: vi.fn(async () => [{ id: 7, windowId: 1, url: "https://jobs.example.test/" }]),
+      getCurrent: vi.fn<() => Promise<{ id?: number } | undefined>>(async () => undefined),
       update: vi.fn(async (tabId: number) => {
         if (!tabs.has(tabId)) throw new Error("No tab with that id");
         return { id: tabId, windowId: 1 };

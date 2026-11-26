@@ -165,7 +165,8 @@ function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, an
   const row = rowFor(base, shaped(type, answer, base.field), entry);
   // A "location" dropdown can be a list of countries.
   const country = type === "city-state" && row.status === "manual" && base.field.options.length > 0 ? countryIn(entry.answer) : null;
-  return country && base.field.options.some(option => option.label.toLowerCase() === country.toLowerCase()) ? rowFor(base, country, entry) : row;
+  const retried = country ? rowFor(base, country, entry) : null;
+  return retried && retried.status !== "manual" ? retried : row;
 }
 
 /** Saved answers that disagree. A dropdown can still settle it: when the answers that fit its options all fit the same

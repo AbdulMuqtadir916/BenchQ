@@ -14,7 +14,6 @@ declare const chrome: {
   };
   runtime: {
     id: string;
-    getContexts(filter: {contextTypes: string[]; windowIds: number[]}): Promise<unknown[]>;
     onInstalled: ChromeEvent<() => void>;
     onStartup: ChromeEvent<() => void>;
     onMessage: ChromeEvent<(

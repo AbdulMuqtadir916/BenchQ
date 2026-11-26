@@ -171,8 +171,9 @@ export const getRunningTailorings = (firmId: string, candidateId: string) =>
 export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>
   request<unknown>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/autofill`, { method: "PATCH", body: JSON.stringify(change) });
 
-export const getSavedApplications = async (candidateId: string) => {
-  const candidate = `&candidate_id=${encodeURIComponent(candidateId)}`;
+/** A candidate's saved jobs, or, without one, the saved jobs of every candidate this user can see. */
+export const getSavedApplications = async (candidateId?: string) => {
+  const candidate = candidateId ? `&candidate_id=${encodeURIComponent(candidateId)}` : "";
   const [saved, applied] = await Promise.all([
     request<{ applications: Application[] }>(`/api/applications?status=saved&tracked_only=true&limit=2000${candidate}`),
     request<{ applications: Application[] }>(`/api/applications?status=applied&tracked_only=true&limit=2000${candidate}`),

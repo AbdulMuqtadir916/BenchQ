@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 // @vitest-environment jsdom
 const source = readFileSync("public/source-click.js", "utf8");
 
-function click(label: string, marked: boolean) {
+function click(label: string, marked: boolean, isOpened = true) {
   const anchor = document.createElement("a");
   anchor.href = "https://jobs.example.org/jobs/42";
   anchor.target = "_blank";
@@ -16,12 +16,13 @@ function click(label: string, marked: boolean) {
     anchor.dataset.candidate = "7";
   }
   const listen = vi.fn();
-  const sendMessage = vi.fn().mockResolvedValue(true);
-  const context = { document: { addEventListener: listen }, Element, URLSearchParams, location: new URL("https://benchq.example/firm/jobs"), chrome: { runtime: { id: "test", sendMessage } } };
+  const sendMessage = vi.fn().mockResolvedValue(isOpened);
+  const open = vi.fn();
+  const context = { document: { addEventListener: listen }, window: { open }, Element, URLSearchParams, location: new URL("https://benchq.example/firm/jobs"), chrome: { runtime: { id: "test", sendMessage } } };
   runInNewContext(source, context);
   const event = { isTrusted: true, button: 0, target: anchor.firstElementChild, preventDefault: vi.fn() };
   listen.mock.calls[0]![1](event);
-  return { sendMessage, event };
+  return { sendMessage, event, open };
 }
 
 describe("Open source click bridge", () => {
@@ -30,6 +31,10 @@ describe("Open source click bridge", () => {
   });
   it("forwards the candidate and job from annotated links", () => {
     expect(click("Open source", true).sendMessage).toHaveBeenCalledWith(expect.objectContaining({ candidateId: "7", jobId: "42" }));
+  });
+  it("opens the link in a new tab itself, keeping BenchQ open, when the extension can't", async () => {
+    const { open } = click("Open source", true, false);
+    await vi.waitFor(() => expect(open).toHaveBeenCalledWith("https://jobs.example.org/jobs/42", "_blank", "noopener,noreferrer"));
   });
   it("leaves ordinary external links alone", () => {
     expect(click("Help center", false).event.preventDefault).not.toHaveBeenCalled();

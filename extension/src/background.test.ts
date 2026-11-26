@@ -288,6 +288,48 @@ it("uses the source click to open the panel and bind the destination to the save
   expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
   vi.restoreAllMocks();
 });
+it.each([
+  ["binds a source link that redirected within the job's site", "https://www.adzuna.example/details/42?i=1", true],
+  ["leaves the tab unbound once it shows another site", "https://elsewhere.example/", false],
+])("%s", async (_name, landed, isBound) => {
+  const api = await import("./api");
+  const url = "https://www.adzuna.example/land/ad/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: landed }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire(
+    { type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(stored(101) !== undefined).toBe(isBound);
+  vi.restoreAllMocks();
+});
+it.each([
+  ["binds the one candidate who saved the job when the link names none", ["candidate-1"], true],
+  ["leaves it to Add job when two candidates saved the job", ["candidate-1", "candidate-2"], false],
+])("%s", async (_name, candidates, isBound) => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  const saved = vi.spyOn(api, "getSavedApplications").mockResolvedValue(candidates.map((candidate, index) => ({
+    id: `app-${index}`, candidate_id: candidate, job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  })));
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire({ type: "source-click", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL + "/firm/jobs", frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(saved).toHaveBeenCalledWith(undefined);
+  expect(stored(101) !== undefined).toBe(isBound);
+  vi.restoreAllMocks();
+});
+
+it("asks the panel in the job page's window whether BenchQ is open there", async () => {
+  fake.runtime.sendMessage.mockResolvedValueOnce(true);
+  const reply = await new Promise(resolve => fake.runtime.onMessage.fire({ type: "assistant-visible" },
+    { id: "extension-id", url: "https://jobs.example.test/42", frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "panel-window", windowId: 4 });
+  expect(reply).toBe(true);
+});
 
 it("attaches the click listener to an existing BenchQ tab when the extension is installed", async () => {
   const { BENCHQ_URL } = await import("./api");

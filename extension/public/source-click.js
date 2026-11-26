@@ -13,7 +13,9 @@
     }
     event.preventDefault();
     const candidateId = link.dataset.candidate || candidatePage?.[1] || new URLSearchParams(location.search).get("candidate") || undefined;
+    // If the extension can't open it, open the link as the page meant to, without leaving BenchQ.
+    const fallback = () => link.target === "_blank" ? window.open(link.href, "_blank", "noopener,noreferrer") : location.assign(link.href);
     chrome.runtime.sendMessage({ type: "source-click", url: link.href, jobId: link.dataset.benchqJob, candidateId })
-      .then((opened) => { if (!opened) location.assign(link.href); }, () => location.assign(link.href));
+      .then((opened) => { if (!opened) fallback(); }, fallback);
   }, true);
 })();

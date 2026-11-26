@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addJob, BENCHQ_URL } from "../api";
-import AddJobCard, { detailsOf, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import AddJobCard, { detailsOf, isOtherJobOnSite, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
 import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 
@@ -279,4 +279,10 @@ describe("a later reading of the page (PR #140, second review)", () => {
       vi.useRealTimers();
     }
   });
+});
+
+it("treats Adzuna's tracked link and the listing it opens as one job", () => {
+  const saved = "https://www.adzuna.com/land/ad/5963480464?se=b&utm_medium=api&v=C0FFEE";
+  expect(isOtherJobOnSite("https://www.adzuna.com/details/5963480464?i=a&se=b", saved)).toBe(false);
+  expect(isOtherJobOnSite("https://www.adzuna.com/details/5963480465", saved)).toBe(true);
 });

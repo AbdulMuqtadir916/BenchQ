@@ -1,24 +1,31 @@
 import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
 import { isJobLink } from "./autofill/job-link";
 import { connectionFor, connectionKey } from "./autofill/connection-store";
+import { hostOf } from "./autofill/job-check";
 
-async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string) {
+/** Connects the opened tab to the saved job: the link's candidate's, or, from a page without one, the one candidate who
+ * has it saved. With no such job the tab stays unconnected and the panel offers Add job. */
+async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string | undefined) {
   const { principal } = await getSession();
   if (principal.kind !== "firm" || principal.role !== "BDE") return;
   // The website saves the application concurrently with opening the source link.
   for (const delay of [0, 300, 1000, 2500]) {
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     const jobs = await getSavedApplications(candidateId);
-    const matches = jobs.filter(item => item.candidate_id === candidateId && item.status === "saved"
+    const matches = jobs.filter(item => (!candidateId || item.candidate_id === candidateId) && item.status === "saved"
       && (jobId ? item.job_id === jobId : item.url === source.href));
-    const job = matches.length === 1 ? matches[0] : undefined;
+    // More than one match won't settle by waiting.
+    if (matches.length > 1) return;
+    const job = matches[0];
     if (!job) continue;
     const connection = connectionFor(job, principal.user_id);
     const frames = await chrome.webNavigation.getAllFrames({ tabId });
     const currentUrl = frames?.find(frame => frame.frameId === 0)?.url;
     if (!connection) return;
     if (!currentUrl || currentUrl === "about:blank") continue;
-    if (currentUrl !== source.href && currentUrl !== job.url) return;
+    // Source links often redirect within their own site (Adzuna's /land/ad/ opens /details/): compare sites, not addresses.
+    const host = hostOf(currentUrl);
+    if (host !== hostOf(source.href) && (!job.url || host !== hostOf(job.url))) return;
     await chrome.storage.session.set({ [connectionKey(tabId)]: { ...connection, tabId, confirmedHosts: [] } });
     return;
   }
@@ -64,7 +71,8 @@ export function installAssistant() {
     const { windowId } = sender.tab;
     const message = value as Record<string, unknown>;
     if (message.type === "assistant-visible") {
-      void chrome.runtime.getContexts({ windowIds: [windowId], contextTypes: ["SIDE_PANEL"] }).then(list => respond(list.length > 0), () => respond(false));
+      // Chrome reports a side panel's window as -1, so the panel in this window answers for itself (panel-window.ts).
+      void chrome.runtime.sendMessage({ type: "panel-window", windowId }).then(isOpen => respond(isOpen === true), () => respond(false));
     } else if (message.type === "assistant-open") {
       void chrome.sidePanel.open({ windowId }).then(() => respond(true), () => respond(false));
     } else if (message.type === "source-click" && sender.url && new URL(sender.url).origin === BENCHQ_URL && typeof message.url === "string") {
@@ -74,9 +82,9 @@ export function installAssistant() {
       // Consume the trusted click immediately and let Chrome finish opening the panel before switching tabs.
       void chrome.sidePanel.open({ windowId }).catch(() => undefined)
         .then(() => chrome.tabs.create({ windowId, url: source.href })).then(async tab => {
-        if (tab.id !== undefined && typeof message.candidateId === "string") {
-          await connectSource(tab.id, source, typeof message.jobId === "string" ? message.jobId : undefined, message.candidateId).catch(() => undefined);
-        }
+        const jobId = typeof message.jobId === "string" ? message.jobId : undefined;
+        const candidateId = typeof message.candidateId === "string" ? message.candidateId : undefined;
+        if (tab.id !== undefined && (jobId || candidateId)) await connectSource(tab.id, source, jobId, candidateId).catch(() => undefined);
         respond(true);
       }, () => respond(false));
     } else return false;

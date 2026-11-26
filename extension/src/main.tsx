@@ -27,6 +27,7 @@ import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
 import { PREVIEW_KEY } from "./frame-rules";
 import "./style.css";
+import { answerPanelWindow } from "./panel-window";
 import {
   ALERT,
   button,
@@ -252,6 +253,14 @@ function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void chooseCandidate(tabCandidateId);
   }, [tabCandidateId, selectedCandidateId, candidates, chooseCandidate]);
+  // The website can save the job after this list loaded (Open source does both at once): load it again, once per job.
+  const reloadedFor = useRef<string | null>(null);
+  const isLinkedJobMissing = Boolean(connectedJobId) && !loading && !loadingJobs && !linkedJob && selectedCandidateId === tabCandidateId;
+  useEffect(() => {
+    if (!isLinkedJobMissing || !tabCandidateId || reloadedFor.current === connectedJobId) return;
+    reloadedFor.current = connectedJobId;
+    void loadJobs(tabCandidateId).catch(() => undefined);
+  }, [isLinkedJobMissing, tabCandidateId, connectedJobId, loadJobs]);
   useEffect(() => {
     if (!session) return;
     let active = true;
@@ -674,6 +683,7 @@ function App() {
 }
 
 reloadIfManifestIsStale();
+answerPanelWindow();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

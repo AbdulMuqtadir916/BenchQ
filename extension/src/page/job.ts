@@ -241,9 +241,18 @@ function descriptionOf(lines: string[], title: string): string {
 }
 
 /** Job boards reuse navigation labels in headings, metadata and sometimes even JobPosting.title. */
+/** Labels and section headings that never name a role, so a listing's "Responsibilities" heading isn't its title. */
+const GENERIC_TITLE = new RegExp(`^(?:${[
+  "view job", "job (?:details?|description|overview|summary|requirements|responsibilities|duties)", "apply(?: now)?", "how to apply",
+  "overview", "summary", "careers?", "skills", "description", "requirements", "(?:key )?responsibilities", "duties",
+  "(?:minimum |basic |preferred |required )?qualifications", "benefits", "perks(?: (?:and|&) benefits)?",
+  "about (?:us|the (?:role|job|position|team|company)|this (?:role|job|position))",
+  "what (?:you(?:'|’)ll do|you will do|we offer)", "who you are", "(?:position|role) (?:summary|overview)",
+].join("|")})[:.!]?$`, "i");
+
 function roleTitle(value: string | undefined): string {
   const title = collapse(value ?? "");
-  const generic = /^(?:view job|job (?:details?|description|overview)|apply(?: now)?|overview|careers?|skills|description|requirements)[:.!]?$/i;
+  const generic = GENERIC_TITLE;
   const genericPageTitle = title.split(/\s*(?:[|–—]|\s-\s)\s*/).some(part => /^(?:view job|job details?)$/i.test(part));
   return genericPageTitle || generic.test(title) ? "" : title;
 }
@@ -259,11 +268,12 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
   const metadataTitle = roleTitle(meta("og:title")) || roleTitle(doc.title);
   const outerHeading = doc.querySelector("h1");
   // Metadata can be a portal name. Only use it if it corroborates a visible listing line.
-  const supportedLine = lines.find(line => roleTitle(line) && titleLine([line], metadataTitle) === 0);
+  const supportedLine = metadataTitle ? lines.find(line => roleTitle(line) && titleLine([line], metadataTitle) === 0) : undefined;
   const itemTitle = main?.querySelector('[itemprop="title"], [data-automation-id="jobPostingHeader"]');
-  const title = labelled || (itemTitle && roleTitle(textOf(itemTitle))) || heading("h1")
+  // A corroborated line beats the unverified line above Apply. The document h1 comes last: it can be the site's name.
+  const title = labelled || (itemTitle && roleTitle(textOf(itemTitle))) || heading("h1") || supportedLine
     || (preceding.length <= 100 && !/[.!?:]$/.test(preceding) ? roleTitle(preceding) : "")
-    || supportedLine || heading("h2") || (outerHeading && roleTitle(textOf(outerHeading))) || "";
+    || heading("h2") || (outerHeading && roleTitle(textOf(outerHeading))) || "";
   const siteName = meta("og:site_name");
   return {
     title,
