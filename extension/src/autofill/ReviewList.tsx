@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { button, MOTION, SOFT_TEXT } from "../ui";
+import { BELOW_TOP_BAR, button, MOTION, SOFT_TEXT } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
 import { CHECK, CHEVRON_DOWN_ICON, LIGHTBULB_ICON } from "./icons";
@@ -25,7 +25,7 @@ type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions"
 
 /** One line per field: its tick, its label, and what it holds. The row hangs into the margin, so ticks line up with the
  * heading above. */
-const ROW = `-mx-1.5 flex cursor-pointer gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 transition-[background] ${MOTION} aria-disabled:cursor-default aria-[disabled=false]:hover:bg-[var(--color-surface-2)]`;
+const ROW = `-mx-1.5 flex cursor-pointer gap-2 rounded-[var(--radius-sm)] px-1.5 py-2 transition-[background] ${MOTION} aria-disabled:cursor-default aria-[disabled=false]:hover:bg-[var(--color-surface-2)]`;
 const NOTE = "text-caption text-[var(--color-text-3)] wrap-anywhere";
 /** A value from the form: two lines at most, the rest on hover (07 Q56). */
 const VALUE = `line-clamp-2 wrap-anywhere ${SOFT_TEXT}`;
@@ -162,11 +162,15 @@ function Suggestions({ suggestions, ...props }: SuggestionProps & { suggestions:
   </div>;
 }
 
-function Group({ title, count, rows, ...actions }: RowActions & { title: string; count: string; rows: ReviewRow[] }) {
+function Group({ title, count, rows, slot, action, ...actions }: RowActions & { title: string; count: string; rows: ReviewRow[]; slot?: string; action?: ReactNode }) {
   if (rows.length === 0) return null;
-  return <section className="grid min-w-0 gap-1" aria-label={title}>
-    <h3 className="text-sm font-[550]">{title} <span className="font-normal text-[var(--color-text-3)]">({count})</span></h3>
-    <ul className="grid gap-0.5">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
+  // A section the panel scrolls to stops under the sticky top bar.
+  return <section data-slot={slot} className={`grid min-w-0 gap-1 ${slot ? BELOW_TOP_BAR : ""}`} aria-label={title}>
+    <div className="flex items-center justify-between gap-2">
+      <h3 data-slot={slot && `${slot}-title`} tabIndex={slot ? -1 : undefined} className="text-sm font-[550]">{title} <span className="font-normal text-[var(--color-text-3)]">({count})</span></h3>
+      {action}
+    </div>
+    <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
   </section>;
 }
 
@@ -178,7 +182,7 @@ function FilledGroup({ rows, ...actions }: RowActions & { rows: ReviewRow[] }) {
     <button type="button" data-slot="review-filled-toggle" className={FOLD} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
       {CHEVRON_DOWN_ICON}Filled <span className="font-normal text-[var(--color-text-3)]">({rows.length})</span>
     </button>
-    {isOpen && <ul className="grid gap-0.5">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>}
+    {isOpen && <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>}
   </section>;
 }
 
@@ -192,7 +196,7 @@ function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: 
       {onReplace && rows.length > 1 && <button type="button" className={button("secondary", "compact")} disabled={isFilling} onClick={() => onReplace(rows)}>Replace all</button>}
     </div>
     <p className={NOTE}>These differ from the saved answers, so Autofill leaves them as they are.</p>
-    <ul className="grid gap-0.5">{rows.map((row) => <li key={row.key} data-slot="review-row" className="flex items-start gap-1.5">
+    <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <li key={row.key} data-slot="review-row" className="flex items-start gap-1.5">
       <div className="min-w-0 flex-1">
         <RowBody row={row} isFilling={isFilling} onGoTo={onGoTo}>
           <Tick isFilled slot="review-tick" />
@@ -218,12 +222,15 @@ export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListO
   const isOffered = isOfferedIn(Boolean(onSave));
   const typed = rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row));
   const needed = needsYou(rows, Boolean(onSave));
+  const neededFirst = [...needed.filter(({ field }) => field.required), ...needed.filter(({ field }) => !field.required)];
   const uploads = rows.filter(isUpload);
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">
     <KeptGroup rows={rows.filter(isKept)} onReplace={onReplace} {...actions} />
     <Group title="Save for next time" count={String(rows.filter(isOffered).length)} rows={rows.filter(isOffered)} {...actions} />
-    <Group title="Needs you" count={String(needed.length)} {...actions}
-      rows={[...needed.filter(({ field }) => field.required), ...needed.filter(({ field }) => !field.required)]} />
+    {/* Where the BDE takes over once Autofill is done: the panel scrolls here, and this goes to the first field. */}
+    <Group title="Needs you" count={String(needed.length)} slot="review-needed" rows={neededFirst} {...actions}
+      action={neededFirst[0] && <button type="button" data-slot="review-needed-first" className={button("secondary", "compact")}
+        disabled={isFilling} onClick={() => onGoTo(neededFirst[0]!)}>Go to first field</button>} />
     <FilledGroup rows={typed.filter(isFilled)} {...actions} />
     <Group title="Other uploads" count={`${uploads.filter(isFilled).length} of ${uploads.length} filled`} rows={stillToFillFirst(uploads)} {...actions} />
   </div>;

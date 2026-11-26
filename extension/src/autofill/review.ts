@@ -2,6 +2,7 @@ import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
+import { countryNamed } from "./countries";
 import { asksForCode, derivedAnswer, countryIn, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
 import { asksForSelfRating, fieldTypeFor, matchBank, sameAsk } from "./match";
 import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
@@ -166,10 +167,13 @@ function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, an
   // A "location" dropdown can be a list of countries.
   const country = type === "city-state" && row.status === "manual" && base.field.options.length > 0 ? countryIn(entry.answer) : null;
   const retried = country ? rowFor(base, country, entry) : null;
-  // Only an option that is the country itself: "Toronto, Canada" is a city, so a saved Ottawa stays for review.
-  const optionId = retried?.write && "optionId" in retried.write ? retried.write.optionId : undefined;
-  const picked = base.field.options.find((option) => option.id === optionId);
-  return retried && retried.status !== "manual" && picked && !picked.label.includes(",") && countryIn(picked.label) === country ? retried : row;
+  // Only options that are the country itself, under any of its names ("United States, USA"), from a list or boxes.
+  // "Toronto, Canada" is a city, so a saved Ottawa stays for review.
+  const write = retried?.write;
+  const ids = !write ? [] : "optionIds" in write ? write.optionIds ?? [] : "optionId" in write ? [write.optionId] : [];
+  const picked = base.field.options.filter((option) => ids.includes(option.id));
+  const isTheCountry = (label: string) => label.split(",").every((part) => countryNamed(part.trim()) === country);
+  return retried && retried.status !== "manual" && picked.length > 0 && picked.every((option) => isTheCountry(option.label)) ? retried : row;
 }
 
 /** Saved answers that disagree. A dropdown can still settle it: when the answers that fit its options all fit the same

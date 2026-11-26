@@ -250,6 +250,21 @@ function ariaGroupOf(element: HTMLElement): { key: Element; kind: AriaGroup["kin
   return group && group.querySelectorAll("[role='checkbox']").length > 1 ? { key: group, kind: "checkbox" } : null;
 }
 
+/** The fieldset whose checkboxes are one question's options though each has a name of its own, the option's words
+ * (Ashby's "select all that apply"). Null for any other box: boxes named otherwise ("terms", "news") stay apart. */
+function optionSet(element: HTMLInputElement): HTMLFieldSetElement | null {
+  if (element.type !== "checkbox") return null;
+  const set = element.closest("fieldset");
+  if (!set) return null;
+  const boxes = Array.from(set.querySelectorAll<HTMLInputElement>("input[type='checkbox']"));
+  const isNamedForItself = (box: HTMLInputElement) => Boolean(box.name) && collapse(box.name).toLowerCase() === optionLabel(box).toLowerCase();
+  return boxes.length > 1 && boxes.every(isNamedForItself) ? set : null;
+}
+
+/** A site's own "Autofill from resume" box (Ashby's): it reads a résumé to fill the form itself. It isn't the
+ * application's résumé, so nothing is attached there, or the form would show the résumé twice. */
+const isResumeReader = (input: HTMLInputElement) => /\bauto-?fill\b/i.test(labelOf(input));
+
 /** The form's controls in page order, radios and same-named checkboxes gathered where the first of them stands. */
 function collectSlots(doc: Document): Slot[] {
   const slots: Slot[] = [];
@@ -269,6 +284,13 @@ function collectSlots(doc: Document): Slot[] {
     if (tree === doc) return "";
     if (!trees.has(tree)) trees.set(tree, trees.size);
     return `${trees.get(tree)}/`;
+  };
+  const sets = new Map<Element, number>();
+  const setOf = (element: HTMLInputElement) => {
+    const set = optionSet(element);
+    if (!set) return null;
+    if (!sets.has(set)) sets.set(set, sets.size);
+    return `set:${sets.get(set)}`;
   };
   for (const element of queryDeep<HTMLElement>(doc, `input, textarea, select, ${ARIA_CHOICES}`)) {
     if (isAriaChoice(element)) {
@@ -294,7 +316,7 @@ function collectSlots(doc: Document): Slot[] {
         if (!value || value === "on") slots.push(element);
         continue;
       }
-      const key = `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
+      const key = setOf(element) ?? `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
       const group = groups.get(key);
       if (group) group.push(element);
       else {
@@ -302,6 +324,8 @@ function collectSlots(doc: Document): Slot[] {
         groups.set(key, fresh);
         slots.push(fresh);
       }
+    } else if (isFileInput(element) && isResumeReader(element)) {
+      continue;
     } else if (isVisible(element) || (isFileInput(element) && isUploadShown(element))) slots.push(element);
   }
   return slots;

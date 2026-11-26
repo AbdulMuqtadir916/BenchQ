@@ -62,6 +62,17 @@ describe("reading labels", () => {
       .toMatchObject({ label: "LinkedIn", required: false });
   });
 
+  it("reads checkboxes named for their own options as one question, as Ashby's select all that apply", () => {
+    const box = (n: number, text: string) => `<div><span><input type="checkbox" id="q-${n}" name="${text}"></span><label for="q-${n}">${text}</label></div>`;
+    const fields = scan(`<div><fieldset><label for="question">How did you hear about us? (select all that apply)</label>${box(0, "LinkedIn")}${box(1, "Glassdoor")}${box(2, "Notion Blog")}</fieldset></div>`).scan.fields;
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: "checkbox", options: [{ label: "LinkedIn" }, { label: "Glassdoor" }, { label: "Notion Blog" }] });
+    expect(fields[0]?.label).toContain("How did you hear about us");
+    // Boxes named for something else are questions of their own.
+    const consent = `<fieldset><legend>Consent</legend><label><input type="checkbox" name="terms">I agree to the terms</label><label><input type="checkbox" name="news">Send me news</label></fieldset>`;
+    expect(scan(consent).scan.fields).toHaveLength(2);
+  });
+
   it("reads whether a group is required from the group itself", () => {
     const choice = (text: string) => `<label><input type="radio" name="shift">${text}</label>`;
     expect(scan(`<fieldset aria-required="true"><legend>Shift</legend>${choice("Day")}${choice("Night")}</fieldset>`).scan.fields[0])
@@ -253,6 +264,12 @@ describe("a résumé upload behind a styled button (07 Q53)", () => {
     expect(rest).toEqual([]);
     expect(field!.kind).toBe("file");
     expect(documentOf(field!)).toBe("resume");
+  });
+
+  it("leaves a site's own Autofill from resume box alone, so the résumé is attached once", () => {
+    const reader = `<div><p>Autofill from resume</p><p>Upload your resume here to autofill key application fields.</p><button type="button">Upload file</button><span data-hidden><input type="file"></span></div>`;
+    const fields = fieldsOf(`${reader}<div><label for="_systemfield_resume">Resume</label><input type="file" id="_systemfield_resume"></div>`);
+    expect(fields.map((field) => field.label)).toEqual(["Resume"]);
   });
 
   it("isn't, when the whole upload is hidden", () => {
@@ -1129,9 +1146,12 @@ describe("an upload that doesn't say what it's for", () => {
     expect(fields.map(({ label, required }) => [label, required])).toEqual([["Resume/CV", true], ["Cover Letter", false]]);
   });
 
-  it("goes by a heading in its block, as with Ashby's Autofill from resume", () => {
+  it("goes by a heading in its block", () => {
+    expect(labelled(`<h2>Location</h2><div role="presentation"><input type="file" tabindex="-1"><div><h3>Cover letter</h3><p>Upload your cover letter here.</p><button>Upload file</button></div></div>`))
+      .toEqual(["Cover letter"]);
+    // Ashby's Autofill from resume box reads a résumé for the site itself: it isn't a field (no second résumé).
     expect(labelled(`<h2>Location</h2><div role="presentation"><input type="file" tabindex="-1"><div><h3>Autofill from resume</h3><p>Upload your resume here.</p><button>Upload file</button></div></div>`))
-      .toEqual(["Autofill from resume"]);
+      .toEqual([]);
   });
 
   it("keeps an upload's own clear label, as with Ashby's Resume", () => {

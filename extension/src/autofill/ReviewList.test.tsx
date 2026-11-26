@@ -335,3 +335,13 @@ describe("keeping a typed answer (07 Q58)", () => {
     expect(host.querySelector("[data-slot='review-save']")).toBeNull();
   });
 });
+
+describe("after a run", () => {
+  it("offers to go to the first field that needs the BDE, required ones first", () => {
+    const optional = row("Website", false, "manual");
+    const required = row("Phone", true, "manual");
+    show([optional, required]);
+    act(() => { host.querySelector<HTMLButtonElement>("[data-slot='review-needed-first']")!.click(); });
+    expect(onGoTo).toHaveBeenCalledWith(required);
+  });
+});

@@ -968,7 +968,7 @@ describe("confirming Mark applied", () => {
     beforeEach(() => { Element.prototype.scrollIntoView = scrolled; });
     afterEach(() => { delete (Element.prototype as Partial<Element>).scrollIntoView; });
 
-    it("scrolls smoothly to Autofill complete once a run ends, with Mark applied back", () => {
+    it("scrolls smoothly to Needs you once a run leaves fields for the BDE, with Mark applied back", () => {
       const rows = [row("Email", true, "a@example.test"), row("Phone", true)];
       show({ fillCount: 1, rows }, { onApply });
       expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill", "Mark applied"]);
@@ -977,10 +977,21 @@ describe("confirming Mark applied", () => {
       expect(scrolled).not.toHaveBeenCalled();
       rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
       expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
-      const done = host.querySelector("[data-slot='autofill-done']");
+      const needed = host.querySelector("[data-slot='review-needed']");
       expect(scrolled).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-      expect(scrolled.mock.contexts[0]).toBe(done);
+      expect(scrolled.mock.contexts[0]).toBe(needed);
+      expect(document.activeElement?.getAttribute("data-slot")).toBe("review-needed-title");
       // Its scroll margin stops it under the sticky top bar, clear of the Mark applied bar at the bottom.
+      expect(needed?.className).toContain("scroll-mt-[calc(var(--topbar-height)");
+    });
+
+    it("scrolls to Autofill complete once a run leaves nothing for the BDE", () => {
+      const rows = [row("Email", true, "a@example.test")];
+      show({ fillCount: 1, rows }, { onApply });
+      rerender({ fillCount: 1, filling: true, rows });
+      rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
+      const done = host.querySelector("[data-slot='autofill-done']");
+      expect(scrolled.mock.contexts[0]).toBe(done);
       expect(done?.className).toContain("scroll-mt-[calc(var(--topbar-height)");
     });
 

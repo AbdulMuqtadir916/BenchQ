@@ -211,7 +211,9 @@ export function ariaLabelOf(element: HTMLElement): string {
 export function groupLabel(inputs: HTMLElement[]): string {
   const group = inputs[0]!.closest("fieldset, [role='radiogroup'], [role='group']");
   if (group && inputs.every((input) => group.contains(input))) {
-    const legend = group.querySelector(":scope > legend");
+    // Its legend, or a label of its own that names no control (Ashby puts the question in one above the boxes).
+    const legend = Array.from(group.children).find((child) => child.tagName === "LEGEND"
+      || (child.tagName === "LABEL" && !(child as HTMLLabelElement).control));
     const named = legend ? textOf(legend) : labelledBy(group) || group.getAttribute("aria-label") || "";
     if (collapse(named)) return named;
     const before = nearbyText(group);

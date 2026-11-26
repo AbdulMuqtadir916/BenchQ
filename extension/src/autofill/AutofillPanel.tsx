@@ -53,17 +53,28 @@ const SKELETON = "grid gap-1.5 *:h-[var(--skeleton-row)] *:animate-pulse *:round
 
 /** To "Autofill complete" once a run ends, or to the note of a run that stopped, so the BDE sees how it went: just
  * under the sticky top bar (their scroll margin), with the résumé and the fields below. Smoothly, unless the BDE's
- * system asks for less motion. With neither on show, back to the top of whatever scrolls the panel. */
-function scrollToResult(card: HTMLElement | null) {
+ * system asks for less motion. With neither on show, to Needs you, where the BDE takes over; with nothing there
+ * either, back to the top of whatever scrolls the panel. */
+const LOOK_EVERY_MS = 150;
+const LOOKS_AFTER_RUN = 12;
+
+function scrollToResult(card: HTMLElement | null, isLastLook = true): boolean {
   const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-  const result = card?.querySelector<HTMLElement>("[data-slot='autofill-done'], [data-slot='autofill-result']");
-  if (result && typeof result.scrollIntoView === "function") {
-    result.scrollIntoView({ behavior, block: "start" });
-    return;
+  // A run that stopped says why first. Then what Autofill couldn't fill, so the BDE starts there (the keyboard lands on
+  // it too), and only a form with nothing left goes to "Autofill complete" and Mark applied.
+  const stopped = card?.querySelector<HTMLElement>("[data-slot='autofill-result']");
+  const needed = stopped ? null : card?.querySelector<HTMLElement>("[data-slot='review-needed']");
+  const target = stopped ?? needed ?? card?.querySelector<HTMLElement>("[data-slot='autofill-done']");
+  if (target && typeof target.scrollIntoView === "function") {
+    target.scrollIntoView({ behavior, block: "start" });
+    needed?.querySelector<HTMLElement>("[data-slot='review-needed-title']")?.focus({ preventScroll: true });
+    return true;
   }
+  if (!isLastLook) return false;
   let scroller = card?.parentElement ?? null;
   while (scroller && !/^(auto|scroll)$/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
   scroller?.scrollTo?.({ top: 0, behavior });
+  return true;
 }
 
 /** A fill waiting for its résumé's review: which application it's for and which résumé answers it. */
@@ -206,8 +217,16 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const dismiss = useCallback(() => setDismissed(outcome), [outcome]);
   // A run follows its newest field down the panel, so once it ends the panel goes back up to how it went.
   useEffect(() => {
-    if (wasFilling.current && !filling) scrollToResult(card.current);
+    const hasEnded = wasFilling.current && !filling;
     wasFilling.current = filling;
+    if (!hasEnded || scrollToResult(card.current, false)) return;
+    // The form is read again after a run, so its Needs you list can show a moment later: look for it briefly.
+    let looks = 0;
+    const timer = setInterval(() => {
+      looks += 1;
+      if (scrollToResult(card.current, looks >= LOOKS_AFTER_RUN)) clearInterval(timer);
+    }, LOOK_EVERY_MS);
+    return () => clearInterval(timer);
   }, [filling]);
   // Once nothing is left to fill, Mark applied is the next step, so it takes the main button.
   const hasFillsLeft = canReview && (filling || !reviewMatches || fillCount > 0 || rows === null);
