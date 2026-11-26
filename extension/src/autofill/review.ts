@@ -127,8 +127,12 @@ function dropdownHolds(current: string, proposed: string): boolean {
  * asks for the code isn't done while it holds the number without it (#148's review). */
 const holdsWholeNumber = (current: string, proposed: string) => current.replace(/\D/g, "").endsWith(proposed.replace(/\D/g, ""));
 
+/** A box showing only its dial code, as ADP's Mobile Number starts with "+1": no number is on it yet. */
+const DIAL_CODE_ONLY = /^\+\d{1,4}$/;
+
 function holdsAnswer({ current, kind, label }: TabField, proposed: string): boolean {
   if (kind === "combobox" && current && dropdownHolds(current, proposed)) return true;
+  if (DIAL_CODE_ONLY.test(current.trim()) && proposed.replace(/\D/g, "").length > current.replace(/\D/g, "").length) return false;
   if (current.trim() === proposed.trim() || (proposed === UNCHECKED && current === "")) return true;
   if (!PHONE_LIKE.test(proposed) || !samePhone(current, proposed)) return false;
   // With or without its "+": a digits-only "919876543210" is the code and the number too (#148's review).

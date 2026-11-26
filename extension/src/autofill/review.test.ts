@@ -886,3 +886,7 @@ describe("ATS identity fields", () => {
     expect(rows.map(row => row.status)).toEqual(["ready", "ready"]);
   });
 });
+
+it("fills a phone box that shows only its dial code, like ADP's Mobile Number", () => {
+  expect(review(field("Mobile Number", { kind: "tel", current: "+1" }), [entry("Phone", "+1 704-555-0299")]).status).toBe("ready");
+});

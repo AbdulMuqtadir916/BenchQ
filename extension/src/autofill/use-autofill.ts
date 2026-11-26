@@ -209,7 +209,8 @@ function rememberedRow(row: ReviewRow, memory: TabMemory, resume: string | null,
   if (settled.get(key) === current && !isOtherResumes && !isNewAnswer) return { ...row, status: "same" as const };
   if (current && edited.has(key)) return { ...row, status: row.write?.type === "text" ? "kept" : "same" };
   if (row.field.prefilledIdentity && ["first-name", "last-name", "full-name", "email", "phone"].includes(typeOf(row.field) ?? "")) return row;
-  if (current && found.has(key) && !settled.has(key)) return { ...row, status: "kept" as const };
+  // A box the site starts with only its dial code ("+1") holds no answer: Autofill types the number over it.
+  if (current && found.has(key) && !settled.has(key) && !/^\+\d{1,4}$/.test(current.trim())) return { ...row, status: "kept" as const };
   const reason = handedBack.get(key);
   if (!reason) return row;
   const handed = { ...row, status: "manual" as const, reason, write: undefined };
