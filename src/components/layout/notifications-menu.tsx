@@ -81,14 +81,21 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
     buttonRef.current?.focus();
   }
 
+  // A request that couldn't be marked read shows as unread again.
+  function unmarkRead(id: string) {
+    setReadIds(current => { const next = new Set(current); next.delete(id); return next; });
+  }
+
   function markRead(notification: Notification) {
     setReadIds(current => new Set(current).add(notification.id));
-    if (notification.isRequestUnread) markRequestRead.mutate(notification.id);
+    if (notification.isRequestUnread) markRequestRead.mutate(notification.id, { onError: () => unmarkRead(notification.id) });
   }
 
   function markAllRead() {
     setReadIds(new Set(notifications.map(({ id }) => id)));
-    for (const request of notifications) if (request.isRequestUnread) markRequestRead.mutate(request.id);
+    for (const request of notifications) {
+      if (request.isRequestUnread) markRequestRead.mutate(request.id, { onError: () => unmarkRead(request.id) });
+    }
   }
 
   return (

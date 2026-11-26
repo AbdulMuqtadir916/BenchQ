@@ -55,7 +55,7 @@ Never upload a package with a `key` to the store: the store owns the ID.
 
 ## 1. Listing
 
-- **Name:** BenchQ Autofill Apply (12 characters; the store allows 75).
+- **Name:** BenchQ Autofill Apply (21 characters; the store allows 75).
 - **Summary (limit 132):** Fill job application forms from a candidate's BenchQ answers, and track each application.
 - **Category:** Productivity. **Language:** English.
 - **Single purpose** (the store requires one): *Fills a job application form in the open tab with the answers saved for the

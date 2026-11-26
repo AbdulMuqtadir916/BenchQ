@@ -171,27 +171,53 @@ export const getRunningTailorings = (firmId: string, candidateId: string) =>
 export const saveResumeAnswers = (firmId: string, candidateId: string, resumeId: string, change: object) =>
   request<unknown>(`${candidatePath(firmId, candidateId)}/resumes/${encodeURIComponent(resumeId)}/autofill`, { method: "PATCH", body: JSON.stringify(change) });
 
+const PAGE = 2000;
+
+/** Every page of a list of applications: the backend pages by `offset`. */
+async function allApplications(query: string): Promise<Application[]> {
+  const found: Application[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { applications } = await request<{ applications: Application[] }>(
+      `/api/applications?${query}&limit=${PAGE}${offset ? `&offset=${offset}` : ""}`);
+    found.push(...applications);
+    if (applications.length < PAGE) return found;
+  }
+}
+
 /** A candidate's saved jobs, or, without one, the saved jobs of every candidate this user can see. */
 export const getSavedApplications = async (candidateId?: string) => {
   const candidate = candidateId ? `&candidate_id=${encodeURIComponent(candidateId)}` : "";
   const [saved, applied] = await Promise.all([
-    request<{ applications: Application[] }>(`/api/applications?status=saved&tracked_only=true&limit=2000${candidate}`),
-    request<{ applications: Application[] }>(`/api/applications?status=applied&tracked_only=true&limit=2000${candidate}`),
+    allApplications(`status=saved&tracked_only=true${candidate}`),
+    allApplications(`status=applied&tracked_only=true${candidate}`),
   ]);
-  const savedIds = new Set(saved.applications.map((application) => application.id));
-  const appliedFromSaved = applied.applications.filter((application) =>
+  const savedIds = new Set(saved.map((application) => application.id));
+  const appliedFromSaved = applied.filter((application) =>
     !savedIds.has(application.id) && application.status_transitions?.some(
       (transition) => transition.from === "saved" && transition.to === "applied",
     ),
   );
-  return [...saved.applications, ...appliedFromSaved];
+  return [...saved, ...appliedFromSaved];
 };
 /** Marks the job applied with the form as it stood and, when known, the résumé version its answers came from: the one
  * sent (docs/02 §9). */
 /** A job added for a candidate from the page it's on (the add-job plan, 2026-11-11): it becomes one of their jobs and a
  * Saved application at once, or the application they already have for it. */
-export const addJob = (candidateId: string, job: PageJob) => request<Application & { job_created: boolean; application_created: boolean }>(
-  "/api/applications", {
+/** A job BenchQ already has: backend/api/routes_jobs.py get_job. */
+export interface BenchqJob { id: string; title: string | null; company: string | null; location: string | null; description: string | null; url: string | null }
+export const getJob = (jobId: string) => request<BenchqJob>(`/api/jobs/${encodeURIComponent(jobId)}`);
+
+type AddedApplication = Application & { job_created: boolean; application_created: boolean };
+
+/** Saves a job for the candidate: a job BenchQ already has by its id, any other from what its page stated. */
+export const addJob = async (candidateId: string, job: PageJob, known?: BenchqJob): Promise<AddedApplication> => {
+  if (known) {
+    const saved = await request<{ id: string; job_id: string; candidate_id: string; status: string }>("/api/applications", {
+      method: "POST", body: JSON.stringify({ candidate_id: candidateId, job_id: known.id, status: "saved" }),
+    });
+    return { ...saved, title: known.title, company: known.company, location: known.location, url: known.url, job_created: false, application_created: true } as AddedApplication;
+  }
+  return request<AddedApplication>("/api/applications", {
     method: "POST",
     body: JSON.stringify({
       candidate_id: candidateId,
@@ -203,6 +229,7 @@ export const addJob = (candidateId: string, job: PageJob) => request<Application
       },
     }),
   });
+};
 
 export const markApplied = (application: Application, form: AppliedForm, resumeId: string | null = null) => request<Application>(`/api/applications/${encodeURIComponent(application.id)}/candidate-status`, {
   method: "PATCH",

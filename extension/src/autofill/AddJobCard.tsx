@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from "react";
-import { addJob, BENCHQ_URL, type Application } from "../api";
+import { addJob, BENCHQ_URL, getJob, type Application, type BenchqJob } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
-import { sameCompany, sameListing } from "./job-check";
+import { readSourceJob } from "./connection-store";
+import { sameCompany, sameListing, siteOf } from "./job-check";
 import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import { isJobLink } from "./job-link";
 import { readJobPage } from "./tab-bridge";
@@ -34,13 +35,6 @@ const sameUrl = (url: string) => url.split("#")[0]!.replace(/\/+$/, "").toLowerC
 
 /** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
 const JOB_KEYS = /^(gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
-
-/** A host's site: its last two labels, or three under a country's second-level domain (`acme.co.uk`, `acme.com.au`). */
-function siteOf(hostname: string): string {
-  const labels = hostname.toLowerCase().split(".");
-  const isCountrySecondLevel = labels.length >= 3 && labels.at(-1)!.length === 2 && /^(co|com|org|net|gov|ac|edu)$/.test(labels.at(-2)!);
-  return labels.slice(isCountrySecondLevel ? -3 : -2).join(".");
-}
 
 /** What names a link's job: its site without the subdomain (Greenhouse sends `boards.` to `job-boards.`), its path, and
  * the query keys that name a job. */
@@ -185,6 +179,15 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   const legacyUrl = legacy?.url;
   const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
+  // The BenchQ job this tab was opened for from the website, if BenchQ has it: Save saves that job itself.
+  const [known, setKnown] = useState<BenchqJob | null>(null);
+  useEffect(() => {
+    if (tabId === null) return;
+    let isLive = true;
+    void readSourceJob(tabId).then((jobId) => (jobId ? getJob(jobId) : null))
+      .then((found) => { if (isLive) setKnown(found); }, () => undefined);
+    return () => { isLive = false; };
+  }, [tabId]);
   const [state, setState] = useState<{ status: "idle" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
   // The site, while BenchQ may not read it: the page is read once the BDE allows it (`allowed` counts the grants).
   const [access, setAccess] = useState<SiteAccess | null>(null);
@@ -258,12 +261,17 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   }
   if (tabId === null || !job) return null;
 
-  const details = detailsOf(job);
+  // Still the page of the job BenchQ has (not one the tab moved on to): show BenchQ's details, not the page's reading.
+  const sameKnown = known?.url && isSameJob(job.url, known.url) ? known : null;
+  const shown: PageJob = sameKnown ? { ...job, title: sameKnown.title || job.title, company: sameKnown.company || job.company,
+    location: sameKnown.location ?? job.location, description: sameKnown.description || job.description } : job;
+  const details = detailsOf(shown);
   const add = async () => {
     setState({ status: "adding" });
     try {
-      const application = await addJob(candidateId, job);
-      setState({ status: "added", text: application.application_created ? `Added to ${candidateName}'s Saved jobs.` : `Already in ${candidateName}'s jobs.` });
+      const application = await (sameKnown ? addJob(candidateId, shown, sameKnown) : addJob(candidateId, shown));
+      setState({ status: "added", text: sameKnown ? `Saved to ${candidateName}'s jobs.`
+        : application.application_created ? `Added to ${candidateName}'s Saved jobs.` : `Already in ${candidateName}'s jobs.` });
       onAdded(application);
     } catch (error) {
       setState({ status: "error", text: `Couldn't add this job. ${error instanceof Error ? error.message : "Try again."}` });
@@ -271,8 +279,9 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   };
 
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
-    <h2 id="add-job-title" className="text-h3 wrap-anywhere">{job.title}</h2>
-    <p className={SOFT_TEXT}>{[job.company, job.location].filter(Boolean).join(" · ")}</p>
+    <h2 id="add-job-title" className="text-h3 wrap-anywhere">{shown.title}</h2>
+    <p className={SOFT_TEXT}>{[shown.company, shown.location].filter(Boolean).join(" · ")}</p>
+    {sameKnown && <p data-slot="add-job-known" className={MUTED_TEXT}>{`This job is already in BenchQ. Save it to ${candidateName}'s jobs.`}</p>}
     {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
       {details.map(([name, value]) => <Fragment key={name}>
         <dt className="text-[var(--color-text-3)]">{name}</dt>

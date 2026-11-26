@@ -21,6 +21,15 @@ it("answers for its own window only, so a panel elsewhere can't hide this window
   expect(ask(2)).not.toHaveBeenCalled();
 });
 
+it("answers a question that arrives while it is still finding its window", async () => {
+  const fake = fakeChrome();
+  vi.stubGlobal("chrome", fake);
+  answerPanelWindow();
+  const respond = vi.fn();
+  fake.runtime.onMessage.fire({ type: "panel-window", windowId: 1 }, { id: "extension-id" }, respond);
+  await vi.waitFor(() => expect(respond).toHaveBeenCalledWith(true));
+});
+
 it("doesn't answer as the panel when index.html is open in a tab", async () => {
   expect((await panel({ id: 9 }))(1)).not.toHaveBeenCalled();
 });

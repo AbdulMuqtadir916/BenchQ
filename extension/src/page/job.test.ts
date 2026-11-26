@@ -43,10 +43,16 @@ describe("telling a job's page", () => {
     expect(readJob(doc, "https://example.org/jobs/12407").title).toBe("Salesforce Developer");
   });
 
-  it("prefers the line the tab title confirms over the line above Apply", () => {
+  it.each(["QA Engineer", "QA Engineer | View Job"])("prefers the line the tab title %s confirms over the line above Apply", (tabTitle) => {
     const doc = pageOf("<main><div>QA Engineer</div><div>Remote</div><button>Apply</button></main>");
-    doc.title = "QA Engineer";
+    doc.title = tabTitle;
     expect(readJob(doc, "https://acme.com/jobs/42").title).toBe("QA Engineer");
+  });
+
+  it("takes the role above SmartRecruiters' I'm interested", () => {
+    const doc = pageOf("<main><div>QA Engineer</div><button>I'm interested</button><p>Test the API.</p></main>");
+    doc.title = "Acme";
+    expect(readJob(doc, "https://jobs.smartrecruiters.com/Acme/743999-qa-engineer").title).toBe("QA Engineer");
   });
 
   it.each([

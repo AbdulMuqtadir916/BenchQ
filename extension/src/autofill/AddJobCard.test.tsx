@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addJob, BENCHQ_URL } from "../api";
+import { addJob, BENCHQ_URL, getJob } from "../api";
 import AddJobCard, { detailsOf, isOtherJobOnSite, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
 import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
@@ -10,7 +10,7 @@ import { readJobPage } from "./tab-bridge";
 vi.mock("./tab-bridge", () => ({ readJobPage: vi.fn() }));
 // A site BenchQ may read, unless a test says otherwise (#126).
 vi.mock("./site-access", () => ({ missingAccess: vi.fn(async () => null), requestAccess: vi.fn() }));
-vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), addJob: vi.fn() }));
+vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), addJob: vi.fn(), getJob: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -285,4 +285,18 @@ it("treats Adzuna's tracked link and the listing it opens as one job", () => {
   const saved = "https://www.adzuna.com/land/ad/5963480464?se=b&utm_medium=api&v=C0FFEE";
   expect(isOtherJobOnSite("https://www.adzuna.com/details/5963480464?i=a&se=b", saved)).toBe(false);
   expect(isOtherJobOnSite("https://www.adzuna.com/details/5963480465", saved)).toBe(true);
+});
+
+it("offers to save a job BenchQ already has, with BenchQ's details, and saves that job", async () => {
+  vi.stubGlobal("chrome", { storage: { session: { get: async () => ({ "source-job:7": "job-9" }) } } });
+  vi.mocked(getJob).mockResolvedValue({ id: "job-9", title: "QA Lead", company: "Acme Corp", location: "Austin, TX", description: "<p>Lead QA.</p>", url: page.url });
+  vi.mocked(readJobPage).mockResolvedValue(page);
+  vi.mocked(addJob).mockResolvedValue({ id: "app-1", candidate_id: "cand-1", job_id: "job-9", status: "saved", title: "QA Lead", company: "Acme Corp", location: "Austin, TX", url: page.url, job_created: false, application_created: true });
+  await show();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(host.textContent).toContain("already in BenchQ");
+  expect(host.textContent).toContain("Acme Corp · Austin, TX");
+  await click("add-job-run");
+  expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ title: "QA Lead", company: "Acme Corp" }), expect.objectContaining({ id: "job-9" }));
+  vi.unstubAllGlobals();
 });

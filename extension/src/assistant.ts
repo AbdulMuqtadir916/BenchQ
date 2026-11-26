@@ -1,15 +1,17 @@
 import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
 import { isJobLink } from "./autofill/job-link";
-import { connectionFor, connectionKey } from "./autofill/connection-store";
-import { hostOf } from "./autofill/job-check";
+import { connectionFor, connectionKey, sourceJobKey } from "./autofill/connection-store";
+import { siteOf } from "./autofill/job-check";
+
+const siteOfUrl = (url: string) => { try { return siteOf(new URL(url).hostname); } catch { return ""; } };
 
 /** Connects the opened tab to the saved job: the link's candidate's, or, from a page without one, the one candidate who
  * has it saved. With no such job the tab stays unconnected and the panel offers Add job. */
 async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string | undefined) {
   const { principal } = await getSession();
   if (principal.kind !== "firm" || principal.role !== "BDE") return;
-  // The website saves the application concurrently with opening the source link.
-  for (const delay of [0, 300, 1000, 2500]) {
+  // The website saves the application while the source opens: look again for about nine seconds.
+  for (const delay of [0, 300, 1000, 2500, 5000]) {
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     const jobs = await getSavedApplications(candidateId);
     const matches = jobs.filter(item => (!candidateId || item.candidate_id === candidateId) && item.status === "saved"
@@ -23,9 +25,10 @@ async function connectSource(tabId: number, source: URL, jobId: string | undefin
     const currentUrl = frames?.find(frame => frame.frameId === 0)?.url;
     if (!connection) return;
     if (!currentUrl || currentUrl === "about:blank") continue;
-    // Source links often redirect within their own site (Adzuna's /land/ad/ opens /details/): compare sites, not addresses.
-    const host = hostOf(currentUrl);
-    if (host !== hostOf(source.href) && (!job.url || host !== hostOf(job.url))) return;
+    // Source links often redirect within their own site (Adzuna's /land/ad/ opens /details/, Greenhouse's boards. opens
+    // job-boards.): compare sites, not addresses.
+    const site = siteOfUrl(currentUrl);
+    if (site !== siteOfUrl(source.href) && (!job.url || site !== siteOfUrl(job.url))) return;
     await chrome.storage.session.set({ [connectionKey(tabId)]: { ...connection, tabId, confirmedHosts: [] } });
     return;
   }
@@ -61,6 +64,7 @@ export function installAssistant() {
     }).catch(() => undefined);
   };
   chrome.tabs.onActivated.addListener(checkTab);
+  chrome.tabs.onRemoved.addListener((tabId) => { void chrome.storage.session.remove(sourceJobKey(tabId)).catch(() => undefined); });
   chrome.permissions.onAdded.addListener(() => {
     void chrome.tabs.query({ active: true }).then(tabs => {
       for (const tab of tabs) if (tab.id !== undefined) checkTab({ tabId: tab.id });
@@ -84,6 +88,7 @@ export function installAssistant() {
         .then(() => chrome.tabs.create({ windowId, url: source.href })).then(async tab => {
         const jobId = typeof message.jobId === "string" ? message.jobId : undefined;
         const candidateId = typeof message.candidateId === "string" ? message.candidateId : undefined;
+        if (tab.id !== undefined && jobId) await chrome.storage.session.set({ [sourceJobKey(tab.id)]: jobId }).catch(() => undefined);
         if (tab.id !== undefined && (jobId || candidateId)) await connectSource(tab.id, source, jobId, candidateId).catch(() => undefined);
         respond(true);
       }, () => respond(false));

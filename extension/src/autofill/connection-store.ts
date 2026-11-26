@@ -3,6 +3,13 @@ import type { Application } from "../api";
 
 export const connectionKey = (tabId: number) => `connection:${tabId}`;
 
+/** The BenchQ job a tab was opened for by the website's Open source (assistant.ts): Add job saves that job itself. */
+export const sourceJobKey = (tabId: number) => `source-job:${tabId}`;
+export async function readSourceJob(tabId: number): Promise<string | null> {
+  const value = (await chrome.storage.session.get(sourceJobKey(tabId)))[sourceJobKey(tabId)];
+  return typeof value === "string" ? value : null;
+}
+
 export const sendToBackground = (message: PanelMessage) => chrome.runtime.sendMessage(message) as Promise<PanelReply>;
 
 export function connectionFor(job: Application, userId: string): NewConnection | null {

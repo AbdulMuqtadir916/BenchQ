@@ -14,6 +14,13 @@ function parsed(url: string): URL | null {
   }
 }
 
+/** A host's site: its last two labels, or three under a country's second-level domain (`acme.co.uk`, `acme.com.au`). */
+export function siteOf(hostname: string): string {
+  const labels = hostname.toLowerCase().split(".");
+  const isCountrySecondLevel = labels.length >= 3 && labels.at(-1)!.length === 2 && /^(co|com|org|net|gov|ac|edu)$/.test(labels.at(-2)!);
+  return labels.slice(isCountrySecondLevel ? -3 : -2).join(".");
+}
+
 export const hostOf = (url: string) => parsed(url)?.hostname.replace(/^www\./, "") ?? "";
 const pathOf = (url: string) => parsed(url)?.pathname ?? "";
 

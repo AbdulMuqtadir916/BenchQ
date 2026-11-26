@@ -285,15 +285,17 @@ it("uses the source click to open the panel and bind the destination to the save
   expect(reply).toBe(true);
   expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
   expect(stored(101)).toMatchObject({ candidateId: "candidate-1", applicationId: "app-1", userId: "user-1" });
+  // Add job saves this very job if the tab is disconnected later.
+  expect(fake.session.get("source-job:101")).toBe("job-42");
   expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
   vi.restoreAllMocks();
 });
 it.each([
-  ["binds a source link that redirected within the job's site", "https://www.adzuna.example/details/42?i=1", true],
-  ["leaves the tab unbound once it shows another site", "https://elsewhere.example/", false],
-])("%s", async (_name, landed, isBound) => {
+  ["binds a source link that redirected within the job's site", "https://www.adzuna.example/land/ad/42", "https://www.adzuna.example/details/42?i=1", true],
+  ["binds a link that moved to another host of the same site", "https://boards.greenhouse.io/acme/jobs/42", "https://job-boards.greenhouse.io/acme/jobs/42", true],
+  ["leaves the tab unbound once it shows another site", "https://www.adzuna.example/land/ad/42", "https://elsewhere.example/", false],
+])("%s", async (_name, url, landed, isBound) => {
   const api = await import("./api");
-  const url = "https://www.adzuna.example/land/ad/42";
   vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
   vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
     id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,

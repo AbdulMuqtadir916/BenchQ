@@ -251,10 +251,12 @@ const GENERIC_TITLE = new RegExp(`^(?:${[
 ].join("|")})[:.!]?$`, "i");
 
 function roleTitle(value: string | undefined): string {
-  const title = collapse(value ?? "");
-  const generic = GENERIC_TITLE;
-  const genericPageTitle = title.split(/\s*(?:[|–—]|\s-\s)\s*/).some(part => /^(?:view job|job details?)$/i.test(part));
-  return genericPageTitle || generic.test(title) ? "" : title;
+  const full = collapse(value ?? "");
+  // "QA Engineer | View Job" keeps the role before the label; "View Job | Adzuna" has none, only the site's name.
+  const parts = full.split(/(\s*(?:[|–—]|\s-\s)\s*)/);
+  const label = parts.findIndex((part, index) => index % 2 === 0 && /^(?:view job|job details?)$/i.test(part));
+  const title = label < 0 ? full : parts.slice(0, Math.max(label - 1, 0)).join("");
+  return GENERIC_TITLE.test(title) ? "" : title;
 }
 
 function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"> {
@@ -263,7 +265,8 @@ function fromPage(doc: Document, url: string): Omit<PageJob, "url" | "isJobPage"
   const lines = main ? linesOf(main) : [];
   const heading = (selector: string) => Array.from(main?.querySelectorAll(selector) ?? [], el => roleTitle(textOf(el))).find(Boolean);
   const labelled = lines.map(line => roleTitle(/^(?:job title|position|role)\s*:\s*(.+)$/i.exec(line)?.[1])).find(Boolean);
-  const applyLine = lines.findIndex(line => /^apply(?: now)?$/i.test(line));
+  // The Apply control as a line of text, SmartRecruiters' "I'm interested" included (as hasApply reads it).
+  const applyLine = lines.findIndex(line => /^(?:apply(?: now| for this job)?|i[’']?m interested)$/i.test(line));
   const preceding = lines[applyLine - 1] ?? "";
   const metadataTitle = roleTitle(meta("og:title")) || roleTitle(doc.title);
   const outerHeading = doc.querySelector("h1");
