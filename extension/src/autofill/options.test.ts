@@ -23,6 +23,8 @@ describe("optionFor", () => {
     expect(optionFor("Baltimore, MD", lever)).toBe("b");
     expect(optionFor("Atlanta, GA, USA", [{ id: "a", label: "Atlanta, Georgia, United States" }])).toBe("a");
     expect(optionFor("Hyderabad, India", [{ id: "a", label: "Hyderabad, Sindh, Pakistan" }, { id: "b", label: "Hyderabad, Telangana, India" }])).toBe("b");
+    // A US state names the United States: never another country's Hyderabad.
+    expect(optionFor("Hyderabad, India", [{ id: "a", label: "Hyderabad, Texas" }])).toBeNull();
   });
 
   it("picks the option the answer names", () => {

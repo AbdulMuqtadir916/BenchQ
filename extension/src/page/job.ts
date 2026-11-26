@@ -343,7 +343,9 @@ export async function readJobForSave(doc: Document): Promise<PageJob> {
   const parent = new URL(original);
   const lever = /^jobs(?:\.eu)?\.lever\.co$/.test(parent.hostname) && /^\/[^/]+\/[\da-f-]{36}\/apply\/?$/i.test(parent.pathname);
   const workable = parent.hostname === "apply.workable.com" && /^\/[^/]+\/j\/[a-z0-9]+\/apply\/?$/i.test(parent.pathname);
-  if ((!lever && !workable) || (page.isJobPage && page.title && page.description)) return page;
+  // An application page's own heading and buttons aren't a posting's description: only a real one saves the fetch.
+  const described = (page.description ?? "").replace(page.title ?? "", "").replace(/(apply( now| for this job)?|submit( application)?)/gi, "").trim().length >= 200;
+  if ((!lever && !workable) || (page.isJobPage && page.title && described)) return page;
   parent.pathname = parent.pathname.replace(/apply\/?$/, "");
   if (lever) parent.pathname = parent.pathname.replace(/\/$/, "");
   parent.search = parent.hash = "";

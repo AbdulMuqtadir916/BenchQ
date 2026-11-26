@@ -29,7 +29,11 @@ export const fieldLabel = ({ label }: Pick<TabField, "label">) => label || "Unla
 /** What a row's field holds, or nothing if it still needs filling. A box that should stay unchecked is already right; a
  * phone box showing only its dial code ("+1") holds no number yet. */
 export const filledValue = ({ field, status, proposed }: ReviewRow) =>
-  (/^\+\d{1,4}$/.test(field.current.trim()) ? "" : field.current) || (status === "same" ? proposed ?? "" : "");
+  (isDialCodeOnly(field) ? "" : field.current) || (status === "same" ? proposed ?? "" : "");
+
+/** A phone box showing only its dial code: a "+5000" in a salary box is a value. */
+const isDialCodeOnly = ({ current, kind, label }: TabField) =>
+  /^\+\d{1,4}$/.test(current.trim()) && (kind === "tel" || /(phone|mobile|cell)/i.test(label));
 
 /** Takes in the fields on the page now. A field on another page keeps what it last held. A Social Security or card
  * number is never kept, whatever its field is called. */

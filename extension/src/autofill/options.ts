@@ -79,11 +79,13 @@ function placeFor(answer: string, options: FieldOption[]): string | null {
   // A country at the end is the option's country however each writes it: "Baltimore, MD, USA" is Lever's "Baltimore,
   // Maryland, United States". A state code there ("Dallas, TX") is the state, never a country with the same code.
   const parts = answer.split(",").map((part) => part.trim()).filter(Boolean);
+  const last = parts[parts.length - 1] ?? "";
+  const country = parts.length > 1 && !isUsState(canonical(last)) ? countryNamed(last) : null;
+  // An option ending in a US state is in the United States: "Hyderabad, Texas" is never "Hyderabad, India".
   const countryOf = (place: string) => {
-    const last = place.split(",").pop()!.trim();
-    return isUsState(canonical(last)) ? null : countryNamed(last);
+    const end = place.split(",").pop()!.trim();
+    return isUsState(canonical(end)) ? countryNamed("United States") : countryNamed(end);
   };
-  const country = parts.length > 1 ? countryOf(answer) : null;
   const wanted = canonical(country ? parts.slice(0, -1).join(", ") : answer);
   const words = wanted.split(" ").map((word) => US_STATES[word] ?? word);
   if (!country && words.length < 2 && words[0] === wanted) return null;

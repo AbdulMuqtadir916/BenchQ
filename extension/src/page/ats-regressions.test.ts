@@ -44,6 +44,17 @@ it.each(["https://jobs.lever.co/tenant/12345678-1234-1234-1234-123456789012/appl
   expect(await readJobForSave(form)).toMatchObject({ title: "Programmer", url, isJobPage: true });
 });
 
+it("reads the listing behind an application page that shows only the role's heading", async () => {
+  const url = "https://jobs.lever.co/tenant/12345678-1234-1234-1234-123456789012/apply";
+  const form = new DOMParser().parseFromString("<main><h1>Programmer</h1><button>Apply</button></main>", "text/html");
+  Object.defineProperty(form, "URL", { value: url });
+  const fetched = vi.fn().mockResolvedValue({ ok: true, url: url.replace(/apply\/?$/, ""), text: async () =>
+    '<script type="application/ld+json">{"@type":"JobPosting","title":"Programmer","description":"Build things","hiringOrganization":"Example"}</script>' });
+  vi.stubGlobal("fetch", fetched);
+  expect(await readJobForSave(form)).toMatchObject({ title: "Programmer", company: "Example", url });
+  expect(fetched).toHaveBeenCalled();
+});
+
 it("only confirms the publication named by the SmartRecruiters posting", async () => {
   const posting = "https://jobs.smartrecruiters.com/Example/12345-programmer";
   const uuid = "12345678-1234-1234-1234-123456789012";
