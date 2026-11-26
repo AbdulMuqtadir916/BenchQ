@@ -2,6 +2,7 @@ import type { ScannedField } from "./types";
 import { normalize } from "./text";
 
 const GOVERNMENT = "Government or tax ID";
+const ACCOUNT = "Account details";
 
 /** What autofill never touches, whatever the bank holds. */
 const RULES: { reason: string; pattern: RegExp }[] = [
@@ -10,7 +11,7 @@ const RULES: { reason: string; pattern: RegExp }[] = [
   { reason: "Place of birth", pattern: /\b((place|city|country|state|town|county) of birth|birth ?(place|country|city)|born in|where were you born|country of origin)\b/ },
   { reason: GOVERNMENT, pattern: /\b(ssn|social security|passport|national (id|identity|insurance)|drivers? licen[cs]e|tax (id|number)|tin|ein|itin|aadhaar|aadhar|pan (card|number)|alien (registration )?number|uscis number|i 94|visa number)\b/ },
   { reason: "Payment details", pattern: /\b(credit card|debit card|card number|cvv|cvc|iban|routing number|bank account|account number|sort code)\b/ },
-  { reason: "Account details", pattern: /\b(password|passcode|username|user name|user id|log ?in|sign in|security (question|answer)|verification code|one time (code|password)|otp|(security|account|atm|card|bank|secret|login|access) pin|pin (number|no))\b/ },
+  { reason: ACCOUNT, pattern: /\b(password|passcode|username|user name|user id|log ?in|sign in|security (question|answer)|verification code|one time (code|password)|otp|(security|account|atm|card|bank|secret|login|access) pin|pin (number|no))\b/ },
   // "Tax terms" and "Employment terms (W2/C2C)" are questions; terms someone agrees to aren't.
   { reason: "Consent or legal statement", pattern: /\b(i (hereby )?(agree|accept|consent|acknowledge|certify|attest|declare|understand|confirm|authori[sz]e)|terms (and|&) conditions|terms of (service|use)|(agree|accept|consent)\b.*\bterms|terms\b.*\b(agree|accept)|privacy (policy|notice|statement)|gdpr|consent|acknowledg\w*)\b/ },
   { reason: "Signature", pattern: /\b(signature|e sign|esign|sign here|digitally sign|initials)\b/ },
@@ -65,5 +66,9 @@ export function neverFillReason(field: ScannedField): string | null {
   const text = normalize(`${field.label} ${field.hints.replace(/([a-z])([A-Z])/g, "$1 $2")}`)
     .replace(PROFILE_HANDLE, "$1 profile").replace(AS_ON_DOCUMENT, " ");
   const asksWhether = ASKS_WHETHER.test(text) && !DOCUMENT_DETAIL.test(text);
-  return RULES.find(({ reason, pattern }) => !(asksWhether && reason === GOVERNMENT) && pattern.test(text))?.reason ?? null;
+  // A label says what a field asks: ADP's "Mobile Number" is named "login_view_phone", and asks for a phone. Sign-in
+  // words in a field's attributes count only when it has no label (a password field and a sign-in form are caught above).
+  const labelled = normalize(field.label).replace(PROFILE_HANDLE, "$1 profile").replace(AS_ON_DOCUMENT, " ");
+  return RULES.find(({ reason, pattern }) => !(asksWhether && reason === GOVERNMENT)
+    && pattern.test(reason === ACCOUNT && labelled.trim() ? labelled : text))?.reason ?? null;
 }

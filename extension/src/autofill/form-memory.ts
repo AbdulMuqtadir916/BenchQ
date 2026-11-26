@@ -26,9 +26,10 @@ export const forgetForms = () => forms.clear();
 
 export const fieldLabel = ({ label }: Pick<TabField, "label">) => label || "Unlabeled field";
 
-/** What a row's field holds, or nothing if it still needs filling. A box that should stay unchecked is already right. */
+/** What a row's field holds, or nothing if it still needs filling. A box that should stay unchecked is already right; a
+ * phone box showing only its dial code ("+1") holds no number yet. */
 export const filledValue = ({ field, status, proposed }: ReviewRow) =>
-  field.current || (status === "same" ? proposed ?? "" : "");
+  (/^\+\d{1,4}$/.test(field.current.trim()) ? "" : field.current) || (status === "same" ? proposed ?? "" : "");
 
 /** Takes in the fields on the page now. A field on another page keeps what it last held. A Social Security or card
  * number is never kept, whatever its field is called. */

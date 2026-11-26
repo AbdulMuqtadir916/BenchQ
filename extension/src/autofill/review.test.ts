@@ -890,3 +890,9 @@ describe("ATS identity fields", () => {
 it("fills a phone box that shows only its dial code, like ADP's Mobile Number", () => {
   expect(review(field("Mobile Number", { kind: "tel", current: "+1" }), [entry("Phone", "+1 704-555-0299")]).status).toBe("ready");
 });
+
+it("fills ADP's Mobile Number, whose name says login, and isn't taken for a sign-in field", () => {
+  const row = review(field("Mobile Number", { kind: "tel", current: "+1", hints: "phone login_view_phone" }), [entry("Phone", "+1 704-555-0299")]);
+  expect(row.status).toBe("ready");
+  expect(review(field("", { hints: "login_username" }), [entry("Phone", "+1 704-555-0299")]).status).toBe("blocked");
+});
