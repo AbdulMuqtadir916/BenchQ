@@ -17,19 +17,44 @@ function setNativeValue(control: HTMLInputElement | HTMLTextAreaElement, value: 
   else control.value = value;
 }
 
+/** ADP keeps only what is typed into its page while the page has focus: through the browser's editor, never a set value. */
+function typeOnAdp(control: HTMLInputElement | HTMLTextAreaElement, value: string): boolean {
+  const doc = control.ownerDocument;
+  control.focus({ preventScroll: true });
+  if (doc.activeElement !== control && !control.matches(":focus")) return false;
+  control.select();
+  if (!doc.execCommand("insertText", false, value)) return false;
+  // ADP formats a phone number as it's typed ("+1 704 555 0299"): the same digits are the same number.
+  const digits = value.replace(/\D/g, "");
+  if (control.value !== value && !(digits.length >= 7 && control.value.replace(/\D/g, "").endsWith(digits))) return false;
+  control.dispatchEvent(new Event("change", { bubbles: true }));
+  control.blur();
+  return true;
+}
+
+/** Values waiting for ADP's page to get the focus back: a click in BenchQ's panel takes it, and ADP drops anything
+ * written without it. They're typed in once the BDE clicks the form. */
+const waiting = new Map<HTMLInputElement | HTMLTextAreaElement, string>();
+
+function typeWhenFocused(control: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const win = control.ownerDocument.defaultView;
+  if (!win) return;
+  if (waiting.size === 0) {
+    win.addEventListener("focus", () => {
+      for (const [field, text] of waiting) if (field.isConnected && field.value !== text) typeOnAdp(field, text);
+      waiting.clear();
+    }, { once: true });
+  }
+  // A phone is tried in several ways in a row: the first, the form's likeliest, is the one typed in.
+  if (!waiting.has(control)) waiting.set(control, value);
+}
+
 export function setText(control: HTMLInputElement | HTMLTextAreaElement, value: string) {
   const doc = control.ownerDocument;
   if (value && /(?:^|\.)adp\.com$/.test(doc.location?.hostname ?? "") && typeof doc.execCommand === "function"
     && (control.tagName === "TEXTAREA" || /^(?:text|email|tel|search|url)$/.test(control.type))) {
-    control.focus({ preventScroll: true });
-    if (doc.activeElement === control || control.matches(":focus")) {
-      control.select();
-      if (doc.execCommand("insertText", false, value) && control.value === value) {
-        control.dispatchEvent(new Event("change", { bubbles: true }));
-        control.blur();
-        return;
-      }
-    }
+    if (!doc.hasFocus()) return typeWhenFocused(control, value);
+    if (typeOnAdp(control, value)) return;
   }
   setNativeValue(control, value);
   fireEvents(control);

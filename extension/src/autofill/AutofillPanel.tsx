@@ -85,6 +85,14 @@ type PendingFill = { context: string; resumeId: string | null; isFileSwap?: bool
 
 /** The connected tab's job and its form, top to bottom: the job, the résumé the answers come from, Autofill, the run as
  * it goes, the résumé and the cover letter, then the rest of the form. The form stays theirs to submit. */
+const isAdp = (url: string | null) => {
+  try {
+    return url !== null && /(?:^|\.)adp\.com$/.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+};
+
 export default function AutofillPanel({ connection, tabUrl = null, firmId = null, firmSlug = null, details = null, applicationStatus = "ready", onRetryContext = () => {}, resumesUrl = null, candidateName, applying, isApplied, onApply, onDisconnect, onSessionExpired, onAccessLost }: AutofillPanelProps) {
   const { tabId, job } = connection;
   // The address the BDE said to keep this tab connected on, though it shows another job's page.
@@ -308,6 +316,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {isOpen && <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
         isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />}
 
+      {isOpen && isAdp(tabUrl) && <p data-slot="adp-focus" className={MUTED_TEXT}>ADP only takes typing on its own page. If a field stays empty after Autofill, click the form once and BenchQ types it in, or press Alt+Shift+F on the form.</p>}
       {isOpen && error && <div role="alert">
         <p data-slot="error" className={ALERT}>{error}</p>
         <button type="button" className={TEXT_BUTTON} disabled={scanning} onClick={() => void state.rescan()}>Try again</button>
