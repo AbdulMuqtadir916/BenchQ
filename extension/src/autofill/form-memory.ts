@@ -33,7 +33,7 @@ export const filledValue = ({ field, status, proposed }: ReviewRow) =>
 
 /** A phone box showing only its dial code: a "+5000" in a salary box is a value. */
 const isDialCodeOnly = ({ current, kind, label }: TabField) =>
-  /^\+\d{1,4}$/.test(current.trim()) && (kind === "tel" || /(phone|mobile|cell)/i.test(label));
+  /^\+\d{1,4}$/.test(current.trim()) && (kind === "tel" || /\b(phone|mobile|cell)\b/i.test(label));
 
 /** Takes in the fields on the page now. A field on another page keeps what it last held. A Social Security or card
  * number is never kept, whatever its field is called. */
