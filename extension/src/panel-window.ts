@@ -16,8 +16,9 @@ export function answerPanelWindow() {
       if (query.windowId === panelWindow) respond(true);
       return false;
     }
-    // Asked while still finding its window, as it opens: answer once it knows, so the launcher isn't left showing.
-    void known.then(() => respond(query.windowId === panelWindow));
+    // Asked while still finding its window, as it opens: the panel in that window answers once it knows. Another
+    // window's panel stays silent here too (the first answer wins), and Chrome closes a channel nobody answers.
+    void known.then(() => { if (query.windowId === panelWindow) respond(true); });
     return true;
   });
 }

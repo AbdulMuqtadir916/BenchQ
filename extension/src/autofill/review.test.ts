@@ -315,6 +315,8 @@ describe("answers the bank holds inside another", () => {
     expect(review(locationField, [entry("Current location", "London")]).status).toBe("manual");
     const shortNames = field("Location", { kind: "select", options: [{ id: "ca", label: "Canada" }, { id: "us", label: "USA" }] });
     expect(review(shortNames, [entry("Current location", "Dallas, TX")])).toMatchObject({ status: "ready", write: { optionId: "us" } });
+    const cities = field("Location", { kind: "select", options: [{ id: "to", label: "Toronto, Canada" }, { id: "pa", label: "Paris, France" }] });
+    expect(review(cities, [entry("Current location", "Ottawa, Canada")]).status).toBe("manual");
   });
 
   it("names the country a place ends with, and says nothing of one it can't place", () => {

@@ -401,7 +401,7 @@ function App() {
   // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then this tab connects, as
   // the BDE is already on the form (Q10), with no tab of its own.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
-    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} candidateId={selectedCandidate.id}
+    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} firmId={session?.principal.firm_id ?? null} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
       onPageTitle={showPageTitle}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}

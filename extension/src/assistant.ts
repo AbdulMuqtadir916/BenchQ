@@ -1,6 +1,6 @@
 import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
 import { isJobLink } from "./autofill/job-link";
-import { connectionFor, connectionKey, sourceJobKey } from "./autofill/connection-store";
+import { connectionFor, connectionKey, connectionWrites, countConnectionWrite, sourceJobKey } from "./autofill/connection-store";
 import { siteOf } from "./autofill/job-check";
 
 const siteOfUrl = (url: string) => { try { return siteOf(new URL(url).hostname); } catch { return ""; } };
@@ -8,6 +8,7 @@ const siteOfUrl = (url: string) => { try { return siteOf(new URL(url).hostname);
 /** Connects the opened tab to the saved job: the link's candidate's, or, from a page without one, the one candidate who
  * has it saved. With no such job the tab stays unconnected and the panel offers Add job. */
 async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string | undefined) {
+  const writesBefore = connectionWrites(tabId);
   const { principal } = await getSession();
   if (principal.kind !== "firm" || principal.role !== "BDE") return;
   // The website saves the application while the source opens: look again for about nine seconds.
@@ -29,6 +30,9 @@ async function connectSource(tabId: number, source: URL, jobId: string | undefin
     // job-boards.): compare sites, not addresses.
     const site = siteOfUrl(currentUrl);
     if (site !== siteOfUrl(source.href) && (!job.url || site !== siteOfUrl(job.url))) return;
+    // A connection made for this tab meanwhile (the BDE picked a job) wins. The check and the write are one step.
+    if (connectionWrites(tabId) !== writesBefore) return;
+    countConnectionWrite(tabId);
     await chrome.storage.session.set({ [connectionKey(tabId)]: { ...connection, tabId, confirmedHosts: [] } });
     return;
   }

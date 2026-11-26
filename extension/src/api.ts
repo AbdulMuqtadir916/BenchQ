@@ -175,12 +175,13 @@ const PAGE = 2000;
 
 /** Every page of a list of applications: the backend pages by `offset`. */
 async function allApplications(query: string): Promise<Application[]> {
-  const found: Application[] = [];
+  // By application id: a save between two pages can move a row onto the next page as well.
+  const found = new Map<string, Application>();
   for (let offset = 0; ; offset += PAGE) {
     const { applications } = await request<{ applications: Application[] }>(
       `/api/applications?${query}&limit=${PAGE}${offset ? `&offset=${offset}` : ""}`);
-    found.push(...applications);
-    if (applications.length < PAGE) return found;
+    for (const application of applications) found.set(application.id, application);
+    if (applications.length < PAGE) return [...found.values()];
   }
 }
 
@@ -203,9 +204,16 @@ export const getSavedApplications = async (candidateId?: string) => {
  * sent (docs/02 §9). */
 /** A job added for a candidate from the page it's on (the add-job plan, 2026-11-11): it becomes one of their jobs and a
  * Saved application at once, or the application they already have for it. */
-/** A job BenchQ already has: backend/api/routes_jobs.py get_job. */
+/** One of a candidate's jobs in BenchQ, the posting the website's Open source names. */
 export interface BenchqJob { id: string; title: string | null; company: string | null; location: string | null; description: string | null; url: string | null }
-export const getJob = (jobId: string) => request<BenchqJob>(`/api/jobs/${encodeURIComponent(jobId)}`);
+
+/** backend/api/routes_job_search.py: the candidate's own posting, or a 404 when the job isn't theirs. */
+export const getCandidateJob = async (firmId: string, candidateId: string, postingId: string): Promise<BenchqJob> => {
+  const posting = await request<Omit<BenchqJob, "url" | "description"> & { description?: string | null; apply_url: string | null }>(
+    `${candidatePath(firmId, candidateId)}/job-postings/${encodeURIComponent(postingId)}`);
+  return { id: posting.id, title: posting.title, company: posting.company, location: posting.location,
+    description: posting.description ?? null, url: posting.apply_url };
+};
 
 type AddedApplication = Application & { job_created: boolean; application_created: boolean };
 

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { addJob, BENCHQ_URL, getJob, type Application, type BenchqJob } from "../api";
+import { addJob, BENCHQ_URL, getCandidateJob, type Application, type BenchqJob } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { readSourceJob } from "./connection-store";
@@ -12,6 +12,8 @@ import type { PageJob } from "./types";
 type KnownJob = { id?: string; status?: string; title: string | null; company: string | null; location: string | null; url?: string | null };
 
 type AddJobCardProps = {
+  /** The BDE's firm, for looking up the BenchQ job a tab was opened for. */
+  firmId?: string | null;
   /** The tab the BDE is looking at. */
   tab: { id: number; url: string } | null;
   candidateId: string;
@@ -171,7 +173,7 @@ export const looksLikeJobPage = (url: string) => isJobLink(url);
  * to it, ready for Autofill. On a site BenchQ may not read yet (#126) it first asks, on a link that looks like a job's
  * page, and reads the page once the BDE allows it.
  */
-export default function AddJobCard({ tab, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
+export default function AddJobCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
   // Re-read only legacy placeholders whose saved URL identifies this exact posting.
   const legacy = knownJobs.find(known => tab && known.url === tab.url
     && /^(?:view job|job details?|job description)$/i.test(known.title?.trim() ?? ""));
@@ -179,16 +181,22 @@ export default function AddJobCard({ tab, candidateId, candidateName, knownUrls,
   const legacyUrl = legacy?.url;
   const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
-  // The BenchQ job this tab was opened for from the website, if BenchQ has it: Save saves that job itself.
+  // The BenchQ job this tab was opened for from the website, when this candidate has it: Save saves that job itself.
   const [known, setKnown] = useState<BenchqJob | null>(null);
-  useEffect(() => {
-    if (tabId === null) return;
-    let isLive = true;
-    void readSourceJob(tabId).then((jobId) => (jobId ? getJob(jobId) : null))
-      .then((found) => { if (isLive) setKnown(found); }, () => undefined);
-    return () => { isLive = false; };
-  }, [tabId]);
   const [state, setState] = useState<{ status: "idle" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
+  useEffect(() => {
+    if (tabId === null || !firmId) return;
+    let isLive = true;
+    void readSourceJob(tabId).catch(() => null).then((jobId) => (jobId ? getCandidateJob(firmId, candidateId, jobId) : null)).then(
+      (found) => { if (isLive) setKnown(found); },
+      (error: unknown) => {
+        // A 404 is a job this candidate doesn't have, so the page's reading is what gets saved. Anything else is said.
+        if (isLive && (error as { status?: number }).status !== 404) {
+          setState({ status: "error", text: "Couldn't check whether BenchQ already has this job. Saving uses what the page shows." });
+        }
+      });
+    return () => { isLive = false; };
+  }, [tabId, firmId, candidateId]);
   // The site, while BenchQ may not read it: the page is read once the BDE allows it (`allowed` counts the grants).
   const [access, setAccess] = useState<SiteAccess | null>(null);
   const [isDenied, setIsDenied] = useState(false);

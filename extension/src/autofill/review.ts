@@ -166,7 +166,10 @@ function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, an
   // A "location" dropdown can be a list of countries.
   const country = type === "city-state" && row.status === "manual" && base.field.options.length > 0 ? countryIn(entry.answer) : null;
   const retried = country ? rowFor(base, country, entry) : null;
-  return retried && retried.status !== "manual" ? retried : row;
+  // Only an option that is the country itself: "Toronto, Canada" is a city, so a saved Ottawa stays for review.
+  const optionId = retried?.write && "optionId" in retried.write ? retried.write.optionId : undefined;
+  const picked = base.field.options.find((option) => option.id === optionId);
+  return retried && retried.status !== "manual" && picked && !picked.label.includes(",") && countryIn(picked.label) === country ? retried : row;
 }
 
 /** Saved answers that disagree. A dropdown can still settle it: when the answers that fit its options all fit the same

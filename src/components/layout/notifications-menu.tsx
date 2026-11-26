@@ -88,13 +88,14 @@ export function NotificationsMenu({ variant = "firm" }: { variant?: "firm" | "ad
 
   function markRead(notification: Notification) {
     setReadIds(current => new Set(current).add(notification.id));
-    if (notification.isRequestUnread) markRequestRead.mutate(notification.id, { onError: () => unmarkRead(notification.id) });
+    if (notification.isRequestUnread) void markRequestRead.mutateAsync(notification.id).catch(() => unmarkRead(notification.id));
   }
 
   function markAllRead() {
     setReadIds(new Set(notifications.map(({ id }) => id)));
+    // Each request's own failure: mutate keeps only the last call's callbacks.
     for (const request of notifications) {
-      if (request.isRequestUnread) markRequestRead.mutate(request.id, { onError: () => unmarkRead(request.id) });
+      if (request.isRequestUnread) void markRequestRead.mutateAsync(request.id).catch(() => unmarkRead(request.id));
     }
   }
 
