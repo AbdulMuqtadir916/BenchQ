@@ -221,10 +221,23 @@ function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
 }
 
 /** A styled choice that's part of a form: shown, enabled, and not a control inside a menu or a site's header. One
- * that wraps a real input is that input's look, and the input stands for it. */
+ * that wraps a real input is that input's look, and the input stands for it. Toggle buttons that keep their answer in
+ * an input beside them are a form's question wherever they are: Ashby's Yes/No has no <form> around it. */
 function isAriaQuestion(element: HTMLElement): boolean {
   return isVisible(element) && element.getAttribute("aria-disabled") !== "true" && !element.querySelector("input, select, textarea")
-    && closestThrough(element, FORM_AREA) !== null && closestThrough(element, NOT_A_QUESTION) === null;
+    && (closestThrough(element, FORM_AREA) !== null || keepsAnswerBeside(element)) && closestThrough(element, NOT_A_QUESTION) === null;
+}
+
+/** Toggle buttons side by side, with the input that keeps their answer among them (Ashby's Yes/No). */
+function keepsAnswerBeside(element: HTMLElement): boolean {
+  const group = element.hasAttribute("aria-pressed") ? element.parentElement : null;
+  return Boolean(group && group.querySelector(":scope > input") && group.querySelectorAll(":scope > [aria-pressed]").length > 1);
+}
+
+/** The input those toggles keep their answer in: the buttons are the question, so it isn't one of its own. */
+function isToggleAnswer(input: HTMLInputElement): boolean {
+  const toggle = input.parentElement?.querySelector<HTMLElement>(":scope > [aria-pressed]");
+  return Boolean(toggle && keepsAnswerBeside(toggle));
 }
 
 /** `closest()` through the components an element sits in: a choice inside a component under a form is in that form,
@@ -309,7 +322,7 @@ function collectSlots(doc: Document): Slot[] {
     // A control hidden from people is the page's own plumbing, like the input a custom dropdown keeps beside it.
     if (element.matches(":disabled") || element.getAttribute("aria-hidden") === "true") continue;
     if (isChoice(element)) {
-      if (!isChoiceVisible(element)) continue;
+      if (!isChoiceVisible(element) || isToggleAnswer(element)) continue;
       if (!element.name) {
         // A box with its own value but no name is an option of the group around it, like Lever's "Custom" pronoun.
         const value = element.getAttribute("value");

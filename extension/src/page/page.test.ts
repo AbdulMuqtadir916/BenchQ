@@ -73,6 +73,18 @@ describe("reading labels", () => {
     expect(scan(consent).scan.fields).toHaveLength(2);
   });
 
+  it("reads Ashby's Yes/No buttons as one question, outside any form, without the box they keep it in", () => {
+    const fields = scan(`<div role="tabpanel"><div><label for="q1">Will you now or in the future require sponsorship?</label><div>
+      <button aria-pressed="false" data-option="yes">Yes</button><button aria-pressed="false" data-option="no">No</button>
+      <input type="checkbox" tabindex="-1" name="q1"></div></div></div>`).scan.fields;
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: "radio", options: [{ label: "Yes" }, { label: "No" }] });
+    expect(fields[0]?.label).toContain("require sponsorship");
+    // A lone toggle outside a form, like a site's Save button, still isn't a question.
+    expect(scan(`<div><button aria-pressed="false">Save</button><input type="checkbox" tabindex="-1"></div>`).scan.fields
+      .filter((field) => field.kind === "radio")).toEqual([]);
+  });
+
   it("reads whether a group is required from the group itself", () => {
     const choice = (text: string) => `<label><input type="radio" name="shift">${text}</label>`;
     expect(scan(`<fieldset aria-required="true"><legend>Shift</legend>${choice("Day")}${choice("Night")}</fieldset>`).scan.fields[0])
