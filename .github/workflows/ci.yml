@@ -52,7 +52,7 @@ jobs:
                 frontend=true
                 extension=true
                 ;;
-              src/*|public/*|scripts/qa/candidate-gmail/*|.env.example|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|next.config.ts|tsconfig.json|vitest.config.ts|eslint.config.mjs|postcss.config.mjs|components.json)
+              src/*|public/*|scripts/qa/candidate-gmail/*|scripts/check-csp.mjs|.env.example|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|next.config.ts|tsconfig.json|vitest.config.ts|eslint.config.mjs|postcss.config.mjs|components.json)
                 frontend=true
                 ;;
               docs/*|README.md|CONTRIBUTING.md|AGENTS.md|CLAUDE.md|product.md|design.md|design-qa.md|.github/pull_request_template.md)
@@ -87,6 +87,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      # The built app's page headers: every page renders per request, and every <script> carries the CSP nonce
+      # (production layer step 6). Starts `next start` on port 3100 with no backend; only public pages are fetched.
+      - run: node scripts/check-csp.mjs
 
   # The Chrome extension has its own package and tests (vitest, jsdom); its build runs tsc -b first.
   extension:
@@ -141,9 +144,93 @@ jobs:
       # "live" tests hit a running stack over HTTP; there is none here.
       - run: python -m pytest backend/tests -q -o asyncio_mode=auto -m "not live" -p no:cacheprovider
 
+  # Secret scan of the PR with the pinned gitleaks release (not the Marketplace action), rules and allowlists in the
+  # base branch's .gitleaks.toml. Runs on every PR, whatever the paths. Two scans, both required to pass:
+  #   1. each of the PR's commits, so a secret added in one commit and removed in a later one is still caught (it is
+  #      in the history and must be rotated);
+  #   2. the PR's net change (merge base to head), so a secret added only in a merge commit is caught too, e.g. one
+  #      typed while resolving a conflict when main was merged in (issue #168). `git log -p` shows no patch for a
+  #      merge commit, so scan 1 never sees those lines.
+  # Why not `--log-opts=-m` instead of scan 2: -m diffs a merge against each parent, so the scan would also read every
+  # change main brought in, judged by the PR's base policy rather than the policy main's changes were reviewed under
+  # (when the base has no .gitleaks.toml, main's allowlisted test values would fail the PR). The net change holds the
+  # PR's own lines and its conflict resolutions only: once main is merged in, the merge base is main's tip.
+  # To bump: change GITLEAKS_VERSION and GITLEAKS_SHA256 together, the hash taken from that release's
+  # gitleaks_<version>_checksums.txt (linux_x64 line).
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history, so the base branch and every commit of the PR are present.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks
+        shell: bash
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          "$RUNNER_TEMP/gitleaks/gitleaks" version
+      - name: Load the base branch's scan policy
+        id: policy
+        shell: bash
+        # The policy comes from the BASE branch, never from the PR's checkout, so a PR cannot weaken the scan of its
+        # own changes (disable a rule, allowlist its own secret). A PR that changes .gitleaks.toml is scanned with
+        # main's policy; its new allowlist only takes effect after it merges. When the base has no .gitleaks.toml
+        # (before the first one merges) both scans use gitleaks' built-in rules alone. --config is passed in every
+        # case: without it gitleaks would load ./.gitleaks.toml, the PR's copy. For the same reason the PR's
+        # .gitleaksignore is deleted from the working copy (the scans read commits, not files on disk) and inline
+        # "gitleaks:allow" comments are ignored. Each scan exits non-zero on any finding; --redact keeps secret
+        # values out of the log.
+        run: |
+          config="$RUNNER_TEMP/gitleaks.toml"
+          if git cat-file -e "${BASE_SHA}:.gitleaks.toml" 2>/dev/null; then
+            git show "${BASE_SHA}:.gitleaks.toml" > "$config"
+            echo "Policy: .gitleaks.toml from the base branch (${BASE_SHA})."
+          else
+            printf '[extend]\nuseDefault = true\n' > "$config"
+            echo "::notice::The base branch (${BASE_SHA}) has no .gitleaks.toml: scanning with gitleaks' built-in rules only, no allowlists."
+          fi
+          rm -f .gitleaksignore
+      - name: Scan the PR's commits
+        shell: bash
+        run: |
+          echo "Scan 1 of 2: each commit in ${BASE_SHA}..${HEAD_SHA} (merge commits show no patch here; scan 2 covers them)."
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --config "$RUNNER_TEMP/gitleaks.toml" --ignore-gitleaks-allow --redact \
+            --no-banner --verbose --log-opts="${BASE_SHA}..${HEAD_SHA}" .
+      - name: Scan the PR's net change
+        # Runs even when scan 1 found something, so one run reports both.
+        if: ${{ !cancelled() && steps.policy.outcome == 'success' }}
+        shell: bash
+        # The net change is written as one throwaway commit, never pushed: the head's tree on top of the merge base.
+        # gitleaks then scans it like any commit, so only added lines are checked (a secret the PR removes is not
+        # reported) and every finding keeps its file path, which the policy's path-scoped allowlists need. Piping
+        # `git diff` into `gitleaks stdin` instead would lose the paths and also scan the removed lines. A finding
+        # here names the throwaway commit; its file and line are the head's.
+        run: |
+          merge_base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          net="$(GIT_AUTHOR_NAME=ci-secret-scan GIT_AUTHOR_EMAIL=ci-secret-scan@invalid \
+            GIT_COMMITTER_NAME=ci-secret-scan GIT_COMMITTER_EMAIL=ci-secret-scan@invalid \
+            git commit-tree "${HEAD_SHA}^{tree}" -p "$merge_base" -m "Net change of the PR (CI secret scan only)")"
+          echo "Scan 2 of 2: the net change from the merge base ${merge_base} to ${HEAD_SHA}, as throwaway commit ${net}."
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --config "$RUNNER_TEMP/gitleaks.toml" --ignore-gitleaks-allow --redact \
+            --no-banner --verbose --log-opts="${merge_base}..${net}" .
+
   required:
     name: CI required
-    needs: [changes, frontend, extension, backend]
+    needs: [changes, frontend, extension, backend, gitleaks]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -155,6 +242,7 @@ jobs:
           FRONTEND: ${{ needs.frontend.result }}
           EXTENSION: ${{ needs.extension.result }}
           BACKEND: ${{ needs.backend.result }}
+          GITLEAKS: ${{ needs.gitleaks.result }}
           EXPECTED_FRONTEND: ${{ needs.changes.outputs.frontend == 'false' && 'skipped' || 'success' }}
           EXPECTED_EXTENSION: ${{ needs.changes.outputs.extension == 'false' && 'skipped' || 'success' }}
           EXPECTED_BACKEND: ${{ needs.changes.outputs.backend == 'false' && 'skipped' || 'success' }}
@@ -169,3 +257,5 @@ jobs:
           check frontend "$FRONTEND" "$EXPECTED_FRONTEND"
           check extension "$EXTENSION" "$EXPECTED_EXTENSION"
           check backend "$BACKEND" "$EXPECTED_BACKEND"
+          # Never path-gated, so anything but success (a skip included) fails.
+          check gitleaks "$GITLEAKS" success

@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { QueryProvider } from "@/lib/query/provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 
-/** Providers — client boundary for the whole app. */
-export function Providers({ children }: { children: ReactNode }) {
+/** Providers — client boundary for the whole app. `nonce` is the request's CSP nonce, for next-themes' inline script. */
+export function Providers({ children, nonce }: { children: ReactNode; nonce?: string }) {
   return (
-    <ThemeProvider>
+    <ThemeProvider nonce={nonce}>
       <QueryProvider>{children}</QueryProvider>
     </ThemeProvider>
   );
