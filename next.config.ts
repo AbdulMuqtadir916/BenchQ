@@ -1,6 +1,25 @@
 import type { NextConfig } from "next";
 
+/**
+ * Security headers for every page (production layer step 6, decided 2026-11-23). The Content-Security-Policy is not
+ * here: it carries a per-request nonce, so src/proxy.ts sets it. `clipboard-write` stays allowed for the copy buttons.
+ * No Strict-Transport-Security: the deployment's Caddy proxy sets it for app.benchq.io (Abdul, 2026-11-24), and a
+ * second copy from here would double it.
+ */
+const PAGE_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+];
+
+/** Every path but the two rewritten to the backend below (/api and /health), whose headers are the backend's. */
+const PAGE_HEADERS_SOURCE = "/((?!api(?:/|$)|health$).*)";
+
 const nextConfig: NextConfig = {
+  // No `X-Powered-By: Next.js`.
+  poweredByHeader: false,
   // Hide the Next.js "N" indicator so it doesn't sit on the design preview.
   // Compile/runtime error overlays still appear.
   devIndicators: false,
@@ -24,6 +43,9 @@ const nextConfig: NextConfig = {
       { source: "/api/:path*", destination: `${backend}/api/:path*` },
       { source: "/health", destination: `${backend}/health` },
     ];
+  },
+  async headers() {
+    return [{ source: PAGE_HEADERS_SOURCE, headers: PAGE_HEADERS }];
   },
 };
 
