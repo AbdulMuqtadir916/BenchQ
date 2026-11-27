@@ -74,7 +74,7 @@ def test_the_daily_limits_reset_at_the_firms_start():
 # ── the firm ─────────────────────────────────────────────────────────────────
 
 def test_the_owner_changes_the_hours_and_past_work_keeps_its_day(anonymous_client, world, test_db):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     firm_id = world["firm"].id
     batch = ScrapeJob(firm_id=firm_id, candidate_id=uuid.UUID(_create(anonymous_client, world, bde="adnan").json()["id"]),
                       user_id=world["people"]["adnan"].id, batch_id=uuid.uuid4(), kind="search", state="success",
@@ -90,7 +90,7 @@ def test_the_owner_changes_the_hours_and_past_work_keeps_its_day(anonymous_clien
                                   headers=world["as"]["owner"]).status_code == 400
     r = anonymous_client.patch(url, json={"work_start": "09:00", "work_end": "18:00"}, headers=world["as"]["owner"])
     assert r.status_code == 200 and (r.json()["work_start"], r.json()["work_end"]) == ("09:00", "18:00")
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.firm_id == firm_id, LedgerEntry.entity_type == "firm").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.firm_id == firm_id, ActivityEntry.entity_type == "firm").one()
     assert entry.summary == "Work hours 9:00 AM – 6:00 PM (was 6:30 PM – 4:00 AM)"
     test_db.expire_all()
     assert test_db.get(ScrapeJob, batch.id).work_date == date(2026, 11, 11)   # 10 AM is the 12th's now, but not moved

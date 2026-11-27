@@ -9,7 +9,7 @@ from backend.applications.tracking import apply_email_decision, email_command_id
 from backend.inbox import classification_worker as worker
 from backend.models.candidates import InboxMessage
 from backend.models.db import Application, ApplicationReview, ApplicationStatusEvent, EmailClassification, utcnow
-from backend.models.tenancy import LedgerEntry
+from backend.models.tenancy import ActivityEntry
 from backend.tests.test_pr3_matching import matching_case, mailbox_case, email  # noqa: F401 (fixtures)
 from backend.tests.test_pr3_pipeline import decision, pipeline  # noqa: F401 (fixture)
 
@@ -56,7 +56,7 @@ def test_eligible_email_moves_the_application_with_evidence(test_db, pipeline, a
     event = events[-1]
     assert (event.source, event.actor_user_id, event.from_status, event.to_status) == ('email_classifier', None, 'applied', 'screening_call')
     assert event.original_payload['email_id'] == str(message_id) and event.original_payload['event_id'] == str(event.id)
-    assert test_db.query(LedgerEntry).filter_by(actor_name='Email classifier').count() == 1
+    assert test_db.query(ActivityEntry).filter_by(actor_name='Email classifier').count() == 1
 
 
 @pytest.mark.parametrize(('category', 'confidence', 'auth', 'reason'), [

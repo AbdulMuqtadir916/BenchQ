@@ -26,7 +26,11 @@ per-scraper throttles
 3. **The scheduler out of the API process,** so the API can run more than one worker.
 4. **Errors and logging:** structured logs with a request id, no secrets or personal data in logs, one error shape.
 5. **Health and readiness** endpoints for the deployment (agreed with Abdul).
-6. **Security headers and CORS** for production; secrets only from the environment.
+6. **Security headers and CORS** for production; server secrets come only from the environment, and BenchQ's own
+   stored credentials (the AI key, candidate Gmail tokens) are encrypted with a key from the environment (step 6
+   below). The JobNavigator leftover settings secrets (`linkedin_password`, `jobright_password`,
+   `linkedin_mock_password`, `telegram_webhook_secret`, the legacy `gmail_refresh_token`) are plain `Setting.value`
+   and on Abdul's clean-up list.
 
 ### Decisions and what's deferred (agreed with Abdul, 2026-10-31)
 
@@ -67,7 +71,7 @@ All answer 429 with `Retry-After` and `{"detail": "Too many attempts. Try again 
   stamp, so a restart, a deploy's overlap or a second copy never fails a live copy's runs.
 - **AI quotas per plan,** with billing (Abdul). The cap above is not a quota.
 - **AI work started in the background** (scoring after a scrape, the score a tailor chains): a request limit doesn't see it. It is covered once AI spend is recorded per firm (07-auth issue 8).
-- **The IP-count fix.** A successful sign-in resets the IP's count as well as the email's, so someone with their own account can keep resetting the per-IP lock. The fix is to reset only the email's count (`throttle.clear()`).
+- **The IP-count fix:** done in step 6. A successful sign-in reset the IP's count as well as the email's, so someone with their own account could keep resetting the per-IP lock; `throttle.clear()` now resets only the email's.
 - **More than one API process (after step 3).** In-memory counts are per process, so N processes allow about N times each limit. Choose then:
   - stay at one process (likely enough at BenchQ's load; §2 measures it)
   - counters in Postgres, which is already paid for (needs a table: Abdul)
@@ -396,6 +400,130 @@ small fix of its own.
   the reference). Check each popup; existing behaviour, not caused by 4b.
 - **Pre-existing accessibility found by axe:** the not-found and Forbidden screens have no `h1`; the Forbidden screen's
   description fails contrast on a hard load without the app shell (3.88:1); the sign-in page has no `<main>`.
+
+### Step 6, security headers, CORS and secrets (plan agreed 2026-11-23)
+
+**The problem.** Production's safety rested on settings nobody checked:
+- `DATABASE_URL` fell back to `postgresql://jobnavigator:password@db…` (`backend/config.py:11`), so a forgotten
+  variable started production on the local default password.
+- `ALLOWED_ORIGINS` fell back to the `http://localhost` list in production too (`config.py:20`), and was not
+  validated; the same list feeds CORS (`main.py:141`, with `allow_methods` and `allow_headers` `*`) and the CSRF
+  Origin check (`backend/auth/access.py:325-330`).
+- An empty `SESSION_COOKIE_SECURE=` or `BENCHQ_ENV=` meant "not production" (`config.py:14,17`): insecure cookies,
+  the API docs on.
+- The AI key's secret was checked only when a key was stored (`main.py:55`), the reset link's base only for https
+  (`backend/auth/password_reset.py:25`), and nothing stopped a production database holding the seeded demo accounts,
+  whose password is published (docs/03 §3.2).
+- No API answer carried security headers (nosniff, framing, referrer, HSTS), and uvicorn named itself in `server`.
+- A successful sign-in cleared the IP's failure count (`backend/auth/throttle.py:81-83`).
+
+**Decisions (Uzair, 2026-11-23):**
+1. **Two PRs:** the backend's (the IP fix, the production config checks, the API's headers, CORS), then the
+   frontend's (the pages' headers and their CSP, `next.config.ts`).
+2. **CORS narrowed now, removed later:** methods GET/POST/PUT/PATCH/DELETE, `allow_headers` Content-Type and
+   X-Request-ID, `expose_headers` Retry-After and X-Request-ID, `max_age` 600. The site calls through the Next proxy
+   (same origin) and the extension has host permissions, so neither should need CORS; it goes in a later PR, once a
+   manual extension test confirms that. **One validated origin list** for CORS and the Origin check
+   (`config.parse_origins`, lower-case).
+3. **No demo account gets in, in production** (revised 2026-11-23; a start-up refusal was dropped: an OWNER or the
+   Super Admin could invite a `*.benchq.test` address and stop every firm at the next restart). Instead, in production
+   only: no invite (an OWNER's, a new firm's owner, a resend) goes to an address on a testing domain (`.test`,
+   `.example`, `.invalid`, `.localhost`): a 400 in the §12 shape, "This is a test address, and BenchQ invites only real
+   ones. Use the person's own email address."; and an account with such an address can't sign in, with the same 401
+   as a wrong password, so it confirms nothing (`backend/auth/invites.py`, `routes_auth.py`). The demo seed
+   (`seed_demo`) runs only when `BENCHQ_ENV` is exactly `development`. Development is unchanged.
+4. **`AI_SETTINGS_ENCRYPTION_KEY` required always in production,** API and worker; development unchanged.
+5. **No CSP report endpoint:** the frontend switches its CSP between report-only and enforcing with an environment
+   variable instead.
+6. **Staging runs as `BENCHQ_ENV=production`,** with its own accounts on real (non-test) addresses; there is no third
+   mode. Everything above applies to it.
+7. **Merge order: the backend PR first;** the frontend PR cites this section.
+8. **HSTS is the HTTPS proxy's** (Abdul, 2026-11-23): his Caddy sets it for `app.benchq.io` (`max-age=300`, raised to a
+   year after a week; no `preload`), in the Caddyfile on his branch `deploy/aws-ec2`. The backend never sends it, so it
+   can't contradict the proxy's. Never `includeSubDomains` on `benchq.io`: it would force HTTPS on every subdomain.
+   The marketing site (`benchq.io`, `www`) is on Vercel and sends its own.
+9. **The database password:** production uses password authentication only (EC2 now, RDS planned), so no password,
+   an empty one or `password` is refused. No test or CI run uses SQLite (conftest forces the Postgres test database;
+   CI runs Postgres), so nothing is exempt.
+
+**The backend PR** (`feat/production-hardening-backend`):
+- **The IP-count fix:** `throttle.clear()` clears only `email:{email}`. The trade-off (an office behind one NAT shares
+  the IP's count and a colleague's success no longer clears it) is written in the test.
+- **The production config check** (`backend/startup_checks.py`): `check_production_config(env, role)` is pure (the
+  mapping it is given; no database, no module reload) and returns one line per problem naming the variable, never its
+  value; `require_config(role)` raises them as one error. Production (`BENCHQ_ENV` unset or `production`) refuses:
+  `DATABASE_URL` with the default password `password`; `AI_SETTINGS_ENCRYPTION_KEY` missing or not Fernet; Gmail on
+  without a client id, a secret, an https redirect or a Fernet key; and, for the API, `ALLOWED_ORIGINS` unset or any
+  entry not exactly `https://host[:port]` (not `:443`, which a browser never sends) or `chrome-extension://<32
+  letters a-p>`, `SESSION_COOKIE_SECURE` false, `TRUSTED_PROXY_HOPS` 0, `PASSWORD_RESET_BASE_URL` not https or its
+  origin not listed, the Gmail redirect's origin not listed. Every environment refuses what nothing can run with:
+  `DATABASE_URL` unset, `TRUSTED_PROXY_HOPS` not a number, an unknown `BENCHQ_ENV`, a bad Gmail key with Gmail on.
+  It runs first everywhere: `python -m backend.scripts.check_config --role api|worker` in the start scripts before the
+  migration (never opens the database), `db_upgrade` (a direct run), the lifespan (API), `worker.start`, and every
+  script that writes to the database (`seed_demo`, `create_platform_admin`, `reset_password`, the backfills,
+  `move_local_jobs_to_postings`). The stored AI key's decrypt stays in the lifespan (it needs the database).
+  `config.py` reads leniently: no fallback `DATABASE_URL` and no crash on import; the engine builds on a `.invalid`
+  host until the check speaks.
+- **Testing domains** (decision 3): `invites.normal_email` and `resend_invite` refuse them, sign-in refuses their
+  accounts, production only.
+- **Secrets lint** (`backend/tests/test_secret_lint.py`, over backend/ with the tests): no `os.getenv` /
+  `os.environ.get` / `.setdefault` / `os.environ[…] =` / `os.getenv(…) or "…"` of a secret-ish name with a literal
+  default, no literal in a secret-named constant; `NOT_SECRET` by name with the reason, a stale check and a planted self-test.
+- **The API's headers** (`backend/security_headers.py`, the outermost middleware, set only when absent):
+  `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, `Content-Security-Policy: default-src 'none';
+  frame-ancestors 'none'` (not on the API docs in development), `X-Frame-Options: DENY` unless the route set its own
+  CSP (the posting reader is framed by the app), `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy:
+  same-origin`. No `Strict-Transport-Security` (decision 8; a test checks it is never sent).
+  `problem_response` adds the same set, because the crash 500 is sent outside every user middleware. uvicorn runs
+  with `--no-server-header`. The route sweep checks the headers on every route: the API's CSP on each, unless the
+  route is named with its own (the posting reader) or is the API docs in development.
+- Docs: `backend/.env.example` "Production: required"; the root `.env.example` loses the backend-only
+  `CANDIDATE_EMAIL_*` lines.
+
+**The frontend PR** (`feat/production-hardening-frontend`), the pages' headers:
+- **CSP** per request from `src/proxy.ts` (`src/lib/security/csp.ts`, a pure builder): `default-src 'self'`;
+  `script-src 'self' 'nonce-…' 'strict-dynamic'` (plus `'unsafe-eval'` in development only); `style-src 'self'
+  'unsafe-inline'` (computed `style` attributes and next-themes' guard); `img-src 'self' https://www.google.com
+  https://*.gstatic.com` (company favicons, the Google mark); `font-src 'self' data:`; `connect-src 'self'` (plus `ws:`
+  in development for HMR); `frame-src https://linkedin.com https://*.linkedin.com` (the source preview's LinkedIn
+  posting, nothing else); `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `object-src 'none'`;
+  `manifest-src 'self'`. No `upgrade-insecure-requests` (the app is also opened over plain http on a local network) and
+  no report endpoint.
+- **A fresh nonce per request,** read by Next for its own scripts and passed to next-themes' inline script by the root
+  layout. Reading the request headers makes **every page dynamic** (a static page would carry one build-time nonce).
+- **`CSP_REPORT_ONLY=true`** in the server's environment sends the policy as `Content-Security-Policy-Report-Only`,
+  without a rebuild: the switch if a page breaks during a shift.
+- **The other page headers** (`next.config.ts`, every path but `/api` and `/health`, which are the backend's):
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`,
+  `Cross-Origin-Opener-Policy: same-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(),
+  usb=(), browsing-topics=()`; no `X-Powered-By`. As built it also sends `Strict-Transport-Security: max-age=86400`
+  in production builds; with decision 8 that header is the proxy's, so the frontend PR drops it too (open below).
+- **The CI check** (`scripts/check-csp.mjs`, after `pnpm build`): no page prerendered; on `next start`, enforced and
+  report-only, the policy under the right header, a fresh nonce per request on every `<script>`, the page headers
+  there, and none of them on `/api` and `/health`.
+
+**What needs Abdul, answered 2026-11-23:**
+- The empty database password and HSTS: decisions 9 and 8.
+- **Production facts:** `BENCHQ_ENV` is unset in production (AWS EC2 behind Caddy), so it runs as production.
+  `ALLOWED_ORIGINS=https://app.benchq.io` today, exactly: `benchq.io` and `www` are other origins, added only if a
+  marketing page ever calls the API; never `*`. The session cookie has no `Domain` attribute (`app.benchq.io` only);
+  don't widen it. No real users yet, so a redeploy is cheap, but run `python -m backend.scripts.check_config --role
+  api` (and `--role worker`) against the production environment first. A secret scanner (gitleaks) is approved; it
+  is built separately.
+- Still for his review: the changes in his areas (`access.py`'s Origin compare, `config.py`, the start scripts and
+  database scripts, the invites' and sign-in's testing-domain refusal; rows in `cross-area-changes.md`).
+
+**Open:**
+- **The extension's origin in production (Abdul).** His reply says both that the Web Store id is stored in
+  `ALLOWED_ORIGINS` and that `ALLOWED_ORIGINS=https://app.benchq.io` today. If `chrome-extension://<the store id>` is
+  not in the production list, the Origin check refuses every save the extension makes (403 "Cross-origin request
+  refused"; docs/extension-store.md step 5). Confirm the list is `https://app.benchq.io,chrome-extension://<id>`.
+- **The frontend's HSTS:** `next.config.ts` on `feat/production-hardening-frontend` still sends
+  `Strict-Transport-Security: max-age=86400` in production builds, and `scripts/check-csp.mjs` expects it; with
+  decision 8 it should go there too (that PR's owner).
+
+**Left out, JobNavigator leftovers (for Abdul's clean-up):** the old single-account Gmail monitor's `GMAIL_CLIENT_ID`
+/ `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` and `TELEGRAM_BOT_TOKEN` are read but not checked.
 
 ## 2. Production testing (second)
 

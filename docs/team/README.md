@@ -48,7 +48,7 @@ it. Everyone else reads it.
 | `base_resumes` (new, 0008) | Zuhair | A candidate's bases, one active ([resume-versioning.md](./resume-versioning.md)) |
 | `applications`, `interviews` | Samad | |
 | `candidate_mailboxes`, `inbox_messages`, `candidate_google_oauth_attempts` (0010) | Samad | Candidate connection, imported mail and one-use OAuth handoff state |
-| `ledger_entries` | Abdul | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table |
+| `activity_logs` | Umamah | Everyone *writes* through `backend/auth/ledger.py`; nobody changes the table. It replaced `ledger_entries` and `activity_log_v2` (migration 0018) |
 | billing tables (new) | Abdul | |
 | `users`, `firms`, `plans`, `invites`, `sessions`, `support_views` | Abdul | Tenancy |
 | `notifications`, `password_reset_requests` | Mohammed Abdul Ahad Umamah | Extensible inbox; password recovery approvals |
@@ -124,4 +124,7 @@ it. Everyone else reads it.
 | 0029 | Zuhair | LinkedIn's pace for the whole backend: `linkedin_slots` (4 rows, filled here) and `linkedin_waiting` (who waits: opens before searches, firms in turn). Additive. Follows 0028 | `feat/job-search-indeed-and-candidate-details` |
 | 0030 | Zuhair | `resumes.search_titles` (JSONB, null): the job search's extra titles on the active base's v1. Additive. Follows 0029 | `feat/job-search-indeed-and-candidate-details` |
 | 0031 | Zuhair (firms and candidates columns: Abdul approves) | `firms.work_start`, `work_end` (required; existing firms 18:30–04:00), `candidates.bde_assigned_at`, `bde_day_one`, `scrape_jobs.work_date` (filled from the rows). Follows 0030 | `feat/job-search-indeed-and-candidate-details` |
-| 0032+ | — | Claim the next number here in your PR | — |
+| 0033 | Mohammed Abdul Ahad Umamah | Activity log: `activity_logs`, filled from `ledger_entries`. Follows main's 0032 (#150) | `activity-log/pr3-new-table-and-endpoints` |
+| 0034 | Mohammed Abdul Ahad Umamah | Activity log: sign-out, failed sign-ins, lockouts. Follows 0033 | `activity-logs/pr6-signin-events-and-super-admin` |
+| 0035 | Mohammed Abdul Ahad Umamah | Remove `activity_log_v2` and `ledger_entries` after copying their rows into `activity_logs`. Follows 0034 | `activity-logs/pr7-remove-old-log-tables` |
+| 0036+ | — | Claim the next number here in your PR | — |

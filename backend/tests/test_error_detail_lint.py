@@ -24,8 +24,8 @@ TRACEBACK_CALLS = {"format_exc", "format_exception", "format_exception_only", "f
 BANNED_WORDS = re.compile(r"please|oops|!", re.IGNORECASE)
 
 KNOWN = {
-    "api/routes_applications.py:1013": "POST /api/applications/check-url, 'Unsafe URL' (JobNavigator leftover)",
-    "api/routes_companies.py:670": "the companies test-scrape 500 (JobNavigator leftover)",
+    "api/routes_applications.py:1037": "POST /api/applications/check-url, 'Unsafe URL' (JobNavigator leftover)",
+    "api/routes_companies.py:671": "the companies test-scrape 500 (JobNavigator leftover)",
     "api/routes_cover_letters.py:317": "cover letters' PDF 500 (JobNavigator leftover)",
     "api/routes_jobs.py:82": "POST /api/jobs/linkedin-import, already running; the route answers 410 first",
     "api/routes_jobs.py:1199": "the posting fetch 502 (JobNavigator leftover)",

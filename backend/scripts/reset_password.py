@@ -14,12 +14,13 @@ import sys
 
 from fastapi import HTTPException
 
+from backend import startup_checks
 from backend.auth.invites import normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.auth.sessions import end_all_sessions
 from backend.models.db import SessionLocal, utcnow
 from backend.models.notifications import Notification, PasswordResetRequest
-from backend.models.tenancy import LedgerEntry, PlatformUser, User
+from backend.models.tenancy import ActivityEntry, PlatformUser, User
 
 
 class Refused(Exception):
@@ -29,8 +30,8 @@ class Refused(Exception):
 def reset_password(db, *, email: str, password: str) -> User | PlatformUser:
     try:
         address = normal_email(email)
-    except HTTPException:
-        raise Refused("Enter a valid email address.")
+    except HTTPException as refused:               # not an email, or (production) a testing domain's
+        raise Refused(refused.detail)
     if len(password) < MIN_PASSWORD_LENGTH:
         raise Refused(f"Use at least {MIN_PASSWORD_LENGTH} characters for the password.")
     account = (db.query(User).filter(User.email == address).first()
@@ -52,7 +53,7 @@ def reset_password(db, *, email: str, password: str) -> User | PlatformUser:
                 Notification.entity_id == str(row.id), Notification.resolved_at.is_(None)).all():
                 notice.resolved_at = now
     # In the firm's own ledger for a firm user, so the OWNER sees it; a platform event for a Super Admin (A13).
-    db.add(LedgerEntry(firm_id=account.firm_id if is_firm_user else None, actor_type="SYSTEM", actor_user_id=None,
+    db.add(ActivityEntry(firm_id=account.firm_id if is_firm_user else None, actor_type="SYSTEM", actor_user_id=None,
                        actor_name="reset_password", entity_type="user" if is_firm_user else "platform_user",
                        entity_id=str(account.id), entity_label=account.name, action="UPDATE",
                        summary=f"Reset the password of {account.name} ({address}) from the command line"))
@@ -74,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--email", required=True)
     parser.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
     db = SessionLocal()
     try:
         account = reset_password(db, email=args.email, password=_read_password(args.password_stdin))

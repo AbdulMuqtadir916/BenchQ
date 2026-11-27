@@ -5,7 +5,7 @@ A grep-like check over the backend, as `test_firm_scoping_lint.py` does for firm
 1. Every route that changes data writes a ledger entry, directly or through a helper it calls. A route that doesn't
    is listed in `NOT_LOGGED` with the reason. A listed route that starts logging must leave the list, so it shrinks.
 2. Every ledger write states `candidate_id`, even as None, and goes through `backend/auth/ledger.py`.
-3. Only the listed routes read `LedgerEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
+3. Only the listed routes read `ActivityEntry`, so no new endpoint skips the role limit in `routes_ledger.py`.
 """
 import ast
 from functools import lru_cache
@@ -17,37 +17,36 @@ SOURCE_FILES = [path for path in sorted(BACKEND.rglob("*.py"))
                 if not {"tests", "migrations", "__pycache__"} & set(path.relative_to(BACKEND).parts)]
 TEST_FILES = sorted((BACKEND / "tests").glob("*.py"))
 WRITE_METHODS = {"post", "put", "patch", "delete"}
-WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated")}
+WRITERS = {("auth/ledger.py", "record"), ("auth/ledger.py", "record_automated"), ("auth/ledger.py", "_sign_in_entry")}
+# Background work's own rows, for the Super Admin. They say a run or an AI call happened, not that a person's change was
+# logged, so reaching one doesn't count as a route writing its entry.
+BACKGROUND_LOGGING = {("activity.py", "log_activity"), ("analyzer/llm_logger.py", "_log_work"), ("job_monitor.py", "_log_run")}
 
-# Why a route that changes something writes no entry. Firm work marked TO_LOG leaves this list as its Activity logs PR
-# lands; every other reason is a decision. A new route doesn't belong here unless a reason below is true of it.
-TO_LOG = "firm work with no entry yet: the Activity logs PR that logs this area removes it from this list"
-NOT_FIRM_ACTIVITY = "a Super Admin operation, not a firm's activity"
+# Why a route that changes something writes no entry. Each reason is a decision. A new route doesn't belong here unless
+# a reason below is true of it.
+RETIRED = "the old job pool's write route: it answers 410 (job search PR 2) and goes with the pool in the clean-up PR"
+COVER_LETTERS_REMOVED = "cover letters are being removed from BenchQ (decided 2026-11-12), so nothing logs them"
+NOT_FIRM_ACTIVITY = "Telegram calling in, with its own secret: no signed-in person to credit"
 PERSONA_REMOVED = "the Persona table is being removed; its fields live on the candidate, whose edits routes_candidates logs"
-REFERENCE_DATA = "global reference data, not a firm's record (07 tenancy: Company is global)"
 NO_READ_ENTRIES = "no ledger entry for reads and manual sync (Abdul, 2026-11-03)"
 NOTHING_SAVED = "saves nothing about a firm's records"
+REFUSES_ALL = "refuses every application: each has a candidate (migration 0027) and is removed through Saved/favorite actions, which log"
 
 NOT_LOGGED: dict[tuple[str, str], str] = {
-    ("api/routes_applications.py", "delete_application"): TO_LOG,
-    ("api/routes_applications.py", "bulk_delete_applications"): TO_LOG,
-    ("api/routes_applications.py", "add_interview"): TO_LOG,
-    ("api/routes_applications.py", "update_interview"): TO_LOG,
-    ("api/routes_applications.py", "delete_interview"): TO_LOG,
-    ("api/routes_cover_letters.py", "create_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "update_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "delete_cover_letter"): TO_LOG,
-    ("api/routes_cover_letters.py", "generate_cover_letter"): TO_LOG,
-    ("api/routes_jobs.py", "linkedin_import"): TO_LOG,
-    ("api/routes_jobs.py", "save_from_extension"): TO_LOG,
-    ("api/routes_jobs.py", "create_manual_job"): TO_LOG,
-    ("api/routes_jobs.py", "bulk_update_jobs"): TO_LOG,
-    ("api/routes_jobs.py", "update_job"): TO_LOG,
+    ("api/routes_cover_letters.py", "create_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "update_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "delete_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_cover_letters.py", "generate_cover_letter"): COVER_LETTERS_REMOVED,
+    ("api/routes_jobs.py", "linkedin_import"): RETIRED,
+    ("api/routes_jobs.py", "save_from_extension"): RETIRED,
+    ("api/routes_jobs.py", "create_manual_job"): RETIRED,
+    ("api/routes_jobs.py", "bulk_update_jobs"): RETIRED,
+    ("api/routes_jobs.py", "update_job"): RETIRED,
+    ("main.py", "trigger_analysis"): RETIRED,
+    ("api/routes_applications.py", "delete_application"): REFUSES_ALL,
+    ("api/routes_applications.py", "bulk_delete_applications"): REFUSES_ALL,
     ("api/routes_persona.py", "update_persona"): PERSONA_REMOVED,
     ("api/routes_persona.py", "append_qa_bank"): PERSONA_REMOVED,
-    ("api/routes_autofill.py", "autofill_answer"): TO_LOG,
-    ("api/routes_autofill.py", "autofill_answer_stream"): TO_LOG,
-    ("main.py", "trigger_analysis"): TO_LOG,
 
     ("api/routes_inbox.py", "mark_candidate_message_read"): NO_READ_ENTRIES,
     ("api/routes_notifications.py", "mark_read"): NO_READ_ENTRIES,
@@ -60,53 +59,30 @@ NOT_LOGGED: dict[tuple[str, str], str] = {
     ("api/routes_inbox.py", "cancel_mailbox"): "drops an unconfirmed attempt; nothing was connected",
     ("api/routes_ai_presets.py", "test_preset"): "runs a preset on a pasted sample; nothing is saved",
 
-    ("api/routes_companies.py", "create_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "update_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "acknowledge_company_warning"): REFERENCE_DATA,
-    ("api/routes_companies.py", "delete_company"): REFERENCE_DATA,
-    ("api/routes_companies.py", "auto_create_from_jobs"): REFERENCE_DATA,
-    ("api/routes_companies.py", "bulk_activate"): REFERENCE_DATA,
-    ("api/routes_companies.py", "refresh_h1b_all"): REFERENCE_DATA,
-    ("api/routes_companies.py", "backfill_h1b_jobs"): REFERENCE_DATA,
-    ("api/routes_companies.py", "test_scrape_company"): REFERENCE_DATA,
 
-    ("api/routes_linkedin.py", "session_refresh"): NOT_FIRM_ACTIVITY,
-    ("api/routes_linkedin.py", "session_pin"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "create_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "update_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "acknowledge_search_warning"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "delete_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "trigger_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_searches.py", "test_search"): NOT_FIRM_ACTIVITY,
-    ("api/routes_settings.py", "update_settings"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_all_scrapes"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_email_check"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_h1b_refresh"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_job_cleanup"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_auto_reject"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_backfill_descriptions"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_db_backup"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_digest"): NOT_FIRM_ACTIVITY,
-    ("main.py", "trigger_company_scrape"): NOT_FIRM_ACTIVITY,
     ("main.py", "telegram_webhook"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_register_webhook"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_rotate_webhook_secret"): NOT_FIRM_ACTIVITY,
-    ("main.py", "telegram_test"): NOT_FIRM_ACTIVITY,
 }
 
-# (file, function) -> why it builds a LedgerEntry itself instead of calling backend/auth/ledger.py.
+# (file, function) -> why it builds a ActivityEntry itself instead of calling backend/auth/ledger.py.
 DIRECT_WRITES = {
     ("auth/ledger.py", "record"): "the writer",
     ("auth/ledger.py", "record_automated"): "the writer",
+    ("auth/ledger.py", "_sign_in_entry"): "the writer, for an email with no account to act as",
     ("auth/password_reset.py", "system_entry"): "a SYSTEM entry with no acting user; `record` needs an actor",
     ("scripts/create_platform_admin.py", "create_platform_admin"): "a staff script, no signed-in actor",
     ("scripts/reset_password.py", "reset_password"): "a staff script, no signed-in actor",
 }
 
-# (file, function) that may read LedgerEntry.
+# (file, function) that may read ActivityEntry.
 LEDGER_READERS = {
-    ("api/routes_ledger.py", "list_ledger"): "a firm's ledger, limited by role",
+    ("api/routes_ledger.py", "_visible"): "a firm's log, limited by role",
+    ("api/routes_ledger.py", "list_ledger"): "pages what `_visible` allows",
+    ("api/routes_ledger.py", "_after_cursor"): "pages what `_visible` allows",
+    ("api/routes_ledger.py", "_has_history"): "whether a picked person has rows, inside `_limit_to_reader`",
     ("api/routes_admin.py", "list_audit"): "the Super Admin's audit across the platform",
+    ("api/routes_admin_activity.py", "_rows"): "the Super Admin's log, which has no role limit",
+    ("api/routes_admin_activity.py", "entry_ip"): "one failed sign-in's IP, for the Super Admin",
+    ("auth/ledger.py", "record_sign_in_failure"): "finds the row a repeat try adds to; serves no one",
     ("scripts/seed_demo.py", "reset"): "clears local demo data; serves no one",
 }
 
@@ -224,24 +200,26 @@ def _callee(call: ast.Call, file: str, resolve, functions: dict, modules: dict) 
     return None
 
 
-def _ledger_model_names(tree: ast.Module) -> set[str]:
-    """The names `LedgerEntry` goes by at the top of a file: an `import ... as` alias, and `Entry = LedgerEntry`."""
-    return _assigned_names(tree, _imported_names(tree))
+def _ledger_model_names(tree: ast.Module, model: str = "ActivityEntry") -> set[str]:
+    """The names a model (the log's `ActivityEntry` unless told otherwise) goes by at the top of a file: an
+    `import ... as` alias, and `Entry = ActivityEntry`."""
+    return _assigned_names(tree, _imported_names(tree, model), model)
 
 
-def _imported_names(tree: ast.Module) -> set[str]:
-    names = {"LedgerEntry"}
+def _imported_names(tree: ast.Module, model: str = "ActivityEntry") -> set[str]:
+    names = {model}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
-            names.update(alias.asname or alias.name for alias in node.names if alias.name == "LedgerEntry")
+            names.update(alias.asname or alias.name for alias in node.names if alias.name == model)
     return names
 
 
-def _assigned_names(scope: ast.AST, outer: set[str], before: ast.AST | None = None) -> set[str]:
+def _assigned_names(scope: ast.AST, outer: set[str], model: str = "ActivityEntry",
+                    before: ast.AST | None = None) -> set[str]:
     """The names the model goes by inside `scope` (a file or one function), given those it goes by outside: an assignment
     in this scope binds the name here only, and binding it to anything else replaces an alias, in source order. A
     function's assignments don't reach another function. With `before` (a call in this scope), only the assignments
-    that end before it starts count: `model = LedgerEntry; db.query(model); model = Candidate` reads the log."""
+    that end before it starts count: `model = ActivityEntry; db.query(model); model = Candidate` reads the log."""
     names = set(outer)
     assigns = sorted((node for node in _own_nodes(scope) if isinstance(node, ast.Assign)), key=lambda node: node.lineno)
     if before is not None:
@@ -249,21 +227,21 @@ def _assigned_names(scope: ast.AST, outer: set[str], before: ast.AST | None = No
         assigns = [node for node in assigns if (node.end_lineno, node.end_col_offset) <= start]
     for node in assigns:
         targets = {target.id for target in node.targets if isinstance(target, ast.Name)}
-        names = names | targets if _is_ledger_model(node.value, names) else names - targets
+        names = names | targets if _is_ledger_model(node.value, names, model) else names - targets
     return names
 
 
-def _names_by_scope(tree: ast.Module) -> dict[tuple[str, ...], set[str]]:
+def _names_by_scope(tree: ast.Module, model: str = "ActivityEntry") -> dict[tuple[str, ...], set[str]]:
     """The model's names in each function (by its path, as `_scoped_functions` names it), and `()` for the file."""
-    found = {(): _ledger_model_names(tree)}
+    found = {(): _ledger_model_names(tree, model)}
     for path, function in _scoped_functions(tree):       # a function comes after the one it sits in
-        found[path] = _assigned_names(function, found[path[:-1]])
+        found[path] = _assigned_names(function, found[path[:-1]], model)
     return found
 
 
-def _is_ledger_model(node: ast.AST, names: set[str]) -> bool:
-    """`LedgerEntry`, an alias of it, or `module.LedgerEntry`."""
-    return (isinstance(node, ast.Name) and node.id in names) or (isinstance(node, ast.Attribute) and node.attr == "LedgerEntry")
+def _is_ledger_model(node: ast.AST, names: set[str], model: str = "ActivityEntry") -> bool:
+    """The model, an alias of it, or `module.<model>`."""
+    return (isinstance(node, ast.Name) and node.id in names) or (isinstance(node, ast.Attribute) and node.attr == model)
 
 
 def _own_nodes(function):
@@ -432,7 +410,7 @@ def _logging_functions(trees=None) -> set[tuple[str, str]]:
             calls.setdefault(key, set()).update(returns.get(factory, set()))
     grew = True
     while grew:
-        found = {key for key, called in calls.items() if called & logging} - logging
+        found = {key for key, called in calls.items() if (called - BACKGROUND_LOGGING) & logging} - logging
         logging |= found
         grew = bool(found)
     return logging
@@ -494,20 +472,21 @@ def test_every_ledger_write_states_its_candidate():
     assert not missing, "State candidate_id, or candidate_id=None for an entry about no candidate:\n" + "\n".join(missing)
 
 
-def _enclosing_calls(accept, trees=None) -> set[tuple[str, str]]:
-    """(file, outermost function) of every call `accept(call, ledger_model_names)` takes, across the backend."""
+def _enclosing_calls(accept, trees=None, model: str = "ActivityEntry") -> set[tuple[str, str]]:
+    """(file, outermost function) of every call `accept(call, names)` takes, across the backend, where `names` are what
+    `model` is called in that file."""
     found = set()
     for file, tree in _source_trees(SOURCE_FILES) if trees is None else trees:
 
         def visit(node, function, scope, outer):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Inside a function, the names around it are what they end up as: it runs after they are all bound.
-                function, scope, outer = function or node.name, node, _assigned_names(scope, outer)
-            if isinstance(node, ast.Call) and accept(node, _assigned_names(scope, outer, before=node)):
+                function, scope, outer = function or node.name, node, _assigned_names(scope, outer, model)
+            if isinstance(node, ast.Call) and accept(node, _assigned_names(scope, outer, model, before=node)):
                 found.add((file, function or "<module>"))        # the model's names at this call, not at the end
             for child in ast.iter_child_nodes(node):
                 visit(child, function, scope, outer)
-        visit(tree, None, tree, _imported_names(tree))
+        visit(tree, None, tree, _imported_names(tree, model))
     return found
 
 
@@ -530,7 +509,7 @@ def _reads_the_ledger(call: ast.Call, names: set[str]) -> bool:
 def test_only_the_listed_routes_read_the_ledger():
     """A new read would skip the role limit in `routes_ledger.py`: add to that route instead."""
     reads = _enclosing_calls(_reads_the_ledger)
-    assert reads <= set(LEDGER_READERS), f"These read LedgerEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
+    assert reads <= set(LEDGER_READERS), f"These read ActivityEntry outside the role limit: {sorted(reads - set(LEDGER_READERS))}"
 
 
 # The checks above are only as good as what they can see. These feed each one a small file that does the thing a
@@ -565,12 +544,23 @@ def test_a_route_added_with_api_route_or_add_api_route_is_a_write_route():
     assert sorted(name for _, name in _write_routes(_snippet(source))) == ["a", "c", "d"]
 
 
+def test_a_route_with_the_platform_action_dependency_counts_as_logging():
+    """A Super Admin's operation logs through `dependencies=[Depends(logs_platform_action(...))]` on the route."""
+    logged = _snippet("from fastapi import Depends\nfrom backend.auth.platform_actions import logs_platform_action\n"
+                      "@router.post('/x', dependencies=[Depends(logs_platform_action('Did x', entity_type='x'))])\ndef x(): pass\n"
+                      "@router.post('/y')\ndef y(): pass\n")
+    real = _logging_functions(_source_trees(SOURCE_FILES) + logged)
+    assert ("api/routes_example.py", "x") in real and ("api/routes_example.py", "y") not in real
+    assert ("auth/platform_actions.py", "logs_platform_action.dependency") in real   # what FastAPI runs
+    assert ("auth/platform_actions.py", "logs_platform_action") not in real            # the factory alone doesn't log
+
+
 def test_a_renamed_ledger_model_is_still_seen_when_built_or_read():
-    source = ("from backend.models.tenancy import LedgerEntry as Entry\nfrom backend.models import tenancy\n"
+    source = ("from backend.models.tenancy import ActivityEntry as Entry\nfrom backend.models import tenancy\n"
               "def build(db):\n    return Entry(firm_id=1)\n"
-              "def build_by_module(db):\n    return tenancy.LedgerEntry(firm_id=1)\n"
+              "def build_by_module(db):\n    return tenancy.ActivityEntry(firm_id=1)\n"
               "def read(db):\n    return db.query(Entry).all()\n"
-              "def read_by_module(db):\n    return db.query(tenancy.LedgerEntry).all()\n")
+              "def read_by_module(db):\n    return db.query(tenancy.ActivityEntry).all()\n")
     trees = _snippet(source)
     assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"build", "build_by_module"}
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"read", "read_by_module"}
@@ -621,7 +611,7 @@ def test_a_writer_call_is_found_even_beside_a_nested_function_of_the_same_name()
 
 
 def test_a_model_renamed_by_assignment_is_still_seen():
-    source = ("from backend.models.tenancy import LedgerEntry\nEntry = LedgerEntry\nAgain = Entry\n"
+    source = ("from backend.models.tenancy import ActivityEntry\nEntry = ActivityEntry\nAgain = Entry\n"
               "def read(db):\n    return db.query(Again).all()\n"
               "def build(db):\n    return Entry(firm_id=1)\n")
     trees = _snippet(source)
@@ -630,20 +620,20 @@ def test_a_model_renamed_by_assignment_is_still_seen():
 
 
 def test_a_name_bound_to_the_model_in_one_function_is_not_the_model_in_another():
-    source = ("from backend.models.tenancy import LedgerEntry, Candidate\n"
-              "def reads_the_log(db):\n    model = LedgerEntry\n    return db.query(model).all()\n"
+    source = ("from backend.models.tenancy import ActivityEntry, Candidate\n"
+              "def reads_the_log(db):\n    model = ActivityEntry\n    return db.query(model).all()\n"
               "def reads_candidates(db):\n    model = Candidate\n    return db.query(model).all()\n"
-              "def rebinds(db):\n    model = LedgerEntry\n    model = Candidate\n    return db.query(model).all()\n"
-              "def reads_then_rebinds(db):\n    model = LedgerEntry\n    rows = db.query(model).all()\n    model = Candidate\n    return rows\n"
-              "def binds_after_reading(db):\n    model = Candidate\n    rows = db.query(model).all()\n    model = LedgerEntry\n    return rows\n")
+              "def rebinds(db):\n    model = ActivityEntry\n    model = Candidate\n    return db.query(model).all()\n"
+              "def reads_then_rebinds(db):\n    model = ActivityEntry\n    rows = db.query(model).all()\n    model = Candidate\n    return rows\n"
+              "def binds_after_reading(db):\n    model = Candidate\n    rows = db.query(model).all()\n    model = ActivityEntry\n    return rows\n")
     trees = _snippet(source)
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, trees)} == {"reads_the_log", "reads_then_rebinds"}
 
 
 def test_an_entry_built_under_a_name_that_is_rebound_later_is_still_a_write():
-    source = ("from backend.models.tenancy import LedgerEntry\n"
-              "def builds_then_rebinds(db):\n    Row = LedgerEntry\n    db.add(Row(firm_id=1))\n    Row = dict\n"
-              "def binds_after_building(db):\n    Row = dict\n    db.add(Row(firm_id=1))\n    Row = LedgerEntry\n")
+    source = ("from backend.models.tenancy import ActivityEntry\n"
+              "def builds_then_rebinds(db):\n    Row = ActivityEntry\n    db.add(Row(firm_id=1))\n    Row = dict\n"
+              "def binds_after_building(db):\n    Row = dict\n    db.add(Row(firm_id=1))\n    Row = ActivityEntry\n")
     trees = _snippet(source)
     assert {name for _, name in _enclosing_calls(_builds_a_ledger_entry, trees)} == {"builds_then_rebinds"}
     logging = {name for _, name in _logging_functions(trees)}
@@ -701,8 +691,8 @@ def test_a_writer_handed_to_a_task_must_state_its_candidate():
 
 
 def test_a_ledger_read_passed_by_keyword_is_seen():
-    source = ("from backend.models.tenancy import LedgerEntry\n"
-              "def by_keyword(db, row_id):\n    return db.get(entity=LedgerEntry, ident=row_id)\n"
-              "def by_position(db, row_id):\n    return db.get(LedgerEntry, row_id)\n"
+    source = ("from backend.models.tenancy import ActivityEntry\n"
+              "def by_keyword(db, row_id):\n    return db.get(entity=ActivityEntry, ident=row_id)\n"
+              "def by_position(db, row_id):\n    return db.get(ActivityEntry, row_id)\n"
               "def elsewhere(db, row_id):\n    return db.get(Other, row_id)\n")
     assert {name for _, name in _enclosing_calls(_reads_the_ledger, _snippet(source))} == {"by_keyword", "by_position"}

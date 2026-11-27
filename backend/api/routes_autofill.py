@@ -3,9 +3,14 @@ from backend.analyzer.prompt_fence import fence, fence_notice
 import json as _json
 import logging
 import re as _re
-from fastapi import APIRouter, HTTPException
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from backend.api.routes_auth import current_principal
+from backend.auth import ledger
+from backend.auth.sessions import Principal
 from backend.models.db import SessionLocal, Setting, Persona
+from backend.models.tenancy import User
 from backend.analyzer.llm_client import call_autofill_llm, call_autofill_llm_stream
 from backend.analyzer.model_json import first_json_object
 from backend.analyzer.llm_logger import track_llm_call
@@ -364,8 +369,23 @@ def _build_autofill_prompt(body: dict, *, want_provider: bool = False) -> dict:
             "max_chars": max_chars, "provider": provider, "model": model}
 
 
+def _log_answer(principal: Principal, body: dict, model: str | None = None) -> None:
+    """An AI draft saves no record, so its entry has its own id. The question itself stays out of the log."""
+    company = (body.get("company") or "").strip() or "an unknown company"
+    position = (body.get("position") or "").strip() or "an application"
+    db = SessionLocal()
+    try:
+        ledger.record_agent(db, person=db.get(User, principal.user_id), action="AI_GENERATE",
+                            entity_type="autofill_answer", entity_id=uuid.uuid4(), entity_label=f"{position} · {company}",
+                            summary=f"AI agent drafted an answer for {position} at {company}", candidate_id=None,
+                            model_id=model)
+        db.commit()
+    finally:
+        db.close()
+
+
 @router.post("/answer")
-async def autofill_answer(body: dict):
+async def autofill_answer(body: dict, principal: Principal = Depends(current_principal)):
     built = _build_autofill_prompt(body, want_provider=True)
     cached_prefix, suffix = built["cached_prefix"], built["suffix"]
     max_chars = built["max_chars"]
@@ -392,11 +412,12 @@ async def autofill_answer(body: dict):
         raise HTTPException(502, "autofill generation failed") from e
     # The length the user picked is a contract, not a hint.
     answer, trimmed = _trim_to_chars(answer, max_chars)
+    _log_answer(principal, body, model)
     return {"answer": answer, "trimmed": trimmed, "max_chars": max_chars}
 
 
 @router.post("/answer/stream")
-async def autofill_answer_stream(body: dict):
+async def autofill_answer_stream(body: dict, principal: Principal = Depends(current_principal)):
     """SSE variant of /answer that streams the drafted answer as plain-text chunks (no JSON wrapper) so the extension can render it into the field live, sharing the persona/qa_bank cache prefix with /answer."""
     # Same editable `autofill_prompt` template as /answer, so what the user edits
     # in Settings governs the variant the extension actually streams (R4-T1-22).
@@ -432,13 +453,21 @@ async def autofill_answer_stream(body: dict):
         try:
             raw_chunks = call_autofill_llm_stream(suffix, system, max_tokens=max_tokens,
                                                   cached_prefix=cached_prefix)
+            wrote = False
             async for chunk in _clean_stream(raw_chunks):
                 if chunk:
+                    wrote = wrote or bool(chunk.strip())
                     yield f"data: {_json.dumps({'delta': chunk})}\n\n"
+            if not wrote:               # nothing usable came back: an error, not a drafted answer, and no entry
+                yield f"data: {_json.dumps({'error': 'autofill generation failed'})}\n\n"
+                return
+            _log_answer(principal, body)
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"autofill stream failed: {e}")
             yield f"data: {_json.dumps({'error': 'autofill generation failed'})}\n\n"
 
+    # no-store, not no-cache: the drafted answer is the candidate's and no cache keeps it (backend/security_headers.py
+    # sets only what a route leaves out). X-Accel-Buffering keeps a proxy from holding the stream back.
     return StreamingResponse(_events(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})

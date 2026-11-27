@@ -24,8 +24,11 @@ _stop_heartbeat = None
 
 def start() -> None:
     """Startup checks, then the scheduler. Mirrors the API's start (main.py `lifespan`) for what the jobs need."""
-    from backend import statement_timeout
-    from backend.config import CANDIDATE_GMAIL_ENABLED
+    from backend import startup_checks, statement_timeout
+
+    # The settings first (backend/startup_checks.py). The inbox jobs decrypt mailbox tokens, so a missing or bad Gmail
+    # key stops this process here, not mid-sync; in production the AI key's secret too.
+    startup_checks.require_config("worker")
     from backend.db_schema import check_schema_at_head
     from backend.job_monitor import start_heartbeat
     from backend.models.db import engine
@@ -33,10 +36,6 @@ def start() -> None:
 
     statement_timeout.install(engine)
     check_schema_at_head()
-    if CANDIDATE_GMAIL_ENABLED:
-        # The inbox jobs decrypt mailbox tokens: a missing or bad key stops this process at start, not mid-sync.
-        from backend.inbox.google_oauth import _fernet
-        _fernet()
     global _stop_heartbeat
     _stop_heartbeat = start_heartbeat()
     configure_scheduler()

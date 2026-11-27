@@ -138,7 +138,7 @@ def test_the_bde_pastes_a_linkedin_posting_for_every_copy_and_it_stays_unscored(
     """Q107, Q114: BenchQ never fetches a LinkedIn posting; the BDE pastes it to tailor. Every copy in the firm gets it;
     LinkedIn jobs are never scored."""
     from backend.models.job_search import JobPosting
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     assert not hasattr(li.LinkedIn(), "full_description")
     other = _create(anonymous_client, world, bde="adnan").json()
     first, second = _saved(test_db, world, adnans), _saved(test_db, world, other)
@@ -148,7 +148,7 @@ def test_the_bde_pastes_a_linkedin_posting_for_every_copy_and_it_stays_unscored(
     for posting_id in (first, second):
         row = test_db.get(JobPosting, posting_id)
         assert row.content["_pasted"] is True and "Kafka" in row.content["description"] and row.match_score is None
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.summary == "Added the job's posting by hand").count() == 1
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.summary == "Added the job's posting by hand").count() == 1
     assert _paste(anonymous_client, world, adnans, first, POSTING).status_code == 409          # it has its text now
 
 

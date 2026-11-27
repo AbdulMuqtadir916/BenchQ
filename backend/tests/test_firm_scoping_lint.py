@@ -39,6 +39,8 @@ ALLOWED = {
     # Background workers: the route that launched them already checked the ids against the user's firm.
     ("routes_cover_letters.py", "_generate_inner"): "worker; ids checked by generate_cover_letter",
     ("routes_admin.py", "list_audit"): "platform route: the ledger across the platform and every firm",
+    ("routes_admin_activity.py", "_rows"): "platform route: the activity log across every firm",
+    ("routes_admin_activity.py", "_named"): "platform route: names the candidates on a page of that log, and lists the ones on it, one firm at a time",
 }
 
 
@@ -68,7 +70,7 @@ _F2B_TABLES = {"searches", "applications", "interviews", "resumes", "cover_lette
                "job_postings", "scrape_jobs"}
 # Firm-owned although `firm_id` may be null: a ledger entry with no firm is a platform-only event (A13), and a
 # firm route must still read only its own firm's entries.
-_NULLABLE_FIRM_OWNED = {"LedgerEntry"}
+_NULLABLE_FIRM_OWNED = {"ActivityEntry"}
 
 
 def _root_name(node):
@@ -104,7 +106,7 @@ def _violations(path: Path, models: set[str], allowed: dict = ALLOWED) -> list[s
 
 def test_the_firm_owned_models_are_known():
     assert _firm_owned_models() == {"Search", "Application", "Interview", "Resume", "CoverLetter", "TracerLink",
-                                    "TracerClickEvent", "FirmJob", "LedgerEntry", "Candidate", "ResumeParse",
+                                    "TracerClickEvent", "FirmJob", "ActivityEntry", "Candidate", "ResumeParse",
                                     # The candidate core (migration 0007).
                                     "CandidateJob", "FavoriteJob", "CandidateMailbox", "InboxMessage",
                                     # Résumé versioning (migration 0008).

@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from backend.auth import ledger, throttle
-from backend.auth.invites import account_exists, effective_status, lock_firm
+from backend.auth.invites import account_exists, effective_status, is_test_account, lock_firm
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.auth.serialize import session_json
 from backend.auth.sessions import COOKIE_NAME, cookie_kwargs, end_session, principal_for, start_session
@@ -32,8 +32,14 @@ class AcceptBody(BaseModel):
 
 
 def _invite_for(db: DbSession, token: str, *, lock: bool = False) -> Invite | None:
+    """The invite the token opens, or None. In production an invite to a testing domain (made before that rule, or
+    in development before the database moved) opens nothing: it answers like an unknown link, so it shows nothing,
+    makes no account and starts no session (docs/team/uzair.md, step 6; backend/auth/invites.py)."""
     query = db.query(Invite).filter(Invite.token_hash == hash_token(token))
-    return (query.with_for_update() if lock else query).first()
+    invite = (query.with_for_update() if lock else query).first()
+    if invite is not None and is_test_account(invite.email):
+        return None
+    return invite
 
 
 def _block(db: DbSession, invite: Invite, now) -> str | None:
