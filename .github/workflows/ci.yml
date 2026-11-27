@@ -52,7 +52,7 @@ jobs:
                 frontend=true
                 extension=true
                 ;;
-              src/*|public/*|scripts/qa/candidate-gmail/*|.env.example|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|next.config.ts|tsconfig.json|vitest.config.ts|eslint.config.mjs|postcss.config.mjs|components.json)
+              src/*|public/*|scripts/qa/candidate-gmail/*|scripts/check-csp.mjs|.env.example|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|next.config.ts|tsconfig.json|vitest.config.ts|eslint.config.mjs|postcss.config.mjs|components.json)
                 frontend=true
                 ;;
               docs/*|README.md|CONTRIBUTING.md|AGENTS.md|CLAUDE.md|product.md|design.md|design-qa.md|.github/pull_request_template.md)
@@ -87,6 +87,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      # The built app's page headers: every page renders per request, and every <script> carries the CSP nonce
+      # (production layer step 6). Starts `next start` on port 3100 with no backend; only public pages are fetched.
+      - run: node scripts/check-csp.mjs
 
   # The Chrome extension has its own package and tests (vitest, jsdom); its build runs tsc -b first.
   extension:
