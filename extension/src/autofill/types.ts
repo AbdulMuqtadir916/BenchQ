@@ -82,7 +82,8 @@ export type ResumeFile = { name: string; mimeType: string; data: string; source?
  * §8.2), or picked by the BDE from their computer in the panel. */
 export type ResumeFileSource = "uploaded" | "generated" | "picked";
 
-export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string };
+/** `runId`: the Autofill run the fill belongs to, which scopes a wait for ADP's form that ran out. */
+export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string; runId?: string };
 export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "no-match"; current: string; reason?: string };
 export type UndoResult = { restored: number; kept: number; skipped: number };
 

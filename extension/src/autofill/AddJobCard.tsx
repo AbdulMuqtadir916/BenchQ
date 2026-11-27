@@ -182,15 +182,18 @@ export default function AddJobCard({ tab, firmId, candidateId, candidateName, kn
   const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
   // The BenchQ job this tab was opened for from the website, when this candidate has it: Save saves that job itself.
-  const [known, setKnown] = useState<BenchqJob | null>(null);
+  // Kept with the candidate it was looked up for: another candidate's posting is never saved by its id for this one.
+  const [lookup, setLookup] = useState<{ candidateId: string; job: BenchqJob | null } | null>(null);
+  const known = lookup?.candidateId === candidateId ? lookup.job : null;
   const [state, setState] = useState<{ status: "idle" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
   useEffect(() => {
     if (tabId === null || !firmId) return;
     let isLive = true;
     void readSourceJob(tabId).catch(() => null).then((jobId) => (jobId ? getCandidateJob(firmId, candidateId, jobId) : null)).then(
-      (found) => { if (isLive) setKnown(found); },
+      (found) => { if (isLive) setLookup({ candidateId, job: found }); },
       (error: unknown) => {
         // A 404 is a job this candidate doesn't have, so the page's reading is what gets saved. Anything else is said.
+        if (isLive) setLookup({ candidateId, job: null });
         if (isLive && (error as { status?: number }).status !== 404) {
           setState({ status: "error", text: "Couldn't check whether BenchQ already has this job. Saving uses what the page shows." });
         }

@@ -55,6 +55,15 @@ it("reads the listing behind an application page that shows only the role's head
   expect(fetched).toHaveBeenCalled();
 });
 
+it("keeps the application page's description when the listing behind it has none", async () => {
+  const url = "https://jobs.lever.co/tenant/12345678-1234-1234-1234-123456789012/apply";
+  const form = new DOMParser().parseFromString('<script type="application/ld+json">{"@type":"JobPosting","title":"Programmer","description":"Write code for the payments team.","hiringOrganization":"Example"}</script>', "text/html");
+  Object.defineProperty(form, "URL", { value: url });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, url: url.replace(/apply\/?$/, ""), text: async () =>
+    '<script type="application/ld+json">{"@type":"JobPosting","title":"Programmer"}</script>' }));
+  expect(await readJobForSave(form)).toMatchObject({ title: "Programmer", description: expect.stringContaining("payments team"), url });
+});
+
 it("only confirms the publication named by the SmartRecruiters posting", async () => {
   const posting = "https://jobs.smartrecruiters.com/Example/12345-programmer";
   const uuid = "12345678-1234-1234-1234-123456789012";

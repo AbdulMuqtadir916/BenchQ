@@ -253,7 +253,7 @@ describe("a suggestion the BDE picks", () => {
     const row = hook.rows![0]!;
     expect(row.suggestions?.map(({ question }) => question)).toEqual(["Willing to work weekends?"]);
     await run(() => hook.fillWith(row, row.suggestions![0]!));
-    expect(fillField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", write: { type: "text", value: "Yes" } });
+    expect(fillField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", write: { type: "text", value: "Yes" }, runId: expect.any(String) });
   });
 });
 
@@ -410,7 +410,7 @@ describe("autofill", () => {
     await mount();
     await run(() => hook.autofill());
     expect(fillField).toHaveBeenCalledTimes(2);
-    expect(fillField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", write: { type: "text", value: "priya@example.test" } });
+    expect(fillField).toHaveBeenCalledWith(7, 0, { scanId: 1, fieldId: "a", current: "", write: { type: "text", value: "priya@example.test" }, runId: expect.any(String) });
     expect(hook.outcome).toEqual({ filled: 2, handedBack: 0, stopped: false });
     expect(hook.filling).toBe(false);
   });
@@ -1132,7 +1132,8 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     const running = hook.autofill();
     await advance(500 * 24);
     await act(async () => { await running; });
-    const requests = vi.mocked(fillField).mock.calls.map(([, , request]) => request);
+    // Each fill carries its run's id; what matters here is what was written, in order.
+    const requests = vi.mocked(fillField).mock.calls.map(([, , request]) => ({ ...request, runId: undefined }));
     expect(requests).toEqual([
       { scanId: 1, fieldId: "r", current: "", write: { type: "file", name: NAME, ...pdf, id: "benchq:res-1:" } },
       { scanId: 1, fieldId: "a", current: "site@parsed.test", write: { type: "text", value: "priya@example.test" } },

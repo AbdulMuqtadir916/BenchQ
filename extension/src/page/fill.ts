@@ -1,7 +1,7 @@
 import { accepts } from "./accepts";
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
-import { fireEvents, pause, setText, focusArrives, typesOnlyWithFocus } from "./events";
+import { fireEvents, pause, setText, focusArrives, typesOnlyWithFocus, typeOnAdp } from "./events";
 import { ariaChecked, collapse, isAriaChoice, isOn, isVisible, textOf, uploadBoxes } from "./labels";
 import { readCurrent, type Entry, type Registry } from "./scan";
 
@@ -261,10 +261,23 @@ async function restoreChoice(entry: Entry, label: string): Promise<boolean> {
   return sameChoice(readCurrent(entry), label);
 }
 
+/** How long a fill waits for the BDE to click ADP's form. */
+const FOCUS_WAIT_MS = 30_000;
+const CLICK_THE_FORM = "ADP takes typing only on its own page: click the form, then Autofill again.";
+
 /** Takes a field back to what it held, whether for undo or after a fill that didn't take. A styled radio can't be
  * turned off by a click, so whether it went back is checked. */
-async function putBack(entry: Entry, before: Snapshot): Promise<boolean> {
+async function putBack(entry: Entry, before: Snapshot, run?: string): Promise<boolean> {
   if ("choice" in before) return restoreChoice(entry, before.choice);
+  // ADP drops a value set without typing: the old one is typed back once its page has the focus, and only a field that
+  // holds it again counts as put back (CodeRabbit's review of cf130dea).
+  const control = entry.controls[0] as HTMLInputElement;
+  if ("value" in before && typesOnlyWithFocus(control)) {
+    if (!(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS, run))) return false;
+    typeOnAdp(control, before.value);
+    await pause(SETTLE_MS);
+    return control.value === before.value;
+  }
   restore(entry, before);
   if (!isAriaChoice(entry.controls[0]!)) return true;
   await pause(SETTLE_MS);
@@ -284,10 +297,6 @@ function listed(entry: Entry, found: HTMLElement[]): ChoiceList {
 
 /** Writes one field at a time for the panel. Prior values stay here in the page, so undo ends with the page and
  * nothing the BDE typed leaves it. */
-/** How long a fill waits for the BDE to click ADP's form. */
-const FOCUS_WAIT_MS = 30_000;
-const CLICK_THE_FORM = "ADP takes typing only on its own page: click the form, then Autofill again.";
-
 export function createFiller(registry: () => Registry | null) {
   let filled: Filled[] = [];
 
@@ -298,7 +307,7 @@ export function createFiller(registry: () => Registry | null) {
   }
 
   return {
-    async fill({ scanId, fieldId, write, current }: FillRequest): Promise<FillResult> {
+    async fill({ scanId, fieldId, write, current, runId }: FillRequest): Promise<FillResult> {
       const entry = liveEntry(scanId, fieldId);
       if (!entry) return STALE;
       const present = readCurrent(entry);
@@ -306,9 +315,12 @@ export function createFiller(registry: () => Registry | null) {
       // ADP keeps only what is typed while its page has the focus, which a click on BenchQ's panel takes. The fill waits
       // for the BDE's click on the form, inside this fill, so what it types is checked, kept for Undo or taken back here.
       const control = entry.controls[0]!;
-      if (write.type === "text" && typesOnlyWithFocus(control) && !(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS))) {
+      if (write.type === "text" && typesOnlyWithFocus(control) && !(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS, runId))) {
         return { status: "failed", current: present, reason: CLICK_THE_FORM };
       }
+      // The wait can outlast its scan: a disconnect, another candidate or a rescan replaces it, and nothing is written
+      // then (Abdul's review of cf130dea).
+      if (liveEntry(scanId, fieldId) !== entry) return STALE;
       if (readCurrent(entry) !== present) return { status: "changed", current: readCurrent(entry) };
       // The page can change what an upload takes after the scan: a file it won't take now isn't written.
       if (write.type === "file" && !accepts((entry.controls[0] as HTMLInputElement).accept, write.mimeType, write.name)) {
@@ -319,7 +331,7 @@ export function createFiller(registry: () => Registry | null) {
       await pause(SETTLE_MS);
       const written = write.type === "text" && (!accepted(entry, write) || isInvalid(entry)) ? await refit(entry, write) : write;
       if (!accepted(entry, written)) {
-        await putBack(entry, before);
+        await putBack(entry, before, runId);
         return { status: "failed", current: readCurrent(entry) };
       }
       filled.push({ scanId, entry, write: written, before, after: snapshot(entry) });
@@ -439,10 +451,12 @@ export function createFiller(registry: () => Registry | null) {
 
     async undo(): Promise<UndoResult> {
       const result: UndoResult = { restored: 0, kept: 0, skipped: 0 };
+      // One undo stops waiting for ADP's form once nobody clicks it, as one Autofill run does.
+      const run = `undo-${Date.now()}`;
       for (const { entry, before, after } of [...filled].reverse()) {
         const untouched = entry.controls.every((control) => control.isConnected) && sameSnapshot(snapshot(entry), after);
         if (!untouched) result.kept += 1;
-        else if (await putBack(entry, before)) result.restored += 1;
+        else if (await putBack(entry, before, run)) result.restored += 1;
         else result.skipped += 1;
       }
       filled = [];

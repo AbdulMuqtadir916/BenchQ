@@ -239,6 +239,8 @@ function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>,
 export function useAutofill({ connection, firmId, resumeId, fileName = null, pickedFile = null, onSessionExpired, onAccessLost, isHeld = false }: Options) {
   // Read when a fill is about to start, which can be well after the render that started its run (a next page settles).
   const held = useRef(isHeld);
+  // Each Autofill run's id: a wait for ADP's form that ran out isn't repeated within the run (page/events.ts).
+  const runCount = useRef(0);
   useEffect(() => { held.current = isHeld; });
   // Whether the rows on show came from a look begun or ended while held, which may have read another job's page.
   const heldLook = useRef(false);
@@ -629,7 +631,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
               searchHint: write.value.split(/[^\p{L}\p{N}]+/u).filter(word => word.length > 2 && !/^(?:university|college|the|and|institute)$/i.test(word))
                 .sort((a, b) => b.length - a.length)[0],
             } : {}) }, write.value, write.also, () => held.current)
-        : fillField(tabId, field.frameId, { ...request, write });
+        : fillField(tabId, field.frameId, { ...request, write, runId: String(runCount.current) });
       const result = scanId === undefined ? STALE : await fill.catch(() => STALE);
       if (result.status === "stale") {
         stopped = true;
@@ -692,6 +694,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
    * before the run. A field that was there keeps whatever the first pass left it. The résumé's file goes on before
    * anything else: what the site reads from it is then the site's, and the answers replace it (07 Q50). */
   const fillRows = useCallback(async (first: FillableRow[], passes: number) => {
+    runCount.current += 1;
     if (busy.current || needsConfirmation || held.current || first.length === 0) return;
     busy.current = true;
     setOutcome(null);

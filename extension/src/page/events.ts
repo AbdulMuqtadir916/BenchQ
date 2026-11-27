@@ -17,13 +17,15 @@ function setNativeValue(control: HTMLInputElement | HTMLTextAreaElement, value: 
   else control.value = value;
 }
 
-/** ADP keeps only what is typed into its page while the page has focus: through the browser's editor, never a set value. */
-function typeOnAdp(control: HTMLInputElement | HTMLTextAreaElement, value: string): boolean {
+/** ADP keeps only what is typed into its page while the page has the focus: through the browser's editor, never a set
+ * value. An empty value is typed as a delete. */
+export function typeOnAdp(control: HTMLInputElement | HTMLTextAreaElement, value: string): boolean {
   const doc = control.ownerDocument;
+  if (control.value === value) return true;
   control.focus({ preventScroll: true });
   if (doc.activeElement !== control && !control.matches(":focus")) return false;
   control.select();
-  if (!doc.execCommand("insertText", false, value)) return false;
+  if (!doc.execCommand(value ? "insertText" : "delete", false, value)) return false;
   // ADP formats a phone number as it's typed ("+1 704 555 0299"): the same digits are the same number.
   const digits = value.replace(/\D/g, "");
   if (control.value !== value && !(digits.length >= 7 && control.value.replace(/\D/g, "").endsWith(digits))) return false;
@@ -39,22 +41,23 @@ export function typesOnlyWithFocus(control: Element): boolean {
     && (control.tagName === "TEXTAREA" || (control.tagName === "INPUT" && /^(?:text|email|tel|search|url)$/.test((control as HTMLInputElement).type)));
 }
 
-/** A wait that ran out: the BDE isn't clicking the form, so the next field doesn't wait again so soon. */
-let gaveUpAt = Number.NEGATIVE_INFINITY;
+/** The Autofill run whose wait last ran out: the BDE isn't clicking the form, so that run's next field doesn't wait
+ * again. Another run, or a Retry, does (CodeRabbit's review of cf130dea). */
+let gaveUp: { run: string; at: number } | null = null;
 const GIVE_UP_FOR_MS = 60_000;
 
 /** Whether the page has the focus, or gets it within `ms`: a click on BenchQ's panel takes it, and the BDE's click on
  * the form gives it back. */
-export function focusArrives(doc: Document, ms: number): Promise<boolean> {
+export function focusArrives(doc: Document, ms: number, run?: string): Promise<boolean> {
   const win = doc.defaultView;
   if (doc.hasFocus() || !win) return Promise.resolve(doc.hasFocus());
-  if (Date.now() - gaveUpAt < GIVE_UP_FOR_MS) return Promise.resolve(false);
+  if (run !== undefined && gaveUp?.run === run && Date.now() - gaveUp.at < GIVE_UP_FOR_MS) return Promise.resolve(false);
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer);
       win.removeEventListener("focus", done);
       const hasFocus = doc.hasFocus();
-      if (!hasFocus) gaveUpAt = Date.now();
+      if (!hasFocus && run !== undefined) gaveUp = { run, at: Date.now() };
       resolve(hasFocus);
     };
     const timer = setTimeout(done, ms);

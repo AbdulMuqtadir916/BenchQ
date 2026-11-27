@@ -302,6 +302,22 @@ it("offers to save a job BenchQ already has, with BenchQ's details, and saves th
   vi.unstubAllGlobals();
 });
 
+it("never saves one candidate's BenchQ job by its id for another", async () => {
+  vi.stubGlobal("chrome", { storage: { session: { get: async () => ({ "source-job:7": "job-9" }) } } });
+  const job = { id: "job-9", title: "QA Lead", company: "Acme Corp", location: "Austin, TX", description: "<p>Lead QA.</p>", url: page.url };
+  vi.mocked(getCandidateJob).mockImplementation((_firm, candidate) => (candidate === "cand-1" ? Promise.resolve(job) : new Promise<never>(() => undefined)));
+  vi.mocked(readJobPage).mockResolvedValue(page);
+  vi.mocked(addJob).mockResolvedValue({ id: "app-2", candidate_id: "cand-2", job_id: "job-10", status: "saved", title: page.title, company: page.company, location: page.location, url: page.url, job_created: true, application_created: true });
+  await show();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(host.textContent).toContain("already in BenchQ");
+  await act(async () => { root!.render(<AddJobCard tab={{ id: 7, url: page.url }} firmId="firm-1" candidateId="cand-2" candidateName="Ravi" knownUrls={[]} knownJobs={[]} onAdded={vi.fn()} />); });
+  expect(host.textContent).not.toContain("already in BenchQ");
+  await click("add-job-run");
+  expect(addJob).toHaveBeenLastCalledWith("cand-2", expect.anything());
+  vi.unstubAllGlobals();
+});
+
 it("adds from the page when the selected candidate doesn't have the BenchQ job", async () => {
   vi.stubGlobal("chrome", { storage: { session: { get: async () => ({ "source-job:7": "job-9" }) } } });
   vi.mocked(getCandidateJob).mockRejectedValue(Object.assign(new Error("Not found."), { status: 404 }));

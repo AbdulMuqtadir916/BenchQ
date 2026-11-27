@@ -9,6 +9,9 @@ const siteOfUrl = (url: string) => { try { return siteOf(new URL(url).hostname);
  * has it saved. With no such job the tab stays unconnected and the panel offers Add job. */
 async function connectSource(tabId: number, source: URL, jobId: string | undefined, candidateId: string | undefined) {
   const writesBefore = connectionWrites(tabId);
+  // A tab that already has a connection keeps it: Open source only connects a tab that has none. Read after the count,
+  // so a connection written meanwhile is caught by the count instead (CodeRabbit's review).
+  if ((await chrome.storage.session.get(connectionKey(tabId)))[connectionKey(tabId)]) return;
   const { principal } = await getSession();
   if (principal.kind !== "firm" || principal.role !== "BDE") return;
   // The website saves the application while the source opens: look again for about nine seconds.

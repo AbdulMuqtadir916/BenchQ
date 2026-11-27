@@ -353,7 +353,12 @@ export async function readJobForSave(doc: Document): Promise<PageJob> {
     const response = await fetch(parent, { mode: "same-origin", credentials: "omit", signal: AbortSignal.timeout(5000) });
     if (!response.ok || new URL(response.url).pathname.replace(/\/$/, "") !== parent.pathname.replace(/\/$/, "")) return page;
     const listing = readJob(new DOMParser().parseFromString(await response.text(), "text/html"), response.url);
-    return doc.URL === original && listing.isJobPage && listing.title ? { ...listing, url: original } : page;
+    if (doc.URL !== original || !listing.isJobPage || !listing.title) return page;
+    // The posting fills in what the application page lacks, and a field the posting leaves out keeps the page's: a
+    // listing without a description never erases the page's (CodeRabbit's review of cf130dea).
+    const stated = (job: PageJob) => Object.fromEntries(Object.entries(job).filter(([, value]) => value !== null && value !== undefined
+      && value !== "" && !(Array.isArray(value) && value.length === 0)));
+    return { ...stated(page), ...stated(listing), isJobPage: true, url: original } as PageJob;
   } catch {
     return page;
   }
