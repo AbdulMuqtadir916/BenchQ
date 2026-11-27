@@ -16,7 +16,8 @@ async function connectSource(tabId: number, source: URL, jobId: string | undefin
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     const jobs = await getSavedApplications(candidateId);
     const matches = jobs.filter(item => (!candidateId || item.candidate_id === candidateId) && item.status === "saved"
-      && (jobId ? item.job_id === jobId : item.url === source.href));
+      // The firm's Jobs feed can send another candidate's copy of the same job: the posting's address names it too.
+      && ((Boolean(jobId) && item.job_id === jobId) || item.url === source.href));
     // More than one match won't settle by waiting.
     if (matches.length > 1) return;
     const job = matches[0];

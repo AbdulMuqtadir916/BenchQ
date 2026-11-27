@@ -32,30 +32,38 @@ function typeOnAdp(control: HTMLInputElement | HTMLTextAreaElement, value: strin
   return true;
 }
 
-/** Values waiting for ADP's page to get the focus back: a click in BenchQ's panel takes it, and ADP drops anything
- * written without it. They're typed in once the BDE clicks the form. */
-const waiting = new Map<HTMLInputElement | HTMLTextAreaElement, string>();
+/** ADP's text fields, which keep only what is typed into them while the page has the focus. */
+export function typesOnlyWithFocus(control: Element): boolean {
+  const doc = control.ownerDocument;
+  return /(?:^|\.)adp\.com$/.test(doc.location?.hostname ?? "") && typeof doc.execCommand === "function"
+    && (control.tagName === "TEXTAREA" || (control.tagName === "INPUT" && /^(?:text|email|tel|search|url)$/.test((control as HTMLInputElement).type)));
+}
 
-function typeWhenFocused(control: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const win = control.ownerDocument.defaultView;
-  if (!win) return;
-  if (waiting.size === 0) {
-    win.addEventListener("focus", () => {
-      for (const [field, text] of waiting) if (field.isConnected && field.value !== text) typeOnAdp(field, text);
-      waiting.clear();
-    }, { once: true });
-  }
-  // A phone is tried in several ways in a row: the first, the form's likeliest, is the one typed in.
-  if (!waiting.has(control)) waiting.set(control, value);
+/** A wait that ran out: the BDE isn't clicking the form, so the next field doesn't wait again so soon. */
+let gaveUpAt = Number.NEGATIVE_INFINITY;
+const GIVE_UP_FOR_MS = 60_000;
+
+/** Whether the page has the focus, or gets it within `ms`: a click on BenchQ's panel takes it, and the BDE's click on
+ * the form gives it back. */
+export function focusArrives(doc: Document, ms: number): Promise<boolean> {
+  const win = doc.defaultView;
+  if (doc.hasFocus() || !win) return Promise.resolve(doc.hasFocus());
+  if (Date.now() - gaveUpAt < GIVE_UP_FOR_MS) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      win.removeEventListener("focus", done);
+      const hasFocus = doc.hasFocus();
+      if (!hasFocus) gaveUpAt = Date.now();
+      resolve(hasFocus);
+    };
+    const timer = setTimeout(done, ms);
+    win.addEventListener("focus", done);
+  });
 }
 
 export function setText(control: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const doc = control.ownerDocument;
-  if (value && /(?:^|\.)adp\.com$/.test(doc.location?.hostname ?? "") && typeof doc.execCommand === "function"
-    && (control.tagName === "TEXTAREA" || /^(?:text|email|tel|search|url)$/.test(control.type))) {
-    if (!doc.hasFocus()) return typeWhenFocused(control, value);
-    if (typeOnAdp(control, value)) return;
-  }
+  if (value && typesOnlyWithFocus(control) && control.ownerDocument.hasFocus() && typeOnAdp(control, value)) return;
   setNativeValue(control, value);
   fireEvents(control);
 }

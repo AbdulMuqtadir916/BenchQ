@@ -1,7 +1,7 @@
 import { accepts } from "./accepts";
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
-import { fireEvents, pause, setText } from "./events";
+import { fireEvents, pause, setText, focusArrives, typesOnlyWithFocus } from "./events";
 import { ariaChecked, collapse, isAriaChoice, isOn, isVisible, textOf, uploadBoxes } from "./labels";
 import { readCurrent, type Entry, type Registry } from "./scan";
 
@@ -284,6 +284,10 @@ function listed(entry: Entry, found: HTMLElement[]): ChoiceList {
 
 /** Writes one field at a time for the panel. Prior values stay here in the page, so undo ends with the page and
  * nothing the BDE typed leaves it. */
+/** How long a fill waits for the BDE to click ADP's form. */
+const FOCUS_WAIT_MS = 30_000;
+const CLICK_THE_FORM = "ADP takes typing only on its own page: click the form, then Autofill again.";
+
 export function createFiller(registry: () => Registry | null) {
   let filled: Filled[] = [];
 
@@ -299,6 +303,13 @@ export function createFiller(registry: () => Registry | null) {
       if (!entry) return STALE;
       const present = readCurrent(entry);
       if (present !== current) return { status: "changed", current: present };
+      // ADP keeps only what is typed while its page has the focus, which a click on BenchQ's panel takes. The fill waits
+      // for the BDE's click on the form, inside this fill, so what it types is checked, kept for Undo or taken back here.
+      const control = entry.controls[0]!;
+      if (write.type === "text" && typesOnlyWithFocus(control) && !(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS))) {
+        return { status: "failed", current: present, reason: CLICK_THE_FORM };
+      }
+      if (readCurrent(entry) !== present) return { status: "changed", current: readCurrent(entry) };
       // The page can change what an upload takes after the scan: a file it won't take now isn't written.
       if (write.type === "file" && !accepts((entry.controls[0] as HTMLInputElement).accept, write.mimeType, write.name)) {
         return { status: "failed", current: present, reason: UPLOAD_REFUSES_KIND };

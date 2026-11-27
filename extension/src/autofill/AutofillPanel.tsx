@@ -316,7 +316,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {isOpen && <ResumePicker resumes={resumes} candidateName={candidateName} resumesUrl={resumesUrl} studioUrl={studioUrl}
         isBusy={isWorking || applicationStatus !== "ready"} onPick={pickResume} onRetry={retry} onRetryContext={onRetryContext} footer={tailorFooter} />}
 
-      {isOpen && isAdp(tabUrl) && <p data-slot="adp-focus" className={MUTED_TEXT}>ADP only takes typing on its own page. If a field stays empty after Autofill, click the form once and BenchQ types it in, or press Alt+Shift+F on the form.</p>}
+      {isOpen && isAdp(tabUrl) && <p data-slot="adp-focus" className={MUTED_TEXT}>ADP only takes typing on its own page: after you click Autofill, click the ADP form and BenchQ types in the details. Alt+Shift+F on the form works too.</p>}
       {isOpen && error && <div role="alert">
         <p data-slot="error" className={ALERT}>{error}</p>
         <button type="button" className={TEXT_BUTTON} disabled={scanning} onClick={() => void state.rescan()}>Try again</button>
