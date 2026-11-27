@@ -467,5 +467,7 @@ async def autofill_answer_stream(body: dict, principal: Principal = Depends(curr
             logger.error(f"autofill stream failed: {e}")
             yield f"data: {_json.dumps({'error': 'autofill generation failed'})}\n\n"
 
+    # no-store, not no-cache: the drafted answer is the candidate's and no cache keeps it (backend/security_headers.py
+    # sets only what a route leaves out). X-Accel-Buffering keeps a proxy from holding the stream back.
     return StreamingResponse(_events(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})

@@ -8,21 +8,54 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GMAIL_CLIENT_ID = os.getenv("GMAIL_CLIENT_ID", "")
 GMAIL_CLIENT_SECRET = os.getenv("GMAIL_CLIENT_SECRET", "")
 GMAIL_REFRESH_TOKEN = os.getenv("GMAIL_REFRESH_TOKEN", "")
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://jobnavigator:password@db:5432/jobnavigator")
+# Server secrets come only from the environment (docs/team/uzair.md, step 6): no fallback here. docker-compose.yml sets
+# it; unset, the start-up check (backend/startup_checks.py) refuses to start with the variable's name.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 # "production" unless told otherwise, so a forgotten setting fails safe: Secure cookies, no API docs, no demo
 # seed. docker-compose sets BENCHQ_ENV=development for local work.
-BENCHQ_ENV = os.getenv("BENCHQ_ENV", "production").strip().lower()
+# An empty value counts as unset (an `.env` line `BENCHQ_ENV=` must not mean development); any value but these two is
+# refused at start (backend/startup_checks.py).
+BENCHQ_ENV = (os.getenv("BENCHQ_ENV") or "production").strip().lower() or "production"
 IS_PRODUCTION = BENCHQ_ENV == "production"
-# The session cookie is Secure in production; browsers drop Secure cookies over plain http://localhost.
-SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "true" if IS_PRODUCTION else "false").lower() == "true"
-# The app's own origins: CORS, and the Origin check on unsafe requests (07 Q37).
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
-    "ALLOWED_ORIGINS", "http://localhost,http://localhost:3000,http://localhost:80").split(",") if o.strip()]
-PASSWORD_RESET_BASE_URL = (os.getenv("PASSWORD_RESET_BASE_URL") or
-                           ("" if IS_PRODUCTION else "http://localhost:3000")).strip().rstrip("/")
+
+
+def session_cookie_secure(raw: str | None, is_production: bool) -> bool:
+    """The session cookie is Secure in production; browsers drop Secure cookies over plain http://localhost. An empty
+    or whitespace-only value counts as unset, as backend/startup_checks.py reads it, so `SESSION_COOKIE_SECURE= ` can't
+    switch it off in production."""
+    value = (raw or "").strip().lower()
+    return (value or ("true" if is_production else "false")) == "true"
+
+
+SESSION_COOKIE_SECURE = session_cookie_secure(os.getenv("SESSION_COOKIE_SECURE"), IS_PRODUCTION)
+
+
+def parse_origins(raw: str) -> list[str]:
+    """The comma-separated origin list, trimmed and lower-cased (a browser sends an origin lower-case). The one parse
+    for the list CORS and the Origin check use (backend/main.py, backend/auth/access.py) and for the start-up check
+    that validates it (backend/startup_checks.py)."""
+    return [o.strip().lower() for o in raw.split(",") if o.strip()]
+
+
+def _int_env(name: str, default: int) -> int:
+    """An integer setting, read without crashing on import; an invalid value is refused at start by the check."""
+    try:
+        return int(os.getenv(name, str(default)).strip())
+    except ValueError:
+        return default
+
+
+# The app's own origins: CORS, and the Origin check on unsafe requests (07 Q37). Local development has a default;
+# production has none, and the start-up check refuses an unset or malformed list.
+DEV_ALLOWED_ORIGINS = "http://localhost,http://localhost:3000,http://localhost:80"
+# A whitespace-only value counts as unset here too, as the start-up check reads it.
+ALLOWED_ORIGINS = parse_origins((os.getenv("ALLOWED_ORIGINS") or "").strip()
+                                or ("" if IS_PRODUCTION else DEV_ALLOWED_ORIGINS))
+PASSWORD_RESET_BASE_URL = ((os.getenv("PASSWORD_RESET_BASE_URL") or "").strip() or
+                           ("" if IS_PRODUCTION else "http://localhost:3000")).rstrip("/")
 # How many proxies in front of the backend append to X-Forwarded-For (the load balancer: 1). The client's address
 # is that many entries from the right; anything further left was sent by the client and can be forged.
-TRUSTED_PROXY_HOPS = max(0, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
+TRUSTED_PROXY_HOPS = max(0, _int_env("TRUSTED_PROXY_HOPS", 1))
 
 # Candidate-scoped Gmail: separate from the legacy single-account monitor.
 CANDIDATE_GMAIL_CLIENT_ID = os.getenv("CANDIDATE_GMAIL_CLIENT_ID", "")

@@ -7,11 +7,15 @@ The Dockerfile CMD does this. The database is built by the migrations only; one 
 """
 import logging
 
+from backend import startup_checks
 from backend.db_schema import upgrade_database
 from backend.logging_setup import configure_logging
 
 
 def main() -> None:
+    # The settings every process needs, before the migration touches the database (docs/team/uzair.md, step 6). The
+    # start scripts check the full set for their role first (backend/scripts/check_config.py); this covers a direct run.
+    startup_checks.require_config("worker")
     configure_logging()
     upgrade_database()
     logging.getLogger(__name__).info("Database schema is up to date.")

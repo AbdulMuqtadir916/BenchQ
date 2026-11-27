@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.auth import ledger, support, throttle
 from backend.auth.password_reset import (GENERIC_REQUEST, LINK_EXPIRED, expire_due_for_user, expire_request,
                                          make_reset_link, password_frozen, request_reset, system_entry)
+from backend.auth.invites import is_test_account
 from backend.auth.tokens import hash_token
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password, needs_rehash, verify_password
 from backend.auth.serialize import session_json
@@ -82,8 +83,12 @@ def sign_in(body: SignInBody, request: Request, response: Response, db: DbSessio
                or db.query(User).filter(User.email == email).first())
     # The password is checked even when the account is missing or inactive, so every failure takes as long.
     password_ok = verify_password(account.password_hash if account else None, body.password)
-    if not password_ok or not account.is_active:
-        reason = "no such account" if account is None else "Wrong password" if not password_ok else "Account deactivated"
+    # In production an account on a testing domain (a demo account, docs/03 §3.2) never signs in: the same 401 as a
+    # wrong password, counted and logged the same way, so it confirms nothing (docs/team/uzair.md, step 6). It is a real
+    # account, so its entry names it like any other; the reason, seen only by the Super Admin, says why.
+    if not password_ok or not account.is_active or is_test_account(account.email):
+        reason = ("no such account" if account is None else "Wrong password" if not password_ok
+                  else "Account deactivated" if not account.is_active else "Test account, refused in production")
         raise _refuse_sign_in(db, request, email, account, reason)
     if isinstance(account, User):
         # Serialize with reset requests so an old password cannot create a session after a request freezes it.

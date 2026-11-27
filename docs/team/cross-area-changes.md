@@ -3,6 +3,36 @@
 When a PR has to change something in another person's area (`docs/team/README.md` §2–§3), it is agreed first and
 listed here: what changed, in whose area, and why. Newest PR first.
 
+## Production hardening, backend (`feat/production-hardening-backend`, Uzair, 2026-11-23)
+
+Production layer step 6 ([uzair.md](./uzair.md), "Step 6"). **Abdul to confirm the rows in his areas in review.**
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| Sessions and access (Abdul) | `backend/auth/access.py` (the Origin check) | The incoming `Origin` is trimmed and lower-cased before it is compared; the list is the one CORS uses, lower-cased (`config.parse_origins`). Same routes, same refusal. | One validated origin list for CORS and the CSRF check (decision 2); a browser sends origins lower-case, so nothing that passed before is refused. |
+| Settings (Abdul) | `backend/config.py` | No fallback `DATABASE_URL`; `ALLOWED_ORIGINS` has no default in production; an empty `BENCHQ_ENV=` or `SESSION_COOKIE_SECURE=` counts as unset (production, Secure) instead of "not production"; `TRUSTED_PROXY_HOPS` no longer crashes on import when it isn't a number. | Server secrets come only from the environment, and a forgotten or empty setting must fail safe. `backend/startup_checks.py` refuses to start with the variable's name. |
+| Deployment (Abdul) | `backend/scripts/start.sh`, `start_worker.sh`, `db_upgrade.py` (new `backend/scripts/check_config.py`) | Each start runs `python -m backend.scripts.check_config --role api\|worker` before the migration; `db_upgrade` runs the shared checks itself; uvicorn gets `--no-server-header`. `docker-compose.yml` is unchanged (it already sets `DATABASE_URL` and `BENCHQ_ENV=development`). | A misconfigured deploy stops before it changes the database; the `server` header named the server. |
+| Engine (shared) | `backend/models/db.py` | With `DATABASE_URL` unset the engine is built on a `.invalid` host, so importing the models never crashes before the check names the variable. | No hard-coded database URL. Informational. |
+| Sign-in tests (Abdul) | `backend/tests/test_auth_sessions.py` | One new test: a success after 9 IP failures doesn't reset the IP's count. The existing tests are unchanged. | The IP-count fix (`throttle.clear()`, production layer). |
+| Gmail key check (Samad) | `backend/main.py` (`lifespan`), `backend/worker.py` (`start`) | The `CANDIDATE_GMAIL_ENCRYPTION_KEY` check at start moved into `startup_checks` (same rule in development; in production also the client id, secret and an https redirect). | One start-up check. Informational. |
+| Password reset (Umamah) | `backend/main.py` (`lifespan`) | The lifespan no longer calls `password_reset.require_reset_base_url()`: the start-up check refuses the same (not https) and also a base whose origin isn't in `ALLOWED_ORIGINS`. The function and its test stay. | One start-up check. Informational. |
+| Frontend env file (shared) | `.env.example` (root) | The backend-only `CANDIDATE_EMAIL_*` lines are removed (Next never read them); a line points to `backend/.env.example`. | Backend switches live in the backend's file. |
+| Invites and sign-in (Abdul) | `backend/auth/invites.py` (`normal_email`, `resend_invite`, new `is_test_email`), `backend/api/routes_auth.py` (`sign_in`) | Production only: an invite (an OWNER's, a new firm's owner, a resend) to an address on `.test`, `.example`, `.invalid` or `.localhost` is a 400 ("This is a test address, and BenchQ invites only real ones. Use the person's own email address."); an account on one is refused at sign-in with the same 401 as a wrong password, after the password check, counted by the rate limits and logged as a failed sign-in on that account like any other (activity logs PR 6; reason "Test account, refused in production", seen only by the Super Admin). `create_platform_admin` and `reset_password` go through `normal_email`, so they refuse them too. Development is unchanged. | The demo accounts (`*.benchq.test`, a published password) must never get into production (decision 3, replacing a start-up refusal anyone with an invite could trigger). |
+| Database scripts (Abdul) | `backend/scripts/seed_demo.py`, `create_platform_admin.py`, `reset_password.py`, `backfill_external_id.py`, `backfill_location.py`, `backfill_work_arrangement.py`, `move_local_jobs_to_postings.py` | Each `main` runs `startup_checks.require_config("worker")` before it touches the database; `seed_demo` seeds only when `BENCHQ_ENV` is exactly `development` (a typo no longer seeds). | No script writes to a misconfigured database. |
+| Rate limits (Uzair) | `backend/auth/throttle.py` (`clear`) | A successful sign-in clears only the email's failure count, not the IP's. | Someone with their own account could reset the per-IP lock between guesses. The trade-off (people behind one NAT share the IP's count) is in `test_auth_sessions.py`. |
+| Extension (Arbaz) | `backend/main.py` (CORS), `backend/startup_checks.py`; `docs/extension-store.md` step 5 (the exact format; `docs/team/arbaz.md` already says the exact origin) | CORS allows only GET/POST/PUT/PATCH/DELETE, the headers Content-Type and X-Request-ID, and exposes Retry-After and X-Request-ID (not `X-Resume-File`). Production refuses to start unless each `ALLOWED_ORIGINS` entry is exact: the extension's must be `chrome-extension://<its 32-letter id, a–p>`, lower-case, no slash. The extension's host permissions should bypass CORS; a manual extension test confirms before CORS is removed. | Narrowed now, removed later (decision 2). Informational; no extension code changes. |
+
+## Production hardening, frontend (`feat/production-hardening-frontend`, Uzair, 2026-11-23)
+
+The pages' half of step 6 ([uzair.md](./uzair.md), "Step 6", "The frontend PR"). Merges after the backend PR.
+
+| Area (owner) | File | What changed | Why |
+|---|---|---|---|
+| App shell (shared) | `src/app/layout.tsx` | The root layout reads the request's `x-nonce` and passes it on; reading the headers makes every page render per request. | The CSP nonce must be fresh per request; a static page would carry one build-time nonce or none. |
+| App shell (shared) | `src/app/providers.tsx` | `Providers` takes `nonce` and gives it to `ThemeProvider` (next-themes' inline script). | The theme script runs under the CSP. |
+| CI (Abdul) | `.github/workflows/ci.yml` | `node scripts/check-csp.mjs` after `pnpm build`; `scripts/check-csp.mjs` counts as a frontend change. | The page headers and the nonce are checked end to end on every PR. |
+| Frontend env file (shared) | `.env.example` (root) | A commented `CSP_REPORT_ONLY=true` with when to use it. | The switch if a page breaks under the CSP during a shift. Touches the same file as the backend PR's row above, in another place. |
+
 ## Activity logs (Umamah; PRs 3 to 7)
 
 The ledger moves to a new table, `activity_logs`, that can only be added to (07 Q65; migrations 0033 to 0035). Each row
