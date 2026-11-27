@@ -27,6 +27,28 @@ describe("optionFor", () => {
     expect(optionFor("Hyderabad, India", [{ id: "a", label: "Hyderabad, Texas" }])).toBeNull();
   });
 
+  it("reads a state code as the address's own country writes it, and IND as India", () => {
+    const lookup = [{ id: "a", label: "Hyderabad, Sindh, Pakistan" }, { id: "b", label: "Hyderabad, Telangana, IND" },
+      { id: "c", label: "Secunderabad, Telangana, IND" }];
+    expect(optionFor("Hyderabad, TS, India", lookup)).toBe("b");
+    expect(optionFor("Hyderabad, TG, India", lookup)).toBe("b");
+    expect(optionFor("Bengaluru, KA, India", [{ id: "a", label: "Bengaluru, Karnataka, India" }])).toBe("a");
+    expect(optionFor("Toronto, ON, Canada", [{ id: "a", label: "Toronto, Ontario, Canada" }, { id: "b", label: "Toronto, Ohio, United States" }])).toBe("a");
+    // Without a country, a code that's no US state is still India's or Canada's.
+    expect(optionFor("Hyderabad, TS", lookup)).toBe("b");
+    // In the US, "OR" is Oregon as ever, never Odisha.
+    const portland = [{ id: "a", label: "Portland, Maine, United States" }, { id: "b", label: "Portland, Oregon, United States" }];
+    expect(optionFor("Portland, OR, USA", portland)).toBe("b");
+  });
+
+  it("takes the city alone when the state is written otherwise, only if one option in that country names it", () => {
+    expect(optionFor("Hyderabad, Telangana, India", [{ id: "a", label: "Hyderabad, IND" }, { id: "b", label: "Hyderabad, Sindh, Pakistan" }])).toBe("a");
+    // Two cities of that name in the country: the state has to tell them apart, so nothing is picked.
+    expect(optionFor("Aurangabad, XX, India", [{ id: "a", label: "Aurangabad, Maharashtra, India" }, { id: "b", label: "Aurangabad, Bihar, India" }])).toBeNull();
+    // Never a city in another country, or one whose country can't be read.
+    expect(optionFor("Hyderabad, XX, India", [{ id: "a", label: "Hyderabad, Sindh, Pakistan" }, { id: "b", label: "Hyderabad, Somewhere" }])).toBeNull();
+  });
+
   it("picks the option the answer names", () => {
     expect(optionFor("Two weeks", options("One week", "Two weeks"))).toBe("o1");
   });

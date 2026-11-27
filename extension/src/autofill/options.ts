@@ -1,5 +1,5 @@
 import { statusOptionFor } from "./authorization";
-import { countryNamed } from "./countries";
+import { CANADA_REGIONS, countryNamed, INDIA_REGIONS } from "./countries";
 import { polarity } from "./polarity";
 import { raceOptionFor } from "./race";
 import type { FieldOption } from "./types";
@@ -87,10 +87,20 @@ function placeFor(answer: string, options: FieldOption[]): string | null {
     return isUsState(canonical(end)) ? countryNamed("United States") : countryNamed(end);
   };
   const wanted = canonical(country ? parts.slice(0, -1).join(", ") : answer);
-  const words = wanted.split(" ").map((word) => US_STATES[word] ?? word);
+  // A state code as the address's own country writes it: "TS" is Telangana in India, "ON" Ontario in Canada, "OR"
+  // Oregon in the US. Without a country, a US code first, then India's or Canada's.
+  const regions = country === "India" ? INDIA_REGIONS : country === "Canada" ? CANADA_REGIONS : US_STATES;
+  const words = wanted.split(" ").map((word) => regions[word] ?? (country ? null : INDIA_REGIONS[word] ?? CANADA_REGIONS[word]) ?? word);
   if (!country && words.length < 2 && words[0] === wanted) return null;
   const named = options.filter((option) => words.every((word) => hasPhrase(canonical(option.label), word))
     && (!country || [null, country].includes(countryOf(option.label))));
+  // The state written another way, or not at all ("Hyderabad, IND"): the city alone, when just one option names it in
+  // the address's own country. Two such cities still need the state to tell them apart.
+  if (named.length === 0 && country) {
+    const city = canonical(parts[0]!);
+    const sameCity = options.filter((option) => canonical(option.label.split(",")[0]!) === city && countryOf(option.label) === country);
+    return sameCity.length === 1 ? sameCity[0]!.id : null;
+  }
   if (named.length < 2) return named[0]?.id ?? null;
   const city = canonical(answer.split(",")[0]!);
   const plain = named.filter((option) => canonical(option.label.split(",")[0]!) === city);

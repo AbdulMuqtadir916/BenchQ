@@ -105,6 +105,8 @@ describe("changing the résumé on a filled form (07 Q24)", () => {
     await wait(800);
     expect(onPage).toEqual({ a: "one@example.test", b: "Phoenix", r: "" });
 
+    // The filled form's fields are open: closing them shows the résumé picker.
+    await act(async () => { if (slot("fields-fold")?.getAttribute("aria-expanded") === "true") slot("fields-fold")!.click(); });
     await act(async () => { slot("resume-select")!.click(); });
     const options = [...host.querySelectorAll<HTMLButtonElement>("[data-slot='resume-option']")];
     await act(async () => { options[1]!.click(); });
@@ -142,6 +144,8 @@ describe("changing the résumé where the page shows the file it took", () => {
     await runFor(15);
     expect(onPage).toEqual({ r: "Priya - Java Developer.pdf", a: "one@example.test", b: "Phoenix" });
 
+    // The filled form's fields are open: closing them shows the résumé picker.
+    await act(async () => { if (slot("fields-fold")?.getAttribute("aria-expanded") === "true") slot("fields-fold")!.click(); });
     await act(async () => { slot("resume-select")!.click(); });
     await act(async () => { host.querySelectorAll<HTMLButtonElement>("[data-slot='resume-option']")[1]!.click(); });
     await advance(100);

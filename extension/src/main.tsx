@@ -33,7 +33,7 @@ import {
   button,
   CARD,
   EYEBROW,
-  ICON_BUTTON_RAISED,
+  ICON_BUTTON_QUIET,
   MOTION,
   MUTED_TEXT,
   SOFT_TEXT,
@@ -50,13 +50,22 @@ const OPEN_JOB = (
   </>
 );
 
-/** The white workspace: the frame around it stays put and this scrolls inside it, as on the website. */
+/** The white workspace: a column the panel's height that never scrolls as a whole (Simplify's layout). Its top bar
+ * stays put, and only the job list or the connected job's fields scroll inside it. */
 const WORKSPACE =
-  "min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 pb-3 shadow-[var(--shadow-sm)] [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
+  "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]";
 const TOPBAR =
-  "sticky top-0 z-2 -mx-3 flex min-h-[var(--topbar-height)] items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2";
+  "flex min-h-[var(--topbar-height)] flex-none items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2";
+/** Under the top bar, at the panel's height. A panel too short for its fixed parts scrolls them rather than cut any off. */
+const VIEW = "relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
+/** The one part of the job list that scrolls: the jobs, under the fixed account, candidate and tabs. */
+const LIST = "relative -mx-3 min-h-32 flex-1 overflow-y-auto overscroll-contain px-3 pt-0.5 pb-3 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
 const CANDIDATE_SELECT = `h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] bg-[image:var(--gradient-neutral)] pr-[var(--control-sm)] pl-2.5 text-sm text-[var(--color-text)] shadow-[var(--shadow-control)] transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-text-3)] enabled:hover:bg-[image:var(--gradient-neutral-hover)] focus-visible:border-[var(--color-focus-ring)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)] disabled:bg-none disabled:text-[var(--color-text-3)] disabled:shadow-none [&_option]:bg-[var(--color-surface)] [&_option]:text-[var(--color-text)]`;
 const CANDIDATE_LOCK = "candidate-lock";
+/** The LinkedIn preview as a slide switch: blue and to the right when on. */
+const SWITCH = `group inline-flex flex-none items-center gap-1.5 rounded-[var(--radius-md)] px-1.5 py-1 transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)]`;
+const TRACK = `inline-flex h-5 w-9 flex-none items-center rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface-3)] transition-[background,border-color] ${MOTION} group-aria-checked:border-[var(--color-primary)] group-aria-checked:bg-[var(--color-primary)]`;
+const THUMB = `size-3.5 translate-x-0.5 rounded-full bg-[var(--color-surface)] shadow-[var(--shadow-xs)] transition-transform ${MOTION} group-aria-checked:translate-x-4.5`;
 /** The panel opened as a tab of its own: the background answers only Chrome's side panel, so say how to get there. */
 const PANEL_IN_A_TAB = "BenchQ runs in Chrome's side panel. Go to the job's tab and click the BenchQ icon in the toolbar.";
 
@@ -76,6 +85,10 @@ const isConnectable = (job: Application) =>
   job.status === "saved" &&
   Boolean(job.url && job.candidate_id) &&
   hasAutofillPermissions();
+
+/** A card that holds the place of a job while the list loads. */
+const SKELETON_CARD = "grid gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3";
+const SKELETON_LINE = "h-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-3)] motion-safe:animate-pulse"
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -426,9 +439,15 @@ function App() {
         }
         onChange={setActiveTab}
       />
-      <div id={JOB_PANEL} role="tabpanel" aria-labelledby={tabId(activeTab)}>
+      <div id={JOB_PANEL} role="tabpanel" aria-labelledby={tabId(activeTab)} className={LIST}>
         {loadingJobs ? (
-          <p className={`my-3 ${MUTED_TEXT}`}>Loading jobs…</p>
+          <div className="grid gap-2" role="status" aria-label="Loading jobs">
+            {[0, 1, 2].map((index) => <div key={index} className={SKELETON_CARD} aria-hidden="true">
+              <div className={`${SKELETON_LINE} w-1/2`} />
+              <div className={`${SKELETON_LINE} w-1/3`} />
+            </div>)}
+            <span className="sr-only">Loading jobs…</span>
+          </div>
         ) : visibleJobs.length === 0 ? (
           <section data-slot="empty" className={NOTICE}>
             <h2 className={NOTICE_TITLE}>No {activeTab} jobs</h2>
@@ -439,15 +458,15 @@ function App() {
             </p>
           </section>
         ) : (
-          <section className="grid gap-2" aria-label={`${activeTab} jobs`}>
+          <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-label={`${activeTab} jobs`}>
             {visibleJobs.map((job) => (
               <article
                 data-slot="job"
-                className={`p-3 transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-sm)] ${CARD}`}
+                className={`min-w-0 p-3 transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-sm)] ${CARD}`}
                 key={job.id}
               >
-                <div className={EYEBROW}>{job.company || "Company"}</div>
-                <h2 className="my-0.5 text-h3">
+                <div className={`truncate ${EYEBROW}`}>{job.company || "Company"}</div>
+                <h2 className="my-0.5 text-h3 wrap-anywhere">
                   {isConnectable(job) ? (
                     <button
                       type="button"
@@ -461,7 +480,7 @@ function App() {
                     job.title || "Untitled role"
                   )}
                 </h2>
-                <p className={`mb-2.5 ${MUTED_TEXT}`}>
+                <p className={`mb-2.5 wrap-anywhere ${MUTED_TEXT}`}>
                   {job.location || "Location not listed"}
                 </p>
                 <div className="flex gap-1.5 *:min-w-0 *:flex-1">
@@ -493,7 +512,7 @@ function App() {
         </div>
         <div className="flex min-w-0 flex-none items-center gap-1.5">
           <button
-            className={ICON_BUTTON_RAISED}
+            className={ICON_BUTTON_QUIET}
             onClick={() =>
               setTheme((current) => (current === "light" ? "dark" : "light"))
             }
@@ -520,29 +539,34 @@ function App() {
             )}
           </button>
           <button
-            className={button("secondary", "small")}
+            type="button"
+            role="switch"
+            className={SWITCH}
             onClick={togglePreview}
             aria-label="LinkedIn posting preview"
-            aria-pressed={isPreviewOn}
+            aria-checked={isPreviewOn}
             title="Show LinkedIn postings inside BenchQ"
           >
-            <span>Preview {isPreviewOn ? "on" : "off"}</span>
+            <span className="text-caption font-[600] text-[var(--color-text-2)]">Preview</span>
+            <span className={TRACK} aria-hidden="true">
+              <span className={THUMB} />
+            </span>
           </button>
           <button
-            className={ICON_BUTTON_RAISED}
+            className={ICON_BUTTON_QUIET}
             onClick={() => void refresh()}
             aria-label="Refresh saved jobs"
             title="Refresh saved jobs"
           >
+            {/* One circular arrow (rotate-cw): lighter than the two-arrow refresh. */}
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21 2v6h-6" />
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-              <path d="M3 22v-6h6" />
-              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
             </svg>
           </button>
         </div>
       </header>
+      <div className={VIEW}>
       {loading ? (
         <p className={`my-3 ${MUTED_TEXT}`}>Checking your BenchQ session…</p>
       ) : !session ? (
@@ -678,6 +702,7 @@ function App() {
           )}
         </>
       )}
+      </div>
     </main>
   );
 }

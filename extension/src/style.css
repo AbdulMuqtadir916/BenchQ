@@ -76,12 +76,12 @@
   --control-lg: 36px;
   --action-min-width: 124px;
   --topbar-height: 52px;
+  /* The field list's own scrolling box: about half the panel, like Simplify's checklist. */
   --panel-min-width: 280px;
   --icon-sm: 14px;
   --icon-md: 16px;
   --count-size: 18px;
   --tick-stroke: 3;
-  --skeleton-row: 64px;
   --focus-width: 2px;
   --focus-offset: 3px;
   --tabs-inset: 3px;
@@ -142,6 +142,9 @@
   --radius-full: 9999px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
+  --duration-slide: 360ms;
+  /* A sheet's ease: quick to start, long and soft to settle, the same up and down. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* A row joining the Autofill run, the dialog's content, a tick as its field fills, and the run's note going. Reduced motion turns them off
@@ -150,6 +153,8 @@
   --animate-rise-in: rise-in var(--duration-fast) var(--ease-out) both;
   --animate-tick-in: tick-in var(--duration-fast) var(--ease-out) both;
   --animate-fade-out: fade-out var(--duration-fast) var(--ease-out) both;
+  /* Fills only before it starts, so the fold's own slide moves the sheet afterwards. */
+  --animate-sheet-rise: sheet-rise var(--duration-slide) var(--ease-sheet) backwards;
 
   @keyframes rise-in {
     from { opacity: 0; transform: translateY(var(--motion-lift)); }
@@ -157,6 +162,10 @@
 
   @keyframes fade-out {
     to { opacity: 0; transform: translateY(calc(var(--motion-lift) * -1)); }
+  }
+
+  @keyframes sheet-rise {
+    from { transform: translateY(var(--sheet-down)); }
   }
 
   @keyframes tick-in {
@@ -222,41 +231,40 @@
 
 /* The website's two buttons. Size and shape come from `button()` in src/ui.ts. */
 @layer components {
+  /* The design mock's buttons: a solid BenchQ blue primary with a soft glow of its own colour, and a flat surface
+     secondary with a hairline (2026-11-27 redesign). */
   .bq-primary {
-    border: 1px solid var(--color-primary-active);
-    background: var(--gradient-primary);
-    box-shadow: var(--shadow-primary);
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
     color: var(--color-primary-fg);
-    text-shadow: var(--shadow-text-primary);
+    font-weight: 650;
   }
 
   .bq-primary:hover:not(:disabled) {
-    background: var(--gradient-primary-hover);
+    border-color: var(--color-primary-active);
+    background: var(--color-primary-active);
   }
 
   .bq-primary:active:not(:disabled) {
-    box-shadow: var(--shadow-primary-pressed);
+    box-shadow: none;
     transform: translateY(1px);
   }
 
   .bq-secondary {
     border: 1px solid var(--color-border-strong);
-    background: var(--gradient-neutral);
-    box-shadow: var(--shadow-control);
+    background: var(--color-surface-2);
     color: var(--color-text-2);
+    font-weight: 600;
   }
 
   .bq-secondary:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--color-text-3) 42%, var(--color-border-strong));
-    background: var(--gradient-neutral-hover);
-    box-shadow: var(--shadow-control-hover);
+    background: var(--color-surface-3);
     color: var(--color-text);
   }
 
   .bq-secondary:active:not(:disabled) {
-    border-color: var(--color-border-strong);
-    background: var(--color-surface-2);
-    box-shadow: var(--shadow-control-pressed);
+    transform: translateY(1px);
   }
 }
 

@@ -56,6 +56,10 @@ export const SHIELD_CHECK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="m9 12 2 2 4-4" />
 </svg>;
 
+export const SEARCH_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+</svg>;
+
 export const EYE_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
   <circle cx="12" cy="12" r="3" />

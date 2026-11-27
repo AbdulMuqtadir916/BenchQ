@@ -47,28 +47,24 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("the groups (07 Q56)", () => {
-  const fold = () => host.querySelector<HTMLButtonElement>("[data-slot='review-filled-toggle']");
-
-  it("put what still needs the BDE first, required before optional, each required one marked", () => {
+describe("the groups, as Simplify lists a filled form", () => {
+  it("list the required fields, then the optional ones, each in the form's order with how many are filled, with no pill", () => {
     show([holding("First name", true, "Priya"), row("Why us?", false, "manual"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
-    expect(titles()).toEqual(["Needs you (2)"]);
-    expect(labels()).toEqual(["Email", "Why us?"]);
-    expect(all("[data-slot='review-required']").map((tag) => tag.textContent)).toEqual(["Required"]);
+    expect(titles()).toEqual(["Required (1 of 2 filled)", "Optional (1 of 2 filled)"]);
+    expect(labels()).toEqual(["First name", "Email", "Why us?", "LinkedIn"]);
+    expect(all("[data-slot='review-tick']").map((tick) => tick.getAttribute("aria-label"))).toEqual(["Filled", "Not filled", "Not filled", "Filled"]);
+    expect(all("[data-slot='review-required']")).toEqual([]);
   });
 
-  it("fold what's filled under its count, open on a click", () => {
+  it("show the filled fields ticked in their section, with nothing to unfold", () => {
     show([holding("First name", true, "Priya"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
-    expect([fold()!.textContent, fold()!.getAttribute("aria-expanded")]).toEqual(["Filled (2)", "false"]);
-    act(() => { fold()!.click(); });
-    expect(fold()!.getAttribute("aria-expanded")).toBe("true");
-    expect(labels()).toEqual(["Email", "First name", "LinkedIn"]);
+    expect(labels()).toEqual(["First name", "Email", "LinkedIn"]);
+    expect(host.querySelector("[data-slot='review-filled-toggle']")).toBeNull();
   });
 
   it("leave out a group with nothing in it", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Needs you (1)"]);
-    expect(fold()).toBeNull();
+    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
   });
 
   it("have no checkboxes", () => {
@@ -76,12 +72,13 @@ describe("the groups (07 Q56)", () => {
     expect(host.querySelector("input")).toBeNull();
   });
 
-  it("show a value from the page as plain text, on two lines at most", () => {
+  it("show a value from the page as plain text only, kept for screen readers", () => {
     show([holding("Name", true, "<img src=x onerror=alert(1)>")]);
     expect(host.querySelector("img")).toBeNull();
     const value = host.querySelector("[data-slot='review-value']")!;
     expect(value.textContent).toBe("<img src=x onerror=alert(1)>");
-    expect(value.className).toContain("line-clamp-2");
+    // One line per field, as Simplify lists them: the value stays for screen readers and the row's hover.
+    expect(value.className).toContain("sr-only");
   });
 });
 
@@ -148,25 +145,25 @@ describe("file uploads", () => {
   const upload = (label: string, required: boolean, current = "") =>
     holding(label, required, current, "blocked", { reason: "File upload", field: { label, required, current, kind: "file" } as TabField });
 
-  it("get their own section, after the rest", () => {
+  it("sit with the form's other fields, in its order, as Simplify lists them", () => {
     show([row("Email", true), upload("Resume/CV", true), row("LinkedIn", false), upload("Cover Letter", false, "letter.pdf")]);
-    expect(titles()).toEqual(["Needs you (2)", "Other uploads (1 of 2 filled)"]);
-    expect(labels()).toEqual(["Email", "LinkedIn", "Resume/CV", "Cover Letter"]);
+    expect(titles()).toEqual(["Required (0 of 2 filled)", "Optional (1 of 2 filled)"]);
+    expect(labels()).toEqual(["Email", "Resume/CV", "LinkedIn", "Cover Letter"]);
   });
 
-  it("stay out of the other groups' counts", () => {
+  it("count with the other fields", () => {
     show([upload("Resume/CV", true), holding("Email", true, "a@example.test")]);
-    expect(titles()).toEqual(["Other uploads (0 of 1 filled)"]);
+    expect(titles()).toEqual(["Required (1 of 2 filled)"]);
   });
 
   it("show no section when the form has none", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Needs you (1)"]);
+    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
   });
 
   it("show the BDE what's needed, without repeating that it's an upload", () => {
     show([upload("Resume/CV", true), upload("Cover Letter", false)]);
-    expect(all("[data-slot='review-row']").map(({ textContent }) => textContent)).toEqual(["Resume/CVRequired", "Cover Letter"]);
+    expect(all("[data-slot='review-row']").map(({ textContent }) => textContent)).toEqual(["!Resume/CVRequired", "!Cover Letter"]);  // the amber "!" marks a field that still needs the BDE
   });
 
   it("tick and show the file's name once it's attached", () => {
@@ -321,7 +318,7 @@ describe("keeping a typed answer (07 Q58)", () => {
   it("lists what the BDE typed first, each with its button and Only this résumé", async () => {
     const typedRow = holding("Why us?", false, "Payments.", "same", { saveOffer: offer });
     const onSave = renderWith([row("Email", true), typedRow]);
-    expect(titles()).toEqual(["Save for next time (1)", "Needs you (1)"]);
+    expect(titles()).toEqual(["Save for next time (1)", "Required (0 of 1 filled)"]);
     const box = host.querySelector<HTMLInputElement>("[data-slot='review-save'] input")!;
     act(() => { box.click(); });
     await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='review-save'] button")!.click(); });
@@ -337,11 +334,9 @@ describe("keeping a typed answer (07 Q58)", () => {
 });
 
 describe("after a run", () => {
-  it("offers to go to the first field that needs the BDE, required ones first", () => {
-    const optional = row("Website", false, "manual");
-    const required = row("Phone", true, "manual");
-    show([optional, required]);
-    act(() => { host.querySelector<HTMLButtonElement>("[data-slot='review-needed-first']")!.click(); });
-    expect(onGoTo).toHaveBeenCalledWith(required);
+  it("offers no Go to first field: each row takes the BDE to its field", () => {
+    show([row("Website", false, "manual"), row("Phone", true, "manual")]);
+    expect(host.querySelector("[data-slot='review-needed-first']")).toBeNull();
+    expect(all("button").map(({ textContent }) => textContent)).not.toContain("Go to first field");
   });
 });

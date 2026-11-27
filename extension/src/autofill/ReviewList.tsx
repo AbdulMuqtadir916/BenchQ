@@ -1,8 +1,8 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { BELOW_TOP_BAR, button, MOTION, SOFT_TEXT } from "../ui";
+import { BELOW_TOP_BAR, button, MOTION } from "../ui";
 import ChoicePicker from "./ChoicePicker";
 import { fieldLabel, filledValue } from "./form-memory";
-import { CHECK, CHEVRON_DOWN_ICON, LIGHTBULB_ICON } from "./icons";
+import { CHECK, LIGHTBULB_ICON } from "./icons";
 import { Tick } from "./marks";
 import type { BankEntry, ReviewRow } from "./types";
 
@@ -25,16 +25,12 @@ type RowActions = Pick<ReviewListProps, "isFilling" | "onGoTo" | "onListOptions"
 
 /** One line per field: its tick, its label, and what it holds. The row hangs into the margin, so ticks line up with the
  * heading above. */
-const ROW = `-mx-1.5 flex cursor-pointer gap-2 rounded-[var(--radius-sm)] px-1.5 py-2 transition-[background] ${MOTION} aria-disabled:cursor-default aria-[disabled=false]:hover:bg-[var(--color-surface-2)]`;
+const ROW = `-mx-1.5 flex cursor-pointer items-start gap-2 rounded-[var(--radius-sm)] px-1.5 py-1 transition-[background] ${MOTION} aria-disabled:cursor-default aria-[disabled=false]:hover:bg-[var(--color-surface-2)]`;
 const NOTE = "text-caption text-[var(--color-text-3)] wrap-anywhere";
-/** A value from the form: two lines at most, the rest on hover (07 Q56). */
-const VALUE = `line-clamp-2 wrap-anywhere ${SOFT_TEXT}`;
-const REQUIRED = "flex-none rounded-full bg-[var(--color-surface-3)] px-1.5 text-caption font-[550] text-[var(--color-text-2)]";
 /** The saved answers that might fit a question nothing matched: a box of their own, set apart from the field's row. */
 const SUGGESTIONS = "ml-[calc(var(--icon-md)+var(--spacing)*2)] mt-1 grid gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5";
 const SUGGESTIONS_TITLE = "flex items-center gap-1.5 text-sm font-[550] text-[var(--color-text)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:text-[var(--color-text-3)]";
 const LINK = "text-caption text-[var(--color-text-2)] underline-offset-2 hover:text-[var(--color-primary)] hover:underline";
-const FOLD = `-mx-1.5 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-left text-sm font-[550] transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:transition-transform motion-reduce:[&_svg]:transition-none aria-expanded:[&_svg]:rotate-180`;
 /** An answer longer than this shows four lines until "Show all". */
 const LONG_ANSWER = 220;
 
@@ -75,9 +71,6 @@ export function needsYou(rows: ReviewRow[], canSave: boolean): ReviewRow[] {
   return rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row) && !isFilled(row));
 }
 
-/** Fields still to fill first, each kind in the form's order. A run keeps every row in place, so it ticks where it is. */
-const stillToFillFirst = (rows: ReviewRow[]) => [...rows.filter((row) => !isFilled(row)), ...rows.filter(isFilled)];
-
 /** A field BenchQ never touches keeps its value on the form: the row says it's filled, and an upload gives its name. */
 const shownValue = (row: ReviewRow) => (row.status === "blocked" && row.isUnsaved ? "" : filledValue(row));
 
@@ -95,7 +88,7 @@ function RowBody({ row, isFilling, onGoTo, children }: RowActions & { row: Revie
     event.preventDefault();
     go();
   };
-  return <div data-slot="review-jump" className={ROW} role="button" tabIndex={isFilling ? -1 : 0} aria-disabled={isFilling} title="Go to this field on the form" onClick={go} onKeyDown={onKeyDown}>
+  return <div data-slot="review-jump" className={ROW} role="button" tabIndex={isFilling ? -1 : 0} aria-disabled={isFilling} title={row.reason && !row.field.current ? `${row.reason} Click to go to this field.` : "Go to this field on the form"} onClick={go} onKeyDown={onKeyDown}>
     {children}
   </div>;
 }
@@ -115,12 +108,11 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
       <Tick isFilled={filled} slot="review-tick" />
       <span className="grid min-w-0 flex-1">
         <span className="flex min-w-0 items-start justify-between gap-2">
-          <span data-slot="review-label" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
-          {!filled && row.field.required && !isUpload(row) && <span data-slot="review-required" className={REQUIRED}>Required</span>}
+          <span data-slot="review-label" className="min-w-0 text-sm leading-snug text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
         </span>
-        {value && <span data-slot="review-value" className={VALUE} title={value}>{value}</span>}
-        {!filled && note && <span data-slot="review-reason" className={NOTE}>{note}</span>}
-        {!filled && savedAnswers(row).map((answer) => <span key={answer} data-slot="review-saved" className={NOTE}>Saved: {answer}</span>)}
+        {value && <span data-slot="review-value" className="sr-only">{value}</span>}
+        {!filled && note && <span data-slot="review-reason" className="sr-only">{note}</span>}
+        {!filled && savedAnswers(row).map((answer) => <span key={answer} data-slot="review-saved" className="sr-only">Saved: {answer}</span>)}
       </span>
     </RowBody>
     {row.canChoose && !filled && actions.onListOptions && actions.onChoose && <div className="pl-[calc(var(--icon-md)+var(--spacing)*2)]">
@@ -162,76 +154,74 @@ function Suggestions({ suggestions, ...props }: SuggestionProps & { suggestions:
   </div>;
 }
 
+/** A section heading as the design mock has it: small capitals, wide spacing, coloured by what the section means. */
+const SECTION_TITLE = "text-sm font-[700] text-[var(--color-text)]";
+const COUNT = "font-[450] text-[var(--color-text-3)]";
+/** A small action on a line: Replace, Replace all. */
+const TEXT_ACTION = "flex-none text-caption font-[600] text-[var(--color-primary)] hover:underline disabled:cursor-not-allowed disabled:opacity-50";
+
+
 function Group({ title, count, rows, slot, action, ...actions }: RowActions & { title: string; count: string; rows: ReviewRow[]; slot?: string; action?: ReactNode }) {
   if (rows.length === 0) return null;
   // A section the panel scrolls to stops under the sticky top bar.
   return <section data-slot={slot} className={`grid min-w-0 gap-1 ${slot ? BELOW_TOP_BAR : ""}`} aria-label={title}>
     <div className="flex items-center justify-between gap-2">
-      <h3 data-slot={slot && `${slot}-title`} tabIndex={slot ? -1 : undefined} className="text-sm font-[550]">{title} <span className="font-normal text-[var(--color-text-3)]">({count})</span></h3>
+      <h3 data-slot={slot && `${slot}-title`} tabIndex={slot ? -1 : undefined} className={SECTION_TITLE}>{title} <span className={COUNT}>({count})</span></h3>
       {action}
     </div>
-    <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
-  </section>;
-}
-
-/** What already holds a value, folded under its count so what's left comes first (07 Q56). */
-function FilledGroup({ rows, ...actions }: RowActions & { rows: ReviewRow[] }) {
-  const [isOpen, setIsOpen] = useState(false);
-  if (rows.length === 0) return null;
-  return <section data-slot="review-filled" className="grid min-w-0 gap-1" aria-label="Filled">
-    <button type="button" data-slot="review-filled-toggle" className={FOLD} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
-      {CHEVRON_DOWN_ICON}Filled <span className="font-normal text-[var(--color-text-3)]">({rows.length})</span>
-    </button>
-    {isOpen && <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>}
+    <ul className="grid gap-0.5">{rows.map((row) => <Row key={row.key} row={row} {...actions} />)}</ul>
   </section>;
 }
 
 /** Values the form held before BenchQ looked, typed earlier or filled by the site, that differ from the saved answers.
- * Autofill leaves them: Replace writes the saved answer over one, Replace all over every one. */
+ * Autofill leaves them: Replace writes the saved answer over one, Replace all over every one. Each is one plain line, as
+ * the list's other rows: the field, what the form holds struck through, then the saved answer. */
 function KeptGroup({ rows, isFilling, onGoTo, onReplace }: RowActions & { rows: ReviewRow[]; onReplace?: ReviewListProps["onReplace"] }) {
   if (rows.length === 0) return null;
   return <section data-slot="review-kept" className="grid min-w-0 gap-1" aria-label="Already on the form">
     <div className="flex items-center justify-between gap-2">
-      <h3 className="text-sm font-[550]">Already on the form <span className="font-normal text-[var(--color-text-3)]">({rows.length})</span></h3>
-      {onReplace && rows.length > 1 && <button type="button" className={button("secondary", "compact")} disabled={isFilling} onClick={() => onReplace(rows)}>Replace all</button>}
+      <h3 className={SECTION_TITLE}>Already on the form <span className={COUNT}>({rows.length})</span></h3>
+      {onReplace && rows.length > 1 && <button type="button" className={TEXT_ACTION} disabled={isFilling} onClick={() => onReplace(rows)}>Replace all</button>}
     </div>
-    <p className={NOTE}>These differ from the saved answers, so Autofill leaves them as they are.</p>
-    <ul className="grid divide-y divide-[var(--color-border)]">{rows.map((row) => <li key={row.key} data-slot="review-row" className="flex items-start gap-1.5">
+    <p className={NOTE}>These differ from the saved answers, so Autofill leaves them.</p>
+    <ul className="grid gap-0.5">{rows.map((row) => <li key={row.key} data-slot="review-row" className="flex min-w-0 items-start gap-2">
       <div className="min-w-0 flex-1">
         <RowBody row={row} isFilling={isFilling} onGoTo={onGoTo}>
           <Tick isFilled slot="review-tick" />
-          <span className="grid min-w-0 flex-1">
-            <span data-slot="review-label" className="min-w-0 text-body-strong text-[var(--color-text)] wrap-anywhere">{fieldLabel(row.field)}</span>
-            <span data-slot="review-value" className={VALUE} title={row.field.current}>On the form: {row.field.current}</span>
-            <span data-slot="review-saved" className={NOTE}>Saved: {row.proposed}</span>
+          <span className="min-w-0 flex-1 text-sm leading-snug wrap-anywhere">
+            <span data-slot="review-label" className="text-[var(--color-text)]">{fieldLabel(row.field)}</span>{" "}
+            <span data-slot="review-value" className="text-[var(--color-text-3)] line-through" title={row.field.current}><span className="sr-only">On the form: </span>{row.field.current}</span>
+            {row.proposed && <>{" "}<span data-slot="review-proposed" className="font-[600] text-[var(--color-success-fg)]"><span aria-hidden="true">→ </span><span className="sr-only">Saved answer: </span>{row.proposed}</span></>}
+            <span data-slot="review-saved" className="sr-only">Saved: {row.proposed}</span>
           </span>
         </RowBody>
       </div>
-      {onReplace && <button type="button" className={button("secondary", "compact")} disabled={isFilling} aria-label={`Replace ${fieldLabel(row.field)} with the saved answer`} onClick={() => onReplace([row])}>Replace</button>}
+      {onReplace && <button type="button" className={`mt-1 ${TEXT_ACTION}`} disabled={isFilling} aria-label={`Replace ${fieldLabel(row.field)} with the saved answer`} onClick={() => onReplace([row])}>Replace</button>}
     </li>)}</ul>
   </section>;
 }
 
-/** The form's fields and what each holds: what the form already held that differs from the saved answers, what still
- * needs the BDE (required first, each marked), what's filled (folded under its count), then any upload the Resume and
- * Cover letter sections don't stand for. Labels and values come from the employer's page and render as plain text. */
+/** The form's fields and what each holds, as Simplify lists them once it has filled a form: what the form already held
+ * that differs from the saved answers and answers to keep first, then the required fields and the optional ones, each in
+ * the form's order, ticked once filled, then any upload the Resume and Cover letter sections don't stand for. Labels and values come from the employer's page and render as plain text. */
 export default function ReviewList({ rows, isFilling, onGoTo, onReplace, onListOptions, onChoose, onSuggest, onSave }: ReviewListProps) {
   const actions = { isFilling, onGoTo, onListOptions, onChoose, onSuggest, onSave };
   // Answers the BDE typed and can keep come first, in sight, until they're saved (07 Q58).
   // A saved one stays there, saying so, rather than folding away the moment it's kept.
   const isOffered = isOfferedIn(Boolean(onSave));
-  const typed = rows.filter((row) => !isUpload(row) && !isKept(row) && !isOffered(row));
-  const needed = needsYou(rows, Boolean(onSave));
-  const neededFirst = [...needed.filter(({ field }) => field.required), ...needed.filter(({ field }) => !field.required)];
-  const uploads = rows.filter(isUpload);
+  // The uploads too, the résumé's and the cover letter's among them: fields like any other.
+  const fields = rows.filter((row) => !isKept(row) && !isOffered(row));
+  const required = fields.filter(({ field }) => field.required);
+  const optional = fields.filter(({ field }) => !field.required);
+  const isOptionalLeft = optional.some((row) => !isFilled(row));
+  const filledOf = (list: ReviewRow[]) => `${list.filter(isFilled).length} of ${list.length} filled`;
+  // Where the BDE takes over once Autofill is done: the panel scrolls to the first section with a field left.
+  const isRequiredLeft = required.some((row) => !isFilled(row));
+  // In the panel's fields section, which scrolls between the résumé and the actions, as Simplify's field list does.
   return <div data-slot="review" className="grid grid-cols-[minmax(0,1fr)] gap-3">
     <KeptGroup rows={rows.filter(isKept)} onReplace={onReplace} {...actions} />
     <Group title="Save for next time" count={String(rows.filter(isOffered).length)} rows={rows.filter(isOffered)} {...actions} />
-    {/* Where the BDE takes over once Autofill is done: the panel scrolls here, and this goes to the first field. */}
-    <Group title="Needs you" count={String(needed.length)} slot="review-needed" rows={neededFirst} {...actions}
-      action={neededFirst[0] && <button type="button" data-slot="review-needed-first" className={button("secondary", "compact")}
-        disabled={isFilling} onClick={() => onGoTo(neededFirst[0]!)}>Go to first field</button>} />
-    <FilledGroup rows={typed.filter(isFilled)} {...actions} />
-    <Group title="Other uploads" count={`${uploads.filter(isFilled).length} of ${uploads.length} filled`} rows={stillToFillFirst(uploads)} {...actions} />
+    <Group title="Required" count={filledOf(required)} slot={isRequiredLeft ? "review-needed" : undefined} rows={required} {...actions} />
+    <Group title="Optional" count={filledOf(optional)} slot={!isRequiredLeft && isOptionalLeft ? "review-needed" : undefined} rows={optional} {...actions} />
   </div>;
 }

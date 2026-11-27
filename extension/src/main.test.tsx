@@ -139,7 +139,7 @@ it("shows only the linked job on a connected tab: no list, no tabs, no accordion
   connectTab();
   await mount();
   expect(document.querySelector("#autofill-title")?.textContent).toBe("Java Developer");
-  expect(document.querySelector("[role='tablist']")).toBeNull();
+  expect(document.querySelector("[role='tablist']:not([data-slot='job-views'])")).toBeNull();
   expect(document.querySelector("[data-slot='job']")).toBeNull();
   expect(document.querySelector("details")).toBeNull();
 });

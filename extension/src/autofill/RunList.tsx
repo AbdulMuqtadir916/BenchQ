@@ -18,7 +18,8 @@ function Mark({ status }: Pick<RunItem, "status">) {
 
 /** The fields an Autofill run sets out to fill. Each joins the list as BenchQ reaches it, with a spinner while it fills,
  * then a green tick and the value it took, or a warning and why it's the BDE's. The run never waits for the list. */
-export default function RunList({ run: { total, items } }: { run: AutofillRun }) {
+/** `isHeadless`: the panel's heading says it's filling and how far, so this one is only said, for screen readers. */
+export default function RunList({ run: { total, items }, isHeadless = false }: { run: AutofillRun; isHeadless?: boolean }) {
   const latest = useRef<HTMLLIElement>(null);
   const done = items.filter(({ status }) => status !== "filling").length;
 
@@ -28,7 +29,7 @@ export default function RunList({ run: { total, items } }: { run: AutofillRun })
   }, [items.length]);
 
   return <section data-slot="run" className="grid min-w-0 gap-1" aria-labelledby="run-title">
-    <div className="flex items-baseline justify-between gap-2">
+    <div className={isHeadless ? "sr-only" : "flex items-baseline justify-between gap-2"}>
       <h3 id="run-title" className="text-sm font-[550]">Filling the form</h3>
       <span data-slot="run-count" className="text-mono-sm text-[var(--color-text-3)]" role="status">{done} of {total}</span>
     </div>

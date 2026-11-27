@@ -92,6 +92,27 @@ export const resumeStudioUrl = (firmSlug: string, versionId: string) =>
   `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/resumes/${encodeURIComponent(versionId)}`;
 
 export const getSession = () => request<Session>("/api/auth/me");
+
+/** One of a job's cover letters in BenchQ (backend/api/routes_cover_letters.py `_to_dict`): its name and when it last
+ * changed, never its text. */
+export type CoverLetter = { id: string; name: string | null; job_id: string | null; updated_at: string | null; created_at: string | null };
+
+/** The cover letters BenchQ holds for one job, newest first (the backend's own order). */
+export const getCoverLetters = (jobId: string) =>
+  request<CoverLetter[]>(`/api/cover-letters?job_id=${encodeURIComponent(jobId)}`);
+
+/** A cover letter as a PDF, its type and its bytes in base64, for the form's cover-letter upload. Null when it's not
+ * found. */
+export async function getCoverLetterFile(id: string): Promise<{ mimeType: string; data: string } | null> {
+  try {
+    const response = await send(`/api/cover-letters/${encodeURIComponent(id)}/pdf`);
+    const mimeType = (response.headers.get("Content-Type") ?? "").split(";")[0]!.trim() || "application/pdf";
+    return { mimeType, data: base64Of(new Uint8Array(await response.arrayBuffer())) };
+  } catch (error) {
+    if ((error as { status?: number }).status === 404) return null;
+    throw error;
+  }
+}
 export type Candidate = { id: string; full_name: string };
 
 export const getCandidates = (firmId: string) =>

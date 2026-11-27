@@ -1,4 +1,4 @@
-import { BELOW_TOP_BAR, button, MUTED_TEXT, WARNING } from "../ui";
+import { BELOW_TOP_BAR, button, WARNING } from "../ui";
 import { documentOf } from "./documents";
 import { filledValue } from "./form-memory";
 import { CHECK } from "./icons";
@@ -34,9 +34,9 @@ export default function AutofillDone({ filled, rows, attached, attachedShown = f
   const isResumeMissing = upload ? !onForm : Boolean(attached) && !attachedShown;
   const summary = [`Filled ${filled}`, needs ? `${needs} need${needs === 1 ? "s" : ""} you` : "",
     kept ? `${kept} kept as ${kept === 1 ? "it was" : "they were"}` : ""].filter(Boolean).join(" · ");
-  return <div className="grid gap-1.5">
-    <p data-slot="autofill-done" className={DONE} role="status">{CHECK}{summary}</p>
-    {onForm && <p data-slot="autofill-done-file" className={`wrap-anywhere ${MUTED_TEXT}`}>Resume attached: {onForm}</p>}
+  return <div className="grid gap-1.5 empty:hidden">
+    <p data-slot="autofill-done" className={`${DONE} sr-only`} role="status">{CHECK}{summary}</p>
+    {onForm && <p data-slot="autofill-done-file" className="sr-only">Resume attached: {onForm}</p>}
     {isResumeMissing && <div data-slot="autofill-done-no-file" className={WARNING} role="alert">
       <p className="mb-1.5">The resume isn&apos;t on the form yet. Attach it by hand.</p>
       {upload && <button type="button" className={button("secondary", "compact")} onClick={() => onGoTo(upload)}>Go to field</button>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accepts, DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, readOwnFile, resumeFileName, withResumeFile } from "./documents";
+import { accepts, DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, readOwnFile, resumeFileName, withCoverLetterFile, withResumeFile } from "./documents";
 import { accepts as pageAccepts } from "../page/accepts";
 import type { FieldKind, ReviewRow, TabField } from "./types";
 
@@ -86,5 +86,25 @@ describe("a file from the BDE's computer (Q5)", () => {
     const big = new File(["x"], "big.pdf");
     Object.defineProperty(big, "size", { value: 10 * 1024 * 1024 + 1 });
     expect(await readOwnFile(big)).toBe("That file is over 10 MB. Pick a smaller one.");
+  });
+});
+
+describe("withCoverLetterFile, the picked cover letter on the form's cover-letter upload", () => {
+  const upload = (label: string, accept = "") => ({ key: label, status: "manual", field: { label, kind: "file", hints: "", required: false, current: "", accept } }) as unknown as ReviewRow;
+  const letter = { name: "Cover Letter.pdf", mimeType: "application/pdf", data: "JVBERi0=", source: "generated" as const, id: "cover:cl-2" };
+
+  it("goes on the cover-letter upload, never the résumé's", () => {
+    const rows = withCoverLetterFile([upload("Resume/CV"), upload("Cover Letter")], letter);
+    expect(rows.map(({ status, write }) => [status, write?.type ?? null])).toEqual([["manual", null], ["ready", "file"]]);
+    expect(rows[1]!.proposed).toBe("Cover Letter.pdf");
+  });
+
+  it("leaves an upload that won't take a PDF, a form without one, or no pick, as they are", () => {
+    const wordOnly = [upload("Cover Letter", ".docx")];
+    expect(withCoverLetterFile(wordOnly, letter)).toBe(wordOnly);
+    const none = [upload("Resume/CV")];
+    expect(withCoverLetterFile(none, letter)).toBe(none);
+    const rows = [upload("Cover Letter")];
+    expect(withCoverLetterFile(rows, null)).toBe(rows);
   });
 });

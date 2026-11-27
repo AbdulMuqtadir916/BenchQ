@@ -12,7 +12,9 @@ type TickProps = {
 
 /** A round mark beside a field: empty while it needs filling, a green tick once it holds a value. */
 export function Tick({ isFilled, slot, isNew = false }: TickProps) {
-  return <span data-slot={slot} className={isNew ? `${TICK} animate-tick-in` : TICK} role="img" aria-label={isFilled ? "Filled" : "Not filled"} data-filled={isFilled}>
-    {isFilled && CHECK}
+  // As Simplify marks its checklist: a tick once filled, an amber "!" while the field still needs the BDE.
+  const look = isFilled ? TICK : `${TICK} border-transparent bg-[var(--color-warning-bg)] text-[var(--color-warning-fg)]`;
+  return <span data-slot={slot} className={isNew ? `${look} animate-tick-in` : look} role="img" aria-label={isFilled ? "Filled" : "Not filled"} data-filled={isFilled}>
+    {isFilled ? CHECK : <span aria-hidden="true" className="text-caption leading-none font-[800]">!</span>}
   </span>;
 }

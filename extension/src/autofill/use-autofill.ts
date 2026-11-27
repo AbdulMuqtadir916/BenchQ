@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
-import { DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, resumeUploadOf, withResumeFile } from "./documents";
+import { getCoverLetterFile, getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
+import { documentOf, DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, resumeUploadOf, withCoverLetterFile, withResumeFile } from "./documents";
 import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
 import { forgetOwnFiles } from "./own-files";
 import { checkJob, confirmationKey, hostOf } from "./job-check";
@@ -81,6 +81,8 @@ type Options = {
   /** A file the BDE picked from their computer for this candidate (the résumé card's upload button): it goes on the form
    * in place of the résumé's own, named the same way. Kept in the panel's memory only, never saved or sent to BenchQ. */
   pickedFile?: ResumeFile | null;
+  /** The cover letter picked for the form's cover-letter upload (the cover letter card); null for none. */
+  coverLetterId?: string | null;
   onSessionExpired: () => void;
   onAccessLost: () => void;
   /** The tab shows another job's page the BDE hasn't kept (the panel asks whether to disconnect): nothing fills, on its
@@ -236,7 +238,7 @@ function withSaveOfferIn(memory: TabMemory, built: ReadonlyMap<string, unknown>,
 /** One connected tab's review, held in memory: scan the page, match it against the picked résumé's answers, fill what
  * has an answer, verify it stuck, follow what happens on the form, and undo. Unmounting (another tab, sign-out) drops
  * the answers. */
-export function useAutofill({ connection, firmId, resumeId, fileName = null, pickedFile = null, onSessionExpired, onAccessLost, isHeld = false }: Options) {
+export function useAutofill({ connection, firmId, resumeId, fileName = null, pickedFile = null, coverLetterId = null, onSessionExpired, onAccessLost, isHeld = false }: Options) {
   // Read when a fill is about to start, which can be well after the render that started its run (a next page settles).
   const held = useRef(isHeld);
   // Each Autofill run's id: a wait for ADP's form that ran out isn't repeated within the run (page/events.ts).
@@ -285,12 +287,14 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const shownRows = useRef<ReviewRow[] | null>(null);
   // The answers the latest scan took, with what came with them, and the file: always one résumé's, never a mix.
   // `isRefused`: a file was offered that the form's upload won't take, so nothing is to replace what's attached.
-  const bank = useRef<(Answers & { resumeId: string | null; file: ResumeFile | null; isRefused: boolean }) | null>(null);
+  const bank = useRef<(Answers & { resumeId: string | null; file: ResumeFile | null; isRefused: boolean; letter: ResumeFile | null }) | null>(null);
   /** The newest scan's page, for the check a next page runs between renders (followPage). */
   const latestSignals = useRef<Parameters<typeof checkJob>[1]>(null);
   // The picked résumé's files, by version and kind: a version's file never changes, so each is fetched once, and a form
   // that takes only Word doesn't have the PDF made again on every look. Null: not found.
   const files = useRef(new Map<string, Omit<ResumeFile, "name"> | null>());
+  // The picked cover letters' PDFs, by letter: each is made once. Null: not found.
+  const letters = useRef(new Map<string, Omit<ResumeFile, "name"> | null>());
   // The name of the file Autofill attaches to the résumé upload, while the picked résumé has one, and where it came from.
   const [attachment, setAttachment] = useState<string | null>(null);
   const [attachmentSource, setAttachmentSource] = useState<ResumeFileSource | null>(null);
@@ -351,6 +355,19 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     return found && named({ ...found, id: `benchq:${key}` }, found.mimeType === DOCX_MIME ? "docx" : "pdf");
   }, [firmId, candidateId, resumeId, fileName, pickedFile]);
 
+  /** The picked cover letter's PDF for the form's cover-letter upload; none picked, none. One that won't load leaves the
+   * upload to the BDE. */
+  const loadCoverLetter = useCallback(async (): Promise<ResumeFile | null> => {
+    if (!coverLetterId) return null;
+    let found = letters.current.get(coverLetterId);
+    if (found === undefined) {
+      found = await getCoverLetterFile(coverLetterId).then((file) => file && { ...file, source: "generated" as const }, () => undefined);
+      if (found === undefined) return null;
+      letters.current.set(coverLetterId, found);
+    }
+    return found && { ...found, name: "Cover Letter.pdf", id: `cover:${coverLetterId}` };
+  }, [coverLetterId]);
+
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
       const missing = await missingAccess(tabId);
@@ -385,7 +402,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const review = useCallback((fields: TabField[], answers: BankEntry[], justFilled?: ReadonlySet<string>) => {
     const withSaveOffer = withSaveOfferIn(memory.current, bank.current?.built ?? new Map(), bank.current?.answered ?? new Map(),
       bank.current?.resumeId ?? null);
-    const reviewed = withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY), bank.current?.file ?? null);
+    const reviewed = withCoverLetterFile(withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY),
+      bank.current?.file ?? null), bank.current?.letter ?? null);
     const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
     showRows(next);
     // While the panel asks whether the tab moved on to another job, the look goes on (it's how the job is checked), but
@@ -413,6 +431,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     isScanRunning.current = true;
     setScanning(true);
     const reused = reuseBank && bank.current?.resumeId === resumeId ? bank.current : null;
+    // The cover letter's PDF loads alongside the answers: BenchQ makes it the first time, which takes a moment.
+    const letterLoad = loadCoverLetter();
     // A next page of the form keeps the answers; its file is looked at again (kept by version, so nothing is fetched).
     const [answers, loaded] = reused ? [reused, await loadFile()] : await Promise.all([loadAnswers(), loadFile()]);
     const page = answers ? await readPage(isCurrent) : null;
@@ -421,6 +441,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     // file the upload won't take stays off the form: it's the BDE's to attach.
     const wanted = page && loaded?.source !== "picked" ? formatFor(page.fields, loaded?.mimeType ?? PDF_MIME) : null;
     const offered = wanted ? await loadFile(wanted) : loaded;
+    const letter = await letterLoad;
     const file = offered && fitsUpload(page?.fields ?? [], offered.mimeType, offered.name) ? offered : null;
     // The kinds the upload takes when the file offered isn't one: the Resume section says so and keeps the BDE's controls.
     const refused = offered && !file && page ? resumeUploadOf(page.fields)?.accept ?? "" : null;
@@ -439,7 +460,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
           setAttachedFile(null);
         }
         memory.current.lastScan = topScan;
-        bank.current = { ...answers, resumeId, file, isRefused: refused !== null };
+        bank.current = { ...answers, resumeId, file, isRefused: refused !== null, letter };
         heldLook.current = isHeldAtStart || held.current;
         review(page.fields, answers.entries, justFilled);
         setAttachment(file?.name ?? null);
@@ -463,7 +484,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       isScanRunning.current = false;
       setScanning(false);
     }
-  }, [applicationId, candidateId, resumeId, pickedFile, tabId, loadAnswers, loadFile, readPage, review]);
+  }, [applicationId, candidateId, resumeId, pickedFile, tabId, loadAnswers, loadFile, loadCoverLetter, readPage, review]);
   // The scan for the current résumé, for a click that started before the résumé changed (Allow, while Chrome asks).
   const currentScan = useRef(scan);
   useEffect(() => { currentScan.current = scan; }, [scan]);
@@ -642,7 +663,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
         filled.push(row);
         memory.current.filledFrom.set(memoKeyOf(row), resume.current);
         memory.current.wrote.set(memoKeyOf(row), write.type === "file" ? fileKey(write) : row.proposed ?? "");
-        if (write.type === "file") {
+        if (write.type === "file" && documentOf(row.field) !== "cover-letter") {
           memory.current.attached.set(memoKeyOf(row), write.name);
           memory.current.attachedId.set(memoKeyOf(row), fileKey(write));
           setAttachedFile(write.name);
