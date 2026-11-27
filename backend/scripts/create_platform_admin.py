@@ -13,10 +13,11 @@ import sys
 
 from fastapi import HTTPException
 
+from backend import startup_checks
 from backend.auth.invites import account_exists, normal_email
 from backend.auth.passwords import MIN_PASSWORD_LENGTH, hash_password
 from backend.models.db import SessionLocal
-from backend.models.tenancy import LedgerEntry, PlatformUser
+from backend.models.tenancy import ActivityEntry, PlatformUser
 
 
 class Refused(Exception):
@@ -26,8 +27,8 @@ class Refused(Exception):
 def create_platform_admin(db, *, email: str, name: str, password: str) -> PlatformUser:
     try:
         address = normal_email(email)
-    except HTTPException:
-        raise Refused("Enter a valid email address.")
+    except HTTPException as refused:               # not an email, or (production) a testing domain's
+        raise Refused(refused.detail)
     name = name.strip()
     if not name:
         raise Refused("Enter a name.")
@@ -39,7 +40,7 @@ def create_platform_admin(db, *, email: str, name: str, password: str) -> Platfo
     db.add(admin)
     db.flush()
     # A platform event (A13): no firm, and no person did it, so the actor is the system.
-    db.add(LedgerEntry(firm_id=None, actor_type="SYSTEM", actor_user_id=None, actor_name="create_platform_admin",
+    db.add(ActivityEntry(firm_id=None, actor_type="SYSTEM", actor_user_id=None, actor_name="create_platform_admin",
                        entity_type="platform_user", entity_id=str(admin.id), entity_label=name, action="CREATE",
                        summary=f"Created Super Admin {name} ({address}) from the command line"))
     db.commit()
@@ -61,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", required=True)
     parser.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
     db = SessionLocal()
     try:
         admin = create_platform_admin(db, email=args.email, name=args.name,

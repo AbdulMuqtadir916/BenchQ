@@ -186,6 +186,8 @@ def _clean_db(_schema):
         db_mod.engine.dispose()           # drops connections a failed test left mid-transaction
         with db_mod.engine.begin() as conn:
             conn.execute(text("SET LOCAL lock_timeout = '10s'"))
+            # activity_logs refuses a TRUNCATE unless the reset names itself for this transaction (0033).
+            conn.execute(text("SET LOCAL benchq.activity_logs_demo_reset = 'on'"))
             names = [r[0] for r in conn.execute(text(
                 "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'alembic_version'"))]
             conn.execute(text("TRUNCATE " + ", ".join(f'"{n}"' for n in names) + " RESTART IDENTITY CASCADE"))

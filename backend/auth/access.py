@@ -116,7 +116,10 @@ ROUTE_ACCESS: dict[str, Access] = {
     # The job screens' firm-level reads (job search PR 3): only the candidates the principal sees.
     "GET /api/firms/{firm_id}/job-postings": F,
     "GET /api/firms/{firm_id}/job-postings/{posting_id}": F,
-    "GET /api/firms/{firm_id}/ledger": F,          # a BDE gets their own entries only (routes_ledger)
+    "GET /api/firms/{firm_id}/ledger": F,          # limited by role in routes_ledger
+    "GET /api/firms/{firm_id}/ledger/people": F,
+    "GET /api/firms/{firm_id}/ledger/candidates": F,
+    "GET /api/firms/{firm_id}/ledger/days": F,
     "POST /api/analyze/{job_id}": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/inbox": F,
     "GET /api/firms/{firm_id}/candidates/{candidate_id}/email-reviews": F,
@@ -199,6 +202,12 @@ ROUTE_ACCESS: dict[str, Access] = {
     "GET /api/admin/candidate-usage": A,                 # counts only (job search PR 3)
     "GET /api/admin/team": A,
     "GET /api/admin/audit": A,
+    "GET /api/admin/activity": A,
+    "GET /api/admin/activity/overview": A,
+    "GET /api/admin/activity/people": A,
+    "GET /api/admin/activity/days": A,
+    "GET /api/admin/activity/candidates": A,
+    "GET /api/admin/activity/{entry_id}/ip": A,
     # The Super Admin's AI setup (docs/integration/08-ai-presets.md).
     "GET /api/admin/ai": A,
     "GET /api/admin/ai/available-models": A,
@@ -212,7 +221,6 @@ ROUTE_ACCESS: dict[str, Access] = {
     "POST /api/admin/ai/presets/{preset_id}/restore": A,
     "POST /api/admin/ai/presets/{preset_id}/test-run": A,
     "PATCH /api/admin/ai/limits": A,
-    "GET /api/activity-log": A,                    # the system log, not the business ledger (07-auth §6.6)
     "POST /api/auto-reject/run": A,
     "POST /api/companies": A,                      # companies are global reference data
     "POST /api/companies/auto-create-from-jobs": A,
@@ -323,9 +331,10 @@ async def enforce(request: Request, call_next):
         return _refuse(404, "Not Found") if IS_PRODUCTION else await call_next(request)
 
     # CSRF (07-auth §2): a browser always sends Origin on a cross-site POST, so one from elsewhere is refused.
-    # Clients without a browser (the Telegram webhook, curl) send none and carry no cookie to abuse.
+    # Clients without a browser (the Telegram webhook, curl) send none and carry no cookie to abuse. ALLOWED_ORIGINS
+    # is the one list CORS uses too (backend/config.py, lower-cased; validated at start in production, step 6).
     origin = request.headers.get("origin")
-    if request.method in UNSAFE_METHODS and origin is not None and origin not in ALLOWED_ORIGINS:
+    if request.method in UNSAFE_METHODS and origin is not None and origin.strip().lower() not in ALLOWED_ORIGINS:
         logger.warning("refused cross-origin %s from %r", key, origin)
         return _refuse(403, "Cross-origin request refused")
     if access is Access.PUBLIC:

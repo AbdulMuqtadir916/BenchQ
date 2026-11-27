@@ -80,7 +80,7 @@ def _list(client, world, who):
 # ── Creating ─────────────────────────────────────────────────────────────────
 
 def test_the_owner_hands_a_candidate_to_a_manager(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     r = _create(anonymous_client, world, handoff_note="  Prefers banking.  ")
     assert r.status_code == 201, r.text
     c = r.json()
@@ -88,7 +88,7 @@ def test_the_owner_hands_a_candidate_to_a_manager(anonymous_client, test_db, wor
                                                                        "ON_BENCH", "ravi@example.com")
     assert not {"persona", "skills", "summary_state"} & set(c)            # the active base's now (migration 0015)
     assert c["target_roles"] == ["Java Developer"]
-    entries = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"]).order_by(LedgerEntry.created_at).all()
+    entries = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"]).order_by(ActivityEntry.created_at).all()
     assert [(e.action, e.summary, e.note) for e in entries] == [
         ("CREATE", "Added Ravi Teja", None), ("ASSIGN", "Handed to Fatima Reddy", "Prefers banking.")]
 
@@ -298,11 +298,11 @@ def _assign(client, world, who, candidate, manager, bde=None, note=None):
 
 
 def test_the_owner_moves_a_candidate_across_teams_into_the_new_queue(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _create(anonymous_client, world, bde="adnan").json()
     r = _assign(anonymous_client, world, "owner", c, "priya", note="Over to you.")
     assert (r.json()["manager_id"], r.json()["bde_id"]) == (str(world["people"]["priya"].id), None)
-    last = test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"]).order_by(LedgerEntry.created_at.desc()).first()
+    last = test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"]).order_by(ActivityEntry.created_at.desc()).first()
     assert (last.action, last.summary, last.note) == ("ASSIGN", "Handed to Priya Shah (from Adnan Khan)", "Over to you.")
     assert _list(anonymous_client, world, "priya") == {"Ravi Teja"} and _list(anonymous_client, world, "adnan") == set()
 
@@ -316,10 +316,10 @@ def test_a_manager_moves_only_between_their_own_bdes(anonymous_client, world):
 
 
 def test_an_unchanged_assignment_writes_nothing(anonymous_client, test_db, world):
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _create(anonymous_client, world, bde="adnan").json()
     _assign(anonymous_client, world, "owner", c, "fatima", "adnan")
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "ASSIGN").count() == 1
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "ASSIGN").count() == 1
 
 
 # ── Editing ──────────────────────────────────────────────────────────────────
@@ -394,15 +394,15 @@ def test_an_edit_keeps_a_place_for_the_job_search(anonymous_client, world):
 
 def test_the_ledger_names_what_changed(anonymous_client, world, test_db):
     """One UPDATE entry naming the fields that changed; nothing changed, no entry."""
-    from backend.models.tenancy import LedgerEntry
+    from backend.models.tenancy import ActivityEntry
     c = _create(anonymous_client, world, bde="adnan", rate_target=80).json()
     r = _patch(anonymous_client, world, c, "adnan", rate_target=80, notice_period_days=7)
     assert r.status_code == 200, r.text
-    entry = (test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "UPDATE")
+    entry = (test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "UPDATE")
              .one())
     assert entry.summary == "Updated notice period days"                                # the rate didn't change
     _patch(anonymous_client, world, c, "adnan", rate_target=80)
-    assert test_db.query(LedgerEntry).filter(LedgerEntry.entity_id == c["id"], LedgerEntry.action == "UPDATE").count() == 1
+    assert test_db.query(ActivityEntry).filter(ActivityEntry.entity_id == c["id"], ActivityEntry.action == "UPDATE").count() == 1
 
 
 @pytest.mark.parametrize("fixed", [{"target_roles": ["Data Engineer"]}, {"search_titles": ["AI Engineer"]},

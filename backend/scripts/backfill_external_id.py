@@ -36,6 +36,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from backend import startup_checks
 from backend.models.db import SessionLocal, Job
 from backend.scraper._shared.dedup import make_external_id
 
@@ -153,6 +154,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Compute and print counts only. No writes.")
     parser.add_argument("--apply", action="store_true", help="Write the recomputed external_id values.")
     args = parser.parse_args()
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
 
     if args.dry_run and args.apply:
         parser.error("pass either --dry-run or --apply, not both")

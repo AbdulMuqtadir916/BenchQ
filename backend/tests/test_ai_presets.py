@@ -15,7 +15,7 @@ from backend.inbox.decider import config_identity
 from backend.models.ai_presets import AiModel, AiProvider
 from backend.models.candidates import ResumeParse
 from backend.models.db import LlmCallLog, utcnow
-from backend.models.tenancy import LedgerEntry
+from backend.models.tenancy import ActivityEntry
 from backend.tests.ai_support import edit_active, set_up_ai
 from backend.tests.auth_support import make_user
 from backend.tests.test_migration_0002 import scratch_db  # noqa: F401  (the fixture)
@@ -78,7 +78,7 @@ def test_the_key_is_encrypted_and_never_comes_back(api_client, test_db, ai):
     row = test_db.get(AiProvider, 1)
     assert b"sk-real-secret" not in bytes(row.api_key_encrypted) and store.shared_key(test_db) == "sk-real-secret-9876"
     assert len(ai["models"]) == 4
-    entry = test_db.query(LedgerEntry).filter(LedgerEntry.entity_type == "ai_provider").one()
+    entry = test_db.query(ActivityEntry).filter(ActivityEntry.entity_type == "ai_provider").one()
     assert entry.firm_id is None and "sk-real" not in entry.summary
 
 

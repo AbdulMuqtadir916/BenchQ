@@ -59,7 +59,7 @@ export interface RouteDef {
   access: RouteAccess;
   /** What a role with "none" sees. Default: the Forbidden screen in place. */
   onDenied?: "forbidden" | "landing";
-  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon };
+  nav?: { section: "workspace" | "preferences" | "settings" | "notifications" | "admin"; order: number; icon?: LucideIcon; /** The sidebar's name, when it isn't `title`. */ label?: string };
   /** Second key of a `g` shortcut, e.g. "c" for `g c`. */
   shortcut?: string;
   palette?: boolean;
@@ -105,7 +105,7 @@ const ROUTE_DEFS = [
   // One version's Autofill screen (07 Q6, Q13): the studio's access; editing follows canChangeResume, as saving does.
   { id: "resumes.autofill", path: "/[firm]/resumes/[id]/autofill", title: "Autofill answers", area: "firm", shell: "studio", access: firm(roles("full", "team", "assigned", "read")) },
   { id: "outreach", path: "/[firm]/outreach", title: "Outreach", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 7, icon: Mail }, palette: true },
-  { id: "ledger", path: "/[firm]/ledger", title: "Ledger", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText }, palette: true },
+  { id: "ledger", path: "/[firm]/ledger", title: "Activity logs", area: "firm", shell: "app", access: firm(roles("full", "team", "own", "read")), nav: { section: "workspace", order: 8, icon: ScrollText, label: "Activity" }, palette: true },
   { id: "focus", path: "/[firm]/focus", title: "Focus mode", area: "firm", shell: "focus", palette: true, access: firm(roles("none", "none", "full", "none"), "none") }, // BDE only (Zuhair 2026-11-12, replaces Q3)
 
   // Preferences
@@ -133,7 +133,7 @@ const ROUTE_DEFS = [
   { id: "admin.firms.detail.plan", path: "/admin/firms/[firmId]/plan", title: "Firm plan", area: "platform", shell: "admin", access: PLATFORM },
   { id: "admin.firms.detail.activity", path: "/admin/firms/[firmId]/activity", title: "Firm activity", area: "platform", shell: "admin", access: PLATFORM },
   { id: "admin.plans", path: "/admin/plans", title: "Plans", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 3, icon: Layers }, shortcut: "p", palette: true },
-  { id: "admin.audit", path: "/admin/audit", title: "Audit", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText }, shortcut: "a", palette: true },
+  { id: "admin.audit", path: "/admin/audit", title: "Activity logs", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 4, icon: ScrollText, label: "Activity" }, shortcut: "a", palette: true },
   { id: "admin.system", path: "/admin/system", title: "System", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 5, icon: Activity }, shortcut: "s", palette: true },
   { id: "admin.team", path: "/admin/team", title: "Team", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 6, icon: Users }, shortcut: "t", palette: true },
   { id: "admin.aiPresets", path: "/admin/ai-presets", title: "AI presets", area: "platform", shell: "admin", access: PLATFORM, nav: { section: "admin", order: 7, icon: Sparkles }, shortcut: "i", palette: true },

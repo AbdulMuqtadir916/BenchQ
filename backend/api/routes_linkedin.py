@@ -5,9 +5,10 @@ import os
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
+from backend.auth.platform_actions import did_nothing, logs_platform_action
 from backend.job_monitor import launch_background, JobAlreadyRunningError
 from backend.scraper.sources.linkedin_extension import _SESSION_PATH
 
@@ -56,26 +57,29 @@ def session_status():
     }
 
 
-@router.post("/session/refresh", status_code=202)
-async def session_refresh():
+@router.post("/session/refresh", status_code=202, dependencies=[Depends(logs_platform_action("Started a LinkedIn session refresh", entity_type="linkedin_session"))])
+async def session_refresh(request: Request):
     """Start the interactive login. Poll /session until phase leaves 'running'."""
     from backend import refresh_linkedin_session as rls
 
     if rls.STATE.get("phase") in ("running", "awaiting_pin"):
+        did_nothing(request)                    # one is already under way: nothing started
         return {"run_id": None, "status": rls.STATE["phase"]}
     try:
         run_id = launch_background("linkedin_session_refresh", rls.run_refresh,
                                    trigger="manual", scope_key="linkedin")
     except JobAlreadyRunningError:
+        did_nothing(request)
         return {"run_id": None, "status": "running"}
     return {"run_id": run_id, "status": "running"}
 
 
-@router.post("/session/pin")
-def session_pin(body: PinIn):
+@router.post("/session/pin", dependencies=[Depends(logs_platform_action("Pinned the LinkedIn session", entity_type="linkedin_session", action="UPDATE"))])
+def session_pin(body: PinIn, request: Request):
     """Hand the emailed PIN to the waiting login (it polls PIN_FILE)."""
     digits = "".join(c for c in (body.pin or "") if c.isdigit())
     if not digits:
+        did_nothing(request)                    # nothing was pinned
         return {"ok": False, "detail": "Enter the digits from LinkedIn's email."}
     with open(PIN_FILE, "w") as f:
         f.write(digits)

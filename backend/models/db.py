@@ -39,7 +39,10 @@ _engine_kwargs = {"pool_pre_ping": True, "hide_parameters": True}
 if not DATABASE_URL.startswith("sqlite"):
     _engine_kwargs.update(pool_size=20, max_overflow=10, pool_timeout=5, pool_recycle=1800,
                           connect_args={"connect_timeout": 5, "options": "-c statement_timeout=60s"})
-engine = create_engine(DATABASE_URL, **_engine_kwargs)
+# DATABASE_URL unset: the start-up check refuses to start with the variable's name (backend/startup_checks.py). The
+# engine still builds, so importing the models never crashes first; a `.invalid` host never resolves, so nothing can
+# connect anywhere by accident.
+engine = create_engine(DATABASE_URL or "postgresql://database-url-unset.invalid/unset", **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -578,18 +581,6 @@ class LlmCallLog(Base):
     # The AI preset and version the call ran with (08 Q5); null for code outside the presets and for older rows.
     preset_id = Column(UUID(as_uuid=True), ForeignKey("ai_presets.id", ondelete="SET NULL"), nullable=True)
     preset_version = Column(Integer, nullable=True)
-
-
-# ── Activity Log ────────────────────────────────────────────────────────────
-class ActivityLog(Base):
-    __tablename__ = "activity_log_v2"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type = Column(String, nullable=False)       # scrape | h1b | cv_score | email | telegram
-    message = Column(Text, nullable=False)
-    company = Column(String, nullable=True)
-    details = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
 # ── Resumes ─────────────────────────────────────────────────────────────────

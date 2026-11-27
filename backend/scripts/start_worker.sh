@@ -4,5 +4,7 @@
 # The migration runs under an advisory lock and is a no-op at the newest revision, so the worker and the API may both
 # start it: whichever comes second waits, then finds nothing to do, and the worker never starts on an old schema.
 set -e
+# The settings first (backend/startup_checks.py): a misconfigured deploy stops before the migration changes anything.
+python -m backend.scripts.check_config --role worker
 python -m backend.scripts.db_upgrade
 exec python -m backend.worker
