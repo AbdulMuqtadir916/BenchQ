@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
+from backend import config
 from backend.auth import ledger
 from backend.auth.tokens import hash_token, new_token
 from backend.models.db import utcnow
@@ -27,6 +28,28 @@ RESERVED_SLUGS = (
 )
 
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+# Top-level domains reserved for testing (RFC 2606, RFC 6761): no real mailbox has one. The demo accounts use .test
+# (docs/03 §3.2). In production no invite goes to one and no account with one signs in (docs/team/uzair.md, step 6).
+TEST_DOMAINS = (".test", ".example", ".invalid", ".localhost")
+TEST_EMAIL_REFUSED = ("This is a test address, and BenchQ invites only real ones. Use the person's own email "
+                      "address.")
+
+
+def is_test_email(address: str) -> bool:
+    domain = address.strip().lower().rpartition("@")[2].rstrip(".")
+    return any(domain == tld[1:] or domain.endswith(tld) for tld in TEST_DOMAINS)
+
+
+def is_test_account(address: str) -> bool:
+    """In production, an account on a testing domain is refused at sign-in (backend/api/routes_auth.py)."""
+    return config.IS_PRODUCTION and is_test_email(address)
+
+
+def refuse_test_email(address: str) -> None:
+    """In production, a 400 for an address on a testing domain; nothing in development (the tests and the demo seed
+    use them)."""
+    if config.IS_PRODUCTION and is_test_email(address):
+        raise bad_request(TEST_EMAIL_REFUSED)
 
 
 def bad_request(detail: str) -> HTTPException:
@@ -63,6 +86,7 @@ def normal_email(email: str) -> str:
     address = email.strip().lower()
     if not _EMAIL.match(address) or len(address) > 320:
         raise bad_request("Enter a valid email address.")
+    refuse_test_email(address)
     return address
 
 
@@ -160,6 +184,7 @@ def resend_invite(db: DbSession, invite: Invite, *, actor: User | PlatformUser, 
     """Same row, a new token, expiry now + 7 days (A9); the old link stops working. Logs INVITE_SENT
     "Invite resent to …" (Q24). An expired BDE invite takes a seat again, so it is blocked at the limit (A4, 07 Q44).
     "Copy link" is a resend, because only the token's hash is kept (07 Q38). Returns the new token."""
+    refuse_test_email(invite.email)
     status = effective_status(invite, now)
     if status not in ("PENDING", "EXPIRED"):
         raise conflict("Only a pending or expired invite can be resent.")

@@ -19,6 +19,7 @@ import collections
 import logging
 import sys
 
+from backend import startup_checks
 from backend.analyzer.location import _places_of, apply_location_to_job, parse
 from backend.models.db import Job, JobLocation, SessionLocal
 
@@ -129,6 +130,8 @@ def main(argv=None):
                               "the ones the parser now reads differently, rows "
                               "with parsed columns included"))
     args = parser.parse_args(argv)
+    # The settings first, before anything touches the database (backend/startup_checks.py; uzair.md step 6).
+    startup_checks.require_config("worker")
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     report = run(commit=args.commit, reparse=args.reparse)

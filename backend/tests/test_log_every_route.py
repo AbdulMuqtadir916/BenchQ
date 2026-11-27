@@ -22,6 +22,7 @@ from sqlalchemy import text as sql_text
 
 import backend.main  # noqa: F401  configures logging, as the running app does
 import backend.tests.log_leak_cases as leak_cases
+from backend.tests.header_support import assert_security_headers
 from backend.tests.problem_support import LEFTOVER_DEFAULT_CODES, LEFTOVER_SHAPE, assert_problem
 from backend.tests.route_sweep import build_request, seed_every_table, stub_outside
 from backend.tests.test_logging_canary import MARKERS
@@ -178,6 +179,8 @@ def test_no_route_writes_planted_values_to_the_log(route, swept, api_client, tes
     # Details body with a registered code, but the leftovers' hand-built ones (problem_support.LEFTOVER_SHAPE).
     if not reached and route not in LEFTOVER_SHAPE and response.status_code != 303:
         assert_problem(response, route)
+    # And the security headers (docs/team/uzair.md step 6; backend/security_headers.py), whatever the route answered.
+    assert_security_headers(response, route)
     if route in NOT_REACHED:
         assert not reached, f"{route} gets through now: remove it from NOT_REACHED"
     else:

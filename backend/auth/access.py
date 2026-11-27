@@ -331,9 +331,10 @@ async def enforce(request: Request, call_next):
         return _refuse(404, "Not Found") if IS_PRODUCTION else await call_next(request)
 
     # CSRF (07-auth §2): a browser always sends Origin on a cross-site POST, so one from elsewhere is refused.
-    # Clients without a browser (the Telegram webhook, curl) send none and carry no cookie to abuse.
+    # Clients without a browser (the Telegram webhook, curl) send none and carry no cookie to abuse. ALLOWED_ORIGINS
+    # is the one list CORS uses too (backend/config.py, lower-cased; validated at start in production, step 6).
     origin = request.headers.get("origin")
-    if request.method in UNSAFE_METHODS and origin is not None and origin not in ALLOWED_ORIGINS:
+    if request.method in UNSAFE_METHODS and origin is not None and origin.strip().lower() not in ALLOWED_ORIGINS:
         logger.warning("refused cross-origin %s from %r", key, origin)
         return _refuse(403, "Cross-origin request refused")
     if access is Access.PUBLIC:

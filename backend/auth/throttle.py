@@ -85,8 +85,10 @@ def record_failure(request: Request, email: str) -> tuple[str, tuple[int, float]
 
 
 def clear(request: Request, email: str) -> None:
-    for key, _ in _sign_in_buckets(request, email):
-        _hits.pop(key, None)
+    """A successful sign-in forgets the email's failures only. The IP's count runs out its own window: clearing it
+    too let anyone with an account reset the per-IP lock by signing in to it between guesses at other accounts
+    (docs/team/uzair.md, step 6)."""
+    _hits.pop(f"email:{email}", None)
 
 
 def check_invite_accept(request: Request) -> None:

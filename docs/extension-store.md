@@ -25,7 +25,8 @@ correct. The privacy text in particular needs a person who is responsible for it
 5. Put `chrome-extension://<the item's ID>` in the production backend's `ALLOWED_ORIGINS`, next to
    `https://app.benchq.io`, **before submitting**: the reviewer marks a job applied, and without it every write the
    extension makes (Mark applied, Add job, saving an answer, tailoring) is refused with 403 "Cross-origin request
-   refused" (`backend/auth/access.py`). Never `chrome-extension://*`.
+   refused" (`backend/auth/access.py`). Never `chrome-extension://*`. Exactly the 32-letter ID, lower-case, no
+   trailing slash: production refuses to start with any other shape (`backend/startup_checks.py`).
 6. **Production backend up to date:** redeploy it from `main`, with its migrations, so every route the extension calls
    is there, including `GET /api/firms/{firm_id}/candidates/{candidate_id}/resumes/{resume_id}/file` (a résumé as a
    file, which the extension attaches to a form; PR #148). A reviewer who meets a missing route sees a broken extension.
