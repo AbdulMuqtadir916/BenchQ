@@ -247,3 +247,162 @@ describe("LinkedIn postings inside BenchQ (frame-rules.ts, decided 2026-11-17)",
     }
   });
 });
+it("opens the assistant from a page without issuing an autofill command", async () => {
+  const reply = vi.fn();
+  fake.runtime.onMessage.fire({ type: "assistant-open" }, { id: "extension-id", frameId: 0, tab: { id: 8, windowId: 4 } }, reply);
+  await settle();
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(reply).toHaveBeenCalledWith(true);
+  expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
+});
+
+it("checks site access before injecting a job detector", async () => {
+  fake.permissions.contains.mockResolvedValue(false);
+  fake.webNavigation.onCompleted.fire({ frameId: 0, tabId: 8, url: "https://example.test/jobs" });
+  await settle();
+  expect(fake.scripting.executeScript).not.toHaveBeenCalled();
+});
+it("offers Chrome site access for a listing URL before inspecting the page", async () => {
+  fake.permissions.contains.mockResolvedValue(false);
+  const url = "https://example.test/jobs/developer";
+  fake.webNavigation.onCompleted.fire({ frameId: 0, tabId: 8, url });
+  await settle();
+  expect(fake.permissions.addHostAccessRequest).toHaveBeenCalledWith({ tabId: 8, pattern: url });
+  expect(fake.scripting.executeScript).not.toHaveBeenCalled();
+  expect(fake.sidePanel.open).not.toHaveBeenCalled();
+});
+it("uses the source click to open the panel and bind the destination to the saved candidate job", async () => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  const reply = await new Promise(resolve => fake.runtime.onMessage.fire(
+    { type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(reply).toBe(true);
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(stored(101)).toMatchObject({ candidateId: "candidate-1", applicationId: "app-1", userId: "user-1" });
+  expect(fake.tabs.create).toHaveBeenCalledWith({ windowId: 4, url, active: false });
+  const writes = fake.storage.session.set.mock;
+  const sourceWrite = writes.calls.findIndex(([items]) => items["source-job:101"] === "job-42");
+  expect(writes.invocationCallOrder[sourceWrite]).toBeLessThan(fake.tabs.update.mock.invocationCallOrder[0]!);
+  // Add job saves this very job if the tab is disconnected later.
+  expect(fake.session.get("source-job:101")).toBe("job-42");
+  expect(fake.runtime.sendMessage).not.toHaveBeenCalled();
+  vi.restoreAllMocks();
+});
+it.each([
+  ["binds an Adzuna tracking redirect", "https://www.adzuna.com/land/ad/42", "https://www.adzuna.com/details/42?i=1", true],
+  ["does not bind a different Taleo requisition in the same tab", "https://acme.taleo.net/careersection/2/jobdetail.ftl?job=25000123", "https://acme.taleo.net/careersection/2/jobdetail.ftl?job=25000124", false],
+  ["binds a link that moved to another host of the same site", "https://boards.greenhouse.io/acme/jobs/42", "https://job-boards.greenhouse.io/acme/jobs/42", true],
+  ["leaves the tab unbound once it shows another site", "https://www.adzuna.example/land/ad/42", "https://elsewhere.example/", false],
+])("%s", async (_name, url, landed, isBound) => {
+  const api = await import("./api");
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url: landed }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire(
+    { type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(stored(101) !== undefined).toBe(isBound);
+  vi.restoreAllMocks();
+});
+it.each([
+  ["binds the one candidate who saved the job when the link names none", ["candidate-1"], true],
+  ["leaves it to Add job when two candidates saved the job", ["candidate-1", "candidate-2"], false],
+])("%s", async (_name, candidates, isBound) => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  const saved = vi.spyOn(api, "getSavedApplications").mockResolvedValue(candidates.map((candidate, index) => ({
+    id: `app-${index}`, candidate_id: candidate, job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  })));
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire({ type: "source-click", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL + "/firm/jobs", frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(saved).toHaveBeenCalledWith(undefined);
+  expect(stored(101) !== undefined).toBe(isBound);
+  vi.restoreAllMocks();
+});
+
+it("binds the one candidate who saved the job when the link names another candidate's copy of it", async () => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-41", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire({ type: "source-click", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL + "/firm/jobs", frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(stored(101)).toBeDefined();
+  vi.restoreAllMocks();
+});
+
+it("leaves a tab's existing connection alone on Open source", async () => {
+  const api = await import("./api");
+  const url = "https://jobs.example.test/apply/42";
+  fake.session.set(connectionKey(101), { tabId: 101, applicationId: "app-mine" });
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockResolvedValue([{
+    id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url,
+  }]);
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire({ type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(stored(101)).toMatchObject({ applicationId: "app-mine" });
+  vi.restoreAllMocks();
+});
+
+it("asks the panel in the job page's window whether BenchQ is open there", async () => {
+  fake.runtime.sendMessage.mockResolvedValueOnce(true);
+  const reply = await new Promise(resolve => fake.runtime.onMessage.fire({ type: "assistant-visible" },
+    { id: "extension-id", url: "https://jobs.example.test/42", frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "panel-window", windowId: 4 });
+  expect(reply).toBe(true);
+});
+
+it("keeps a connection made for the tab while the source lookup ran", async () => {
+  const api = await import("./api");
+  const store = await import("./autofill/connection-store");
+  const url = "https://jobs.example.test/apply/42";
+  vi.spyOn(api, "getSession").mockResolvedValue({ principal: { kind: "firm", role: "BDE", user_id: "user-1" } });
+  vi.spyOn(api, "getSavedApplications").mockImplementation(async () => {
+    store.countConnectionWrite(101);
+    return [{ id: "app-1", candidate_id: "candidate-1", job_id: "job-42", status: "saved", title: "Engineer", company: "Example", location: null, url }];
+  });
+  fake.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0, url }]);
+  await new Promise(resolve => fake.runtime.onMessage.fire(
+    { type: "source-click", candidateId: "candidate-1", jobId: "job-42", url },
+    { id: "extension-id", url: api.BENCHQ_URL, frameId: 0, tab: { id: 7, windowId: 4 } }, resolve));
+  expect(stored(101)).toBeUndefined();
+  vi.restoreAllMocks();
+});
+
+it("attaches the click listener to an existing BenchQ tab when the extension is installed", async () => {
+  const { BENCHQ_URL } = await import("./api");
+  fake.tabs.query.mockResolvedValue([{ id: 12, windowId: 1, url: BENCHQ_URL + "/firm/jobs" }]);
+  fake.runtime.onInstalled.fire();
+  await settle();
+  expect(fake.scripting.executeScript).toHaveBeenCalledWith({ target: { tabId: 12 }, files: ["source-click.js"] });
+});
+
+it("keeps the original click tab active until the panel has opened", async () => {
+  const { BENCHQ_URL } = await import("./api");
+  let opened!: () => void;
+  fake.sidePanel.open.mockImplementationOnce(() => new Promise<undefined>(resolve => { opened = () => resolve(undefined); }));
+  const reply = vi.fn();
+  fake.runtime.onMessage.fire({ type: "source-click", url: "https://jobs.example.test/42" },
+    { id: "extension-id", frameId: 0, tab: { id: 7, windowId: 4 }, url: BENCHQ_URL + "/firm/jobs" }, reply);
+  expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
+  expect(fake.tabs.create).not.toHaveBeenCalled();
+  opened();
+  await settle();
+  expect(fake.tabs.create).toHaveBeenCalledTimes(1);
+  expect(reply).toHaveBeenCalledWith(true);
+});

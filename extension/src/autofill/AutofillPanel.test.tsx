@@ -2,7 +2,7 @@
 import { act, cloneElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application } from "../api";
+import { applicationUrl, type Application } from "../api";
 import { installDialog } from "../test/dialog";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import AutofillPanel from "./AutofillPanel";
@@ -11,10 +11,16 @@ import type { AppliedForm, Connection, ReviewRow, TabField } from "./types";
 import { useAutofill } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
 import { useTailoring, type Tailoring } from "./use-tailoring";
+import { useCoverLetters } from "./use-cover-letters";
+import { usePageJob } from "./use-page-job";
+import { usePosting } from "./use-posting";
 
 vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
 vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
 vi.mock("./use-tailoring", async (actual) => ({ ...await actual<typeof import("./use-tailoring")>(), useTailoring: vi.fn() }));
+vi.mock("./use-cover-letters", () => ({ useCoverLetters: vi.fn(() => ({ letters: { status: "none" }, retry: vi.fn() })) }));
+vi.mock("./use-posting", () => ({ usePosting: vi.fn(() => ({ posting: { status: "none" }, retry: vi.fn() })) }));
+vi.mock("./use-page-job", async (actual) => ({ ...await actual<typeof import("./use-page-job")>(), usePageJob: vi.fn(() => null) }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 installDialog();
@@ -26,13 +32,14 @@ const connection = {
 
 const form: AppliedForm = { fields: [{ label: "City", value: "Dallas", required: false, source: "bde" }] };
 
-const finalForm = vi.fn(async () => form);
+const finalForm = vi.fn(async () => ({ form, complete: true }));
 const autofill = vi.fn();
+const undo = vi.fn();
 
 const holdsFile = vi.fn<(id: string) => boolean>(() => false);
 const reviewed = {
   rows: [], scanning: false, error: "", filling: false, outcome: null, undoable: 0, fillCount: 0, needsConfirmation: false, unreadableFrames: 0,
-  check: { conflict: false, detected: "" }, finalForm, autofill, holdsFile,
+  check: { conflict: false, detected: "" }, finalForm, autofill, undo, holdsFile,
 };
 
 const row = (label: string, required: boolean, current = ""): ReviewRow => ({
@@ -73,6 +80,7 @@ type State = {
   step?: string | null; error?: string;
   needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null; fileId?: string | null } | null;
+  resumeQueued?: boolean;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null; tabUrl?: string | null } = {}, resumes: Resumes = oneResume) {
@@ -101,7 +109,8 @@ function update(state: State, resumes: Resumes) {
 }
 
 const inBody = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-body'] > button")];
-const atBottom = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-actions'] button")];
+/** The panel's main actions, top to bottom: the big Autofill under the job (Simplify's), then those fixed at the foot. */
+const atBottom = () => [...host.querySelectorAll<HTMLButtonElement>("[data-slot='autofill-run'], [data-slot='autofill-actions'] button")];
 const named = (name: string) => [...host.querySelectorAll<HTMLButtonElement>("button")].find(({ textContent }) => textContent === name)!;
 const click = (name: string) => act(async () => { named(name).click(); });
 
@@ -117,12 +126,16 @@ afterEach(() => {
 });
 
 describe("Autofill", () => {
-  it("floats at the bottom of the panel, in reach however long the form, and gives no count", () => {
+  it("sits under the job as Simplify's big button, with the other actions fixed at the foot and the fields between, and gives no count", () => {
     show({ fillCount: 3, rows: [row("Email", true)] });
     expect(inBody()).toEqual([]);
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill this page"]);
     expect(atBottom()[0]!.className).toContain("bq-primary");
-    expect(host.querySelector("[data-slot='autofill-actions']")!.className).toContain("sticky");
+    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='autofill-run']")).toBeNull();
+    const actions = host.querySelector("[data-slot='autofill-actions']")!;
+    expect(actions.className).toContain("flex-none");
+    expect(host.querySelector("[data-slot='autofill-fields']")!.contains(actions)).toBe(false);
+    expect(host.querySelector("[data-slot='autofill-fields']")!.className).toContain("overflow-y-auto");
   });
 
   it("runs when clicked", () => {
@@ -146,7 +159,7 @@ describe("Autofill", () => {
 
   it("isn't complete while there's more to fill", () => {
     show({ fillCount: 2, outcome: { filled: 3, handedBack: 0, stopped: true } });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill"]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill this page"]);
     expect(host.querySelector("[data-slot='autofill-done']")).toBeNull();
   });
 
@@ -187,6 +200,16 @@ describe("the résumé the answers come from", () => {
     expect(named("Mark applied")).toBeUndefined();
   });
 
+  it("goes on with a run it left once it's back on the page, with no Autofill to press again", async () => {
+    show({ fillCount: 2, rows: [row("Email", true), row("Phone", true)], resumeQueued: true,
+      reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } }, { onApply: vi.fn() });
+    await act(async () => { await Promise.resolve(); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+    // Once: a later render doesn't queue it again.
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+  });
+
   it("refills after a connected application changes and holds Mark applied until the new résumé is in sync", async () => {
     let finish!: () => void;
     autofill.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
@@ -210,7 +233,7 @@ describe("the résumé the answers come from", () => {
     expect(named("Mark applied")).toBeDefined();
   });
 
-  it("keeps Mark applied available when a résumé was picked and the site then needed access: the queued fill waits, tracking doesn't", async () => {
+  it("keeps Mark applied disabled when a résumé was picked and the site still needs access", async () => {
     const access = { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" };
     const reviewedForBase = { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id };
     show({ fillCount: 1, rows: [row("Email", true)], reviewedFor: reviewedForBase }, { onApply: vi.fn() }, twoResumes);
@@ -224,7 +247,7 @@ describe("the résumé the answers come from", () => {
     await act(async () => { root!.render(element); });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
     expect(named("Mark applied")).toBeDefined();
-    expect(named("Mark applied").disabled).toBe(false);
+    expect(named("Mark applied").disabled).toBe(true);
     expect(autofill).not.toHaveBeenCalled();
     // Allowed later: the page is reviewed for the picked résumé, and the fill that was queued runs once.
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: [row("Email", true)], fillCount: 1, reviewedFor: { ...reviewedForBase, resumeId: tailored.id } } as unknown as ReturnType<typeof useAutofill>);
@@ -233,22 +256,22 @@ describe("the résumé the answers come from", () => {
     expect(autofill).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the one résumé as a plain row, with a way to view it in BenchQ (07 Q55)", () => {
+  it("shows the one résumé as Simplify's row, its role and tag, with the eye to view it in BenchQ (07 Q55)", () => {
     show({ fillCount: 1 });
     expect(picker().querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
+    // Which base and version, said on the row for screen readers, shown in the list.
     expect(picker().textContent).toContain("Base 1 · v2");
-    expect(picker().querySelector("a")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
-    expect(picker().querySelectorAll("button")).toHaveLength(0);
+    expect(picker().querySelector("[data-slot='resume-view']")!.getAttribute("href")).toContain("/acme-staffing/resumes/res-2");
+    expect(picker().querySelector("[data-slot='resume-only']")).toBeNull();
   });
 
-  it("says the one résumé is the only one, with a way to add another in BenchQ", () => {
+  it("lists the one résumé when opened, with a way to add another in BenchQ", async () => {
     show({ fillCount: 1 }, { resumesUrl: "https://app.test/acme-staffing/candidates/cand-1?tab=resumes" });
     expect(picker().querySelector("[data-slot='resume-count']")!.textContent).toBe("1 resume");
-    const only = picker().querySelector("[data-slot='resume-only']")!;
-    expect(only.textContent).toBe("Only resumeViewAdd another in BenchQ");
-    expect([...only.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual([
-      "http://localhost:3000/acme-staffing/resumes/res-2", "https://app.test/acme-staffing/candidates/cand-1?tab=resumes"]);
-    expect(picker().querySelector("[data-slot='resume-select']")).toBeNull();
+    await open();
+    expect(options().map((option) => option.getAttribute("aria-pressed"))).toEqual(["true"]);
+    const add = picker().querySelector("[data-slot='resume-add']")!;
+    expect([add.textContent, add.getAttribute("href")]).toEqual(["Add another in BenchQ", "https://app.test/acme-staffing/candidates/cand-1?tab=resumes"]);
   });
 
   it("says how many résumés there are to choose from, closed and open", async () => {
@@ -284,7 +307,7 @@ describe("the résumé the answers come from", () => {
     expect(options().map((option) => option.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
     expect(options()[0]!.textContent).toContain("From Base 1 · v1");
     expect(picker().querySelector("button")).toBe(select());
-    // No link on each row: one "View in BenchQ" at the menu's foot, for the résumé in use.
+    // No link on each row: one eye beside the select, for the résumé in use.
     expect([...picker().querySelectorAll("[data-slot='resume-choice'] a")]).toHaveLength(0);
     const view = picker().querySelector("[data-slot='resume-view']")!;
     expect([view.getAttribute("aria-label"), view.getAttribute("href")]).toEqual([`View ${base.label} in BenchQ`, "http://localhost:3000/acme-staffing/resumes/res-2"]);
@@ -305,6 +328,70 @@ describe("the résumé the answers come from", () => {
     expect(document.activeElement).toBe(options()[0]);
   });
 
+  /** Types `text` into the search box as a person would: React hears the input. */
+  const type = (input: HTMLInputElement, text: string) => act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, text);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const search = () => picker().querySelector<HTMLInputElement>("[data-slot='resume-search']")!;
+
+  it("previews the résumé in use from an eye beside the select, closed and open", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    const view = () => picker().querySelector("[data-slot='resume-view']")!;
+    expect(view().previousElementSibling).toBe(select());
+    expect([view().getAttribute("title"), view().getAttribute("target")]).toEqual(["Preview in BenchQ", "_blank"]);
+    await open();
+    expect(view().getAttribute("href")).toBe("http://localhost:3000/acme-staffing/resumes/res-2");
+  });
+
+  it("searches the open list by role, base or version, and Enter picks the first résumé it shows", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    expect(search().getAttribute("aria-label")).toBe("Search resumes");
+    await type(search(), "v1");
+    expect(options().map((option) => option.textContent)).toEqual([expect.stringContaining("From Base 1 · v1")]);
+    // One group left: its name goes, as when there are only bases.
+    expect(picker().querySelector("[data-slot='resume-group-title']")).toBeNull();
+    await type(search(), "nothing like it");
+    expect(options()).toHaveLength(0);
+    expect(picker().querySelector("[data-slot='resume-no-match']")!.textContent).toBe("No resume matches “nothing like it”.");
+    await type(search(), "TAILORED");
+    await act(async () => { search().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    expect(pick).toHaveBeenCalledWith(tailored.id);
+    expect(picker().querySelectorAll("[data-slot='resume-choice']")).toHaveLength(0);
+  });
+
+  it("clears the search with Esc, then closes, and opens again on every résumé", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    await type(search(), "v2");
+    expect(options()).toHaveLength(1);
+    await press(search(), "Escape");
+    expect([search().value, options().length]).toEqual(["", 2]);
+    await type(search(), "v2");
+    await press(search(), "Escape");
+    await press(search(), "Escape");
+    expect(select().getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(select());
+    await open();
+    expect([search().value, options().length]).toEqual(["", 2]);
+  });
+
+  it("moves between the search box and the rows with the arrow keys, and a letter typed on a row goes to the search", async () => {
+    show({ fillCount: 1 }, {}, twoResumes);
+    await open();
+    await press(search(), "ArrowDown");
+    expect(document.activeElement).toBe(options()[0]);
+    await press(options()[0]!, "ArrowUp");
+    expect(document.activeElement).toBe(search());
+    await press(options()[1]!, "j");
+    expect(document.activeElement).toBe(search());
+    // Space still picks the row it's on, as a button does: it never goes to the search.
+    options()[1]!.focus();
+    await press(options()[1]!, " ");
+    expect(document.activeElement).toBe(options()[1]);
+  });
+
   it("only closes the list when the résumé in use is chosen again", async () => {
     show({ fillCount: 1 }, {}, twoResumes);
     await open();
@@ -317,8 +404,8 @@ describe("the résumé the answers come from", () => {
     show({ fillCount: 1 }, {}, twoResumes);
     const tag = select().querySelector("[data-slot='resume-active']")!;
     expect(tag.textContent).toBe("Active");
-    // On the second line, after the base and version, so the role keeps the whole row.
-    expect(tag.parentElement!.textContent).toBe("Base 1 · v2Active");
+    // On the first line, right after the role, where it's seen at a glance.
+    expect(tag.parentElement!.textContent).toBe("Java DeveloperActive");
     expect(select().querySelector("[data-slot='resume-picked']")!.textContent).toBe("Java Developer");
     await open();
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
@@ -328,7 +415,7 @@ describe("the résumé the answers come from", () => {
 
   it("tags a résumé tailored for this job Tailored, as the website does, closed and in the list", async () => {
     show({ fillCount: 1 }, {}, { ...twoResumes, picked: tailored });
-    expect(select().querySelector("[data-slot='resume-tailored']")!.parentElement!.textContent).toBe("From Base 1 · v1Tailored");
+    expect(select().querySelector("[data-slot='resume-tailored']")!.parentElement!.textContent).toBe("Java DeveloperTailored");
     await open();
     const choices = [...picker().querySelectorAll("[data-slot='resume-choice']")];
     expect(choices.map((choice) => choice.querySelector("[data-slot='resume-tailored']")?.textContent ?? null)).toEqual(["Tailored", null]);
@@ -426,24 +513,59 @@ describe("the résumé the answers come from", () => {
     expect(resume.querySelector("[data-slot='document-attached']")!.textContent).toContain("Attached");
   });
 
-  it("shows an upload's file in one line, then Attached and Go to field, with nothing else to say (07 Q56)", () => {
+  it("lists the résumé's upload with the form's other fields, ticked once a file is on it (Simplify's list)", () => {
     const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
     show({ fillCount: 0, rows: [upload] });
-    const resume = host.querySelector("[data-document='resume']")!;
-    const file = resume.querySelector("[data-slot='document-attached']")!;
-    expect([file.querySelector("[data-slot='document-value']")!.getAttribute("title"), file.textContent]).toEqual(["cv.pdf", "cv.pdfAttachedGo to field"]);
-    expect(resume.querySelector("[data-slot='document-held']")).toBeNull();
-    expect(resume.querySelector("a")).toBeNull();
+    const label = [...host.querySelectorAll("[data-slot='review-label']")].find(({ textContent }) => textContent === "Resume/CV")!;
+    expect(label.closest("[data-slot='review-row']")!.querySelector("[data-slot='review-tick']")!.getAttribute("aria-label")).toBe("Filled");
+    expect(host.querySelector("[data-slot='document-attached']")).toBeNull();
   });
 
-  it("offers Change resume on an attached résumé when there's another to pick, opening the picker's list", async () => {
-    const upload = { key: "cv", status: "same", field: { label: "Resume/CV", kind: "file", hints: "", required: true, current: "cv.pdf" } } as unknown as ReviewRow;
-    show({ fillCount: 0, rows: [upload] }, {}, twoResumes);
-    const change = host.querySelector<HTMLButtonElement>("[data-document='resume'] [data-slot='document-change']")!;
-    expect(change.textContent).toBe("Change resume");
-    await act(async () => { change.click(); });
-    expect(select().getAttribute("aria-expanded")).toBe("true");
-    expect(options()).toHaveLength(2);
+  it("opens the filled form's fields under the job, Simplify's accordion, and shows the pickers again once it's closed", async () => {
+    show({ fillCount: 0, rows: [row("Email", true, "a@example.test")], outcome: { filled: 1, handedBack: 0, stopped: false } }, {}, twoResumes);
+    const fold = () => host.querySelector<HTMLButtonElement>("[data-slot='fields-fold']")!;
+    expect(fold().getAttribute("aria-expanded")).toBe("true");
+    expect(fold().textContent).toBe("Autofill complete! Every required field is filled");
+    // Up, the fields cover the pickers, which stay where they are, out of reach until the fields go down again.
+    const fields = host.querySelector<HTMLElement>("[data-slot='autofill-fields']")!;
+    const pickers = host.querySelector<HTMLElement>("[data-slot='autofill-pickers']")!;
+    expect([fields.dataset.state, pickers.hasAttribute("inert")]).toEqual(["up", true]);
+    await act(async () => { fold().click(); });
+    expect(fold().getAttribute("aria-expanded")).toBe("false");
+    expect([fields.dataset.state, pickers.hasAttribute("inert")]).toEqual(["down", false]);
+    expect(host.querySelector<HTMLElement>("#autofill-fields-list")!.hidden).toBe(true);
+    // Closed, the résumé can change, which fills the form again from it, as always.
+    await open();
+    await choose(0);
+    expect(pick).toHaveBeenCalledWith(tailored.id);
+  });
+
+  it("lists the job's cover letters, picks the newest for the form's upload, and hands the pick to Autofill", async () => {
+    vi.mocked(useCoverLetters).mockReturnValue({ letters: { status: "ready", letters: [
+      { id: "cl-2", name: "Discord letter", job_id: "posting-1", updated_at: "2026-11-27T10:00:00Z", created_at: null },
+      { id: "cl-1", name: "First draft", job_id: "posting-1", updated_at: "2026-11-20T10:00:00Z", created_at: null },
+    ] }, retry: vi.fn() });
+    const letter = { key: "cl", status: "manual", field: { label: "Cover Letter", kind: "file", hints: "", required: false, current: "" } } as unknown as ReviewRow;
+    show({ fillCount: 1, rows: [row("Email", true), letter] });
+    const card = host.querySelector("[data-slot='cover-letter-picker']")!;
+    expect(card.querySelector("[data-slot='cover-letter-select']")!.textContent).toBe("Discord letter");
+    expect(card.querySelector("[data-slot='cover-letter-no-field']")).toBeNull();
+    expect(vi.mocked(useAutofill).mock.lastCall![0].coverLetterId).toBe("cl-2");
+    await act(async () => { card.querySelector<HTMLButtonElement>("[data-slot='cover-letter-select']")!.click(); });
+    const letters = [...card.querySelectorAll<HTMLButtonElement>("[data-slot='cover-letter-option']")];
+    expect(letters.map(({ textContent }) => textContent)).toEqual(["No cover letter", expect.stringContaining("Discord letter"), expect.stringContaining("First draft")]);
+    await act(async () => { letters[0]!.click(); });
+    expect(vi.mocked(useAutofill).mock.lastCall![0].coverLetterId).toBeNull();
+    vi.mocked(useCoverLetters).mockReturnValue({ letters: { status: "none" }, retry: vi.fn() });
+  });
+
+  it("says when the form has no cover letter field, and when the job has no cover letter in BenchQ", () => {
+    vi.mocked(useCoverLetters).mockReturnValue({ letters: { status: "ready", letters: [] }, retry: vi.fn() });
+    show({ fillCount: 1, rows: [row("Email", true)] });
+    const card = host.querySelector("[data-slot='cover-letter-picker']")!;
+    expect(card.querySelector("[data-slot='cover-letter-no-field']")!.textContent).toBe("No field found");
+    expect(card.querySelector("[data-slot='cover-letter-none']")!.textContent).toBe("No cover letter for this job in BenchQ yet.");
+    vi.mocked(useCoverLetters).mockReturnValue({ letters: { status: "none" }, retry: vi.fn() });
   });
 
   it("says Autofill attaches its file when BenchQ has one (07 Q49)", () => {
@@ -562,10 +684,10 @@ describe("the résumé the answers come from", () => {
     expect(vi.mocked(useAutofill).mock.lastCall![0]).toMatchObject({ isHeld: false, pickedFile: { name: "slow.pdf" } });
   });
 
-  it("offers Use a different file on the card of a file BenchQ attached, never on one attached by hand (#148's review)", () => {
+  it("offers Use a different file for a file BenchQ attached, never for one attached by hand (#148's review)", () => {
     const onForm = (name: string) => ({ ...upload(), status: "same", field: { ...upload().field, current: name } }) as ReviewRow;
     show({ ...generated, fillCount: 0, rows: [onForm("Priya - Java Developer.pdf")], attachedFile: "Priya - Java Developer.pdf" });
-    expect(host.querySelector("[data-document='resume'] [data-slot='document-attached'] [data-slot='own-file-pick']")!.textContent).toBe("Use a different file");
+    expect(host.querySelector("[data-document='resume'] [data-slot='own-file-pick']")!.textContent).toBe("Use a different file");
     update({ ...generated, fillCount: 0, rows: [onForm("by-hand.pdf")], attachedFile: null }, oneResume);
     expect(host.querySelector("[data-slot='own-file-pick']")).toBeNull();
   });
@@ -649,14 +771,14 @@ describe("the résumé the answers come from", () => {
   it("shows why a file wasn't taken, though a file is already on the form (#148's review)", async () => {
     const attachedRow = { ...upload(), status: "same", field: { ...upload().field, current: "Priya - Java Developer.pdf" } } as ReviewRow;
     show({ ...generated, fillCount: 0, rows: [attachedRow], attachedFile: "Priya - Java Developer.pdf" });
-    const input = host.querySelector<HTMLInputElement>("[data-document='resume'] [data-slot='document-attached'] [data-slot='own-file-input']")!;
+    const input = host.querySelector<HTMLInputElement>("[data-document='resume'] [data-slot='own-file-input']")!;
     Object.defineProperty(input, "files", { value: [new File(["x"], "photo.png")], configurable: true });
     await act(async () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(host.querySelector("[data-document='resume'] [data-slot='own-file-error']")!.textContent).toBe("Pick a PDF or Word file.");
-    expect(host.querySelector("[data-slot='document-attached'] [data-slot='own-file-pick']")).not.toBeNull();
+    expect(host.querySelector("[data-document='resume'] [data-slot='own-file-pick']")).not.toBeNull();
   });
 
   it("says when the form's upload won't take the file, and keeps the BDE's controls", async () => {
@@ -746,13 +868,102 @@ describe("the keyboard shortcuts", () => {
 });
 
 describe("the job card", () => {
-  it("keeps the job to a few short lines: where on a row of its own, pay and when it was found side by side", () => {
-    const details = { location: "Atlanta, GA - Hybrid; Denver, CO", salary_min: null, salary_max: null, discovered_at: new Date(Date.now() - 86_400_000).toISOString() } as unknown as Application;
+  // Nothing read for the details page until a test says what BenchQ and the page hold.
+  beforeEach(() => {
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "none" }, retry: vi.fn() });
+    vi.mocked(usePageJob).mockReturnValue(null);
+  });
+
+  it("keeps to the job's title, whose job it is and where, with the rest of the job a press away", () => {
+    const details = { location: "Atlanta, GA - Hybrid; Denver, CO", salary_min: 120000, salary_max: 150000 } as unknown as Application;
     show({}, { details });
-    const facts = [...host.querySelectorAll("[data-slot='job-facts'] li")];
-    expect(facts.map(({ textContent }) => textContent)).toEqual(["Location: Atlanta, GA - Hybrid; Denver, CO", "Pay not listed", "Found yesterday"]);
-    expect(facts.map(({ className }) => className.includes("col-span-2"))).toEqual([true, false, false]);
-    expect(host.querySelector("[data-slot='job-card']")?.textContent).not.toContain("Linked job");
+    const card = host.querySelector("[data-slot='job-card']")!;
+    expect(card.querySelector("h2")!.textContent).toBe("Java Developer");
+    expect(card.querySelector("[data-slot='job-card-candidate']")!.textContent).toBe("Priya");
+    expect(card.querySelector("[data-slot='job-card-location']")!.textContent).toBe("Atlanta, GA - Hybrid; Denver, CO");
+    // The company and the pay are on the job's details page.
+    expect(card.textContent).not.toContain("Acme");
+    expect(card.textContent).not.toContain("$120k");
+    expect(card.textContent).not.toContain("Linked job");
+    expect(card.querySelector("[data-slot='job-details-open']")!.getAttribute("aria-label")).toBe("Job details");
+  });
+
+  // What the applications list has for the job: no description, type, mode or posted date. Those are in its posting.
+  const listed = { title: "Java Developer", company: "Acme", location: "Atlanta, GA", salary_min: 120000, salary_max: 150000,
+    url: "https://jobs.acme.test/1", job_id: "post-1" } as unknown as Application;
+  const openDetails = () => act(() => { host.querySelector<HTMLButtonElement>("[data-slot='job-details-open']")!.click(); });
+
+  it("opens the job's details page from its posting in BenchQ: its facts, its description in sections and its pay", () => {
+    vi.mocked(usePosting).mockImplementation((_firm, _user, _candidate, postingId) => ({ retry: vi.fn(), posting: postingId ? { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1", employmentType: "FULL_TIME",
+      workMode: "remote", postedAt: "2026-11-10", description: "<p>Build the payments API.</p><h3>Requirements</h3><ul><li>Java 17</li></ul>",
+    } } : { status: "none" } }));
+    show({}, { details: listed });
+    // Read only once the BDE opens the page.
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "user-1", "cand-1", null, expect.any(Function));
+    openDetails();
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "user-1", "cand-1", "post-1", expect.any(Function));
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect(page.querySelector("[data-slot='job-details-title']")!.textContent).toBe("Java Developer");
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["About the role", "Requirements"]);
+    // Where, the employment and the work mode as badges, then the requirements as a list.
+    expect([...page.querySelectorAll("li")].map(({ textContent }) => textContent)).toEqual(["Atlanta, GA", "Full-time", "Remote", "Java 17"]);
+    expect(page.textContent).toContain("$120k–$150k/yr");
+    expect(page.textContent).toContain("10 Nov 2026");
+    expect(page.querySelector("[data-slot='job-details-actions'] a")!.getAttribute("href")).toBe("https://jobs.acme.test/1");
+    // The page is the job's: the form's controls aren't under it.
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    act(() => { named("Back to Autofill").click(); });
+    expect(host.querySelector("[data-slot='job-details']")).toBeNull();
+    expect(host.querySelector("[data-slot='job-card']")).not.toBeNull();
+  });
+
+  it("shows a job added from its page as Add job showed it: the page's description, its pay as stated, its job ID", () => {
+    vi.mocked(usePosting).mockReturnValue({ retry: vi.fn(), posting: { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1",
+      description: "Build the payments API.\nBenefits\n401(k) with match", employmentType: "Full-time", workMode: "hybrid",
+      descriptionHtml: "<p>Build the payments API.</p><h3>Benefits</h3><ul><li>401(k) with match</li></ul>",
+      salaryMin: 164200, salaryMax: 229990, salaryCurrency: "USD", salaryPeriod: "year", requisitionId: "R123456", logoUrl: "https://acme.example/logo.png",
+    } } });
+    show({}, { details: listed });
+    openDetails();
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["About the role", "Benefits"]);
+    expect([...page.querySelectorAll("li")].map(({ textContent }) => textContent)).toEqual(["Atlanta, GA", "Full-time", "Hybrid", "401(k) with match"]);
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["USD 164,200–229,990 a year", "R123456"]);
+    expect(page.querySelector("img")?.getAttribute("src")).toBe("https://acme.example/logo.png");
+  });
+
+  it("takes what BenchQ doesn't hold from the job's page, while the tab still shows it", () => {
+    vi.mocked(usePosting).mockReturnValue({ retry: vi.fn(), posting: { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1", description: "Build things.",
+    } } });
+    vi.mocked(usePageJob).mockImplementation((_tab, isOpen) => (isOpen ? { title: "Java Developer", company: "Acme", location: "Atlanta, GA",
+      url: "https://jobs.acme.test/1", isJobPage: true, description: "<h3>Benefits</h3><ul><li>401(k)</li></ul>", salaryMin: 60,
+      salaryCurrency: "USD", salaryPeriod: "hour", requisitionId: "R9" } : null));
+    show({}, { details: listed });
+    expect(usePageJob).toHaveBeenLastCalledWith(7, false);
+    openDetails();
+    expect(usePageJob).toHaveBeenLastCalledWith(7, true);
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["Benefits"]);
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["From USD 60 an hour", "R9"]);
+  });
+
+  it("holds the description's place while the posting loads, and offers Try again when it couldn't be read", () => {
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "loading" }, retry: vi.fn() });
+    show({}, { details: listed });
+    openDetails();
+    expect(host.querySelector("[data-slot='job-details-loading']")!.getAttribute("role")).toBe("status");
+    expect(host.textContent).not.toContain("This posting gives no description.");
+    // What the list has shows meanwhile.
+    expect(host.querySelector("[data-slot='job-details-title']")!.textContent).toBe("Java Developer");
+    const retry = vi.fn();
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "error" }, retry });
+    update({}, oneResume);
+    expect(host.querySelector("[data-slot='job-details-error'] [role='alert']")!.textContent).toBe("Could not load the job's description.");
+    act(() => { named("Try again").click(); });
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -797,7 +1008,7 @@ describe("a run's first steps", () => {
 describe("the buttons at the bottom", () => {
   it("make Mark applied plain to see while there are fields to fill: a done look of its own, and what it's for", () => {
     show({ fillCount: 3 }, { onApply: vi.fn() });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill", "Mark applied"]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill this page", "Mark applied"]);
     const markApplied = named("Mark applied");
     expect(markApplied.className).toContain("color-success-bg");
     expect(markApplied.className).not.toContain("bq-primary");
@@ -806,11 +1017,11 @@ describe("the buttons at the bottom", () => {
     expect(markApplied.getAttribute("aria-describedby")).toBe(hint.id);
   });
 
-  it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
+  it("keeps Mark applied disabled on a site BenchQ may not read", () => {
     show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0, needsAccess: { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" }, isAccessDenied: true }, { onApply: vi.fn() });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
     const mark = host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!;
-    expect(mark.disabled).toBe(false);
+    expect(mark.disabled).toBe(true);
   });
 
   it("keep Mark applied waiting for the review when there is no access question", () => {
@@ -823,21 +1034,48 @@ describe("the buttons at the bottom", () => {
     expect(atBottom()[0]!.className).toContain("bq-primary");
   });
 
-  it("leave Mark applied out while a run fills the form, and keep Undo waiting", () => {
+  it("leave Mark applied out while a run fills the form", () => {
     show({ fillCount: 3, filling: true, undoable: 2 }, { onApply: vi.fn() });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…", "Undo"]);
-    expect(atBottom().map(({ disabled }) => disabled)).toEqual([true, true]);
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
+    expect(atBottom().map(({ disabled }) => disabled)).toEqual([true]);
   });
 
-  it("keep Undo beside it", () => {
+  it("offers to undo the extension's fills after a run", async () => {
     show({ fillCount: 0, undoable: 2 }, { onApply: vi.fn() });
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Undo"]);
+    await click("Undo");
+    expect(undo).toHaveBeenCalledOnce();
   });
 
-  it("say Applied once it's done", () => {
-    show({ fillCount: 0 }, { isApplied: true });
+  it("wait for every required field before Mark applied, and say how many are left", () => {
+    show({ fillCount: 0, rows: [row("Email", true), row("Phone", true, "555 0100")] }, { onApply: vi.fn() });
+    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='required-left']")!.textContent).toBe("Fill 1 required field to mark applied");
+    expect(named("Mark applied").disabled).toBe(true);
+    expect(named("Mark applied").getAttribute("aria-describedby")).toBe("required-left");
+  });
+
+  it("say Applied once it's done, while the tab shows another job", () => {
+    show({ fillCount: 0 }, { isApplied: true, tabUrl: "https://jobs.acme.test/jobs/98765" });
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Applied"]);
     expect(atBottom()[0]!.disabled).toBe(true);
+  });
+
+  it("show the success page once it's marked applied: the job, whose application, its status, then BenchQ or the jobs", () => {
+    show({ fillCount: 0 }, { isApplied: true });
+    const page = host.querySelector("[data-slot='applied-page']")!;
+    expect(page.querySelector("#applied-title")!.textContent).toBe("Great job!");
+    expect(page.querySelector("[data-slot='applied-job']")!.textContent).toContain("Java Developer");
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["Priya", "Applied"]);
+    expect(page.querySelector("[data-slot='applied-actions'] a")!.getAttribute("href")).toBe(applicationUrl("acme-staffing", connection.applicationId));
+    // Nothing is left to fill or mark under it.
+    expect(host.querySelector("[data-slot='autofill-actions']")).toBeNull();
+    act(() => { page.querySelector<HTMLButtonElement>("[data-slot='applied-back']")!.click(); });
+    expect((element.props as unknown as { onDisconnect: () => void }).onDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("show no success page before the job is applied", () => {
+    show({ fillCount: 0 }, { onApply: vi.fn() });
+    expect(host.querySelector("[data-slot='applied-page']")).toBeNull();
   });
 
   it("say so while saving", () => {
@@ -860,7 +1098,6 @@ describe("confirming Mark applied", () => {
   // The dialog's own Mark applied, beside the one that opened it.
   const confirmButton = () => host.querySelector<HTMLButtonElement>("[data-slot='mark-applied-confirm']")!;
   const confirm = () => act(async () => { confirmButton().click(); });
-  const note = () => host.querySelector("[data-slot='autofill-confirm-note']");
 
   it("asks first, in a modal dialog that names the job, and marks nothing yet", async () => {
     show({ fillCount: 0 }, { onApply });
@@ -870,8 +1107,8 @@ describe("confirming Mark applied", () => {
     expect(dialog().getAttribute("aria-labelledby")).toBe("autofill-confirm-title");
     expect(host.querySelector("#autofill-confirm-title")?.textContent).toBe("Mark this job as applied?");
     expect(host.querySelector("#autofill-confirm-job")?.textContent).toBe("Java Developer at Acme · for Priya");
-    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Cancel"]);
-    expect(inDialog()[0]!.className).toContain("bq-primary");
+    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Cancel", "Mark applied"]);
+    expect(inDialog()[1]!.className).toContain("bq-primary");
     expect(document.activeElement).toBe(confirmButton());
     expect(onApply).not.toHaveBeenCalled();
     expect(finalForm).not.toHaveBeenCalled();
@@ -886,14 +1123,14 @@ describe("confirming Mark applied", () => {
   });
 
   it("shows it's saving while it reads the form", async () => {
-    let finish: (found: AppliedForm) => void = () => undefined;
+    let finish: (found: { form: AppliedForm; complete: boolean }) => void = () => undefined;
     finalForm.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     show({ fillCount: 0 }, { onApply });
     await click("Mark applied");
     await confirm();
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
     expect(onApply).not.toHaveBeenCalled();
-    await act(async () => { finish(form); });
+    await act(async () => { finish({ form, complete: true }); });
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
 
@@ -916,45 +1153,32 @@ describe("confirming Mark applied", () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
-  it("warns about required fields still empty, each a way back to it, and still lets the BDE confirm", async () => {
-    show({ fillCount: 0, rows: [row("Email", true), row("Phone", true), row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+  it("can mark applied once every required field is filled, or when no form is on show", async () => {
+    show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+    expect(host.querySelector("[data-slot='required-left']")).toBeNull();
     await click("Mark applied");
-    expect(note()?.querySelector("p")?.textContent).toBe("2 required fields are still empty:");
-    expect([...note()!.querySelectorAll("li button")].map(({ textContent }) => textContent)).toEqual(["Email", "Phone"]);
+    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaCancelMark applied");
     await confirm();
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
-  });
-
-  it("lists the first three empty fields, one line each, and all of them on request", async () => {
-    const empty = ["Email", "Phone", "Zip code", "Which of the following metropolitan areas do you reside in?", "Veteran status"];
-    show({ fillCount: 0, rows: empty.map((label) => row(label, true)) }, { onApply });
-    await click("Mark applied");
-    const fields = () => [...note()!.querySelectorAll<HTMLButtonElement>("li button")];
-    expect(fields().map(({ textContent }) => textContent)).toEqual(["Email", "Phone", "Zip code"]);
-    expect(fields()[0]!.className).toContain("truncate");
-    expect(fields()[0]!.getAttribute("title")).toBe("Email");
-    const more = note()!.querySelector<HTMLButtonElement>("[data-slot='autofill-confirm-more']")!;
-    expect(more.textContent).toBe("Show all 5");
-    await act(async () => { more.click(); });
-    expect(fields()).toHaveLength(5);
-    expect(more.textContent).toBe("Show fewer");
-  });
-
-  it("says it right for one", async () => {
-    show({ fillCount: 0, rows: [row("Email", true)] }, { onApply });
-    await click("Mark applied");
-    expect(note()?.querySelector("p")?.textContent).toBe("1 required field is still empty:");
-  });
-
-  it("has nothing to warn about when the required fields are filled, or no form could be read", async () => {
-    show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
-    await click("Mark applied");
-    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaMark appliedCancel");
     act(() => { root?.unmount(); });
     host.remove();
     show({ fillCount: 0, rows: null }, { onApply });
+    expect(named("Mark applied").disabled).toBe(false);
+  });
+
+  it("counts a required field the site says is done, though BenchQ can't read it, like a password", () => {
+    const password = { ...row("Password", true), field: { label: "Password", required: true, current: "", complete: true } as TabField };
+    show({ fillCount: 0, rows: [password] }, { onApply });
+    expect(named("Mark applied").disabled).toBe(false);
+  });
+
+  it("marks nothing when its last look finds a required field emptied meanwhile", async () => {
+    finalForm.mockResolvedValueOnce({ form, complete: false });
+    show({ fillCount: 0, rows: [row("City", true, "Dallas")] }, { onApply });
     await click("Mark applied");
-    expect(note()).toBeNull();
+    await confirm();
+    expect(finalForm).toHaveBeenCalledTimes(1);
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   describe("around a run", () => {
@@ -968,20 +1192,31 @@ describe("confirming Mark applied", () => {
     beforeEach(() => { Element.prototype.scrollIntoView = scrolled; });
     afterEach(() => { delete (Element.prototype as Partial<Element>).scrollIntoView; });
 
-    it("scrolls smoothly to Autofill complete once a run ends, with Mark applied back", () => {
+    it("scrolls smoothly to Needs you once a run leaves fields for the BDE, with Mark applied back", () => {
       const rows = [row("Email", true, "a@example.test"), row("Phone", true)];
       show({ fillCount: 1, rows }, { onApply });
-      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill", "Mark applied"]);
+      expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Autofill this page", "Mark applied"]);
       rerender({ fillCount: 1, filling: true, rows });
       expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Filling…"]);
       expect(scrolled).not.toHaveBeenCalled();
       rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
       expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
-      const done = host.querySelector("[data-slot='autofill-done']");
+      const needed = host.querySelector("[data-slot='review-needed']");
       expect(scrolled).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-      expect(scrolled.mock.contexts[0]).toBe(done);
+      expect(scrolled.mock.contexts[0]).toBe(needed);
+      expect(document.activeElement?.getAttribute("data-slot")).toBe("review-needed-title");
       // Its scroll margin stops it under the sticky top bar, clear of the Mark applied bar at the bottom.
-      expect(done?.className).toContain("scroll-mt-[calc(var(--topbar-height)");
+      expect(needed?.className).toContain("scroll-mt-12");
+    });
+
+    it("scrolls to Autofill complete once a run leaves nothing for the BDE", () => {
+      const rows = [row("Email", true, "a@example.test")];
+      show({ fillCount: 1, rows }, { onApply });
+      rerender({ fillCount: 1, filling: true, rows });
+      rerender({ fillCount: 0, rows, outcome: { filled: 1, handedBack: 0, stopped: false } });
+      const done = host.querySelector("[data-slot='autofill-done']");
+      expect(scrolled.mock.contexts[0]).toBe(done);
+      expect(done?.className).toContain("scroll-mt-12");
     });
 
     it("scrolls to the note of a run that stopped, when Autofill complete isn't on show", () => {
@@ -1001,10 +1236,11 @@ describe("Tailor for this job", () => {
   const twoResumes: Resumes = { status: "ready", choices: [tailored, base], picked: base };
   const tailor = () => host.querySelector("[data-slot='tailor']");
 
-  it("sits at the foot of the résumés, says which base it reads, and starts from that base's version 1", async () => {
+  it("has a view of its own, its button fixed at the foot, says which base it reads, and starts from that base's version 1", async () => {
     show({ fillCount: 1 }, { details: job });
-    expect(host.querySelector("[data-slot='resume-picker']")!.contains(tailor())).toBe(true);
-    // One line: how long it takes; what it does is the button's tooltip and description.
+    expect(host.querySelector("[data-slot='tailoring-body']")!.contains(tailor())).toBe(true);
+    expect(tailor()!.querySelector("[data-slot='tailor-actions'] [data-slot='tailor-start']")).not.toBeNull();
+    // Under the button: which base it rewrites and how long it takes, also the button's tooltip and description.
     expect(tailor()!.querySelector("[data-slot='tailor-from']")!.textContent).toBe("Rewrites Base 1 (Active) to fit this job, about a minute");
     expect(named("Tailor resume for this job").getAttribute("title")).toBe("Rewrites Base 1 (Active) to fit this job");
     await click("Tailor resume for this job");
@@ -1038,6 +1274,23 @@ describe("Tailor for this job", () => {
     expect([bar.getAttribute("aria-valuenow"), bar.getAttribute("aria-valuetext")]).toEqual(["2", "Step 2 of 6: Writing the draft"]);
     expect(tailor()!.querySelector("[data-slot='tailor-clock']")!.textContent).toMatch(/^1:0\d$/);
     expect(tailor()!.querySelector("[data-slot='tailor-start']")).toBeNull();
+  });
+
+  it("names the job while it runs, and fixes the way back to Autofill at the foot: the run carries on", async () => {
+    tailoring = { status: "running", runId: "run-1", step: "analyse", startedAt: Date.now() - 5_000 };
+    show({ fillCount: 1 }, { details: job });
+    await click("Résumé tailoring");
+    expect(tailor()!.querySelector("[data-slot='tailor-running'] p")!.textContent).toContain("for Java Developer at Acme.");
+    expect(tailor()!.querySelector("[data-slot='tailor-actions']")!.textContent).toContain("Back to Autofill");
+    await click("Back to Autofill");
+    expect(host.querySelector("[data-slot='job-view-autofill']")!.getAttribute("aria-selected")).toBe("true");
+    expect(tailorDismiss).not.toHaveBeenCalled();
+  });
+
+  it("says why the tailoring view waits while the job isn't confirmed in BenchQ yet", () => {
+    show({ fillCount: 1 }, { details: job, applicationStatus: "loading" });
+    expect(tailor()).toBeNull();
+    expect(host.querySelector("[data-slot='tailor-waits']")!.textContent).toBe("Tailoring opens once BenchQ has confirmed this job.");
   });
 
   it("offers the finished résumé to use, which picks it and so fills the form from it, once it's in the list", async () => {
@@ -1086,17 +1339,45 @@ describe("Tailor for this job", () => {
 describe("what the panel shows first", () => {
   const body = () => host.querySelector("[data-slot='autofill-body']")!;
 
-  it("shows no step list: the floating actions say what's next, the resume leads the body", () => {
+  it("shows no step list: the fixed actions say what's next, and the résumé sits over the fields", () => {
     show({ fillCount: 2, rows: [row("Email", true)] });
     expect(host.querySelector("[data-slot='next-steps']")).toBeNull();
-    expect(body().querySelector("[data-slot='autofill-run']")).toBeNull();
-    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='autofill-run']")).not.toBeNull();
-    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+    expect(body().querySelector("[data-slot='autofill-cta'] [data-slot='autofill-run']")).not.toBeNull();
+    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='autofill-run']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-body'] [data-slot='resume-picker']")).not.toBeNull();
+  });
+
+  it("shows the job, then Autofill and the résumé, then the fields, which alone scroll, with the actions under them", () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    expect([...body().children].map((child) => child.getAttribute("data-slot"))).toEqual(["job-card", "autofill-stage"]);
+    // Autofill sits with the pickers, under the sheet that rises over them from a run on, right up to the job.
+    expect(body().querySelector("[data-slot='autofill-pickers'] > [data-slot='autofill-cta']")).not.toBeNull();
+    const stage = body().querySelector("[data-slot='autofill-stage']")!;
+    expect([...stage.children].map((child) => child.getAttribute("data-slot"))).toEqual(["autofill-pickers", "autofill-fields"]);
+    expect(stage.querySelector("[data-slot='autofill-pickers'] [data-slot='resume-picker']")).not.toBeNull();
+    // Before a run, only how many fields it fills: the fields themselves show once the form is filled.
+    expect(host.querySelector("[data-slot='autofill-ready']")!.textContent).toBe("Ready to fill 2 fields.");
+    expect(host.querySelector("[data-slot='review']")).toBeNull();
+    expect(host.querySelector("[data-slot='form-progress']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-fields'] [data-slot='autofill-actions']")).toBeNull();
+  });
+
+  it("switches between Autofill and Résumé tailoring with the arrow keys, as tabs, and keeps the form's actions to Autofill", async () => {
+    show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
+    const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-slot='job-view-${id}']`)!;
+    expect([tab("autofill").getAttribute("aria-selected"), tab("autofill").tabIndex, tab("tailoring").tabIndex]).toEqual(["true", 0, -1]);
+    await act(async () => { tab("autofill").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect(tab("tailoring").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("tailoring"));
+    expect([(body() as HTMLElement).hidden, host.querySelector<HTMLElement>("[data-slot='tailoring-body']")!.hidden]).toEqual([true, false]);
+    expect(host.querySelector<HTMLElement>("[data-slot='autofill-actions']")!.hidden).toBe(true);
+    await act(async () => { tab("tailoring").dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })); });
+    expect([tab("autofill").getAttribute("aria-selected"), (body() as HTMLElement).hidden]).toEqual(["true", false]);
   });
 
   it("asks for a site's permission alone, Mark applied kept, and shows the rest once it's given", () => {
     show({ fillCount: 0, rows: null, needsAccess: { origins: ["https://jobs.acme.test/*"], host: "jobs.acme.test" } }, { onApply: vi.fn() });
-    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-body'] [data-slot='resume-picker']")).toBeNull();
     expect(body().querySelector("[data-slot='next-steps']")).toBeNull();
     expect(body().querySelector("[data-slot='autofill-run']")).toBeNull();
     expect(body().textContent).toContain("jobs.acme.test");
@@ -1104,7 +1385,7 @@ describe("what the panel shows first", () => {
     act(() => { root?.unmount(); });
     host.remove();
     show({ fillCount: 2, rows: [row("Email", true)] }, { onApply: vi.fn() });
-    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+    expect(host.querySelector("[data-slot='autofill-body'] [data-slot='resume-picker']")).not.toBeNull();
   });
 
   it("asks to disconnect when the tab moved on to another job on the job's site, and shows nothing else until answered", async () => {
@@ -1113,13 +1394,13 @@ describe("what the panel shows first", () => {
     element = cloneElement(element, { onDisconnect } as never);
     act(() => { root!.render(element); });
     expect(body().querySelector("[data-slot='moved-away']")!.textContent).toContain("This tab now shows another job.");
-    expect(body().querySelector("[data-slot='resume-picker']")).toBeNull();
+    expect(host.querySelector("[data-slot='autofill-body'] [data-slot='resume-picker']")).toBeNull();
     expect(named("Mark applied")).toBeUndefined();
     await click("Disconnect");
     expect(onDisconnect).toHaveBeenCalled();
     await click("Keep it connected");
     expect(body().querySelector("[data-slot='moved-away']")).toBeNull();
-    expect(body().querySelector("[data-slot='resume-picker']")).not.toBeNull();
+    expect(host.querySelector("[data-slot='autofill-body'] [data-slot='resume-picker']")).not.toBeNull();
   });
 
   it("never asks on the job's own page, its application, or another site (an ATS the job sends the BDE to)", () => {

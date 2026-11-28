@@ -18,7 +18,7 @@ declare const chrome: {
     onStartup: ChromeEvent<() => void>;
     onMessage: ChromeEvent<(
       message: unknown,
-      sender: { id?: string; tab?: ChromeTab },
+      sender: { url?: string; frameId?: number; id?: string; tab?: ChromeTab },
       sendResponse: (response: unknown) => void,
     ) => boolean>;
     sendMessage(message: unknown): Promise<unknown>;
@@ -30,8 +30,8 @@ declare const chrome: {
   };
   commands: { onCommand: ChromeEvent<(command: string, tab?: ChromeTab) => void> };
   tabs: {
-    create(options: { url: string }): Promise<ChromeTab>;
-    query(info: { active: boolean; currentWindow: boolean }): Promise<ChromeTab[]>;
+    create(options: { url: string; windowId?: number; active?: boolean }): Promise<ChromeTab>;
+    query(info: { active?: boolean; currentWindow?: boolean; url?: string }): Promise<ChromeTab[]>;
     /** The tab this extension page runs in; undefined in the side panel. */
     getCurrent(): Promise<ChromeTab | undefined>;
     update(tabId: number, options: { active: boolean }): Promise<ChromeTab>;
@@ -41,6 +41,8 @@ declare const chrome: {
     onReplaced: ChromeEvent<(addedTabId: number, removedTabId: number) => void>;
   };
   permissions: {
+    addHostAccessRequest?(request: { tabId: number; pattern: string }): Promise<void>;
+    onAdded: ChromeEvent<() => void>;
     contains(permissions: { origins: string[] }): Promise<boolean>;
     request(permissions: { origins: string[] }): Promise<boolean>;
   };
@@ -57,6 +59,10 @@ declare const chrome: {
     }): Promise<InjectionResult[]>;
   };
   storage: {
+    local: {
+      get(keys: string[]): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
+    };
     session: {
       get(keys: string | null): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;

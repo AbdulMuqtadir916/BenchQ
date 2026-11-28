@@ -173,6 +173,35 @@ def test_an_added_job_keeps_what_its_page_stated_and_refuses_what_doesnt_hold(an
         assert refused.status_code == 422, (wrong, refused.text)
 
 
+def test_an_added_job_keeps_its_logo_and_gives_back_what_its_page_stated(anonymous_client, test_db, world):
+    """The page's employer logo (2026-11-28), flat in `content` beside what the page stated: the application gives it
+    back, and the posting gives it with the page's details and description as given, for the extension's details page.
+    A logo that isn't an http(s) link is refused."""
+    candidate = _candidate(anonymous_client, world)
+    logo = "https://boards.example.test/acme/logo.png"
+    stated = {"work_mode": "hybrid", "salary_min": 60, "salary_currency": "USD", "salary_period": "hour",
+              "requisition_id": "R1"}
+    added = _add(anonymous_client, world, candidate, {**JOB, **stated, "logo_url": logo})
+    assert added.status_code == 201, added.text
+    assert added.json()["logo_url"] == logo
+    posting = test_db.query(JobPosting).one()
+    assert posting.content["logo_url"] == logo
+    assert posting_job(posting).logo_url == logo
+    listed = anonymous_client.get(f"/api/applications?status=saved&tracked_only=true&candidate_id={candidate['id']}",
+                                  headers=world["as"]["adnan"])
+    assert [row["logo_url"] for row in listed.json()["applications"]] == [logo]
+    path = f"/api/firms/{world['firm'].id}/candidates/{candidate['id']}/job-postings/{posting.id}"
+    shown = anonymous_client.get(path, headers=world["as"]["adnan"])
+    assert shown.status_code == 200, shown.text
+    body = shown.json()
+    assert {key: body[key] for key in (*stated, "salary_max", "logo_url")} == {
+        **stated, "salary_max": None, "logo_url": logo}
+    assert body["description_html"] == JOB["description"]
+    for wrong in ("javascript:alert(1)", "data:image/png;base64,AAAA", "/logo.png"):
+        refused = _add(anonymous_client, world, candidate, {**JOB, "title": "Other", "logo_url": wrong})
+        assert refused.status_code == 422, (wrong, refused.text)
+
+
 def test_adding_a_job_already_applied_to_keeps_its_application(anonymous_client, test_db, world):
     candidate = _candidate(anonymous_client, world)
     first = _add(anonymous_client, world, candidate).json()

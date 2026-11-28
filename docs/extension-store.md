@@ -1,4 +1,4 @@
-# BenchQ Apply: Chrome Web Store submission
+# BenchQ Autofill Apply: Chrome Web Store submission
 
 Everything the store asks for, drafted, plus the one-time setup the pipeline needs. The pipeline itself is
 `.github/workflows/extension-publish.yml` (see `docs/team/arbaz.md`). **The drafts below are for the owner to read and
@@ -56,14 +56,14 @@ Never upload a package with a `key` to the store: the store owns the ID.
 
 ## 1. Listing
 
-- **Name:** BenchQ Apply (12 characters; the store allows 75).
+- **Name:** BenchQ Autofill Apply (21 characters; the store allows 75).
 - **Summary (limit 132):** Fill job application forms from a candidate's BenchQ answers, and track each application.
 - **Category:** Productivity. **Language:** English.
 - **Single purpose** (the store requires one): *Fills a job application form in the open tab with the answers saved for the
   chosen candidate in BenchQ, and records the application in BenchQ.*
 - **Description:**
-  > BenchQ Apply is for recruiting teams that use BenchQ. Open a saved job from BenchQ, and the side panel connects to the
-  > employer's application page. BenchQ Apply shows which fields it can fill from the candidate's saved answers, fills them
+  > BenchQ Autofill Apply is for recruiting teams that use BenchQ. Open a saved job from BenchQ, and the side panel connects to the
+  > employer's application page. BenchQ Autofill Apply shows which fields it can fill from the candidate's saved answers, fills them
   > and attaches the candidate's résumé when you press Autofill, lets you undo, and records the application in BenchQ when
   > you mark it applied. You always review and submit the form yourself. Found a job on a board or an employer's site?
   > Add it to the candidate's jobs in BenchQ from the panel.

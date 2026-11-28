@@ -1,11 +1,16 @@
 import { accepts } from "./accepts";
 import type { ChoiceList, ChoiceRequest, FieldTarget, FieldWrite, FillRequest, FillResult, PickRequest, UndoResult } from "../autofill/types";
 import { clearList, closeList, isMultiple, openList, pickOption, searchList } from "./choice";
-import { fireEvents, pause, setText } from "./events";
+import { fireEvents, pause, setText, focusArrives, typesOnlyWithFocus, typeOnAdp } from "./events";
 import { ariaChecked, collapse, isAriaChoice, isOn, isVisible, textOf, uploadBoxes } from "./labels";
-import { readCurrent, type Entry, type Registry } from "./scan";
+import { availableOption, readCurrent, type Entry, type Registry } from "./scan";
 
 const SETTLE_MS = 80;
+/** How long a site may take to show a file it took (sending it to its server first), looked at this often. */
+const FILE_WAIT_MS = 3000;
+const FILE_STEP_MS = 100;
+/** A file BenchQ put on that no input holds and no chip names once the wait is over. */
+const FILE_NOT_SHOWN = "The form doesn't show this file. Check it's attached, or attach it again.";
 const STALE: FillResult = { status: "stale", current: "" };
 const PHONE_LIKE = /^\+?[\d\s().-]{7,}$/;
 // design.md's focus ring by value: our tokens don't exist on an employer's page.
@@ -71,26 +76,55 @@ const controlWords = (element: HTMLElement) =>
 
 const ANY_FILE_NAME = /\S\.(?:pdf|docx?|rtf|odt|txt)\b/i;
 
+/** A file name's letters and digits alone, for a name a site writes its own way: "Priya_Shah_-_Java_Developer.pdf" is
+ * "Priya Shah - Java Developer.pdf". */
+const lettersOf = (text: string) => text.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "");
+/** A name a chip cuts short: "Priya Shah - Java Dev….pdf". */
+const CUT_SHORT = /^(.+?)\s*(?:…|\.{3})\s*(\.[a-z0-9]{2,5})?$/i;
+
+/** Whether a chip's text names the file: whole (perhaps with its size or a "Remove" beside it), with its spaces and
+ * dashes written another way, or cut short with an ellipsis. */
+export function namesFile(text: string, name: string): boolean {
+  if (text.includes(name)) return true;
+  const wanted = lettersOf(name);
+  if (wanted.length >= 6 && lettersOf(text).includes(wanted)) return true;
+  const cut = CUT_SHORT.exec(text.trim());
+  if (!cut) return false;
+  const head = lettersOf(cut[1]!);
+  return head.length >= 8 && wanted.startsWith(head) && (!cut[2] || name.toLowerCase().endsWith(cut[2].toLowerCase()));
+}
+
 /** Whether `box` shows a file other than `name`: then it's wider than that file's chip, and its controls may be
  * another file's. */
 function showsOtherFile(box: HTMLElement, name: string): boolean {
   const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = collapse(node.textContent ?? "");
-    if (ANY_FILE_NAME.test(text) && !text.includes(name)) return true;
+    if (ANY_FILE_NAME.test(text) && !namesFile(text, name)) return true;
   }
   return false;
 }
 
-/** The elements whose text names a file the page took: the chips it shows for it (the name, perhaps with its size). */
+/** The elements whose text names a file the page took: the chips it shows for it (the name, perhaps with its size),
+ * the name in one piece of text or split over a few inside one element. */
 function chipsNamed(name: string): HTMLElement[] {
   const chips: HTMLElement[] = [];
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = collapse(node.textContent ?? "");
-    const parent = node.parentElement;
-    if (parent && text.includes(name) && text.length <= name.length + 40 && isVisible(parent) && !chips.includes(parent)) chips.push(parent);
-  }
+  const fits = (text: string) => text.length <= name.length + 40 && namesFile(text, name);
+  // The page's text, the open components' own (an upload drawn in a component shows its chip there) included.
+  const look = (root: Node) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const shadow = (node as Element).shadowRoot;
+        if (shadow) look(shadow);
+        continue;
+      }
+      const parent = node.parentElement;
+      if (!parent || chips.includes(parent)) continue;
+      if ((fits(collapse(node.textContent ?? "")) || fits(collapse(parent.textContent ?? ""))) && isVisible(parent)) chips.push(parent);
+    }
+  };
+  if (document.body) look(document.body);
   return chips;
 }
 
@@ -129,26 +163,55 @@ function apply(entry: Entry, write: FieldWrite) {
 }
 
 /** A form's own mask can reformat a number or put a country code in front of it: it's the same number. */
-function samePhone(left: string, right: string) {
-  const a = left.replace(/\D/g, "");
-  const b = right.replace(/\D/g, "");
-  return a.length >= 7 && b.length >= 7 && (a.endsWith(b) || b.endsWith(a));
+function samePhone(shown: string, wanted: string, variants: string[] = []) {
+  if (!PHONE_LIKE.test(shown)) return false;
+  const digits = shown.replace(/\D/g, "");
+  return [wanted, ...variants].some(way => {
+    if (!PHONE_LIKE.test(way)) return false;
+    const expected = way.replace(/\D/g, "");
+    return digits === expected || (expected.length === 10 && shown.startsWith("+1") && digits === "1" + expected);
+  });
 }
-
-const compact = (text: string) => text.toLowerCase().replace(/[^a-z0-9+]/g, "");
 
 /** A dropdown can show less than its option said: "+1" for "United States +1". */
 function sameChoice(shown: string, label: string) {
-  const a = compact(shown);
-  const b = compact(label);
-  return Boolean(a && b) && (a.includes(b) || b.includes(a));
+  const clean = (value: string) => collapse(value.normalize("NFC")).toLowerCase();
+  if (shown && clean(shown) === clean(label)) return true;
+  return /^\+\d{1,4}$/.test(shown) && label.match(/\+\d+/g)?.includes(shown) === true;
 }
 
-/** A form's mask can reformat what it's given: "11/20/2026" as "11-20-2026", "95000" as "95,000", "tx" as "TX". The
- * same letters and digits in the same order are the same value. */
-function sameValue(shown: string, wanted: string) {
-  const plain = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return plain(shown) !== "" && plain(shown) === plain(wanted);
+function sameValue(entry: Entry, shown: string, write: FieldWrite & { type: "text" }) {
+  const wanted = write.value.trim();
+  if (shown.normalize("NFC") === wanted.normalize("NFC")) return true;
+  const { kind, label, autocomplete } = entry.field;
+  if (kind === "tel" || /\btel\b/.test(autocomplete) || /\b(?:phone|mobile|telephone|whatsapp)\b/i.test(label))
+    return samePhone(shown, wanted, write.also);
+  if (kind === "number") return shown !== "" && wanted !== "" && Number.isFinite(Number(shown)) && Number(shown) === Number(wanted);
+  if (kind === "date" || /\bdate\b/i.test(label)) {
+    const date = /^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})$/;
+    const actual = date.exec(shown), expected = date.exec(wanted);
+    return Boolean(actual && expected && actual.slice(1).every((part, i) => part === expected[i + 1]));
+  }
+  if (/\b(?:salary|rate|amount|compensation|pay)\b/i.test(label)) {
+    const amount = /^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/;
+    return amount.test(shown) && amount.test(wanted) && shown.replace(/,/g, "") === wanted.replace(/,/g, "");
+  }
+  return /\b(?:state|province|country)\b/i.test(label) && /^[a-z]{2,3}$/i.test(wanted)
+    && shown.toUpperCase() === wanted.toUpperCase();
+}
+
+/** A scan's native option must still belong to this select and carry the answer the panel reviewed. */
+function currentOptions(entry: Entry, write: FieldWrite): boolean {
+  const ids = write.type === "option" ? [write.optionId] : write.type === "check" ? write.optionIds : undefined;
+  return !ids || ids.every(id => {
+    const target = entry.options.get(id);
+    if (!target?.isConnected || target.matches(":disabled, [aria-disabled='true']")) return false;
+    if (!(target instanceof HTMLOptionElement)) return true;
+    const select = entry.controls[0]!.closest("select");
+    return select !== null && target.closest("select") === select && availableOption(target)
+      && entry.optionValues?.get(target) === target.value
+      && entry.field.options.find(option => option.id === id)?.label === collapse(target.label);
+  });
 }
 
 /** The form fails what the control holds: its own checks (a pattern or a type the value doesn't fit), or the page's,
@@ -162,16 +225,18 @@ const isInvalid = (entry: Entry) => {
  * phone number's row sends them (with and without its code, spaced or not). The page never invents a way of its own,
  * as it can't tell a phone number from a salary: "85000.50" with its point taken out is another amount (#148's review).
  * The first the form takes and passes stays. With none, the value goes back as first written, for the form's verdict. */
-async function refit(entry: Entry, write: FieldWrite & { type: "text" }): Promise<FieldWrite & { type: "text" }> {
+async function refit(entry: Entry, write: FieldWrite & { type: "text" }, stillLive: () => boolean): Promise<FieldWrite & { type: "text" }> {
   const retries = [...new Set(write.also ?? [])].filter((value) => value !== write.value);
   if (retries.length === 0) return write;
   const control = entry.controls[0] as HTMLInputElement;
   for (const value of retries) {
+    if (!stillLive()) return write;
     setText(control, value);
     await pause(SETTLE_MS);
     const retry = { ...write, value };
     if (accepted(entry, retry) && !isInvalid(entry)) return retry;
   }
+  if (!stillLive()) return write;
   setText(control, write.value);
   await pause(SETTLE_MS);
   return write;
@@ -179,12 +244,19 @@ async function refit(entry: Entry, write: FieldWrite & { type: "text" }): Promis
 
 function accepted(entry: Entry, write: FieldWrite): boolean {
   const control = entry.controls[0] as HTMLInputElement;
-  if (write.type === "choice") return sameChoice(readCurrent(entry), write.value);
+  // A file the site took, then emptied its upload or swapped it for a chip: still on the form while a chip names it
+  // (07 Q53).
+  if (write.type === "file" && (!control.isConnected || control.files?.[0]?.name !== write.name)) return chipsNamed(write.name).length > 0;
+  if (!entry.controls.every(control => control.isConnected) || !currentOptions(entry, write)) return false;
+  if (write.type === "choice") {
+    if (sameChoice(readCurrent(entry), write.value)) return true;
+    const box = control.closest("[class*='__control'], [class*='-control']");
+    const chips = box?.querySelectorAll("[class*='multi-value__label'], [class*='multiValueLabel']");
+    return Boolean(chips && Array.from(chips).some(chip => sameChoice(collapse(textOf(chip)), write.value)));
+  }
   if (write.type === "file") return control.files?.length === 1 && control.files[0]!.name === write.name;
   if (write.type === "text") {
-    const value = control.value.trim();
-    const wanted = write.value.trim();
-    return value === wanted || (PHONE_LIKE.test(wanted) && samePhone(value, wanted)) || sameValue(value, wanted);
+    return sameValue(entry, control.value.trim(), write);
   }
   if (write.type === "check") {
     return checkTargets(entry, write).every((target) => target !== undefined && isOn(target) === write.checked);
@@ -248,20 +320,36 @@ async function restoreChoice(entry: Entry, label: string): Promise<boolean> {
     await pause(SETTLE_MS);
     return readCurrent(entry) === "";
   }
-  const option = (await openList(control, "")).find((element) => sameChoice(collapse(textOf(element)), label));
-  if (!option) {
+  const options = (await openList(control, "")).filter(element => sameChoice(label, collapse(textOf(element))));
+  if (options.length !== 1) {
     closeList(control);
     return false;
   }
-  pickOption(option);
+  pickOption(options[0]!);
   await pause(SETTLE_MS);
   return sameChoice(readCurrent(entry), label);
 }
 
+/** How long a fill waits for the BDE to click ADP's form. */
+const FOCUS_WAIT_MS = 30_000;
+const CLICK_THE_FORM = "ADP takes typing only on its own page: click the form, then Autofill again.";
+
 /** Takes a field back to what it held, whether for undo or after a fill that didn't take. A styled radio can't be
  * turned off by a click, so whether it went back is checked. */
-async function putBack(entry: Entry, before: Snapshot): Promise<boolean> {
+async function putBack(entry: Entry, before: Snapshot, run?: string, stillLive = () => true): Promise<boolean> {
   if ("choice" in before) return restoreChoice(entry, before.choice);
+  // ADP drops a value set without typing: the old one is typed back once its page has the focus, and only a field that
+  // holds it again counts as put back (CodeRabbit's review of cf130dea).
+  const control = entry.controls[0] as HTMLInputElement;
+  if ("value" in before && typesOnlyWithFocus(control)) {
+    const url = control.ownerDocument.URL;
+    const current = snapshot(entry);
+    if (!(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS, run))) return false;
+    if (!stillLive() || !control.isConnected || control.ownerDocument.URL !== url || !sameSnapshot(snapshot(entry), current)) return false;
+    typeOnAdp(control, before.value);
+    await pause(SETTLE_MS);
+    return control.value === before.value;
+  }
   restore(entry, before);
   if (!isAriaChoice(entry.controls[0]!)) return true;
   await pause(SETTLE_MS);
@@ -283,19 +371,56 @@ function listed(entry: Entry, found: HTMLElement[]): ChoiceList {
  * nothing the BDE typed leaves it. */
 export function createFiller(registry: () => Registry | null) {
   let filled: Filled[] = [];
+  // A search box may temporarily show our query instead of its saved selection.
+  const menus = new WeakMap<Entry, { current: string; shown: string; labels: Map<string, string> }>();
 
   function liveEntry(scanId: number, fieldId: string): Entry | null {
     const scan = registry();
     const entry = scan?.scanId === scanId ? scan.entries.get(fieldId) : undefined;
-    return entry && entry.controls.every((control) => control.isConnected) ? entry : null;
+    return entry && entry.controls.every(control => control.isConnected && !control.matches(":disabled, [aria-disabled='true']")) ? entry : null;
+  }
+
+  async function listChoices({ scanId, fieldId, current, search }: ChoiceRequest, opening: boolean): Promise<ChoiceList> {
+    const entry = liveEntry(scanId, fieldId);
+    if (!entry) return { status: "stale" };
+    const before = readCurrent(entry);
+    const previous = menus.get(entry);
+    if (opening ? before !== current : !previous || previous.current !== current || before !== previous.shown) return { status: "changed" };
+    const menu = { current, shown: before, labels: new Map<string, string>() };
+    menus.set(entry, menu);
+    const stillLive = () => liveEntry(scanId, fieldId) === entry && menus.get(entry) === menu;
+    const control = entry.controls[0]!;
+    const found = opening
+      ? await openList(control, search, () => stillLive() && readCurrent(entry) === before)
+      : await searchList(control, search);
+    if (!stillLive()) return { status: "stale" };
+    menu.shown = readCurrent(entry);
+    if (menu.shown !== before && !(control instanceof HTMLInputElement && search && control.value === search)) {
+      menus.delete(entry);
+      return { status: "changed" };
+    }
+    const list = listed(entry, found);
+    if (list.status === "open") menu.labels = new Map(list.options.map(option => [option.id, option.label]));
+    return list;
   }
 
   return {
-    async fill({ scanId, fieldId, write, current }: FillRequest): Promise<FillResult> {
+    async fill({ scanId, fieldId, write, current, runId }: FillRequest): Promise<FillResult> {
       const entry = liveEntry(scanId, fieldId);
       if (!entry) return STALE;
       const present = readCurrent(entry);
       if (present !== current) return { status: "changed", current: present };
+      // ADP keeps only what is typed while its page has the focus, which a click on BenchQ's panel takes. The fill waits
+      // for the BDE's click on the form, inside this fill, so what it types is checked, kept for Undo or taken back here.
+      const control = entry.controls[0]!;
+      if (write.type === "text" && typesOnlyWithFocus(control) && !(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS, runId))) {
+        return { status: "failed", current: present, reason: CLICK_THE_FORM };
+      }
+      // The wait can outlast its scan: a disconnect, another candidate or a rescan replaces it, and nothing is written
+      // then (Abdul's review of cf130dea).
+      if (liveEntry(scanId, fieldId) !== entry) return STALE;
+      if (readCurrent(entry) !== present) return { status: "changed", current: readCurrent(entry) };
+      if (!currentOptions(entry, write)) return STALE;
       // The page can change what an upload takes after the scan: a file it won't take now isn't written.
       if (write.type === "file" && !accepts((entry.controls[0] as HTMLInputElement).accept, write.mimeType, write.name)) {
         return { status: "failed", current: present, reason: UPLOAD_REFUSES_KIND };
@@ -303,9 +428,29 @@ export function createFiller(registry: () => Registry | null) {
       const before = snapshot(entry);
       apply(entry, write);
       await pause(SETTLE_MS);
-      const written = write.type === "text" && (!accepted(entry, write) || isInvalid(entry)) ? await refit(entry, write) : write;
+      const stillLive = () => liveEntry(scanId, fieldId) === entry;
+      // A file is on the form while an input holds it or a chip names it (07 Q53). Many sites empty their upload, or
+      // draw a new one, as they take the file, and send it to their server before they show it: its chip is waited
+      // for, and a file never seen isn't taken back (the site may still have it). An upload that kept another file
+      // didn't take this one, and gets its own back.
+      if (write.type === "file") {
+        const control = entry.controls[0] as HTMLInputElement;
+        const held = () => control.files?.[0]?.name ?? "";
+        const isShown = () => held() === write.name || chipsNamed(write.name).some((chip) => !UPLOAD_FAILED.test(textOf(chip)));
+        if (control.isConnected && held() && held() !== write.name && !isShown()) {
+          await putBack(entry, before, runId);
+          return { status: "failed", current: readCurrent(entry) };
+        }
+        for (let waited = 0; !isShown() && waited < FILE_WAIT_MS; waited += FILE_STEP_MS) await pause(FILE_STEP_MS);
+        if (!isShown()) return { status: "failed", current: readCurrent(entry), reason: FILE_NOT_SHOWN };
+        filled.push({ scanId, entry, write, before, after: snapshot(entry) });
+        return { status: "filled", current: write.name };
+      }
+      if (!stillLive() || !currentOptions(entry, write)) return STALE;
+      const written = write.type === "text" && (!accepted(entry, write) || isInvalid(entry)) ? await refit(entry, write, stillLive) : write;
+      if (!stillLive()) return STALE;
       if (!accepted(entry, written)) {
-        await putBack(entry, before);
+        await putBack(entry, before, runId);
         return { status: "failed", current: readCurrent(entry) };
       }
       filled.push({ scanId, entry, write: written, before, after: snapshot(entry) });
@@ -313,27 +458,33 @@ export function createFiller(registry: () => Registry | null) {
     },
 
     /** Opens a custom dropdown and lists what it offers, for the panel to match the answer against. */
-    async openChoices({ scanId, fieldId, current, search }: ChoiceRequest): Promise<ChoiceList> {
-      const entry = liveEntry(scanId, fieldId);
-      if (!entry) return { status: "stale" };
-      if (readCurrent(entry) !== current) return { status: "changed" };
-      return listed(entry, await openList(entry.controls[0]!, search));
+    openChoices(request: ChoiceRequest): Promise<ChoiceList> {
+      return listChoices(request, true);
     },
 
-    async searchChoices({ scanId, fieldId, search }: ChoiceRequest): Promise<ChoiceList> {
-      const entry = liveEntry(scanId, fieldId);
-      return entry ? listed(entry, await searchList(entry.controls[0]!, search)) : { status: "stale" };
+    searchChoices(request: ChoiceRequest): Promise<ChoiceList> {
+      return listChoices(request, false);
     },
 
-    async pickChoice({ scanId, fieldId, optionId }: PickRequest): Promise<FillResult> {
+    async pickChoice({ scanId, fieldId, optionId, current }: PickRequest): Promise<FillResult> {
       const entry = liveEntry(scanId, fieldId);
       const option = entry?.options.get(optionId);
-      if (!entry || !option?.isConnected) return STALE;
-      const before = snapshot(entry);
-      const write: FieldWrite = { type: "choice", value: collapse(textOf(option)) };
+      const menu = entry && menus.get(entry);
+      if (!entry || !menu || !option?.isConnected || !isVisible(option) || option.matches(":disabled, [aria-disabled='true']")) return STALE;
+      if (current !== menu.current || readCurrent(entry) !== menu.shown) return { status: "changed", current: readCurrent(entry) };
+      const label = collapse(textOf(option));
+      if (label !== menu.labels.get(optionId)) return STALE;
+      menus.delete(entry);
+      const before: Snapshot = { choice: current };
+      const write: FieldWrite = { type: "choice", value: label };
       pickOption(option);
       await pause(SETTLE_MS);
-      if (!accepted(entry, write)) {
+      if (liveEntry(scanId, fieldId) !== entry) return STALE;
+      // An ignored click can leave exactly the searched-for label in the search box.
+      const control = entry.controls[0]!;
+      const stillSearching = control instanceof HTMLInputElement && control.value !== "" && control.value === menu.shown
+        && option.isConnected && isVisible(option) && control.getAttribute("aria-expanded") !== "false";
+      if (stillSearching || !accepted(entry, write)) {
         closeList(entry.controls[0]!);
         if (!sameSnapshot(snapshot(entry), before)) await putBack(entry, before);
         return { status: "failed", current: readCurrent(entry) };
@@ -344,7 +495,11 @@ export function createFiller(registry: () => Registry | null) {
 
     closeChoices({ scanId, fieldId }: ChoiceRequest) {
       const entry = liveEntry(scanId, fieldId);
-      if (entry) closeList(entry.controls[0]!);
+      const menu = entry && menus.get(entry);
+      if (entry && menu) {
+        menus.delete(entry);
+        closeList(entry.controls[0]!, readCurrent(entry) === menu.shown && menu.shown !== menu.current);
+      }
       return true;
     },
 
@@ -363,7 +518,9 @@ export function createFiller(registry: () => Registry | null) {
       const wanted = new Set(fieldIds);
       const found = filled.filter((item) => item.scanId === scanId && wanted.has(item.entry.field.id) && isFlagged(item.entry));
       filled = filled.filter((item) => !found.includes(item));
-      for (const { entry, before } of found) await putBack(entry, before);
+      for (const { entry, before, after } of found) {
+        if (liveEntry(scanId, entry.field.id) === entry && sameSnapshot(snapshot(entry), after)) await putBack(entry, before);
+      }
       return found.map(({ entry }) => entry.field.id);
     },
 
@@ -390,7 +547,10 @@ export function createFiller(registry: () => Registry | null) {
       const uploads = filled.filter(({ write }) => write.type === "file" && write.name === name)
         .map(({ entry }) => entry.controls[0] as HTMLInputElement);
       if (uploads.length === 0) return false;
-      return ownChip(uploads, chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip).split(name).join(" ")))) !== null;
+      const chips = chipsNamed(name).filter((chip) => !UPLOAD_FAILED.test(textOf(chip).split(name).join(" ")));
+      // Beside its upload, else the one chip on the page with the name: BenchQ's file names the candidate and the role,
+      // so a site that shows it away from its upload still shows this one.
+      return ownChip(uploads, chips) !== null || chips.length === 1;
     },
 
     async removeFile(name: string): Promise<boolean> {
@@ -419,16 +579,19 @@ export function createFiller(registry: () => Registry | null) {
       const mine = filled.filter((item) => item.entry.controls[0] === entry.controls[0]);
       const [first] = mine;
       if (!first || !sameSnapshot(snapshot(entry), mine.at(-1)!.after)) return false;
-      filled = filled.filter((item) => !mine.includes(item));
-      return putBack(entry, first.before);
+      const restored = await putBack(entry, first.before, undefined, () => liveEntry(scanId, fieldId) === entry);
+      if (restored) filled = filled.filter((item) => !mine.includes(item));
+      return restored;
     },
 
     async undo(): Promise<UndoResult> {
       const result: UndoResult = { restored: 0, kept: 0, skipped: 0 };
+      // One undo stops waiting for ADP's form once nobody clicks it, as one Autofill run does.
+      const run = `undo-${Date.now()}`;
       for (const { entry, before, after } of [...filled].reverse()) {
         const untouched = entry.controls.every((control) => control.isConnected) && sameSnapshot(snapshot(entry), after);
         if (!untouched) result.kept += 1;
-        else if (await putBack(entry, before)) result.restored += 1;
+        else if (await putBack(entry, before, run)) result.restored += 1;
         else result.skipped += 1;
       }
       filled = [];

@@ -1,8 +1,10 @@
+import { readJob } from "./job";
 import type { FieldKind, FieldOption, FrameRead, FrameScan, PageSignals, ScannedField } from "../autofill/types";
 import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
   isOn, isUploadShown, isVisible, optionLabel, PLACEHOLDER_OPTION, rawLabel, shownFileName, shownValue, textOf,
 } from "./labels";
+import { LEVER_LOCATION } from "./choice";
 import { hostOf, queryDeep } from "./shadow";
 
 /** One field of a scan: what the panel sees, and the elements a later fill writes to. */
@@ -10,10 +12,11 @@ export type Entry = {
   field: ScannedField;
   controls: HTMLElement[];
   options: Map<string, HTMLElement>;
+  optionValues?: Map<HTMLElement, string>;
 };
 
-/** The controls a scan finds, in order, and how many options each has. */
-type Shape = { control: HTMLElement; size: number }[];
+/** A dependent select can reuse its option nodes and change what those nodes mean. */
+type Shape = { control: HTMLElement; detail?: string }[];
 
 export type Registry = { scanId: number; entries: Map<string, Entry>; shape: Shape };
 
@@ -78,11 +81,15 @@ export function waitForQuiet(doc: Document): Promise<void> {
 }
 
 function isPlaceholder(option: HTMLOptionElement): boolean {
-  return option.value === "" || PLACEHOLDER_OPTION.test(collapse(option.text));
+  return option.value === "" || PLACEHOLDER_OPTION.test(collapse(option.label));
 }
+
+export const availableOption = (option: HTMLOptionElement) =>
+  !isPlaceholder(option) && !option.disabled && !option.closest("optgroup[disabled]");
 
 function kindOf(element: HTMLElement): FieldKind {
   if (isAriaChoice(element)) return element.getAttribute("role") === "radio" ? "radio" : "checkbox";
+  if (element.matches(LEVER_LOCATION)) return "combobox";
   if (element.getAttribute("role") === "combobox" || element.getAttribute("aria-haspopup") === "listbox") return "combobox";
   const custom = element.hasAttribute("aria-autocomplete") || element.hasAttribute("aria-haspopup")
     || (element as HTMLInputElement).readOnly === true;
@@ -143,7 +150,7 @@ export function readCurrent(entry: Entry): string {
   if (entry.field.kind === "combobox") return shownValue(control);
   if (isSelect(control)) {
     const selected = control.selectedOptions[0];
-    return selected && !isPlaceholder(selected) ? collapse(selected.text) : "";
+    return selected && !isPlaceholder(selected) ? collapse(selected.label) : "";
   }
   if (entry.field.options.length > 0) {
     return entry.field.options
@@ -154,6 +161,15 @@ export function readCurrent(entry: Entry): string {
   if (isChoice(control)) return control.checked ? "Checked" : "";
   if (isInput(control) || control.tagName === "TEXTAREA") return (control as HTMLInputElement).value;
   return collapse(textOf(control));
+}
+
+function requiredComplete(entry: Entry, current: string): boolean {
+  const invalid = entry.controls.some(control => control.matches(":invalid, [aria-invalid='true']")
+    || control.closest("[aria-invalid='true']") !== null);
+  if (invalid) return false;
+  // The site may mark a password required only via ARIA. Only its presence leaves this frame.
+  if (entry.field.kind === "password") return (entry.controls[0] as HTMLInputElement).value.length > 0;
+  return Boolean(current.trim());
 }
 
 /** A phone number's own "Country" dropdown holds a dialling code, not where the candidate lives. */
@@ -169,16 +185,18 @@ function singleEntry(element: HTMLElement, id: string): Entry {
   const field = common(element, id, kind, labelOf(element));
   const options: Entry["options"] = new Map();
   if (isSelect(element) && kind === "select") {
-    Array.from(element.options).filter((option) => !isPlaceholder(option) && !option.disabled).forEach((option) => {
+    Array.from(element.options).filter(availableOption).forEach((option) => {
       const optionId = `o${option.index}`;
       options.set(optionId, option);
-      field.options.push({ id: optionId, label: collapse(option.text) });
+      field.options.push({ id: optionId, label: collapse(option.label) });
     });
   }
   const limit = (element as HTMLInputElement).maxLength;
   if (typeof limit === "number" && limit > 0) field.maxLength = limit;
-  return { field, controls: [element], options };
+  return { field, controls: [element], options, ...(isSelect(element) ? { optionValues: nativeValues(element) } : {}) };
 }
+
+const nativeValues = (select: HTMLSelectElement) => new Map(Array.from(select.options, option => [option, option.value] as const));
 
 function groupEntry(inputs: HTMLInputElement[], id: string): Entry {
   const first = inputs[0]!;
@@ -198,20 +216,22 @@ function groupEntry(inputs: HTMLInputElement[], id: string): Entry {
 /** A list box that keeps several choices, read like a group of checkboxes: its options are the boxes. */
 function multiSelectEntry(select: HTMLSelectElement, id: string): Entry {
   const field = common(select, id, "checkbox", labelOf(select));
-  const choices = Array.from(select.options).filter((option) => !isPlaceholder(option) && !option.disabled);
+  const choices = Array.from(select.options).filter(availableOption);
   const options: Entry["options"] = new Map();
   field.options = choices.map((option, index) => {
     options.set(`o${index}`, option);
-    return { id: `o${index}`, label: collapse(option.text) };
+    return { id: `o${index}`, label: collapse(option.label) };
   });
-  return { field, controls: choices.length > 0 ? choices : [select], options };
+  return { field, controls: choices.length > 0 ? choices : [select], options, optionValues: nativeValues(select) };
 }
 
 /** A styled group's question and its options, which are its choices' own words. */
 function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
   const label = groupLabel(aria);
   const field = common(aria[0]!, id, kind, label);
-  field.required = isRequired(aria, label);
+  // The input toggle buttons keep their answer in can be all that says the question is required.
+  const answer = answerInputOf(aria[0]!);
+  field.required = isRequired(answer ? [...aria, answer] : aria, label);
   const options: Entry["options"] = new Map();
   field.options = aria.map((element, index) => {
     options.set(`o${index}`, element);
@@ -221,10 +241,33 @@ function ariaGroupEntry({ aria, kind }: AriaGroup, id: string): Entry {
 }
 
 /** A styled choice that's part of a form: shown, enabled, and not a control inside a menu or a site's header. One
- * that wraps a real input is that input's look, and the input stands for it. */
+ * that wraps a real input is that input's look, and the input stands for it. Toggle buttons that keep their answer in
+ * an input beside them are a form's question wherever they are: Ashby's Yes/No has no <form> around it. */
 function isAriaQuestion(element: HTMLElement): boolean {
   return isVisible(element) && element.getAttribute("aria-disabled") !== "true" && !element.querySelector("input, select, textarea")
-    && closestThrough(element, FORM_AREA) !== null && closestThrough(element, NOT_A_QUESTION) === null;
+    && (closestThrough(element, FORM_AREA) !== null || answerInputOf(element) !== null) && closestThrough(element, NOT_A_QUESTION) === null;
+}
+
+/** An input people don't use themselves: hidden, or taken out of the tab order for the page's script to keep. */
+const isOutOfReach = (input: HTMLInputElement) => input.type === "hidden" || input.tabIndex < 0;
+
+/** Toggle buttons side by side: the element they share, or null for a toggle that stands alone. */
+function toggleRowOf(element: Element): HTMLElement | null {
+  const row = element.hasAttribute("aria-pressed") ? element.parentElement : null;
+  return row && row.querySelectorAll(":scope > [aria-pressed]").length > 1 ? row : null;
+}
+
+/** The input toggle buttons keep their answer in: one beside them that people can't reach themselves (Ashby's Yes/No
+ * keeps it in a checkbox with tabindex -1). A box people can tab to is a question of its own, even beside toggles. */
+function answerInputOf(toggle: Element): HTMLInputElement | null {
+  const row = toggleRowOf(toggle);
+  return (row ? Array.from(row.children).filter(isInput) : []).find(isOutOfReach) ?? null;
+}
+
+/** That input: the buttons are the question, so it isn't one of its own. */
+function isToggleAnswer(input: HTMLInputElement): boolean {
+  const toggle = input.parentElement?.querySelector(":scope > [aria-pressed]");
+  return Boolean(toggle && answerInputOf(toggle) === input);
 }
 
 /** `closest()` through the components an element sits in: a choice inside a component under a form is in that form,
@@ -250,6 +293,34 @@ function ariaGroupOf(element: HTMLElement): { key: Element; kind: AriaGroup["kin
   return group && group.querySelectorAll("[role='checkbox']").length > 1 ? { key: group, kind: "checkbox" } : null;
 }
 
+/** The fieldset whose checkboxes are one question's options though each has a name of its own, the option's words
+ * (Ashby's "select all that apply"). Null for any other box: boxes named otherwise ("terms", "news") stay apart. */
+function optionSet(element: HTMLInputElement): HTMLFieldSetElement | null {
+  if (element.type !== "checkbox") return null;
+  const set = element.closest("fieldset");
+  if (!set) return null;
+  const boxes = Array.from(set.querySelectorAll<HTMLInputElement>("input[type='checkbox']"));
+  const isNamedForItself = (box: HTMLInputElement) => Boolean(box.name) && collapse(box.name).toLowerCase() === optionLabel(box).toLowerCase();
+  return boxes.length > 1 && boxes.every(isNamedForItself) ? set : null;
+}
+
+/** Words that ask for the résumé, as documents.ts reads an upload: page.js has to stand alone, so it keeps its own. */
+const RESUME_WORDS = /\b(?:resume|cv|curriculum vitae)\b/;
+
+/** Whether an upload asks for the résumé: its label, name or id says so ("Resume/CV", "_systemfield_resume"). */
+const isResumeUpload = (input: HTMLInputElement) => RESUME_WORDS.test(`${labelOf(input)} ${input.name} ${input.id}`
+  .replace(/([a-z])([A-Z])/g, "$1 $2").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " "));
+
+/** A site's own "Autofill from resume" box (Ashby's) reads a résumé to fill the form itself. On a form with a résumé
+ * upload of its own, the box isn't the application's résumé: it's left out, so the résumé is attached once. A form's
+ * only résumé upload stays, whatever its label says. */
+function withoutResumeReader(slots: Slot[]): Slot[] {
+  const uploads = slots.filter((slot): slot is HTMLInputElement => !Array.isArray(slot) && !("aria" in slot) && isFileInput(slot));
+  const readers = new Set<Slot>(uploads.filter((upload) => /\bauto-?fill\b/i.test(labelOf(upload))));
+  return readers.size > 0 && uploads.some((upload) => !readers.has(upload) && isResumeUpload(upload))
+    ? slots.filter((slot) => !readers.has(slot)) : slots;
+}
+
 /** The form's controls in page order, radios and same-named checkboxes gathered where the first of them stands. */
 function collectSlots(doc: Document): Slot[] {
   const slots: Slot[] = [];
@@ -270,6 +341,13 @@ function collectSlots(doc: Document): Slot[] {
     if (!trees.has(tree)) trees.set(tree, trees.size);
     return `${trees.get(tree)}/`;
   };
+  const sets = new Map<Element, number>();
+  const setOf = (element: HTMLInputElement) => {
+    const set = optionSet(element);
+    if (!set) return null;
+    if (!sets.has(set)) sets.set(set, sets.size);
+    return `set:${sets.get(set)}`;
+  };
   for (const element of queryDeep<HTMLElement>(doc, `input, textarea, select, ${ARIA_CHOICES}`)) {
     if (isAriaChoice(element)) {
       if (!isAriaQuestion(element)) continue;
@@ -287,14 +365,14 @@ function collectSlots(doc: Document): Slot[] {
     // A control hidden from people is the page's own plumbing, like the input a custom dropdown keeps beside it.
     if (element.matches(":disabled") || element.getAttribute("aria-hidden") === "true") continue;
     if (isChoice(element)) {
-      if (!isChoiceVisible(element)) continue;
+      if (!isChoiceVisible(element) || isToggleAnswer(element)) continue;
       if (!element.name) {
         // A box with its own value but no name is an option of the group around it, like Lever's "Custom" pronoun.
         const value = element.getAttribute("value");
         if (!value || value === "on") slots.push(element);
         continue;
       }
-      const key = `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
+      const key = setOf(element) ?? `${treeOf(element)}${formOf(element.form)}:${element.type}:${element.name}`;
       const group = groups.get(key);
       if (group) group.push(element);
       else {
@@ -304,7 +382,7 @@ function collectSlots(doc: Document): Slot[] {
       }
     } else if (isVisible(element) || (isFileInput(element) && isUploadShown(element))) slots.push(element);
   }
-  return slots;
+  return withoutResumeReader(slots);
 }
 
 /** Dropdowns built from <div>s or buttons, which `input, textarea, select` can't find. */
@@ -326,64 +404,44 @@ function formControls(doc: Document) {
 
 function shapeOf(doc: Document): Shape {
   const { slots, custom } = formControls(doc);
-  const sized = slots.map((slot) => {
-    if (Array.isArray(slot)) return { control: slot[0]! as HTMLElement, size: slot.length };
-    if ("aria" in slot) return { control: slot.aria[0]!, size: slot.aria.length };
-    return { control: slot, size: isSelect(slot) ? slot.options.length : 1 };
-  });
-  return [...sized, ...custom.map((control) => ({ control, size: 1 }))];
+  const shape: Shape = [];
+  for (const slot of slots) {
+    const group = Array.isArray(slot) ? slot : "aria" in slot ? slot.aria : [slot];
+    for (const control of group) {
+      shape.push({ control, detail: `${group.length}:${control.matches("[required]") || Boolean(control.closest("[aria-required='true']"))}` });
+      if (isSelect(control)) for (const option of Array.from(control.options)) {
+        shape.push({ control: option, detail: JSON.stringify([option.label, option.value, availableOption(option)]) });
+      }
+    }
+  }
+  return [...shape, ...custom.map(control => ({ control, detail: String(Boolean(control.closest("[aria-required='true']"))) }))];
 }
 
 const sameShape = (left: Shape, right: Shape) => left.length === right.length
-  && left.every(({ control, size }, index) => control === right[index]!.control && size === right[index]!.size);
+  && left.every(({ control, detail }, index) => control === right[index]!.control && detail === right[index]!.detail);
 
 /** The panel's regular look at a scanned form: what each field holds now, and whether it takes a new scan to see the
  * rest, because fields came or went or a dropdown got new options. */
 export function readFields(doc: Document, { scanId, entries, shape }: Registry): FrameRead {
   const values = Object.fromEntries(Array.from(entries, ([id, entry]) => [id, readCurrent(entry)]));
-  return { scanId, values, moved: !sameShape(shape, shapeOf(doc)) };
-}
-
-function postingIn(node: unknown): PageSignals["posting"] {
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = postingIn(item);
-      if (found) return found;
-    }
-    return null;
+  const required: Record<string, boolean> = {};
+  for (const [id, entry] of entries) {
+    if (entry.field.required) required[id] = requiredComplete(entry, values[id]!);
   }
-  if (typeof node !== "object" || node === null) return null;
-  const record = node as Record<string, unknown>;
-  if (record["@graph"]) return postingIn(record["@graph"]);
-  const types = Array.isArray(record["@type"]) ? record["@type"] : [record["@type"]];
-  if (!types.includes("JobPosting")) return null;
-  const organisation = record.hiringOrganization;
-  const company = typeof organisation === "string" ? organisation
-    : String((organisation as Record<string, unknown> | undefined)?.name ?? "");
-  return { title: String(record.title ?? ""), company };
-}
-
-function findPosting(doc: Document): PageSignals["posting"] {
-  for (const script of Array.from(doc.querySelectorAll("script[type='application/ld+json']"))) {
-    try {
-      const found = postingIn(JSON.parse(script.textContent ?? ""));
-      if (found) return found;
-    } catch {
-      // A page's broken structured data just gives no signal.
-    }
-  }
-  return null;
+  // Only a form with required fields says how far each is: the read stays as it was for any other.
+  return { scanId, values, ...(Object.keys(required).length > 0 ? { required } : {}), moved: !sameShape(shape, shapeOf(doc)) };
 }
 
 function pageSignals(doc: Document): PageSignals {
   const meta = (property: string) => doc.querySelector(`meta[property='${property}']`)?.getAttribute("content") ?? "";
   const heading = doc.querySelector("h1");
+  const job = readJob(doc);
   return {
     url: doc.URL,
     title: collapse(`${doc.title} ${meta("og:title")}`),
     heading: heading ? collapse(textOf(heading)).slice(0, 200) : "",
     siteName: meta("og:site_name"),
-    posting: findPosting(doc),
+    posting: job.isJobPage && job.title ? { title: job.title, company: job.company } : null,
   };
 }
 
@@ -394,7 +452,16 @@ export function scanDocument(doc: Document, scanId: number, isTop: boolean): { r
     const id = `f${entries.size}`;
     const entry = build(id);
     entry.field.current = readCurrent(entry);
-    entry.field.stableId = stableIdOf(entry.controls[0]!);
+    if (entry.field.required) entry.field.complete = requiredComplete(entry, entry.field.current);
+    const control = entry.controls[0]!;
+    const form = (control as HTMLInputElement).form ?? closestThrough(control, "form, [role='form']");
+    if (form && /newsletter|subscribe/i.test([form.id, form.getAttribute("name"), form.getAttribute("aria-label")].join(" "))) return;
+    if (form) entry.field.formId = stableIdOf(form);
+    const tracked = (globalThis as { __benchqDraftEdits?: WeakSet<Element> }).__benchqDraftEdits;
+    if (entry.field.current && isInput(control) && (control.matches(":autofill") || (tracked && !tracked.has(control)))) {
+      entry.field.prefilledIdentity = true;
+    }
+    entry.field.stableId = stableIdOf(control);
     entries.set(id, entry);
   };
   const { slots, custom } = formControls(doc);

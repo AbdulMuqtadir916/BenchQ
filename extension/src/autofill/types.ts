@@ -33,6 +33,8 @@ export type ScannedField = {
   clues: FieldClues;
   autocomplete: string;
   required: boolean;
+  /** Whether a required control is complete on the site. A password exposes only this flag. */
+  complete?: boolean;
   current: string;
   options: FieldOption[];
   maxLength: number | null;
@@ -42,9 +44,16 @@ export type ScannedField = {
   /** The same control keeps this id across scans of one page load, so what the panel remembers about it stays with it
    * when fields come or go above it. */
   stableId?: string;
+  formId?: string;
+  prefilledIdentity?: boolean;
 };
 
-export type TabField = ScannedField & { frameId: number; pageUrl: string };
+export type TabField = ScannedField & {
+  frameId: number; pageUrl: string;
+  /** An upload the site took away once it had BenchQ's file, naming the file instead (Reddit's Greenhouse form): kept as
+   * its row, holding the file, and never written to, since there's no upload left to write to. */
+  isGone?: boolean;
+};
 
 export type PageSignals = {
   url: string;
@@ -54,10 +63,11 @@ export type PageSignals = {
   posting: { title: string; company: string } | null;
 };
 
-export type FrameScan = { scanId: number; url: string; fields: ScannedField[]; signals: PageSignals | null };
+/** `loadId`: which load of the page this is, the same for every scan until it loads again. */
+export type FrameScan = { scanId: number; url: string; fields: ScannedField[]; signals: PageSignals | null; loadId?: string };
 
 /** A frame's fields as they stand, by field id. `moved`: the form has changed shape, so a scan is due. */
-export type FrameRead = { scanId: number; values: Record<string, string>; moved: boolean };
+export type FrameRead = { scanId: number; values: Record<string, string>; moved: boolean; required?: Record<string, boolean> };
 
 export type FieldWrite =
   /** `also`: other ways to write the same value, tried in turn when the form refuses `value`, like a phone number's
@@ -80,12 +90,13 @@ export type ResumeFile = { name: string; mimeType: string; data: string; source?
  * §8.2), or picked by the BDE from their computer in the panel. */
 export type ResumeFileSource = "uploaded" | "generated" | "picked";
 
-export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string };
+/** `runId`: the Autofill run the fill belongs to, which scopes a wait for ADP's form that ran out. */
+export type FillRequest = { scanId: number; fieldId: string; write: FieldWrite; current: string; runId?: string };
 export type FillResult = { status: "filled" | "failed" | "stale" | "changed" | "no-match"; current: string; reason?: string };
 export type UndoResult = { restored: number; kept: number; skipped: number };
 
 /** A custom dropdown's options exist only once it's open, so its answer is matched at fill time. */
-export type ChoiceRequest = { scanId: number; fieldId: string; current: string; search: string };
+export type ChoiceRequest = { scanId: number; fieldId: string; current: string; search: string; searchHint?: string };
 export type PickRequest = ChoiceRequest & { optionId: string };
 /** `multiple`: the dropdown keeps several choices, like a "mark all that apply" list. */
 export type ChoiceList = { status: "open"; options: FieldOption[]; multiple?: boolean } | { status: "empty" | "stale" | "changed" };
@@ -96,6 +107,9 @@ export type FieldTarget = { scanId: number; fieldId: string };
  * page wrote it (HTML from its JobPosting data, else its main text). */
 /** `isJobPage`: the page is a job's page (`page/job.ts`); on any other page the rest is empty. */
 export type PageJob = {
+  logoUrl?: string;
+  /** Verified listing link for saving. url remains the live tab address for navigation checks. */
+  postingUrl?: string;
   title: string; company: string; description: string; location: string | null; url: string; isJobPage: boolean;
   /** The codes the page gives its job (its JobPosting identifier, a "Job ID:" line), lowercase, and the other links it
    * gives itself (canonical, og:url), for knowing a job the candidate already has. */
@@ -110,6 +124,7 @@ export type PageJob = {
 export type PageApi = {
   version: string;
   readJob(): PageJob;
+  readJobForSave(): Promise<PageJob>;
   /** Clicks the form's "Add another" for a kind of history entry (#132): whether one was found. */
   addEntry(kind: "education" | "work"): boolean;
   scan(): Promise<FrameScan>;

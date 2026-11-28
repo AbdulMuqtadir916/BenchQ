@@ -1,7 +1,7 @@
 import type { EngineFieldType } from "../engine/field-types";
 import { callingCodeIn, callingCodeOf, countryNamed, isKnownRegion } from "./countries";
 import { minimumYears } from "./match";
-import { isUsState } from "./options";
+import { isUsState, usStateCode, withStateComma } from "./options";
 import { canonical, normalize } from "./text";
 import type { BankEntry, ScannedField } from "./types";
 
@@ -63,7 +63,8 @@ const DAYS_IN: Record<string, number> = { day: 1, week: 7, month: 30 };
 /** A part of a place without the postal code after it: "OH 43215" is "OH". */
 const withoutPostal = (part: string) => part.replace(POSTAL, "").trim();
 
-const withoutNotes = (text: string) => text.replace(ASIDE, " ").replace(/\s+/g, " ").trim();
+/** A place without its note, and with the comma a US state was written without: "Dallas TX" is "Dallas, TX". */
+const withoutNotes = (text: string) => withStateComma(text.replace(ASIDE, " ").replace(/\s+/g, " ").trim());
 
 /** A place without its postal code, which has a field of its own, or a note: "Columbus, OH 43215" is "Columbus, OH". */
 const placeWithoutPostal = (place: string) => withoutNotes(place).split(",").map((part) => withoutPostal(part.trim())).filter(Boolean).join(", ");
@@ -114,7 +115,7 @@ function addressParts(address: string): AddressParts | null {
 
 /** The country a saved location or address is in, as a form's country list names it: the country its last part names,
  * else "United States" for a US state. */
-function countryIn(text: string): string | null {
+export function countryIn(text: string): string | null {
   const address = addressParts(text);
   if (address) return address.country || (isUsState(canonical(address.region)) ? "United States" : null);
   const parts = withoutNotes(text).split(",").map((part) => withoutPostal(part.trim())).filter(Boolean);
@@ -241,7 +242,9 @@ export function shaped(type: EngineFieldType | null, answer: string, asked: Aske
   const { label, kind } = asked;
   const asks = normalize(label);
   if (type === "phone") return phoneFor(answer, asked);
+  if (type === "middle-name" && /\bmiddle initial\b/.test(asks)) return Array.from(answer.trim())[0] ?? "";
   if (type === "city-state") return placeWithoutPostal(answer);
+  if (type === "address-region") return regionAsAsked(answer, asked);
   if (type === "address-line1" && STREET_ONLY.test(asks)) return addressParts(answer)?.street || answer;
   if (HANDLE.test(asks) && PROFILE_URL.test(answer.trim())) return profileHandle(answer.trim());
   if (type !== "start-date") return answer;
@@ -250,6 +253,17 @@ export function shaped(type: EngineFieldType | null, answer: string, asked: Aske
   if (notice !== null) return dateIn(notice);
   const date = isoDate(answer);
   return date && date < isoDate(today())! ? today() : answer;
+}
+
+/** A US state as the box takes it: its two-letter code where the box is too short for the name or asks for a code ("State
+ * code", a two-character box), else as saved. */
+function regionAsAsked(answer: string, { label, maxLength }: Asked): string {
+  const saved = answer.trim();
+  const code = usStateCode(canonical(saved));
+  if (!code) return answer;
+  const wantsCode = /\b(code|abbreviation|abbrev|abbr)\b/.test(normalize(label))
+    || (maxLength !== null && maxLength !== undefined && maxLength >= 2 && maxLength < saved.length);
+  return wantsCode ? code.toUpperCase() : answer;
 }
 
 export function inTheUs(location: string): boolean {
@@ -424,13 +438,15 @@ function placeIn(saved: Saved): { place: Place; source: BankEntry } | null {
   return fromAddress && address ? { place: fromAddress, source: address } : null;
 }
 
-/** The country of the saved location, else of the saved address (`countryIn`). */
+/** The country of the saved location, else of the saved address (`countryIn`), else the saved country itself. */
 function countryOf(saved: Saved): { country: string; source: BankEntry } | null {
   for (const source of [saved("city-state"), saved("address-line1")]) {
     const country = source ? countryIn(source.answer) : null;
     if (country && source) return { country, source };
   }
-  return null;
+  const own = saved("address-country");
+  const country = own ? countryNamed(own.answer.trim()) : null;
+  return country && own ? { country, source: own } : null;
 }
 
 /** A label that asks for a whole preferred name: "Preferred full name", "Preferred first and last name". */
@@ -466,7 +482,11 @@ export function derivedAnswer(type: EngineFieldType, { label, kind }: Asked, sav
     case "address-postal": return postalCode(saved);
     case "address-country": return country ? { answer: country.country, source: country.source } : null;
     // Where the candidate lives, from the saved address when no location is saved: "Hyderabad, Telangana".
-    case "city-state": return fromPlace(found && found.place.region ? `${found.place.city}, ${found.place.region}` : "");
+    case "city-state": {
+      const city = saved("address-city");
+      if (city) return { answer: [city.answer, saved("address-region")?.answer, saved("address-country")?.answer].filter(Boolean).join(", "), source: city };
+      return fromPlace(found && found.place.region ? `${found.place.city}, ${found.place.region}` : "");
+    }
     // Only a yes: "Do you live and work in North America?" is the same question, and a Canadian's answer to it isn't no.
     case "lives-in-us": return country?.country === "United States" ? { answer: "Yes", source: country.source } : null;
     case "phone-country-code": return phoneCountry(saved);

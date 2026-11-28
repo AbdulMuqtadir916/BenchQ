@@ -26,9 +26,20 @@ export const forgetForms = () => forms.clear();
 
 export const fieldLabel = ({ label }: Pick<TabField, "label">) => label || "Unlabeled field";
 
-/** What a row's field holds, or nothing if it still needs filling. A box that should stay unchecked is already right. */
+/** What a row's field holds, or nothing if it still needs filling. A box that should stay unchecked is already right; a
+ * phone box showing only its dial code ("+1") holds no number yet. */
 export const filledValue = ({ field, status, proposed }: ReviewRow) =>
-  field.current || (status === "same" ? proposed ?? "" : "");
+  (isDialCodeOnly(field) ? "" : field.current) || (status === "same" ? proposed ?? "" : "");
+
+/** A proposed value or an unchecked required box cannot unlock Mark applied. */
+export const needsRequiredAnswer = ({ field }: ReviewRow) => field.required
+  && (isDialCodeOnly(field) || !(field.complete ?? field.current.trim()));
+
+/** A full phone-number box showing only its dial code. A box asking for the code itself ("Country code", a code
+ * dropdown) holds a real value in "+1", and so does a "+5000" in a salary box. */
+const isDialCodeOnly = ({ current, kind, label }: TabField) =>
+  /^\+\d{1,4}$/.test(current.trim()) && kind !== "select" && kind !== "combobox" && !/\bcode\b/i.test(label)
+  && (kind === "tel" || /\b(phone|mobile|cell)\b/i.test(label));
 
 /** Takes in the fields on the page now. A field on another page keeps what it last held. A Social Security or card
  * number is never kept, whatever its field is called. */

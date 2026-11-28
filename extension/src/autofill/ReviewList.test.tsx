@@ -47,28 +47,24 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("the groups (07 Q56)", () => {
-  const fold = () => host.querySelector<HTMLButtonElement>("[data-slot='review-filled-toggle']");
-
-  it("put what still needs the BDE first, required before optional, each required one marked", () => {
+describe("the groups, as Simplify lists a filled form", () => {
+  it("list the required fields, then the optional ones, each in the form's order with how many are filled, with no pill", () => {
     show([holding("First name", true, "Priya"), row("Why us?", false, "manual"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
-    expect(titles()).toEqual(["Needs you (2)"]);
-    expect(labels()).toEqual(["Email", "Why us?"]);
-    expect(all("[data-slot='review-required']").map((tag) => tag.textContent)).toEqual(["Required"]);
+    expect(titles()).toEqual(["Required (1 of 2 filled)", "Optional (1 of 2 filled)"]);
+    expect(labels()).toEqual(["First name", "Email", "Why us?", "LinkedIn"]);
+    expect(all("[data-slot='review-tick']").map((tick) => tick.getAttribute("aria-label"))).toEqual(["Filled", "Not filled", "Not filled", "Filled"]);
+    expect(all("[data-slot='review-required']")).toEqual([]);
   });
 
-  it("fold what's filled under its count, open on a click", () => {
+  it("show the filled fields ticked in their section, with nothing to unfold", () => {
     show([holding("First name", true, "Priya"), row("Email", true), holding("LinkedIn", false, "https://x.test")], false, false);
-    expect([fold()!.textContent, fold()!.getAttribute("aria-expanded")]).toEqual(["Filled (2)", "false"]);
-    act(() => { fold()!.click(); });
-    expect(fold()!.getAttribute("aria-expanded")).toBe("true");
-    expect(labels()).toEqual(["Email", "First name", "LinkedIn"]);
+    expect(labels()).toEqual(["First name", "Email", "LinkedIn"]);
+    expect(host.querySelector("[data-slot='review-filled-toggle']")).toBeNull();
   });
 
   it("leave out a group with nothing in it", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Needs you (1)"]);
-    expect(fold()).toBeNull();
+    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
   });
 
   it("have no checkboxes", () => {
@@ -76,12 +72,13 @@ describe("the groups (07 Q56)", () => {
     expect(host.querySelector("input")).toBeNull();
   });
 
-  it("show a value from the page as plain text, on two lines at most", () => {
+  it("show a value from the page as plain text only, kept for screen readers", () => {
     show([holding("Name", true, "<img src=x onerror=alert(1)>")]);
     expect(host.querySelector("img")).toBeNull();
     const value = host.querySelector("[data-slot='review-value']")!;
     expect(value.textContent).toBe("<img src=x onerror=alert(1)>");
-    expect(value.className).toContain("line-clamp-2");
+    // One line per field, as Simplify lists them: the value stays for screen readers and the row's hover.
+    expect(value.className).toContain("sr-only");
   });
 });
 
@@ -97,7 +94,9 @@ describe("a row", () => {
   it("leaves a field with an answer waiting unticked, without the answer", () => {
     show([row("Email", true, "ready", { proposed: "priya@example.test", source: saved })]);
     expect(ticks()).toEqual(["Not filled"]);
-    expect(host.querySelector("[data-slot='review-tick'] svg")).toBeNull();
+    // The amber "!", never the tick.
+    expect(host.querySelector("[data-slot='review-tick']")!.getAttribute("data-filled")).toBe("false");
+    expect(host.querySelector("[data-slot='review-tick'] path")!.getAttribute("d")).not.toBe("M20 6 9 17l-5-5");
     expect(host.textContent).not.toContain("priya@example.test");
     expect(host.textContent).not.toContain("Asian");
   });
@@ -148,25 +147,27 @@ describe("file uploads", () => {
   const upload = (label: string, required: boolean, current = "") =>
     holding(label, required, current, "blocked", { reason: "File upload", field: { label, required, current, kind: "file" } as TabField });
 
-  it("get their own section, after the rest", () => {
+  it("sit with the form's other fields, in its order, as Simplify lists them", () => {
     show([row("Email", true), upload("Resume/CV", true), row("LinkedIn", false), upload("Cover Letter", false, "letter.pdf")]);
-    expect(titles()).toEqual(["Needs you (2)", "Other uploads (1 of 2 filled)"]);
-    expect(labels()).toEqual(["Email", "LinkedIn", "Resume/CV", "Cover Letter"]);
+    expect(titles()).toEqual(["Required (0 of 2 filled)", "Optional (1 of 2 filled)"]);
+    expect(labels()).toEqual(["Email", "Resume/CV", "LinkedIn", "Cover Letter"]);
   });
 
-  it("stay out of the other groups' counts", () => {
+  it("count with the other fields", () => {
     show([upload("Resume/CV", true), holding("Email", true, "a@example.test")]);
-    expect(titles()).toEqual(["Other uploads (0 of 1 filled)"]);
+    expect(titles()).toEqual(["Required (1 of 2 filled)"]);
   });
 
   it("show no section when the form has none", () => {
     show([row("Email", true)]);
-    expect(titles()).toEqual(["Needs you (1)"]);
+    expect(titles()).toEqual(["Required (0 of 1 filled)"]);
   });
 
   it("show the BDE what's needed, without repeating that it's an upload", () => {
     show([upload("Resume/CV", true), upload("Cover Letter", false)]);
+    // The amber "!" (drawn, so it has no text) marks a field that still needs the BDE.
     expect(all("[data-slot='review-row']").map(({ textContent }) => textContent)).toEqual(["Resume/CVRequired", "Cover Letter"]);
+    expect(all("[data-slot='review-tick']").map((tick) => tick.getAttribute("aria-label"))).toEqual(["Not filled", "Not filled"]);
   });
 
   it("tick and show the file's name once it's attached", () => {
@@ -293,6 +294,81 @@ describe("a long saved answer and a long dropdown (07 Q54)", () => {
     expect(more.textContent).toBe("Show less");
   });
 
+  it("offers a yes-or-no question's answers as buttons, a sensitive one's too, but never a CAPTCHA's", () => {
+    const onChoose = vi.fn();
+    const radios = row("Are you willing to relocate?", true, "manual", { field: { label: "Are you willing to relocate?", required: true, current: "", kind: "radio", options: [{ id: "y", label: "Yes" }, { id: "n", label: "No" }] } as TabField });
+    const consent = row("I agree to the privacy policy", true, "blocked", { reason: "Consent or legal statement", field: { label: "I agree to the privacy policy", required: true, current: "", kind: "checkbox", options: [] } as unknown as TabField });
+    const captcha = row("I am not a robot", true, "blocked", { reason: "CAPTCHA", field: { label: "I am not a robot", required: true, current: "", kind: "checkbox", options: [] } as unknown as TabField });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[radios, consent, captcha]} isFilling={false} onGoTo={onGoTo} onListOptions={vi.fn()} onChoose={onChoose} />); });
+    const groups = [...host.querySelectorAll("[data-slot='choice-list']")];
+    expect(groups.map((group) => [...group.querySelectorAll("button")].map(({ textContent }) => textContent))).toEqual([["Yes", "No"], ["Yes", "No"]]);
+    act(() => { groups[0]!.querySelector<HTMLButtonElement>("button")!.click(); });
+    expect(onChoose).toHaveBeenCalledWith(radios, "Yes");
+    act(() => { groups[1]!.querySelectorAll<HTMLButtonElement>("button")[0]!.click(); });
+    expect(onChoose).toHaveBeenCalledWith(consent, "Yes");
+  });
+
+  it("answers a yes-or-no question from its own answers, never saved answers to other questions", () => {
+    const saved = [{ id: "s1", question: "Do you have a Bachelor's degree?", answer: "Yes", category: "OTHER" }];
+    const radios = row("Do you have a Master's degree?", true, "manual", { suggestions: saved,
+      field: { label: "Do you have a Master's degree?", required: true, current: "", kind: "radio", options: [{ id: "y", label: "Yes" }, { id: "n", label: "No" }] } as TabField });
+    const text = row("Why this company?", true, "manual", { suggestions: saved });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[radios, text]} isFilling={false} onGoTo={onGoTo} onListOptions={vi.fn()} onChoose={vi.fn()} onSuggest={vi.fn()} />); });
+    const rowsShown = [...host.querySelectorAll("[data-slot='review-row']")];
+    expect(rowsShown[0]!.querySelector("[data-slot='choice-list']")).not.toBeNull();
+    expect(rowsShown[0]!.querySelector("[data-slot='review-suggestions']")).toBeNull();
+    expect(rowsShown[1]!.querySelector("[data-slot='review-suggestions']")).not.toBeNull();
+  });
+
+  it("reads a Yes-or-No dropdown's answers from the page when asked, then offers them as buttons", async () => {
+    const onListOptions = vi.fn(async () => ["Yes", "No"]);
+    const onChoose = vi.fn();
+    const dropdown = row("3+ years of experience with large-scale ETL systems", true, "manual", { reason: "No answer in the bank.",
+      field: { label: "3+ years of experience with large-scale ETL systems", required: true, current: "", kind: "combobox", options: [] } as unknown as TabField });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[dropdown]} isFilling={false} onGoTo={onGoTo} onListOptions={onListOptions} onChoose={onChoose} />); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='choice-open']")!.click(); });
+    const answers = [...host.querySelectorAll<HTMLButtonElement>("[data-slot='choice-answer']")];
+    expect(answers.map(({ textContent }) => textContent)).toEqual(["Yes", "No"]);
+    act(() => { answers[0]!.click(); });
+    expect(onChoose).toHaveBeenCalledWith(dropdown, "Yes");
+  });
+
+  it("opens a long select's own options in the panel, with no look at the page", async () => {
+    const onListOptions = vi.fn();
+    const states = ["Texas", "Utah", "Ohio", "Iowa", "Idaho"].map((label, index) => ({ id: `s${index}`, label }));
+    const select = row("State", true, "manual", { field: { label: "State", required: true, current: "", kind: "select", options: states } as TabField });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[select]} isFilling={false} onGoTo={onGoTo} onListOptions={onListOptions} onChoose={vi.fn()} />); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='choice-open']")!.click(); });
+    expect(onListOptions).not.toHaveBeenCalled();
+    expect([...host.querySelectorAll("[data-slot='choice-list'] button")].map(({ textContent }) => textContent)).toEqual(["Texas", "Utah", "Ohio", "Iowa", "Idaho"]);
+  });
+
+  it("searches a long list, takes the one match on Enter, and closes on Esc back to its button", async () => {
+    const options = [...Array.from({ length: 10 }, (_, index) => `Option ${index + 1}`), "Texas"];
+    const onChoose = vi.fn();
+    const dropdown = row("State", true, "manual", { canChoose: true, field: { label: "State", required: true, current: "", kind: "combobox" } as TabField });
+    show([]);
+    act(() => { root!.render(<ReviewList rows={[dropdown]} isFilling={false} onGoTo={onGoTo} onListOptions={async () => options} onChoose={onChoose} />); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='choice-open']")!.click(); });
+    const search = host.querySelector<HTMLInputElement>("[data-slot='choice-search']")!;
+    expect(document.activeElement).toBe(search);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "tex");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect([...host.querySelectorAll("[data-slot='choice-list'] button")].map(({ textContent }) => textContent)).toEqual(["Texas"]);
+    act(() => { search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    expect(onChoose).toHaveBeenCalledWith(dropdown, "Texas");
+    await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='choice-open']")!.click(); });
+    act(() => { host.querySelector("[data-slot='choice-list'] button")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(host.querySelector("[data-slot='choice-list']")).toBeNull();
+    expect(document.activeElement).toBe(host.querySelector("[data-slot='choice-open']"));
+  });
+
   it("lists eight options, then all of them on request, with no scroll", async () => {
     const options = Array.from({ length: 10 }, (_, index) => `Option ${index + 1}`);
     const dropdown = row("Country", true, "manual", { canChoose: true, field: { label: "Country", required: true, current: "", kind: "combobox" } as TabField });
@@ -321,7 +397,7 @@ describe("keeping a typed answer (07 Q58)", () => {
   it("lists what the BDE typed first, each with its button and Only this résumé", async () => {
     const typedRow = holding("Why us?", false, "Payments.", "same", { saveOffer: offer });
     const onSave = renderWith([row("Email", true), typedRow]);
-    expect(titles()).toEqual(["Save for next time (1)", "Needs you (1)"]);
+    expect(titles()).toEqual(["Save for next time (1)", "Required (0 of 1 filled)"]);
     const box = host.querySelector<HTMLInputElement>("[data-slot='review-save'] input")!;
     act(() => { box.click(); });
     await act(async () => { host.querySelector<HTMLButtonElement>("[data-slot='review-save'] button")!.click(); });
@@ -333,5 +409,13 @@ describe("keeping a typed answer (07 Q58)", () => {
     expect(titles()).toEqual(["Save for next time (1)"]);
     expect(host.querySelector("[data-slot='review-saved-note']")!.textContent).toBe("Saved for next time");
     expect(host.querySelector("[data-slot='review-save']")).toBeNull();
+  });
+});
+
+describe("after a run", () => {
+  it("offers no Go to first field: each row takes the BDE to its field", () => {
+    show([row("Website", false, "manual"), row("Phone", true, "manual")]);
+    expect(host.querySelector("[data-slot='review-needed-first']")).toBeNull();
+    expect(all("button").map(({ textContent }) => textContent)).not.toContain("Go to first field");
   });
 });

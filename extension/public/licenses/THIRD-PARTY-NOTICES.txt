@@ -1,6 +1,6 @@
-BenchQ Apply: third-party notices
+BenchQ Autofill Apply: third-party notices
 
-BenchQ Apply includes the open-source software below. Each licence text is in this folder.
+BenchQ Autofill Apply includes the open-source software below. Each licence text is in this folder.
 
 React and React DOM (with Scheduler)
   https://github.com/facebook/react

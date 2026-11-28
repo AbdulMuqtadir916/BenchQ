@@ -99,6 +99,9 @@ class AddedJob(BaseModel):
     posted_at: Annotated[str, StringConstraints(max_length=10), AfterValidator(_posted)] | None = None
     requisition_id: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60,
                                                     pattern=r"^[A-Za-z0-9][A-Za-z0-9_.#/-]*$")] | None = None
+    # The employer's logo its page shows (2026-11-28): an http(s) link, kept so the extension shows the job with it.
+    logo_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2048),
+                        AfterValidator(_http_url)] | None = None
 
     @model_validator(mode="after")
     def _pay_holds_together(self):
@@ -1347,6 +1350,7 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "short_id": None,
         # posting details the detail pane shows, so it never has to re-fetch the job
         "location": job.location,
+        "logo_url": job.logo_url,
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,
         "source": posting.source if posting else None,

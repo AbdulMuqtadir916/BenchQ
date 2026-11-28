@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { hrefFor } from "@/lib/routes/registry";
 
 /**
- * /privacy (docs/07 §2.1): BenchQ Apply's privacy policy, open to everyone, signed in or not, because the Chrome Web
+ * /privacy (docs/07 §2.1): BenchQ Autofill Apply's privacy policy, open to everyone, signed in or not, because the Chrome Web
  * Store listing links to it (docs/extension-store.md §4). It must say what the store's data-use answers say (§3): when
  * the extension starts reading, sending or keeping something new, change both, and the date below.
  */
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <Card className="w-full max-w-2xl p-6 shadow-lg sm:p-8">
         <header className="mb-8">
           <p className="text-display text-[var(--color-text)]">BenchQ</p>
-          <h1 className="mt-5 text-h1 text-[var(--color-text)]">BenchQ Apply privacy policy</h1>
+          <h1 className="mt-5 text-h1 text-[var(--color-text)]">BenchQ Autofill Apply privacy policy</h1>
           <p className="mt-2 text-caption text-[var(--color-text-3)]">
             Last updated <time dateTime="2026-11-24">24 November 2026</time>
           </p>
@@ -22,8 +22,7 @@ export default function PrivacyPage() {
 
         <div className="space-y-6 text-body text-[var(--color-text-2)]">
           <p>
-            BenchQ Apply is a browser extension for people who use BenchQ. It acts only on the tab you connect to a
-            BenchQ job, and, after you allow it, on sites you approve.
+            BenchQ Autofill Apply is a browser extension for people who use BenchQ. On permitted sites it checks the page locally for a job posting or application and offers to open the assistant. Opening a source link in BenchQ can open the panel alongside the job.
           </p>
 
           <Section title="What it reads">
@@ -86,7 +85,7 @@ export default function PrivacyPage() {
           <Section title="Your control">
             <p>
               Filling starts only when you press Autofill, pick a résumé or a file of your own for the job, or use a
-              field&apos;s Replace, Replace all or Use button, and you submit every form yourself. You can remove BenchQ
+              field&apos;s Replace, Replace all or Use button, and you submit every form yourself. You can remove BenchQ Autofill
               Apply&apos;s access to any site in chrome://extensions, and uninstall it at any time.
             </p>
           </Section>

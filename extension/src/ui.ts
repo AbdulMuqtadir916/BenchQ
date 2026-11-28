@@ -6,13 +6,13 @@ export const MOTION = "duration-[var(--duration-fast)] ease-[var(--ease-out)]";
 const BUTTON_SIZES = {
   regular: "min-h-[var(--control-height)] px-3 py-1 text-body-strong",
   small: "min-h-[var(--control-height)] px-2.5 py-1 text-sm font-[550]",
-  large: "min-h-[var(--control-lg)] px-3 py-1 text-body-strong",
+  large: "min-h-[var(--control-lg)] px-4 py-2.5 text-sm",
   compact: "min-h-[var(--control-sm)] px-2 py-0.5 text-sm font-[550]",
 };
 
 /** The website's raised primary and neutral secondary buttons, which also style a link. */
 export const button = (look: "primary" | "secondary", size: keyof typeof BUTTON_SIZES = "regular") =>
-  `bq-${look} inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] no-underline transition-[background,border-color,box-shadow,transform] ${MOTION} disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none ${BUTTON_SIZES[size]}`;
+  `bq-${look} inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] no-underline transition-[background,border-color,box-shadow,transform] ${MOTION} disabled:cursor-not-allowed [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none ${BUTTON_SIZES[size]}`;
 
 const ICON_BUTTON = `grid size-[var(--control-height)] flex-none place-items-center rounded-[var(--radius-sm)] border text-[var(--color-text-2)] transition-[color,background,border-color] ${MOTION} hover:text-[var(--color-text)] [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
 export const ICON_BUTTON_RAISED = `${ICON_BUTTON} border-[var(--color-border-strong)] bg-[image:var(--gradient-neutral)] shadow-[var(--shadow-control)] hover:bg-[image:var(--gradient-neutral-hover)]`;
@@ -26,12 +26,14 @@ export const FITTED_BUTTONS = "grid grid-cols-[repeat(auto-fit,minmax(var(--acti
 /** One hairline and a contact shadow. */
 export const CARD = "rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)]";
 
+/** A line of text still loading. */
+export const SKELETON_LINE = "h-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-3)] motion-safe:animate-pulse";
 export const ALERT = "rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-danger-fg)_24%,transparent)] bg-[var(--color-danger-bg)] px-2.5 py-2 text-sm text-[var(--color-danger-fg)]";
 export const WARNING = "rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-warning-fg)_26%,transparent)] bg-[var(--color-warning-bg)] px-2.5 py-2 text-sm text-[var(--color-warning-fg)]";
 
 /** The scroll margin of what a finished run scrolls to ("Autofill complete", or the run's note): it stops just under the
- * panel's sticky top bar, clear of the Mark applied bar at the bottom. */
-export const BELOW_TOP_BAR = "scroll-mt-[calc(var(--topbar-height)+var(--spacing)*3)]";
+ * fields section's sticky progress line. */
+export const BELOW_TOP_BAR = "scroll-mt-12";
 
 export const SOFT_TEXT = "text-sm text-[var(--color-text-2)]";
 export const MUTED_TEXT = "text-sm text-[var(--color-text-3)]";

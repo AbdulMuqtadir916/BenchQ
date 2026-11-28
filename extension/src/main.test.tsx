@@ -52,6 +52,11 @@ const jobCards = () => [...document.querySelectorAll("[data-slot='job']")];
 
 beforeEach(() => {
   fake = fakeChrome();
+  fake.scripting.executeScript.mockImplementation(async (request?: { args?: unknown[] }) => {
+    if (request?.args?.[0] === "scan") return [{ frameId: 0, result: { scanId: 1, fields: [], url: job.url, signals: null } }];
+    if (request?.args?.[0] === "read") return [{ frameId: 0, result: { scanId: 1, values: {}, moved: false } }];
+    return [];
+  });
   vi.stubGlobal("chrome", fake);
   vi.stubGlobal("fetch", vi.fn(respond));
   vi.resetModules();
@@ -60,6 +65,31 @@ beforeEach(() => {
 });
 
 const opened = { type: "open-job", connection: { applicationId: "app-1", candidateId: "cand-1", userId: "user-1", job: summary } };
+
+it("shows who's signed in in the settings drawer, with the preview and theme, and signs out from it", async () => {
+  await mount();
+  expect(document.body.textContent).not.toContain("· BDE ·");
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='settings-open']")!.click(); });
+  const drawer = document.querySelector<HTMLDialogElement>("dialog[data-slot='settings']")!;
+  expect(drawer.hasAttribute("open")).toBe(true);
+  expect(drawer.querySelector("[data-slot='settings-user']")!.textContent).toContain("BDE");
+  expect([...drawer.querySelectorAll("[role='switch']")].map((toggle) => toggle.getAttribute("aria-label"))).toEqual(["LinkedIn posting preview", "Dark mode"]);
+  await act(async () => { drawer.querySelector<HTMLElement>("[data-slot='sign-out']")!.click(); });
+  await settle();
+  const signOutCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/api/auth/sign-out"));
+  expect((signOutCall?.[1] as RequestInit | undefined)?.method).toBe("POST");
+  expect(document.body.textContent).toContain("Sign in to BenchQ");
+});
+
+it("keeps the session visible and reports a failed sign out", async () => {
+  vi.mocked(fetch).mockImplementation(async (url) => String(url).endsWith("/api/auth/sign-out")
+    ? { ok: false, status: 503, json: async () => ({}) } as Response : respond(String(url)) as Promise<Response>);
+  await mount();
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='settings-open']")!.click(); });
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='sign-out']")!.click(); });
+  expect(document.querySelector("[data-slot='error']")?.textContent).toBe("Could not sign out. Try again.");
+  expect(document.querySelector("[data-slot='settings-open']")).not.toBeNull();
+});
 
 it("opens and connects a job from Open job", async () => {
   await mount();
@@ -139,7 +169,7 @@ it("shows only the linked job on a connected tab: no list, no tabs, no accordion
   connectTab();
   await mount();
   expect(document.querySelector("#autofill-title")?.textContent).toBe("Java Developer");
-  expect(document.querySelector("[role='tablist']")).toBeNull();
+  expect(document.querySelector("[role='tablist']:not([data-slot='job-views'])")).toBeNull();
   expect(document.querySelector("[data-slot='job']")).toBeNull();
   expect(document.querySelector("details")).toBeNull();
 });
@@ -258,7 +288,7 @@ it("asks before marking applied", async () => {
   connectTab();
   await mount();
   await press("Mark applied");
-  expect(actionLabels()).toEqual(["Mark applied", "Mark applied", "Cancel"]);
+  expect(actionLabels()).toEqual(["Mark applied", "Cancel", "Mark applied"]);
   expect(document.querySelector("dialog[data-slot='autofill-confirm']")?.hasAttribute("open")).toBe(true);
   const patches = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("candidate-status"));
   expect(patches()).toEqual([]);
@@ -276,11 +306,15 @@ it("sends the form with the status, and only once confirmed", async () => {
   expect(JSON.parse(String(init?.body))).toMatchObject({ status: "applied", expected_revision: 0, form_data: { fields: [] }, resume_id: "res-1" });
 });
 
-it("ends the job's connections once it's marked applied", async () => {
+it("keeps the Applied confirmation available after disconnecting the job", async () => {
   connectTab();
   await mount();
   await markApplied();
   expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "disconnect-job", applicationId: "app-1" });
+  await endConnection();
+  expect(document.querySelector("[data-slot='applied-page']")?.textContent).toContain("Great job!");
+  await press("Back to jobs");
+  expect(document.querySelector("[data-slot='applied-page']")).toBeNull();
 });
 
 it("leaves the connection alone when marking applied fails", async () => {

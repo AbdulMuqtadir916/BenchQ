@@ -64,3 +64,11 @@ describe("a form's personal questions", () => {
     ]);
   });
 });
+
+it("fills a generic Location from separately saved address components", () => {
+  const bank = answersFromResume([
+    edited("address-city", "City", "Hyderabad"),
+    edited("address-region", "State", "Telangana"),
+  ]);
+  expect(buildReview([field("Location")], bank)[0]).toMatchObject({ status: "ready", proposed: "Hyderabad, Telangana" });
+});

@@ -25,7 +25,7 @@ export function callingCodeOf(digits: string): string | null {
  * ways an address may write it. */
 const COUNTRIES: [name: string, code: string, ...aliases: string[]][] = [
   ["United States", "1", "united states of america", "usa", "us", "u s", "u s a", "america"],
-  ["India", "91", "bharat"], ["Canada", "1"],
+  ["India", "91", "bharat", "ind"], ["Canada", "1"],
   ["United Kingdom", "44", "uk", "u k", "great britain", "britain", "england", "scotland", "wales", "northern ireland"],
   ["Ireland", "353"], ["Australia", "61"], ["New Zealand", "64"], ["Singapore", "65"], ["Malaysia", "60"],
   ["Indonesia", "62"], ["Philippines", "63"], ["Thailand", "66"], ["Vietnam", "84", "viet nam"], ["China", "86"],
@@ -62,6 +62,21 @@ const REGIONS = new Set([
   "prince edward island", "quebec", "saskatchewan", "northwest territories", "nunavut", "yukon",
   "ab", "bc", "mb", "nb", "nl", "ns", "on", "pe", "qc", "sk", "nt", "nu", "yt",
 ].map(normalize));
+
+/** India's states and union territories by the codes addresses write them with: "TS" is Telangana. */
+export const INDIA_REGIONS: Record<string, string> = {
+  ap: "andhra pradesh", as: "assam", br: "bihar", cg: "chhattisgarh", gj: "gujarat", hr: "haryana", hp: "himachal pradesh",
+  jh: "jharkhand", ka: "karnataka", kl: "kerala", mh: "maharashtra", mp: "madhya pradesh", ml: "meghalaya", mz: "mizoram",
+  od: "odisha", pb: "punjab", rj: "rajasthan", tn: "tamil nadu", ts: "telangana", tg: "telangana", up: "uttar pradesh",
+  wb: "west bengal", dl: "delhi", jk: "jammu and kashmir", py: "puducherry",
+};
+
+/** Canada's provinces and territories by their codes: "ON" is Ontario. */
+export const CANADA_REGIONS: Record<string, string> = {
+  ab: "alberta", bc: "british columbia", mb: "manitoba", nb: "new brunswick", nl: "newfoundland and labrador",
+  ns: "nova scotia", on: "ontario", pe: "prince edward island", qc: "quebec", sk: "saskatchewan",
+  nt: "northwest territories", nu: "nunavut", yt: "yukon",
+};
 
 /** Whether a part of an address names a state or province outside the US: "Telangana", "TS", "Ontario". */
 export const isKnownRegion = (text: string) => REGIONS.has(normalize(text));

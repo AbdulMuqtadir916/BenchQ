@@ -13,6 +13,8 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from backend.models.db import get_db, CoverLetter, Resume, Job, Setting, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.api._input import str_field, uuid_filter
+from backend.api.routes_applications import _scoped_application
+from backend.api.routes_auth import current_principal
 from backend.auth.scoping import firm_ref, reader_firm_id, scoped, scoped_jobs, writer_firm_id
 from backend.models.tenancy import DEFAULT_FIRM_ID
 from backend.job_monitor import launch_background, JobAlreadyRunningError
@@ -173,18 +175,34 @@ def _build_ctx(rows: list[CoverLetter], db: Session, firm_id) -> dict:
     return out
 
 
+def _letters_for_application(query, db, firm_id, principal, application_id):
+    app = _scoped_application(db, firm_id, principal, application_id)
+    if app.candidate_id is None:
+        raise HTTPException(404, "Application not found")
+    return query.join(Resume, Resume.id == CoverLetter.resume_id).filter(
+        CoverLetter.job_id == app.job_id,
+        Resume.firm_id == firm_id,
+        Resume.candidate_id == app.candidate_id,
+    )
+
+
 @router.get("")
-def list_cover_letters(job_id: Optional[str] = None, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    q = scoped(db, CoverLetter, firm_id).order_by(CoverLetter.updated_at.desc())
+def list_cover_letters(job_id: Optional[str] = None, application_id: Optional[str] = None,
+                       db: Session = Depends(get_db), firm_id=Depends(reader_firm_id),
+                       principal=Depends(current_principal)):
+    q = scoped(db, CoverLetter, firm_id)
+    if application_id is not None:
+        q = _letters_for_application(q, db, firm_id, principal, application_id)
     # A malformed filter value is a request error (422), not a missing resource —
     # the global DataError handler would otherwise call this list "Not found"
     # (R4-T1-09). Path ids keep their 404.
     job_id = uuid_filter(job_id, "job_id")
     if job_id:
         q = q.filter(CoverLetter.job_id == job_id)
-    rows = q.all()
+    rows = q.order_by(CoverLetter.updated_at.desc()).all()
     ctx = _build_ctx(rows, db, firm_id)
-    return [_to_dict(cl, ctx=ctx.get(cl.id)) for cl in rows]
+    letters = [_to_dict(cl, ctx=ctx.get(cl.id)) for cl in rows]
+    return {"letters": letters} if application_id is not None else letters
 
 
 @router.post("", status_code=201)
@@ -292,8 +310,12 @@ def delete_cover_letter(cl_id: str, db: Session = Depends(get_db), firm_id=Depen
 # ── PDF export ────────────────────────────────────────────────────────────────
 
 @router.get("/{cl_id}/pdf")
-async def export_pdf(cl_id: str, db: Session = Depends(get_db), firm_id=Depends(reader_firm_id)):
-    cl = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id).first()
+async def export_pdf(cl_id: str, application_id: Optional[str] = None, db: Session = Depends(get_db),
+                     firm_id=Depends(reader_firm_id), principal=Depends(current_principal)):
+    q = scoped(db, CoverLetter, firm_id).filter(CoverLetter.id == cl_id)
+    if application_id is not None:
+        q = _letters_for_application(q, db, firm_id, principal, application_id)
+    cl = q.first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
 

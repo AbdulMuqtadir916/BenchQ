@@ -1,7 +1,7 @@
 import type { PageApi } from "../autofill/types";
 import { createFiller } from "./fill";
 import { addEntry } from "./entries";
-import { readJob } from "./job";
+import { readJob, readJobForSave } from "./job";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
 /** Injected into a connected tab's frames, in the extension's isolated world: the page's own scripts can't see it.
@@ -13,6 +13,9 @@ const scope = globalThis as typeof globalThis & { __benchqAutofill?: PageApi };
 if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
   let registry: Registry | null = null;
   let scans = 0;
+  // This page load, as the panel remembers it: one closed and opened again on the same page takes up what it knew,
+  // and a reload starts afresh.
+  const loadId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
   scope.__benchqAutofill = {
     version: __PAGE_BUILD__,
@@ -21,10 +24,11 @@ if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
       scans += 1;
       const result = scanDocument(document, scans, window === window.top);
       registry = result.registry;
-      return result.scan;
+      return { ...result.scan, loadId };
     },
     read: () => (registry ? readFields(document, registry) : null),
     readJob: () => readJob(document),
+    readJobForSave: () => readJobForSave(document),
     addEntry: (kind) => addEntry(document, kind),
     ...createFiller(() => registry),
   };

@@ -34,6 +34,17 @@ export function withResumeFile(rows: ReviewRow[], file: ResumeFile | null): Revi
     : row));
 }
 
+/** The picked cover letter's file for the form's first cover-letter upload, filled like the résumé's: a file that was
+ * there before BenchQ looked stays, one BenchQ attached is replaced by another pick, and an upload that won't take it
+ * stays the BDE's to do. */
+export function withCoverLetterFile(rows: ReviewRow[], file: ResumeFile | null): ReviewRow[] {
+  const upload = file && rows.find(({ field }) => field.kind === "file" && documentOf(field) === "cover-letter");
+  if (!file || !upload || !accepts(upload.field.accept, file.mimeType, file.name)) return rows;
+  return rows.map((row) => (row === upload
+    ? { ...row, status: "ready" as const, reason: undefined, proposed: file.name, write: { type: "file" as const, ...file } }
+    : row));
+}
+
 /** Which file this is, apart from its name on the form: the BDE's own file and BenchQ's can share a name (#148). */
 export const fileKey = (file: { id?: string; name: string; data?: string }) => file.id ?? `${file.name}:${file.data?.length ?? 0}`;
 

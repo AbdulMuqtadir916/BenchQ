@@ -97,13 +97,21 @@ def test_candidate_responses_share_scoped_resume_and_letter_metadata(api_client,
                        name='Candidate tailored resume', created_at=utcnow() - timedelta(hours=1))
     foreign = make_version(test_db, app.firm_id, candidate=other, category='TAILORED', job_id=theirs.id,
                            name='Other candidate latest resume', created_at=utcnow())
-    test_db.add_all([
+    unrelated_letters = [
         CoverLetter(firm_id=app.firm_id, job_id=app.job_id, resume_id=foreign.id, name='Other letter'),
         CoverLetter(firm_id=app.firm_id, job_id=app.job_id, name='Unattributed legacy letter'),
-    ])
+    ]
+    test_db.add_all(unrelated_letters)
     if own_letter:
         test_db.add(CoverLetter(firm_id=app.firm_id, job_id=app.job_id, resume_id=own.id, name='Candidate letter'))
     test_db.commit()
+    letters = api_client.get('/api/cover-letters', headers=headers, params={'application_id': str(app.id)})
+    assert letters.status_code == 200, letters.text
+    assert [letter['name'] for letter in letters.json()['letters']] == (['Candidate letter'] if own_letter else [])
+    assert api_client.get('/api/cover-letters', headers=headers, params={'application_id': str(uuid.uuid4())}).status_code == 404
+    for letter in unrelated_letters:
+        download = api_client.get(f'/api/cover-letters/{letter.id}/pdf', headers=headers, params={'application_id': str(app.id)})
+        assert download.status_code == 404
     expected = {'tailored_resume_id': str(own.id), 'tailored_resume_name': own.name, 'has_cover_letter': own_letter}
     def check(response):
         assert response.status_code == 200, response.text

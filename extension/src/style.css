@@ -76,12 +76,12 @@
   --control-lg: 36px;
   --action-min-width: 124px;
   --topbar-height: 52px;
+  /* The field list's own scrolling box: about half the panel, like Simplify's checklist. */
   --panel-min-width: 280px;
   --icon-sm: 14px;
   --icon-md: 16px;
   --count-size: 18px;
   --tick-stroke: 3;
-  --skeleton-row: 64px;
   --focus-width: 2px;
   --focus-offset: 3px;
   --tabs-inset: 3px;
@@ -142,6 +142,9 @@
   --radius-full: 9999px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
+  --duration-slide: 360ms;
+  /* A sheet's ease: quick to start, long and soft to settle, the same up and down. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* A row joining the Autofill run, the dialog's content, a tick as its field fills, and the run's note going. Reduced motion turns them off
@@ -150,6 +153,14 @@
   --animate-rise-in: rise-in var(--duration-fast) var(--ease-out) both;
   --animate-tick-in: tick-in var(--duration-fast) var(--ease-out) both;
   --animate-fade-out: fade-out var(--duration-fast) var(--ease-out) both;
+  /* Fills only before it starts, so the fold's own slide moves the sheet afterwards. */
+  --animate-sheet-rise: sheet-rise var(--duration-slide) var(--ease-sheet) backwards;
+  /* The settings drawer, in from the right edge. */
+  --animate-drawer-in: drawer-in var(--duration-slide) var(--ease-sheet) both;
+
+  @keyframes drawer-in {
+    from { transform: translateX(100%); }
+  }
 
   @keyframes rise-in {
     from { opacity: 0; transform: translateY(var(--motion-lift)); }
@@ -157,6 +168,10 @@
 
   @keyframes fade-out {
     to { opacity: 0; transform: translateY(calc(var(--motion-lift) * -1)); }
+  }
+
+  @keyframes sheet-rise {
+    from { transform: translateY(var(--sheet-down)); }
   }
 
   @keyframes tick-in {
@@ -213,6 +228,9 @@
 }
 
 /* The website's type scale, as src/app/globals.css has it. */
+/* A page's own heading (the job's details, the application logged), above the panel's usual sizes. */
+.text-h1 { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.text-h2 { font-size: 17px; line-height: 23px; font-weight: 700; letter-spacing: -0.015em; }
 .text-h3 { font-size: 14px; line-height: 20px; font-weight: 550; letter-spacing: -0.01em; }
 .text-body-strong { font-size: 13px; line-height: 20px; font-weight: 550; }
 .text-sm { font-size: 12px; line-height: 18px; }
@@ -222,41 +240,59 @@
 
 /* The website's two buttons. Size and shape come from `button()` in src/ui.ts. */
 @layer components {
+  /* The design mock's buttons: a solid BenchQ blue primary with a soft glow of its own colour, and a flat surface
+     secondary with a hairline (2026-11-27 redesign). */
   .bq-primary {
-    border: 1px solid var(--color-primary-active);
-    background: var(--gradient-primary);
-    box-shadow: var(--shadow-primary);
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
     color: var(--color-primary-fg);
-    text-shadow: var(--shadow-text-primary);
+    font-weight: 650;
   }
 
   .bq-primary:hover:not(:disabled) {
-    background: var(--gradient-primary-hover);
+    border-color: var(--color-primary-active);
+    background: var(--color-primary-active);
   }
 
   .bq-primary:active:not(:disabled) {
-    box-shadow: var(--shadow-primary-pressed);
+    box-shadow: none;
     transform: translateY(1px);
   }
 
   .bq-secondary {
     border: 1px solid var(--color-border-strong);
-    background: var(--gradient-neutral);
-    box-shadow: var(--shadow-control);
+    background: var(--color-surface-2);
     color: var(--color-text-2);
+    font-weight: 600;
   }
 
   .bq-secondary:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--color-text-3) 42%, var(--color-border-strong));
-    background: var(--gradient-neutral-hover);
-    box-shadow: var(--shadow-control-hover);
+    background: var(--color-surface-3);
     color: var(--color-text);
   }
 
   .bq-secondary:active:not(:disabled) {
-    border-color: var(--color-border-strong);
+    transform: translateY(1px);
+  }
+
+  /* A button that can't be pressed yet, muted in BenchQ's own blue: the primary's soft tint, its text dimmed, no glow;
+     never a see-through copy of itself, nor grey. One that is busy (aria-busy, "Saving…") keeps its look. */
+  .bq-primary:disabled:not([aria-busy="true"]) {
+    border-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    background: var(--color-primary-subtle);
+    box-shadow: none;
+    color: color-mix(in srgb, var(--color-primary-subtle-fg) 62%, transparent);
+  }
+
+  .bq-secondary:disabled:not([aria-busy="true"]) {
+    border-color: var(--color-border);
     background: var(--color-surface-2);
-    box-shadow: var(--shadow-control-pressed);
+    color: var(--color-text-3);
+  }
+
+  .bq-primary:disabled[aria-busy="true"] {
+    cursor: progress;
   }
 }
 

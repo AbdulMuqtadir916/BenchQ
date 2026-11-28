@@ -2,7 +2,8 @@ import type { HistoryRecords } from "./resume-answers";
 import { bankForType, closestBankEntry, indexBankByType } from "../engine/bank";
 import { classifyField } from "../engine/classify";
 import { manualOnlyReason, type EngineFieldType } from "../engine/field-types";
-import { asksForCode, derivedAnswer, inTheUs, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
+import { countryNamed } from "./countries";
+import { asksForCode, derivedAnswer, countryIn, isoDate, phoneWays, shaped, withHomeCode } from "./derive";
 import { asksForSelfRating, fieldTypeFor, matchBank, sameAsk } from "./match";
 import { neverFillReason, staysOutOfSavedForm } from "./never-fill";
 import { authorizedIn, sponsorshipIn, sponsorshipWordsIn, statusAnswer, statusOptionFor } from "./authorization";
@@ -47,6 +48,10 @@ const ENTRY_MARKER = /\b(\d+|first|second|third|other|another|alternate|alternat
 const REPEATED = "This asks the same thing again, for another entry, so it's yours to fill.";
 const CHOICE_KINDS = new Set<FieldKind>(["select", "radio", "combobox", "checkbox"]);
 const MAX_SUGGESTIONS = 3;
+/** How alike a saved question's wording must be (bigram likeness, 0 to 1) to be offered: unrelated questions score up
+ * to about 0.3, the same question asked another way from about 0.43 ("Are you open to relocation?" and "Willing to
+ * relocate?"). */
+const MIN_SUGGESTION_SCORE = 0.4;
 
 type Fit = { write: FieldWrite; proposed: string } | { reason: string };
 type Base = Pick<ReviewRow, "key" | "field" | "isUnsaved">;
@@ -126,8 +131,12 @@ function dropdownHolds(current: string, proposed: string): boolean {
  * asks for the code isn't done while it holds the number without it (#148's review). */
 const holdsWholeNumber = (current: string, proposed: string) => current.replace(/\D/g, "").endsWith(proposed.replace(/\D/g, ""));
 
+/** A box showing only its dial code, as ADP's Mobile Number starts with "+1": no number is on it yet. */
+const DIAL_CODE_ONLY = /^\+\d{1,4}$/;
+
 function holdsAnswer({ current, kind, label }: TabField, proposed: string): boolean {
   if (kind === "combobox" && current && dropdownHolds(current, proposed)) return true;
+  if (DIAL_CODE_ONLY.test(current.trim()) && proposed.replace(/\D/g, "").length > current.replace(/\D/g, "").length) return false;
   if (current.trim() === proposed.trim() || (proposed === UNCHECKED && current === "")) return true;
   if (!PHONE_LIKE.test(proposed) || !samePhone(current, proposed)) return false;
   // With or without its "+": a digits-only "919876543210" is the code and the number too (#148's review).
@@ -164,8 +173,15 @@ function fromBank(base: Base, entry: BankEntry, type: EngineFieldType | null, an
   if (type === "phone") return phoneRow(base, entry, answer);
   const row = rowFor(base, shaped(type, answer, base.field), entry);
   // A "location" dropdown can be a list of countries.
-  const isCountryList = type === "city-state" && row.status === "manual" && base.field.options.length > 0 && inTheUs(entry.answer);
-  return isCountryList ? rowFor(base, "United States", entry) : row;
+  const country = type === "city-state" && row.status === "manual" && base.field.options.length > 0 ? countryIn(entry.answer) : null;
+  const retried = country ? rowFor(base, country, entry) : null;
+  // Only options that are the country itself, under any of its names ("United States, USA"), from a list or boxes.
+  // "Toronto, Canada" is a city, so a saved Ottawa stays for review.
+  const write = retried?.write;
+  const ids = !write ? [] : "optionIds" in write ? write.optionIds ?? [] : "optionId" in write ? [write.optionId] : [];
+  const picked = base.field.options.filter((option) => ids.includes(option.id));
+  const isTheCountry = (label: string) => label.split(",").every((part) => countryNamed(part.trim()) === country);
+  return retried && retried.status !== "manual" && picked.length > 0 && picked.every((option) => isTheCountry(option.label)) ? retried : row;
 }
 
 /** Saved answers that disagree. A dropdown can still settle it: when the answers that fit its options all fit the same
@@ -191,8 +207,11 @@ function tied(base: Base, entries: BankEntry[], type: EngineFieldType | null, an
 function suggestionsFor(field: TabField, label: string, type: EngineFieldType | null, { bank, byType }: Review): BankEntry[] | undefined {
   if (type || !(CHOICE_KINDS.has(field.kind) || /\?\s*$/.test(field.label.trim()))) return undefined;
   const typed = new Set([...byType.values()].flat());
+  // Only questions worded near enough to this one: any two long questions share some letters, so the closest of
+  // unrelated ones ("Remote" for an ETL question) would turn up otherwise.
   const closest = bank.filter((entry) => !typed.has(entry))
     .map((entry) => ({ entry, score: similarity(label, questionOf(entry.question)) }))
+    .filter(({ score }) => score >= MIN_SUGGESTION_SCORE)
     .sort((left, right) => right.score - left.score).slice(0, MAX_SUGGESTIONS).map(({ entry }) => entry);
   return closest.length > 0 ? closest : undefined;
 }
@@ -411,7 +430,10 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (sameType.length > 1) return tied(base, sameType, type, answerOf);
   if (sameType[0]) return fromSaved(sameType[0]);
   const derived = type ? derivedAnswer(type, asked, saved) : null;
-  if (derived) return rowFor(base, derived.answer, derived.source);
+  // A place the bank's other answers make goes as a saved one does: a state's code for a two-letter box, and a
+  // "location" list of countries takes the country.
+  if (derived?.source && (type === "city-state" || type === "address-region")) return fromBank(base, derived.source, type, derived.answer);
+  if (derived) return rowFor(base, type === "middle-name" ? shaped(type, derived.answer, asked) : derived.answer, derived.source);
   const entry = closestBankEntry(asked.label, bank, answers);
   if (entry) return fromSaved(entry);
   if (fallback) return fallback;
@@ -431,7 +453,7 @@ function handBackRepeats(rows: ReviewRow[]): ReviewRow[] {
     if (!row.source || !row.proposed || row.isUnsaved || (row.status !== "ready" && row.status !== "same")) return row;
     const asked = normalize(row.field.label).replace(ENTRY_MARKER, " ").replace(/\s+/g, " ").trim();
     if (!asked) return row;
-    const repeat = `${row.source.id}\u0000${normalize(row.proposed)}\u0000${asked}`;
+    const repeat = `${row.field.frameId}:${row.field.formId ?? ""}:${row.source.id}\u0000${normalize(row.proposed)}\u0000${asked}`;
     if (!answered.has(repeat)) {
       answered.add(repeat);
       return row;
@@ -446,10 +468,11 @@ export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | nu
   const review: Review = { bank, byType: indexBankByType(bank), job };
   // A question about someone else is that person's: it doesn't make the candidate's own "Company" a repeat, whose saved
   // answer would then be held back.
+  const questionKey = (field: TabField) => `${field.frameId}:${field.formId ?? ""}:${normalize(field.label)}`;
   const counts = new Map<string, number>();
   for (const field of fields) {
     if (isSomeoneElses(field)) continue;
-    const label = normalize(field.label);
+    const label = questionKey(field);
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   const seen = new Map<string, number>();
@@ -458,6 +481,6 @@ export function buildReview(fields: TabField[], bank: BankEntry[], job: Job | nu
     const index = seen.get(label) ?? 0;
     seen.set(label, index + 1);
     const key = `${field.frameId}:${field.kind}:${label}:${index}`;
-    return reviewField({ key, field }, Boolean(label) && (counts.get(label) ?? 0) > 1, review);
+    return reviewField({ key, field }, Boolean(label) && (counts.get(questionKey(field)) ?? 0) > 1, review);
   }));
 }

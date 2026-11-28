@@ -1,4 +1,5 @@
-import { connectionKey } from "./autofill/connection-store";
+import { installAssistant } from "./assistant";
+import { CONNECTION_PREFIX, connectionKey, countConnectionWrite } from "./autofill/connection-store";
 import { hostOf, isConfirmedHost } from "./autofill/job-check";
 import { PREVIEW_KEY, setupFrameRules } from "./frame-rules";
 import type { Connection, NewConnection, PanelMessage, PanelReply, ShortcutCommand, ShortcutMessage } from "./autofill/types";
@@ -14,13 +15,20 @@ async function readConnection(tabId: number): Promise<Connection | undefined> {
 }
 
 async function allConnections(): Promise<Connection[]> {
-  return Object.values(await chrome.storage.session.get(READ_ALL)) as Connection[];
+  // Session storage also keeps each source tab's BenchQ job (sourceJobKey): only the connections count here.
+  return Object.entries(await chrome.storage.session.get(READ_ALL))
+    .filter(([key]) => key.startsWith(CONNECTION_PREFIX)).map(([, value]) => value) as Connection[];
 }
 
-const saveConnection = (connection: Connection) =>
-  chrome.storage.session.set({ [connectionKey(connection.tabId)]: connection });
+const saveConnection = (connection: Connection) => {
+  countConnectionWrite(connection.tabId);
+  return chrome.storage.session.set({ [connectionKey(connection.tabId)]: connection });
+};
 
-const removeConnection = (tabId: number) => chrome.storage.session.remove(connectionKey(tabId));
+const removeConnection = (tabId: number) => {
+  countConnectionWrite(tabId);
+  return chrome.storage.session.remove(connectionKey(tabId));
+};
 
 async function focusTab(tabId: number): Promise<boolean> {
   try {
@@ -137,3 +145,5 @@ chrome.webNavigation.onCommitted.addListener(({ tabId, frameId, url, transitionT
     if (host !== hostOf(connection.job.url) && !isConfirmedHost(connection.confirmedHosts, host)) void removeConnection(tabId);
   });
 });
+
+installAssistant();

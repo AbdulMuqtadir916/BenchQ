@@ -5,13 +5,14 @@ import { byId } from "./shadow";
 /** Dropdowns built from <div>s, like Greenhouse's. Their options don't exist until the list opens, so this runs at fill
  * time, never during a scan, which only reads. */
 
+export const LEVER_LOCATION = '[data-qa="structured-contact-location-question"] input.location-input';
+
 const OPTION = "[role='option'], [class*='__option']";
 const CLEAR_BUTTON = "[class*='clear-indicator'], [aria-label*='clear' i]";
 const STEP_MS = 40;
 const OPEN_WAIT_MS = 700;
 const SEARCH_WAIT_MS = 5000;
-/** A search that still shows nothing this long after typing has found nothing. */
-const NOTHING_FOUND_MS = 2000;
+
 
 function press(control: HTMLElement, key: string, keyCode: number) {
   control.dispatchEvent(new KeyboardEvent("keydown", {
@@ -34,7 +35,8 @@ function optionElements(control: HTMLElement): HTMLElement[] {
   const listId = control.getAttribute("aria-controls") ?? control.getAttribute("aria-owns");
   const list = listId ? byId(control, listId) : null;
   const scope = list ?? controlBox(control).parentElement ?? control.ownerDocument;
-  return Array.from(scope.querySelectorAll<HTMLElement>(OPTION)).filter(isVisible);
+  return Array.from(scope.querySelectorAll<HTMLElement>(control.matches(LEVER_LOCATION) ? ".dropdown-location" : OPTION))
+    .filter(option => isVisible(option) && !option.matches(":disabled, [aria-disabled='true']"));
 }
 
 async function waitForOptions(control: HTMLElement, limitMs: number): Promise<HTMLElement[]> {
@@ -54,10 +56,11 @@ export async function searchList(control: HTMLElement, search: string): Promise<
   if (control.tagName !== "INPUT" || !search || (control as HTMLInputElement).readOnly) return [];
   const before = listText(optionElements(control));
   typeSearch(control as HTMLInputElement, search);
+  if (control.matches(LEVER_LOCATION)) press(control, search.slice(-1), 0);
   for (let waited = 0; waited < SEARCH_WAIT_MS; waited += STEP_MS) {
     const found = optionElements(control);
     if (found.length > 0 && listText(found) !== before) return found;
-    if (found.length === 0 && waited >= NOTHING_FOUND_MS && control.getAttribute("aria-busy") !== "true") return [];
+    if (found.length && control.getAttribute("aria-busy") !== "true" && found.some(option => option.textContent?.trim().toLowerCase() === search.trim().toLowerCase())) return found;
     await pause(STEP_MS);
   }
   return optionElements(control);
@@ -65,21 +68,24 @@ export async function searchList(control: HTMLElement, search: string): Promise<
 
 /** Opens the list and returns its options. The keyboard works even while the side panel has focus, so it goes first.
  * A list that opens empty is a search box, like a city lookup: typing `search` is what brings its options. */
-export async function openList(control: HTMLElement, search: string): Promise<HTMLElement[]> {
+export async function openList(control: HTMLElement, search: string, stillCurrent = () => true): Promise<HTMLElement[]> {
   control.focus({ preventScroll: true });
+  if (control.matches(LEVER_LOCATION)) return searchList(control, search);
   const attempts = [() => press(control, "ArrowDown", 40), () => clickLike(controlBox(control))];
   for (const attempt of attempts) {
+    if (!stillCurrent()) return [];
     attempt();
     const found = await waitForOptions(control, OPEN_WAIT_MS);
     if (found.length > 0) return found;
     if (control.getAttribute("aria-expanded") === "true") break;
   }
-  return searchList(control, search);
+  return stillCurrent() ? searchList(control, search) : [];
 }
 
-export function closeList(control: HTMLElement) {
-  if (control.tagName === "INPUT" && (control as HTMLInputElement).value) typeSearch(control as HTMLInputElement, "");
+export function closeList(control: HTMLElement, clearSearch = true) {
+  if (clearSearch && control.tagName === "INPUT" && (control as HTMLInputElement).value) typeSearch(control as HTMLInputElement, "");
   press(control, "Escape", 27);
+  if (control.matches(LEVER_LOCATION)) control.blur();
 }
 
 /** Empties a dropdown the way a person would: with its own clear button, else Backspace in its search box. */

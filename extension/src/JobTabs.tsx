@@ -5,7 +5,8 @@ export type JobTab = "saved" | "applied";
 
 const TABS: { id: JobTab; label: string }[] = [{ id: "saved", label: "Saved" }, { id: "applied", label: "Applied" }];
 
-const TAB = `group flex min-h-[var(--control-sm)] flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] text-sm font-[550] text-[var(--color-text-2)] transition-[background,color,box-shadow] ${MOTION} hover:text-[var(--color-text)] aria-selected:bg-[var(--color-surface)] aria-selected:text-[var(--color-text)] aria-selected:shadow-[var(--shadow-control)]`;
+/** Underline tabs, as the design mock has them: the chosen one in the primary colour. */
+const TAB = `group -mb-px flex min-h-[var(--control-height)] flex-1 items-center justify-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-[600] text-[var(--color-text-3)] transition-[color,border-color] ${MOTION} hover:text-[var(--color-text)] aria-selected:border-[var(--color-primary)] aria-selected:text-[var(--color-primary)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]`;
 const TAB_COUNT = "inline-flex h-[var(--count-size)] min-w-[var(--count-size)] items-center justify-center rounded-[var(--radius-full)] bg-[var(--color-surface-3)] px-1 text-mono-sm font-normal text-[var(--color-text-2)] group-aria-selected:bg-[var(--color-primary-subtle)] group-aria-selected:text-[var(--color-primary-subtle-fg)]";
 
 export const tabId = (tab: JobTab) => `job-tab-${tab}`;
@@ -30,7 +31,7 @@ export default function JobTabs({ active, counts, onChange }: JobTabsProps) {
     document.getElementById(tabId(id))?.focus();
   };
 
-  return <div className="mb-2.5 flex gap-0.5 rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] p-[var(--tabs-inset)]" role="tablist" aria-label="Job status">
+  return <div className="-mx-3 mb-3 flex border-b border-[var(--color-border)]" role="tablist" aria-label="Job status">
     {TABS.map(({ id, label }, index) => <button
       key={id}
       type="button"

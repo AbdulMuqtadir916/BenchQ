@@ -20,6 +20,15 @@ describe("saving a typed answer for next time (07 Q58)", () => {
     });
   });
 
+  it("sees the saved phone number in one the form wrote its own way, with its country code or spaced out", () => {
+    const bank = [fixed("phone", "9866138693")];
+    expect(saveOffer(typed("Phone", "+91 98661 38693"), bank, none)).toBeNull();
+    expect(saveOffer(typed("Phone", "98661-38693"), bank, none)).toBeNull();
+    // Another number, or one with a code that isn't a country's, is one to save.
+    expect(saveOffer(typed("Phone", "+91 98661 00000"), bank, none)?.label).toBe("Update the saved answer (9866138693 → +91 98661 00000)");
+    expect(saveOffer(typed("Phone", "+999 9866138693"), bank, none)).not.toBeNull();
+  });
+
   it("offers to update a different saved answer to the same question, never a second one (Q21)", () => {
     const bank = [own("Why do you want to work here?", "Payments.")];
     expect(saveOffer(typed("Why do you want to work here?", "Fintech."), bank, none)).toEqual({

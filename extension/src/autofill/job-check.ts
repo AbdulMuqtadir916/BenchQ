@@ -1,3 +1,5 @@
+import { US_STATES } from "./options";
+import { countryNamed } from "./countries";
 import type { JobCheck, JobSummary, PageSignals } from "./types";
 import { canonical, tokens } from "./text";
 
@@ -12,6 +14,13 @@ function parsed(url: string): URL | null {
   } catch {
     return null;
   }
+}
+
+/** A host's site: its last two labels, or three under a country's second-level domain (`acme.co.uk`, `acme.com.au`). */
+export function siteOf(hostname: string): string {
+  const labels = hostname.toLowerCase().split(".");
+  const isCountrySecondLevel = labels.length >= 3 && labels.at(-1)!.length === 2 && /^(co|com|org|net|gov|ac|edu)$/.test(labels.at(-2)!);
+  return labels.slice(isCountrySecondLevel ? -3 : -2).join(".");
 }
 
 export const hostOf = (url: string) => parsed(url)?.hostname.replace(/^www\./, "") ?? "";
@@ -49,12 +58,16 @@ export function sameCompany(left: string | null, right: string | null): boolean 
   return ours.length > 0 && theirs.length > 0 && (companySeen(ours, theirs.join(" "), "") || companySeen(theirs, ours.join(" "), ""));
 }
 
-/** Places that may be one: they share a word, or one isn't named. Two "city, region" places compare their cities, so
- * Dallas, TX and Austin, TX are two places although they share a state. */
+/** Compare place components, including the region when both postings supply it. */
 function samePlace(left: string, right: string): boolean {
-  const both = left.includes(",") && right.includes(",");
-  const [here, there] = [tokens(both ? left.split(",")[0]! : left), tokens(both ? right.split(",")[0]! : right)];
-  return here.size === 0 || there.size === 0 || [...here].some((word) => there.has(word));
+  if (!left.trim() || !right.trim()) return true;
+  const parts = (location: string) => location.split(",").map(part => {
+    const name = canonical(part);
+    return (Object.hasOwn(US_STATES, name) ? US_STATES[name]! : countryNamed(name) ?? name).toLowerCase();
+  });
+  const a = parts(left), b = parts(right);
+  if (a.length === 1 || b.length === 1) return a.some(part => b.includes(part));
+  return a[0] === b[0] && a[1] === b[1] && (!a[2] || !b[2] || a[2] === b[2]);
 }
 
 /** Whether a page's job is this saved job, at whatever link: the same company and the same role, word for word give or

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getSession } from "./api";
+import { addJob, getCandidateJob, getCoverLetters, getSavedApplications, getSession } from "./api";
 
 /** The backend's RFC 9457 error bodies (step 4b): `failureOf` shows `detail` for a refused request and its own words
  * for a 5xx. */
@@ -13,6 +13,82 @@ async function failure(status: number, body: object): Promise<Error & { status?:
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
+
+it("rejects the older firm-wide cover letter response for an application", async () => {
+  const send = vi.fn().mockResolvedValueOnce(Response.json([{ id: "unscoped-letter" }]))
+    .mockResolvedValueOnce(Response.json({ letters: [{ id: "candidate-letter" }] }));
+  vi.stubGlobal("fetch", send);
+  await expect(getCoverLetters("app-1")).rejects.toThrow("Application cover letters unavailable");
+  await expect(getCoverLetters("app-1")).resolves.toEqual([{ id: "candidate-letter" }]);
+  expect(send.mock.calls[0]![0]).toContain("/api/cover-letters?application_id=app-1");
+});
+
+it("says on every request to BenchQ that it comes from the extension", async () => {
+  const send = vi.fn(async () => Response.json({ principal: null }));
+  vi.stubGlobal("fetch", send);
+  await getSession();
+  const [, init] = send.mock.calls[0]! as unknown as [string, RequestInit];
+  expect(init.headers).toMatchObject({ "X-BenchQ-Client": "extension", "Content-Type": "application/json" });
+});
+
+it("restores a captured logo only on the corresponding saved application", async () => {
+  const local: Record<string, unknown> = {};
+  vi.stubGlobal("chrome", { storage: { local: { set: async (items: object) => Object.assign(local, items), get: async () => local } } });
+  const saved = { id: "a1", title: "Engineer", company: "Acme", status: "saved" };
+  const send = vi.fn().mockResolvedValueOnce(Response.json(saved))
+    .mockResolvedValueOnce(Response.json({ applications: [saved, { ...saved, id: "a2" }] }))
+    .mockResolvedValueOnce(Response.json({ applications: [] }));
+  vi.stubGlobal("fetch", send);
+  const logoUrl = "https://acme.example/logo.svg";
+  const job = { ...saved, url: "https://jobs.example/42", isJobPage: true, description: "Build things.", location: null, logoUrl };
+  expect((await addJob("c1", job)).logoUrl).toBe(logoUrl);
+  expect(JSON.parse(send.mock.calls[0]![1].body).job).not.toHaveProperty("logoUrl");
+  expect((await getSavedApplications("c1")).map(app => app.logoUrl)).toEqual([logoUrl, undefined]);
+});
+
+it("keeps a captured logo when BenchQ tidies the company's name, never for another company", async () => {
+  const local: Record<string, unknown> = {};
+  vi.stubGlobal("chrome", { storage: { local: { set: async (items: object) => Object.assign(local, items), get: async () => local } } });
+  // The page said "Acme Inc"; BenchQ saved it as "Acme, Inc.".
+  const saved = { id: "a1", title: "Engineer", company: "Acme, Inc.", status: "saved" };
+  const send = vi.fn().mockResolvedValueOnce(Response.json(saved))
+    .mockResolvedValueOnce(Response.json({ applications: [saved, { ...saved, id: "a2" }] }))
+    .mockResolvedValueOnce(Response.json({ applications: [] }));
+  vi.stubGlobal("fetch", send);
+  const logoUrl = "https://acme.example/logo.svg";
+  const job = { title: "Engineer", company: "Acme Inc", url: "https://jobs.example/42", isJobPage: true, description: "Build things.", location: null, logoUrl };
+  expect((await addJob("c1", job)).logoUrl).toBe(logoUrl);
+  expect((await getSavedApplications("c1")).map(app => app.logoUrl)).toEqual([logoUrl, undefined]);
+  const other = vi.fn().mockResolvedValueOnce(Response.json({ ...saved, id: "a3", company: "Globex" }));
+  vi.stubGlobal("fetch", other);
+  expect((await addJob("c1", job)).logoUrl).toBeUndefined();
+  expect(Object.keys(local).some((key) => key.endsWith(":a3"))).toBe(false);
+});
+
+it("saves the page's logo with the job, and shows the logo BenchQ saved with it", async () => {
+  vi.stubGlobal("chrome", { storage: { local: { set: async () => undefined, get: async () => ({}) } } });
+  const saved = { id: "a1", title: "Engineer", company: "Acme", status: "saved", logo_url: "https://acme.example/logo.svg" };
+  const send = vi.fn().mockResolvedValueOnce(Response.json(saved))
+    .mockResolvedValueOnce(Response.json({ applications: [saved, { ...saved, id: "a2", logo_url: "javascript:alert(1)" }] }))
+    .mockResolvedValueOnce(Response.json({ applications: [] }));
+  vi.stubGlobal("fetch", send);
+  await addJob("c1", { title: "Engineer", company: "Acme", url: "https://jobs.example/42", isJobPage: true, description: "Build things.",
+    location: null, logoUrl: "https://acme.example/logo.svg" });
+  expect(JSON.parse(send.mock.calls[0]![1].body).job.logo_url).toBe("https://acme.example/logo.svg");
+  expect((await getSavedApplications("c1")).map((app) => app.logoUrl)).toEqual(["https://acme.example/logo.svg", undefined]);
+});
+
+it("reads a saved job's posting with what its page stated, for its details page", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ id: "p1", title: "Analytics Engineer", company: "Reddit", location: "Remote",
+    apply_url: "https://jobs.example/1", description: "Text.", description_html: "<p>Text.</p>", employment_type: "Full-time",
+    remote_mode: "ONSITE", work_mode: null, posted_at: "2026-11-10", salary_min: 164200, salary_max: 229990, salary_currency: "USD",
+    salary_period: "fortnight", requisition_id: "R1", logo_url: "https://reddit.example/logo.png" })));
+  expect(await getCandidateJob("f1", "c1", "p1")).toEqual({ id: "p1", title: "Analytics Engineer", company: "Reddit", location: "Remote",
+    url: "https://jobs.example/1", description: "Text.", descriptionHtml: "<p>Text.</p>", employmentType: "Full-time",
+    // ONSITE is what BenchQ says when nothing says otherwise: not taken as stated. A period it doesn't know isn't one.
+    workMode: null, postedAt: "2026-11-10", salaryMin: 164200, salaryMax: 229990, salaryCurrency: "USD", salaryPeriod: null,
+    requisitionId: "R1", logoUrl: "https://reddit.example/logo.png" });
+});
 
 describe("reading the backend's error body", () => {
   it("shows the detail of a 422 problem, not its field errors", async () => {

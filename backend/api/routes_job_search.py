@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.problem import DAILY_LIMIT, SEARCH_NOT_STARTED, Problem
 from backend.api.routes_auth import current_principal
+from backend.applications.postings import ADDED_SOURCES, read_content
 from backend.api.routes_candidates import _candidate, _member_of, _visible
 from backend.auth import ledger
 from backend.auth.policy import can_manage_resume, can_search_jobs
@@ -333,6 +334,16 @@ def _posting_json(row: JobPosting, with_description: bool) -> dict:
            "match": _match_json(row)}
     if with_description:
         out["description"] = fields.description if fields else ""
+        if row.source in ADDED_SOURCES:
+            # A job the BDE added: what its page stated besides (2026-11-12) and its logo (2026-11-28), and an
+            # extension's description as the page gave it (the employer's HTML), so the extension's details page
+            # shows the job as Add job did. Read as text there, never shown as HTML.
+            added = read_content(row.source, row.content)
+            given = row.content.get("description") if isinstance(row.content, dict) else None
+            out.update({"work_mode": added.work_mode, "salary_min": added.salary_min, "salary_max": added.salary_max,
+                        "salary_currency": added.salary_currency, "salary_period": added.salary_period,
+                        "requisition_id": added.requisition_id, "logo_url": added.logo_url,
+                        "description_html": given if row.source == "extension" and isinstance(given, str) else None})
     return out
 
 

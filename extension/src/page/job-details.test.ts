@@ -76,6 +76,12 @@ describe("reading what a job's page states, and nothing it doesn't", () => {
     expect(employmentOf("Regular")).toBeUndefined();
   });
 
+  it("preserves one-sided pay bounds from structured data and visible pay", () => {
+    expect(postingDetails({ baseSalary: { value: { maxValue: 75, unitText: "HOUR" } } })).toEqual({ salaryMax: 75, salaryPeriod: "hour" });
+    expect(payIn("Salary from $65,000 per year")).toEqual({ salaryMin: 65000, salaryPeriod: "year" });
+    expect(payIn("Pay up to $75 per hour")).toEqual({ salaryMax: 75, salaryPeriod: "hour" });
+  });
+
   it("reads a JobPosting's type, pay, date, identifier and remote mark", () => {
     expect(postingDetails({ employmentType: ["FULL_TIME", "CONTRACTOR"], datePosted: "2026-11-10", jobLocationType: "TELECOMMUTE",
       identifier: { "@type": "PropertyValue", name: "Req", value: "R123456" },

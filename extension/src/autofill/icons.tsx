@@ -2,6 +2,30 @@
 
 export const CHECK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>;
 
+/** Back to where the BDE was: the job details page's way out. */
+export const BACK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14" /></svg>;
+
+/** A requirement met, in the job details' lists. */
+export const CHECK_CIRCLE_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>;
+
+/** How a job is done (remote, hybrid, on-site). */
+export const HOME_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 21v-8h6v8" /></svg>;
+
+/** The signed-in user, for the account and settings drawer. */
+export const USER_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>;
+
+/** More about something: a job's full details. */
+export const INFO_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>;
+
+/** Sign out. */
+export const LOGOUT_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>;
+
+/** Save for next time: a bookmark. */
+export const BOOKMARK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 21l-6-4.5L6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /></svg>;
+
+/** An exclamation mark drawn like the tick, so it fills its round mark the same way: a stroke, then a dot. */
+export const EXCLAIM_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5v9.5M12 19.5v.01" /></svg>;
+
 export const CROSS_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
 
 export const UPLOAD_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>;
@@ -54,6 +78,10 @@ export const EXTERNAL_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
 export const SHIELD_CHECK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
   <path d="m9 12 2 2 4-4" />
+</svg>;
+
+export const SEARCH_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">
+  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
 </svg>;
 
 export const EYE_ICON = <svg viewBox="0 0 24 24" aria-hidden="true">

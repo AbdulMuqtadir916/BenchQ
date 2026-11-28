@@ -15,10 +15,12 @@ export type TabScan = {
   scanIds: Map<number, number>;
   signals: PageSignals | null;
   unreadableFrames: number;
+  /** The top frame's page load (`FrameScan.loadId`), when it says. */
+  loadId?: string | null;
 };
 
 /** Every field's value now, by `frameId:fieldId`. `moved`: the page no longer matches its last scan. */
-export type TabRead = { values: Map<string, string>; moved: boolean };
+export type TabRead = { values: Map<string, string>; moved: boolean; required?: Map<string, boolean> };
 
 type PageMethod = Exclude<keyof PageApi, "version">;
 
@@ -62,6 +64,7 @@ export async function scanTab(tabId: number): Promise<TabScan> {
     scanIds: new Map(scans.map(({ frameId, result }) => [frameId, result.scanId])),
     signals: scans.find(({ result }) => result.signals)?.result.signals ?? null,
     unreadableFrames: await countUnreadable(tabId, scans),
+    loadId: scans.find(({ frameId }) => frameId === MAIN_FRAME)?.result.loadId ?? null,
   };
 }
 
@@ -80,7 +83,7 @@ export async function addEntryIn(tabId: number, kind: "education" | "work", shou
 /** The job the tab's page shows (its top frame), for adding it to a candidate's jobs. */
 export async function readJobPage(tabId: number): Promise<PageJob | null> {
   await chrome.scripting.executeScript({ target: { tabId, frameIds: [MAIN_FRAME] }, files: [PAGE_SCRIPT] });
-  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJob", []);
+  const [found] = await inFrames<PageJob>({ tabId, frameIds: [MAIN_FRAME] }, "readJobForSave", []);
   return found?.result ?? null;
 }
 
@@ -90,6 +93,7 @@ export async function readTab(tabId: number, { scanIds, unreadableFrames }: Pick
   const isScanned = ({ frameId, result }: { frameId: number; result: FrameRead }) => !result.moved && result.scanId === scanIds.get(frameId);
   return {
     values: new Map(reads.flatMap(({ frameId, result }) => Object.entries(result.values).map(([id, value]) => [`${frameId}:${id}`, value]))),
+    required: new Map(reads.flatMap(({ frameId, result }) => Object.entries(result.required ?? {}).map(([id, complete]) => [`${frameId}:${id}`, complete]))),
     moved: reads.length !== scanIds.size || !reads.every(isScanned) || await countUnreadable(tabId, reads) !== unreadableFrames,
   };
 }
@@ -199,7 +203,12 @@ export async function fillChoice(tabId: number, frameId: number, request: Choice
     const parts = (racePartsFor(answer, list.options) ?? answer.split(PARTS)).map((part) => part.trim()).filter(Boolean);
     if (parts.length > 1) return pickEach(target, request, list.options, parts, shouldStop);
   }
-  const optionId = fits(list) ?? (list.status === "open" ? fits(await ask("searchChoices")) : null);
+  let optionId = fits(list) ?? (list.status === "open" ? fits(await ask("searchChoices")) : null);
+  if (!optionId && request.searchHint && request.searchHint !== request.search) {
+    if (shouldStop()) return stopIn(target, request);
+    // Search by a distinctive word, but still match each returned option against the full saved answer.
+    optionId = fits(await askList(target, "searchChoices", { ...request, search: request.searchHint }));
+  }
   if (!optionId) {
     await inFrames<boolean>(target, "closeChoices", [request]);
     const reason = list.status === "open" ? pickOneReason(answer, list.options) : null;
@@ -210,14 +219,14 @@ export async function fillChoice(tabId: number, frameId: number, request: Choice
   return picked?.result ?? STALE;
 }
 
-export async function rejectedFields(tabId: number, frameId: number, scanId: number, fieldIds: string[]): Promise<string[]> {
+export async function rejectedFields(tabId: number, frameId: number, scanId: number, fieldIds: string[]): Promise<string[] | null> {
   const [answer] = await inFrames<string[]>({ tabId, frameIds: [frameId] }, "rejected", [scanId, fieldIds]);
-  return answer?.result ?? [];
+  return answer?.result ?? null;
 }
 
-export async function flaggedFields(tabId: number, frameId: number, scanId: number, fieldIds: string[]): Promise<string[]> {
+export async function flaggedFields(tabId: number, frameId: number, scanId: number, fieldIds: string[]): Promise<string[] | null> {
   const [answer] = await inFrames<string[]>({ tabId, frameIds: [frameId] }, "flagged", [scanId, fieldIds]);
-  return answer?.result ?? [];
+  return answer?.result ?? null;
 }
 
 export async function focusField(tabId: number, frameId: number, target: FieldTarget): Promise<boolean> {
