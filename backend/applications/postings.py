@@ -45,6 +45,8 @@ class PostingJob:
     salary_period: str | None = None
     work_mode: str | None = None
     requisition_id: str | None = None
+    # The employer's logo its page showed (`extension`, 2026-11-28): an http(s) link, else None.
+    logo_url: str | None = None
 
 
 EMPTY = PostingJob()
@@ -109,7 +111,8 @@ def read_content(source: str, content) -> PostingJob:
                       salary_currency=currency if re.fullmatch(r"[A-Z]{3}", currency) else None,
                       salary_period=period if period in PAY_PERIODS else None,
                       work_mode=mode if mode in ("remote", "hybrid", "onsite") else None,
-                      requisition_id=_text(found.get("requisition_id"))[:60] or None)
+                      requisition_id=_text(found.get("requisition_id"))[:60] or None,
+                      logo_url=safe_url(found.get("logo_url")))
 
 
 PAY_PERIODS = {"hour": "an hour", "day": "a day", "week": "a week", "month": "a month", "year": "a year"}

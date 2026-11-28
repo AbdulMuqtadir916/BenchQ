@@ -1390,7 +1390,8 @@ export const JobMarkSchema = z.object({
     `onsite`), `employment_type` ("Full-time", "Part-time", "Contract", "Contract-to-hire", "Temporary", "Internship",
     "Per diem", "Volunteer", "Seasonal"; several joined with ", "), `salary_min`, `salary_max` (numbers),
     `salary_currency` (ISO 4217, only when named), `salary_period` (`hour` | `day` | `week` | `month` | `year`, only
-    when said), `posted_at` (YYYY-MM-DD) and `requisition_id`. Older rows without them read as before. Captures aren't search attempts and don't use the 100-new cap.
+    when said), `posted_at` (YYYY-MM-DD) and `requisition_id`; and `logo_url`, the employer's logo its page shows (an
+    http(s) link, 2026-11-28), which the application's JSON gives back. Older rows without them read as before. Captures aren't search attempts and don't use the 100-new cap.
     A search that finds a captured job merges into that row (`source` and `content` become the provider's), and it
     still stays out of the 100: the cap counts `first_source`, which never changes (Abdul's comment on PR 2).
   - **A repeated search continues (job search PR 2):** a provider returns `next_cursor`; the same role (case and
@@ -1640,6 +1641,9 @@ A closed job is never listed, nor one posted more than 14 days ago (by its own d
 the day it was first saved; decided 2026-11-16, Q56, any source): it stays saved, and its job page, application and
 tailored résumés still open. The Jobs list opens on All days (2026-11-22) and on freehire.me, else Indeed, else LinkedIn, else the first other source with jobs (2026-11-21). Each item adds `matches` (`{candidate_id: {score, note}}` for its visible candidates) and
 `remote_mode`; a candidate's own posting (`…/candidates/{id}/job-postings/{id}`, a capture's answer) adds `match`.
+One the BDE added (`manual`, `extension`) also gives what its page stated (`work_mode`, `salary_min`, `salary_max`,
+`salary_currency`, `salary_period`, `requisition_id`), its `logo_url`, and an `extension` description as its page gave it
+(`description_html`, the employer's HTML, read as text by the extension; 2026-11-28).
 The job list reads it a page at a time with "Load more"; a candidate's list opens at "Any score", best Match first.
 ⌘K asks it for the jobs matching what is typed (`q`, 20).
 

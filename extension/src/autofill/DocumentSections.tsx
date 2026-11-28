@@ -36,7 +36,7 @@ type DocumentSectionsProps = {
 };
 
 /** Use a file from the computer, as a small link on the résumé card. */
-const PICK = "inline-flex items-center gap-1 text-caption font-[600] text-[var(--color-primary)] hover:underline disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
+const PICK = "inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-strong)] px-3 py-2.5 text-caption font-[600] text-[var(--color-text-3)] transition-[background,color] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
 /** A small icon button on the file's line: Use a different file. */
 const ICON_ACTION = "grid size-[var(--control-sm)] flex-none place-items-center rounded-[var(--radius-md)] text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-sm)]";
 /** Go to field, small, on the field's own line. */

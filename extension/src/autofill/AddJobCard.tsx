@@ -1,10 +1,12 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { addJob, BENCHQ_URL, getCandidateJob, type Application, type BenchqJob } from "../api";
-import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
+import { ALERT, button, MOTION, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CompanyLogo } from "./CompanyLogo";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { readSourceJob } from "./connection-store";
 import { sameCompany, sameListing, siteOf } from "./job-check";
+import { detailsOf, factsOf, textOfHtml } from "./job-details";
+import JobDetails from "./JobDetails";
 import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
 import { isJobLink } from "./job-link";
 import { readJobPage } from "./tab-bridge";
@@ -35,7 +37,34 @@ type AddJobCardProps = {
   onAdded: (application: Application) => void;
   /** Connects this tab to the saved job it shows (#130): offered instead of adding it again. */
   onUseTab?: (job: KnownJob) => void;
+  /** Whether the card shows a job (to add, to use, or to allow reading): the panel is then the page that adds it. */
+  onShown?: (isShown: boolean) => void;
+  /** Whether it shows the job's details page (See full job details): the panel is then that page alone. */
+  onDetailsShown?: (isShown: boolean) => void;
 };
+
+/** The card that adds a job, as the design has it: a large logo and the role over a line, then its facts in a grid.
+ * Save is under the card, and the job's whole posting a press away. */
+const ADD_CARD = "grid gap-5 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-sm)]";
+/** A fact's name or a field's label: small capitals, wide spacing. */
+const LABEL = "text-caption font-[700] uppercase tracking-wider text-[var(--color-text-3)]";
+const VALUE = "text-sm font-[600] text-[var(--color-text)] wrap-anywhere";
+/** An input of the edit form: an opaque box that turns blue when it has the focus. */
+const INPUT = `w-full rounded-[var(--radius-lg)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-3)] transition-[border-color,box-shadow] ${MOTION} focus-visible:border-[var(--color-primary)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)]`;
+/** The page that adds a job, under the candidate: it scrolls on its own, so a long edit form never cuts off what's under
+ * it, with room under the last link. */
+const PAGE = "-mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-0.5 pb-5 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
+/** A quiet action under Save: Edit details, See full job details. */
+const QUIET_ACTION = `inline-flex items-center gap-1.5 text-caption font-[650] text-[var(--color-text-3)] transition-[color] ${MOTION} hover:text-[var(--color-text)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`;
+const FIELD_LABELS = { title: "Job title", company: "Company", location: "Location", description: "Description" } as const;
+
+/** A posting's description as text: its HTML (a JobPosting's) read, with a line for each paragraph and list item. */
+function plainText(description: string): string {
+  if (!/<[a-z][\s\S]*>/i.test(description)) return description.trim();
+  const lined = description.replace(/<(?:br|\/p|\/li|\/h[1-6]|\/div|\/ul|\/ol)\b[^>]*>/gi, "\n");
+  const text = textOfHtml(lined);
+  return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
 
 /** When the page is read again while it shows no job yet: pages that build themselves after they load, or after an
  * app moves to another job in place, which can take a while to fetch it. Stops once the job is found. */
@@ -43,6 +72,25 @@ const LOOK_AGAIN_MS = [1000, 2500, 5000, 9000, 15000];
 
 /** A link without its fragment or a trailing slash, so one job's page matches however it was opened. */
 const sameUrl = (url: string) => url.replace(/#(?:top|apply|application|description)?$/i, "").replace(/\/+$/, "");
+
+type Draft = Partial<Pick<PageJob, "title" | "company" | "location" | "description">>;
+
+/** The BDE's edits to a page's job, by the job's link, while the panel is open: they stay when the page is read again,
+ * when the card is drawn afresh (another tab and back, the tab's link changing) and when Save finds the page changed. */
+const drafts = new Map<string, Draft>();
+const draftKey = (job: PageJob) => sameUrl(job.postingUrl ?? job.url);
+const savedDraft = (job: PageJob) => drafts.get(draftKey(job)) ?? drafts.get(sameUrl(job.url));
+
+const sameText = (one: string | null | undefined, other: string | null | undefined) =>
+  (one ?? "").replace(/\s+/g, " ").trim().toLowerCase() === (other ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+
+/** Whether a fresh reading of the page is still the job on the card: its page (or one under it, its form), its title
+ * and company however spaced or cased, and its requisition when both readings name one (a JobPosting that loads late
+ * adds it). Another job means the card's details, and any edits to them, were for a job the tab no longer shows. */
+function isSamePosting(fresh: PageJob | null | undefined, job: PageJob): boolean {
+  return Boolean(fresh?.isJobPage && isSameJob(fresh.url, job.url) && sameText(fresh.title, job.title) && sameText(fresh.company, job.company)
+    && (!fresh.requisitionId || !job.requisitionId || fresh.requisitionId === job.requisitionId));
+}
 
 /** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
 const JOB_KEYS = /^(gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
@@ -69,7 +117,7 @@ function jobKeyOf(url: string) {
 
 /** The same job's page, however it was reached: the same site, the same path or a page under it (Lever's `/apply`,
  * Ashby's `/application`), and no job id that differs. */
-function isSameJob(page: string, known: string): boolean {
+export function isSameJob(page: string, known: string): boolean {
   if (sameUrl(page) === sameUrl(known)) return true;
   const [here, saved] = [jobKeyOf(page), jobKeyOf(known)];
   if (!here || !saved || here.board !== saved.board || here.route !== saved.route) return false;
@@ -140,29 +188,6 @@ function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
 export const isSavedJob = (found: PageJob, known: KnownJob) =>
   (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
-const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
-const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
-const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-
-/** A posted date as anyone reads it, day first and the month in words: "10 Nov 2026", never an ambiguous 11/10. */
-const dateWords = (iso: string) => {
-  const date = new Date(`${iso.slice(0, 10)}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-};
-
-/** What the page stated besides its title, company and place, each with its name, as the card shows it before the BDE
- * adds the job, so anyone can check it at a glance: [["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"],
- * ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"]]. Only what the page stated. */
-export function detailsOf(job: PageJob): Array<[string, string]> {
-  const { salaryMin: min, salaryMax: max } = job;
-  const bound = min === undefined ? "Up to" : max === undefined ? "From" : "";
-  const sum = min !== undefined && max !== undefined && min !== max ? `${amount(min)}–${amount(max)}` : amount(min ?? max ?? 0);
-  const pay = min === undefined && max === undefined ? "" : [bound, job.salaryCurrency, sum, job.salaryPeriod && PER[job.salaryPeriod]].filter(Boolean).join(" ");
-  const facts: Array<[string, string]> = [["Work mode", job.workMode ? MODE_LABEL[job.workMode] : ""], ["Pay", pay],
-    ["Type", job.employmentType ?? ""], ["Posted", job.postedAt ? dateWords(job.postedAt) : ""], ["Job ID", job.requisitionId ?? ""]];
-  return facts.filter(([, value]) => value);
-}
-
 /** Whether the panel looks at the page at all: a web page that isn't BenchQ's own and isn't one of the candidate's jobs. */
 export const offersPage = (url: string | undefined, knownUrls: readonly string[]) =>
   Boolean(url && /^https?:\/\//i.test(url) && !url.startsWith(BENCHQ_URL) && !knownUrls.some((known) => isSameJob(url, known)));
@@ -183,7 +208,7 @@ export default function AddJobCard(props: AddJobCardProps) {
   return <CaptureCard key={JSON.stringify([props.firmId, props.candidateId, props.tab?.id, props.tab?.url])} {...props} />;
 }
 
-function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
+function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle, onShown, onDetailsShown }: AddJobCardProps) {
   // Re-read only legacy placeholders whose saved URL identifies this exact posting.
   const legacy = knownJobs.find(known => tab && known.url === tab.url
     && placeholderTitle(known.title, jobIdsOf(tab.url)));
@@ -191,11 +216,20 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
   const legacyUrl = legacy?.url;
   const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
-  const [edits, setEdits] = useState<{ key: string; values: Partial<Pick<PageJob, "title" | "company" | "location" | "description">> }>();
-  const draftKey = JSON.stringify([job?.url, job?.requisitionId || job?.title]);
-  const draft = edits?.key === draftKey ? edits.values : {};
-  const setDraft = (values: typeof draft) => setEdits({ key: draftKey, values });
+  // The BDE's edits, by the job's link alone: a later reading of the same page (a fuller one, a requisition ID that
+  // loads late) keeps them, and so does a card drawn afresh (`drafts`).
+  const [edits, setEdits] = useState<{ key: string; values: Draft }>();
+  const key = job ? draftKey(job) : "";
+  const draft: Draft = !job ? {} : edits?.key === key ? edits.values : savedDraft(job) ?? {};
   const [editing, setEditing] = useState(false);
+  const setDraft = (values: Draft) => {
+    drafts.set(key, values);
+    setEdits({ key, values });
+    // An edit keeps the form open until Done, even once it fills the last field the form opened for.
+    setEditing(true);
+  };
+  const [isDetailsShown, setIsDetailsShown] = useState(false);
+  const firstName = candidateName.trim().split(/\s+/)[0] || candidateName;
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // The BenchQ job this tab was opened for from the website, when this candidate has it: Save saves that job itself.
@@ -266,52 +300,68 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
     }
   };
 
+  const view = (): { node: ReactNode; isJob: boolean; isDetails?: boolean } => {
   const isWebPage = Boolean(tab && /^https?:\/\//i.test(tab.url) && !tab.url.startsWith(BENCHQ_URL));
   const saved = (isWebPage && knownJobs.find((known) => known.url && isSameJob(tab!.url, known.url)))
     || (job ? knownJobs.find((known) => isSavedJob(job, known)) : undefined);
   if (saved) {
-    return onUseTab && (saved.status ?? "saved") === "saved" ? <section data-slot="use-tab" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="use-tab-title">
-      <h2 id="use-tab-title" className="text-h3 wrap-anywhere">{saved.title}</h2>
-      <p className={SOFT_TEXT}>{[saved.company, `Saved for ${candidateName}`].filter(Boolean).join(" · ")}</p>
-      <button type="button" data-slot="use-tab-run" className={button("primary")} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>
-    </section> : null;
+    if (!onUseTab || (saved.status ?? "saved") !== "saved") return { node: null, isJob: false };
+    return { isJob: true, node: <section data-slot="use-tab" className={ADD_CARD} aria-labelledby="use-tab-title">
+      <div className="flex min-w-0 items-center gap-4">
+        <CompanyLogo company={saved.company || saved.title || "Job"} size="xl" />
+        <div className="grid min-w-0">
+          <h2 id="use-tab-title" className="truncate text-h3 font-[700] leading-tight" title={saved.title ?? undefined}>{saved.title}</h2>
+          <p className="truncate text-sm text-[var(--color-text-2)]">{[saved.company, `Saved for ${candidateName}`].filter(Boolean).join(" · ")}</p>
+        </div>
+      </div>
+      <button type="button" data-slot="use-tab-run" className={`w-full ${button("primary", "large")}`} onClick={() => onUseTab(saved)}>Use this tab for Autofill</button>
+    </section> };
   }
   if (tabId !== null && access) {
-    return looksLikeJobPage(tab!.url) ? <section data-slot="add-job-access" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-access-title">
+    if (!looksLikeJobPage(tab!.url)) return { node: null, isJob: false };
+    return { isJob: true, node: <section data-slot="add-job-access" className={ADD_CARD} aria-labelledby="add-job-access-title">
       <h2 id="add-job-access-title" className="text-sm font-[550]">Read this job for {candidateName}?</h2>
       <p className={SOFT_TEXT}>
         To add it to {candidateName}&apos;s Saved jobs, BenchQ needs to read <strong className="font-[550]">{access.host}</strong>.
         Choose Allow when Chrome asks.
       </p>
       {isDenied && <p role="alert" className={ALERT}>Not allowed. BenchQ can&apos;t read {access.host}, so it can&apos;t add this job from here.</p>}
-      <button type="button" data-slot="add-job-allow" className={button("primary")} disabled={isAsking} onClick={() => void allow()}>
+      <button type="button" data-slot="add-job-allow" className={`w-full ${button("primary", "large")}`} disabled={isAsking} onClick={() => void allow()}>
         {isDenied ? "Ask again" : `Allow on ${access.host}`}
       </button>
-    </section> : null;
+    </section> };
   }
-  if (tabId === null || !job) return state.status === "error" ? <p className={ALERT} role="alert">{state.text}</p> : null;
+  if (tabId === null || !job) return { node: state.status === "error" ? <p className={ALERT} role="alert">{state.text}</p> : null, isJob: false };
 
   // Still the page of the job BenchQ has (not one the tab moved on to): show BenchQ's details, not the page's reading.
   const sameKnown = known?.url && isSameJob(job.url, known.url) ? known : null;
   const shown: PageJob = sameKnown ? { ...job, title: placeholderTitle(sameKnown.title, job.ids) ? job.title : sameKnown.title!, company: sameKnown.company || job.company,
     location: sameKnown.location ?? job.location, description: sameKnown.description || job.description } : { ...job, ...draft };
-  if (shown.company !== job.company) delete shown.logoUrl;
-  const missing = !shown.title.trim() || !shown.company.trim() || !shown.description.trim();
-  const editFields = !sameKnown && (editing || missing || Object.keys(draft).length > 0);
+  // The page's logo stays while the company is still the page's: an edit that tidies its name keeps it.
+  if (shown.company !== job.company && !sameCompany(shown.company, job.company)) delete shown.logoUrl;
+  const description = plainText(shown.description);
+  const missing = !shown.title.trim() || !shown.company.trim() || !description;
+  const isAdded = state.status === "added";
+  const isBusy = state.status === "adding";
+  const editFields = !sameKnown && !isAdded && (editing || missing);
   const details = detailsOf(shown);
   const add = async () => {
+    setIsDetailsShown(false);
     setState({ status: "adding" });
     try {
       const fresh = await readJobPage(tabId);
       if (!mounted.current) return;
-      if (!fresh?.isJobPage || fresh.url !== job.url || fresh.title !== job.title || fresh.company !== job.company || fresh.requisitionId !== job.requisitionId) {
-        setDraft({});
+      if (!isSamePosting(fresh, job)) {
+        // The card shows what the page shows now. The BDE's edits stay with this posting's link (`drafts`): another
+        // job's page starts from its own reading, and the same one again has them back.
         setJob(fresh?.isJobPage ? fresh : null);
         setState({ status: "error", text: "The posting changed. Review its current details before saving." });
         return;
       }
       const application = await (sameKnown ? addJob(candidateId, shown, sameKnown) : addJob(candidateId, shown));
       if (!mounted.current) return;
+      // Saved: the edits are the job's now. The card keeps showing them until the tab connects to it.
+      drafts.delete(key);
       setState({ status: "added", text: sameKnown ? `Saved to ${candidateName}'s jobs.`
         : application.application_created ? `Added to ${candidateName}'s Saved jobs.` : `Already in ${candidateName}'s jobs.` });
       onAdded(application);
@@ -320,30 +370,64 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
     }
   };
 
-  return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
-    <div className="flex items-center gap-2">
-      {shown.logoUrl && <CompanyLogo company={shown.company} url={shown.logoUrl} />}
-      <h2 id="add-job-title" className="text-h3 wrap-anywhere">{shown.title || "Job on this page"}</h2>
-    </div>
-    <p className={SOFT_TEXT}>{[shown.company, shown.location].filter(Boolean).join(" · ")}</p>
-    {sameKnown && <p data-slot="add-job-known" className={MUTED_TEXT}>{`This job is already in BenchQ. Save it to ${candidateName}'s jobs.`}</p>}
-    {!sameKnown && !editFields && (state.status === "idle" || state.status === "error") && <button type="button" className={button("secondary", "compact")} onClick={() => setEditing(true)}>Edit details</button>}
-    {editFields && state.status !== "added" && <fieldset disabled={state.status === "adding"} className="grid gap-2">
-      {(["title", "company", "location", "description"] as const).map(field => <label key={field} className="grid gap-1 text-caption capitalize">{field}
-        {field === "description" ? <textarea value={shown.description} maxLength={100000} onChange={event => setDraft({ ...draft, description: event.target.value })} />
-          : <input value={shown[field] ?? ""} maxLength={300} onChange={event => setDraft({ ...draft, [field]: event.target.value })} />}
-      </label>)}
-    </fieldset>}
-    {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
-      {details.map(([name, value]) => <Fragment key={name}>
-        <dt className="text-[var(--color-text-3)]">{name}</dt>
-        <dd className="min-w-0 text-[var(--color-text-2)] wrap-anywhere">{value}</dd>
-      </Fragment>)}
-    </dl>}
-    {state.status !== "added" && <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding" || (!sameKnown && missing)} onClick={() => void add()}>
-      {state.status === "adding" ? <>{SPINNER_ICON}Saving…</> : `Save job for ${candidateName}`}
-    </button>}
-    {state.status === "added" && <p role="status" className={`flex items-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}
+  const save = !isAdded && <button type="button" data-slot="add-job-run" className={`w-full ${button("primary", "large")}`} disabled={isBusy || (!sameKnown && missing)} onClick={() => void add()}>
+    {isBusy ? <>{SPINNER_ICON}Saving…</> : `Save job for ${firstName}`}
+  </button>;
+  if (isDetailsShown) {
+    // The design's Job Details page, for the job as the card has it (the BDE's edits too), with Save at its foot.
+    const facts = factsOf({ title: shown.title || "Job on this page", company: shown.company, location: shown.location,
+      logoUrl: shown.logoUrl, description: shown.description }, shown);
+    return { isJob: true, isDetails: true, node: <JobDetails job={facts} onBack={() => setIsDetailsShown(false)} actions={<>
+      <button type="button" data-slot="add-job-details-back" className={button("secondary", "large")} onClick={() => setIsDetailsShown(false)}>Back</button>
+      {save}
+    </>} /> };
+  }
+
+  const fields = ["title", "company", "location", "description"] as const;
+  const hasBody = Boolean(sameKnown) || editFields || details.length > 0;
+  return { isJob: true, node: <div data-slot="add-job-page" className={PAGE}><div className="grid gap-4">
+    <section data-slot="add-job" className={ADD_CARD} aria-labelledby="add-job-title">
+      <div className={`flex min-w-0 items-center gap-4 ${hasBody ? "border-b border-[var(--color-border)] pb-5" : ""}`}>
+        <CompanyLogo company={shown.company || shown.title || "Job"} url={shown.logoUrl} size="xl" />
+        <div className="grid min-w-0">
+          <h2 id="add-job-title" className="truncate text-h3 font-[700] leading-tight" title={shown.title || undefined}>{shown.title || "Job on this page"}</h2>
+          <p className="mt-0.5 truncate text-sm text-[var(--color-text-2)]">{shown.company || "Company not listed"}</p>
+          {shown.location && <p className="mt-1 truncate text-caption text-[var(--color-text-3)]" title={shown.location}>{shown.location}</p>}
+        </div>
+      </div>
+      {sameKnown && <p data-slot="add-job-known" className={MUTED_TEXT}>{`This job is already in BenchQ. Save it to ${candidateName}'s jobs.`}</p>}
+      {editFields && <fieldset disabled={isBusy} data-slot="add-job-form" className="grid gap-3">
+        <legend className="sr-only">The job&apos;s details</legend>
+        {fields.map((field) => <label key={field} className="grid gap-1.5">
+          <span className={LABEL}>{FIELD_LABELS[field]}</span>
+          {/* The description as text to edit, not the posting's HTML. Left alone, the posting's own is what's saved. */}
+          {field === "description"
+            ? <textarea className={`${INPUT} min-h-28 resize-y`} rows={6} value={draft.description ?? plainText(job.description)} maxLength={100000} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
+            : <input className={INPUT} value={shown[field] ?? ""} maxLength={300} onChange={(event) => setDraft({ ...draft, [field]: event.target.value })} />}
+        </label>)}
+      </fieldset>}
+      {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-2 gap-x-3 gap-y-4">
+        {details.map(([name, value]) => <div key={name} className={`grid min-w-0 gap-1 ${name === "Pay" ? "col-span-2" : ""}`}>
+          <dt className={LABEL}>{name}</dt>
+          <dd className={VALUE}>{value}</dd>
+        </div>)}
+      </dl>}
+    </section>
+    {save}
+    {isAdded && <p role="status" className={`flex items-center justify-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}
     {state.status === "error" && <p role="alert" className={ALERT}>{state.text}</p>}
-  </section>;
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
+      {!sameKnown && !isAdded && !isBusy && (editFields
+        ? !missing && <button type="button" data-slot="add-job-done" className={QUIET_ACTION} onClick={() => setEditing(false)}>Done editing</button>
+        : <button type="button" data-slot="add-job-edit" className={QUIET_ACTION} onClick={() => setEditing(true)}>Edit details</button>)}
+      <button type="button" data-slot="add-job-more" className={QUIET_ACTION} onClick={() => setIsDetailsShown(true)}>See full job details</button>
+    </div>
+  </div></div> };
+  };
+  const { node, isJob, isDetails = false } = view();
+  useEffect(() => { onShown?.(isJob); }, [isJob, onShown]);
+  useEffect(() => () => onShown?.(false), [onShown]);
+  useEffect(() => { onDetailsShown?.(isDetails); }, [isDetails, onDetailsShown]);
+  useEffect(() => () => onDetailsShown?.(false), [onDetailsShown]);
+  return node;
 }

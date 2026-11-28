@@ -2,6 +2,24 @@
 
 export const CHECK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>;
 
+/** Back to where the BDE was: the job details page's way out. */
+export const BACK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14" /></svg>;
+
+/** A requirement met, in the job details' lists. */
+export const CHECK_CIRCLE_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>;
+
+/** How a job is done (remote, hybrid, on-site). */
+export const HOME_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 21v-8h6v8" /></svg>;
+
+/** The signed-in user, for the account and settings drawer. */
+export const USER_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>;
+
+/** More about something: a job's full details. */
+export const INFO_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>;
+
+/** Sign out. */
+export const LOGOUT_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>;
+
 /** Save for next time: a bookmark. */
 export const BOOKMARK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 21l-6-4.5L6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /></svg>;
 

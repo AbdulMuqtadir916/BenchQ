@@ -1,3 +1,4 @@
+import { sameCompany } from "./autofill/job-check";
 import type { AppliedForm, PageJob, ResumeFileSource } from "./autofill/types";
 
 export const BENCHQ_URL = __BENCHQ_URL__.replace(/\/$/, "");
@@ -32,6 +33,8 @@ export type Application = {
   best_score?: number | null;
   best_cv_score?: number | null;
   job_id?: string;
+  /** The employer's logo its page showed, when the job was added from it (backend/api/routes_applications.py). */
+  logo_url?: string | null;
   /** Where BenchQ found the job (`jobs.source`): `jobspy_linkedin`, `linkedin_extension`, `direct`, `manual`… */
   source?: string | null;
   /** The résumé the application was sent with, else the newest one tailored for its job (routes_applications.py). */
@@ -86,10 +89,18 @@ export function base64Of(bytes: Uint8Array): string {
 
 export const isSessionExpired = (error: unknown) => error instanceof Error && error.message === "SESSION_EXPIRED";
 
+/** Signs the BDE out of BenchQ, as the website's Sign out does (routes_auth.py: 204, even with no session left). */
+export const signOut = () => request<void>("/api/auth/sign-out", { method: "POST" });
+
 /** The candidate's Resumes tab on the website: `candidates.detail` in src/lib/routes/registry.ts, tab `resumes`. The
  * website reads the backend's candidate id as it is while candidates run on the backend. */
 export const candidateResumesUrl = (firmSlug: string, candidateId: string) =>
   `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/candidates/${encodeURIComponent(candidateId)}?tab=resumes`;
+
+/** One application on the website: `applications.detail` in src/lib/routes/registry.ts, for "View in BenchQ" once the
+ * BDE marks a job applied. */
+export const applicationUrl = (firmSlug: string, applicationId: string) =>
+  `${BENCHQ_URL}/${encodeURIComponent(firmSlug)}/applications/${encodeURIComponent(applicationId)}`;
 
 /** One résumé version in the studio on the website: `resumes.studio` in src/lib/routes/registry.ts, whose URL names
  * the version. */
@@ -224,13 +235,16 @@ export const getSavedApplications = async (candidateId?: string) => {
       (transition) => transition.from === "saved" && transition.to === "applied",
     ),
   );
-  const jobs = [...saved, ...appliedFromSaved];
-  const keys = jobs.map(job => logoKey(job.id));
+  // The logo BenchQ saved with the job, else the one this browser kept for it (jobs added before BenchQ kept logos).
+  const jobs = [...saved, ...appliedFromSaved].map((job) => (isLogoLink(job.logo_url) ? { ...job, logoUrl: job.logo_url } : job));
+  const keys = jobs.filter((job) => !job.logoUrl).map(job => logoKey(job.id));
   if (!keys.length || typeof chrome === "undefined" || !chrome.storage?.local) return jobs;
   const logos = await chrome.storage.local.get(keys).catch(() => ({} as Record<string, unknown>));
   return jobs.map(job => {
+    if (job.logoUrl) return job;
     const logo = logos[logoKey(job.id)] as { company?: string; url?: string } | undefined;
-    return logo?.company && logo.company === job.company && typeof logo.url === "string"
+    // The company it was saved for, however BenchQ spells it now ("Acme Inc" and "Acme, Inc." are one company).
+    return logo?.company && typeof logo.url === "string" && (logo.company === job.company || sameCompany(logo.company, job.company))
       ? { ...job, logoUrl: logo.url } : job;
   });
 };
@@ -238,15 +252,43 @@ export const getSavedApplications = async (candidateId?: string) => {
  * sent (docs/02 §9). */
 /** A job added for a candidate from the page it's on (the add-job plan, 2026-11-11): it becomes one of their jobs and a
  * Saved application at once, or the application they already have for it. */
-/** One of a candidate's jobs in BenchQ, the posting the website's Open source names. */
-export interface BenchqJob { id: string; title: string | null; company: string | null; location: string | null; description: string | null; url: string | null }
+/** One of a candidate's jobs in BenchQ, the posting the website's Open source names. For the job's details page, what
+ * BenchQ holds besides: its employment type, work mode and posted date; and, for a job added from its page, what the
+ * page stated (its pay, requisition), its logo and its description as the page gave it (`descriptionHtml`). */
+export interface BenchqJob {
+  id: string; title: string | null; company: string | null; location: string | null; description: string | null; url: string | null;
+  employmentType?: string | null; workMode?: "remote" | "hybrid" | "onsite" | null; postedAt?: string | null;
+  salaryMin?: number | null; salaryMax?: number | null; salaryCurrency?: string | null; salaryPeriod?: PageJob["salaryPeriod"] | null;
+  requisitionId?: string | null; logoUrl?: string; descriptionHtml?: string | null;
+}
+
+type PostingJson = {
+  id: string; title: string | null; company: string | null; location: string | null; description?: string | null; apply_url: string | null;
+  employment_type?: string | null; remote_mode?: string | null; posted_at?: string | null;
+  work_mode?: string | null; salary_min?: number | null; salary_max?: number | null; salary_currency?: string | null;
+  salary_period?: string | null; requisition_id?: string | null; logo_url?: string | null; description_html?: string | null;
+};
+const WORK_MODES = ["remote", "hybrid", "onsite"] as const;
+const PAY_PERIODS = ["hour", "day", "week", "month", "year"] as const;
+/** The work mode BenchQ worked out for a posting (`remote_mode`): remote or hybrid as the source or place says. Its
+ * ONSITE is also what it says when nothing does, so it isn't taken as stated. */
+const REMOTE_MODES = { REMOTE: "remote", HYBRID: "hybrid" } as const;
+const oneOf = <T extends string>(values: readonly T[], value: string | null | undefined): T | null =>
+  (values as readonly string[]).includes(value ?? "") ? value as T : null;
+/** A logo link the panel shows: http(s), as BenchQ takes one. */
+const isLogoLink = (url: string | null | undefined): url is string => typeof url === "string" && /^https?:\/\/[^\s/]/i.test(url) && url.length <= 2048;
 
 /** backend/api/routes_job_search.py: the candidate's own posting, or a 404 when the job isn't theirs. */
 export const getCandidateJob = async (firmId: string, candidateId: string, postingId: string): Promise<BenchqJob> => {
-  const posting = await request<Omit<BenchqJob, "url" | "description"> & { description?: string | null; apply_url: string | null }>(
-    `${candidatePath(firmId, candidateId)}/job-postings/${encodeURIComponent(postingId)}`);
+  const posting = await request<PostingJson>(`${candidatePath(firmId, candidateId)}/job-postings/${encodeURIComponent(postingId)}`);
+  const mode = (posting.remote_mode ?? "").toUpperCase();
   return { id: posting.id, title: posting.title, company: posting.company, location: posting.location,
-    description: posting.description ?? null, url: posting.apply_url };
+    description: posting.description ?? null, url: posting.apply_url, employmentType: posting.employment_type ?? null,
+    workMode: oneOf(WORK_MODES, posting.work_mode) ?? (mode in REMOTE_MODES ? REMOTE_MODES[mode as keyof typeof REMOTE_MODES] : null),
+    postedAt: posting.posted_at ?? null, salaryMin: posting.salary_min ?? null, salaryMax: posting.salary_max ?? null,
+    salaryCurrency: posting.salary_currency ?? null, salaryPeriod: oneOf(PAY_PERIODS, posting.salary_period),
+    requisitionId: posting.requisition_id ?? null, ...(isLogoLink(posting.logo_url) ? { logoUrl: posting.logo_url } : {}),
+    descriptionHtml: posting.description_html ?? null };
 };
 
 type AddedApplication = Application & { job_created: boolean; application_created: boolean };
@@ -256,9 +298,11 @@ const logoKey = (applicationId: string) => `job-logo:${BENCHQ_URL}:${application
 /** Saves a job for the candidate: a job BenchQ already has by its id, any other from what its page stated. */
 export const addJob = async (candidateId: string, job: PageJob, known?: BenchqJob): Promise<AddedApplication> => {
   const application = await saveApplication(candidateId, job, known);
-  if (!job.logoUrl || job.company !== application.company) return application;
-  // Job records have no logo field. Associate the page's public image with this saved application in this browser.
-  if (typeof chrome !== "undefined") await chrome.storage?.local?.set({ [logoKey(application.id)]: { company: job.company, url: job.logoUrl } }).catch(() => undefined);
+  // The page's logo, for the company BenchQ saved: BenchQ may tidy its name, never make it another company's.
+  if (!job.logoUrl || (job.company !== application.company && !sameCompany(job.company, application.company))) return application;
+  // BenchQ's job records have no logo field: the page's public image goes with this saved application, in this browser,
+  // so the panel shows it wherever it shows the job (its card, the Autofill page, its details, Applied).
+  if (typeof chrome !== "undefined") await chrome.storage?.local?.set({ [logoKey(application.id)]: { company: application.company ?? job.company, url: job.logoUrl } }).catch(() => undefined);
   return { ...application, logoUrl: job.logoUrl };
 };
 
@@ -278,6 +322,8 @@ const saveApplication = async (candidateId: string, job: PageJob, known?: Benchq
         // What the page stated besides; a detail it didn't state is left out (JSON drops undefined).
         work_mode: job.workMode, employment_type: job.employmentType, salary_min: job.salaryMin, salary_max: job.salaryMax,
         salary_currency: job.salaryCurrency, salary_period: job.salaryPeriod, posted_at: job.postedAt, requisition_id: job.requisitionId,
+        // The employer's logo the page shows, saved with the job so the panel shows it with the job anywhere.
+        logo_url: isLogoLink(job.logoUrl) ? job.logoUrl : undefined,
       },
     }),
   });

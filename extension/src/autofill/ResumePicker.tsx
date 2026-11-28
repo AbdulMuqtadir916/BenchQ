@@ -27,14 +27,17 @@ type ResumePickerProps = {
   isCompact?: boolean;
 };
 
-/** Simplify's résumé card: a heading with its mark, then the résumé, in BenchQ's colours. */
-const CARD = "grid flex-none gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-xs)]";
+/** The design's résumé section: its name in small capitals with Tailor beside it, then the résumé in use. */
+const CARD = "grid flex-none gap-2";
 const HEAD = "flex min-w-0 items-center gap-2";
+const LABEL = "flex-none text-caption font-[700] uppercase tracking-widest text-[var(--color-text-3)]";
 const FOLD = `grid size-[var(--control-sm)] flex-none place-items-center rounded-[var(--radius-sm)] text-[var(--color-text-3)] transition-[background,color] ${MOTION} hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] [&_svg]:size-[var(--icon-md)] [&_svg]:transition-transform aria-expanded:[&_svg]:rotate-180 motion-reduce:[&_svg]:transition-none`;
 /** The résumé in use and its eye, joined in one box, as Simplify's row. */
-const BOX = "flex min-w-0 items-stretch rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] focus-within:border-[var(--color-primary)]";
+const BOX = "flex min-w-0 items-stretch rounded-[var(--radius-lg)] border border-[var(--color-primary)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)] focus-within:shadow-[var(--ring-input)]";
 /** The résumé in use, as a select: the whole row opens the list (07 Q55), its › says so. */
-const SELECT = `group flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50`;
+const SELECT = `group flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] disabled:cursor-not-allowed disabled:opacity-50`;
+/** The résumé's file mark at the row's start, in the primary blue. */
+const FILE_MARK = "flex-none text-[var(--color-primary)] [&_svg]:size-5";
 const CHEVRON = "flex-none text-[var(--color-text-3)] [&_svg]:size-[var(--icon-md)] [&_svg]:-rotate-90";
 /** Open, the row is the search, as in Simplify: type to find a résumé, ⌃ closes the list. */
 const SEARCH_ROW = "flex min-w-0 flex-1 items-center gap-2 pl-3";
@@ -60,8 +63,8 @@ const TAILORED = `${TAG} border-[color-mix(in_srgb,var(--color-teal-fg)_35%,tran
 const GROUP = `px-2 pt-1.5 pb-0.5 ${EYEBROW}`;
 /** Under the list: another résumé is added in BenchQ. */
 const ADD = "mt-1 flex items-center gap-1 border-t border-[var(--color-border)] px-2.5 pt-1.5 pb-1 text-caption font-[550] text-[var(--color-text-2)] hover:text-[var(--color-primary)] [&_svg]:size-[var(--icon-sm)]";
-/** Simplify's Tailor Resume under the résumé: a soft blue outlined button. */
-const TAILOR = `inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-primary)_45%,transparent)] bg-[var(--color-primary-subtle)] px-2 py-1 text-caption font-[650] text-[var(--color-primary)] transition-[border-color] ${MOTION} hover:border-[var(--color-primary)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`;
+/** The design's Tailor resume: a blue link with its sparkles, beside the section's name. */
+const TAILOR = "inline-flex items-center gap-1 text-caption font-[700] text-[var(--color-primary)] hover:underline [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
 
 const resumesCount = (count: number) => `${count} resume${count === 1 ? "" : "s"}`;
 
@@ -78,8 +81,7 @@ function Section({ count, folded, action, isFolded = false, onFold, footer = nul
   }
   return <section data-slot="resume-picker" className={CARD} aria-labelledby="resume-picker-title">
     <div className={HEAD}>
-      <span className="flex-none text-[var(--color-text-2)] [&_svg]:size-[var(--icon-md)]" aria-hidden="true">{RESUME_ICON}</span>
-      <h3 id="resume-picker-title" className="flex-none text-body-strong text-[var(--color-text)]">Resume</h3>
+      <h3 id="resume-picker-title" className={LABEL}>Resume</h3>
       {count ? <span data-slot="resume-count" className="sr-only">{resumesCount(count)}</span> : null}
       {isFolded && folded}
       {!isFolded && action && <span className="ml-auto flex-none">{action}</span>}
@@ -257,7 +259,7 @@ export default function ResumePicker({ resumes, candidateName, resumesUrl, studi
           hidden={isListed} disabled={isBusy} aria-expanded={isListed} aria-controls={listId}
           aria-label={`Change the resume, ${resumesCount(choices.length)} to choose from. In use: ${current.label}`}
           onKeyDown={onSelectKey} onClick={() => open(false)}>
-          {isCompact && <span className="flex-none text-[var(--color-text-2)] [&_svg]:size-[var(--icon-md)]" aria-hidden="true">{RESUME_ICON}</span>}
+          <span className={FILE_MARK} aria-hidden="true">{RESUME_ICON}</span>
           <Named choice={current} isClipped isOneLine />
           <span data-slot="resume-change" className={CHEVRON} aria-hidden="true">{CHEVRON_DOWN_ICON}</span>
         </button>

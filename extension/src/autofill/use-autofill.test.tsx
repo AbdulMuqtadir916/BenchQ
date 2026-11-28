@@ -1397,6 +1397,30 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     expect(hook.attachedShown).toBe(true);
   });
 
+  it("keeps the Resume/CV row, holding BenchQ's file, once the site takes the upload away and names the file instead", async () => {
+    vi.mocked(fileShownOnPage).mockResolvedValue(true);
+    // Reddit's Greenhouse form: once it has the file, the upload goes and only the file's name is left.
+    await attachBenchQFile([field("a", "Email", "text", "priya@example.test")]);
+    const resume = () => hook.rows!.find(({ field: { kind } }) => kind === "file");
+    expect(hook.rows!.map(({ field: { id } }) => id)).toEqual(["r", "a"]);
+    expect(resume()).toMatchObject({ status: "same", field: { id: "r", current: NAME, isGone: true } });
+    await act(async () => { const looking = hook.rescan(); await vi.advanceTimersByTimeAsync(10); await looking; });
+    expect(resume()).toMatchObject({ status: "same", field: { current: NAME } });
+    expect(resume()!.reason).toBeUndefined();
+    expect(hook.attachedShown).toBe(true);
+    // Never put on again: the upload it went to is gone.
+    expect(vi.mocked(fillField).mock.calls.filter(([, , request]) => request.write.type === "file")).toHaveLength(1);
+  });
+
+  it("drops that row once the page no longer names the file", async () => {
+    vi.mocked(fileShownOnPage).mockResolvedValue(true);
+    await attachBenchQFile([field("a", "Email", "text", "priya@example.test")]);
+    vi.mocked(fileShownOnPage).mockResolvedValue(false);
+    await act(async () => { const looking = hook.rescan(); await vi.advanceTimersByTimeAsync(10); await looking; });
+    expect(hook.rows!.map(({ field: { id } }) => id)).toEqual(["a"]);
+    expect(hook.attachedShown).toBe(false);
+  });
+
   it("leaves a file that was on the form before BenchQ looked", async () => {
     vi.mocked(getResumeFile).mockResolvedValue(pdf);
     vi.mocked(scanTab).mockResolvedValue(page([upload("mine.pdf"), field("a", "Email")], onSite));

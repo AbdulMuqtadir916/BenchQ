@@ -3,7 +3,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addJob, BENCHQ_URL, getCandidateJob } from "../api";
-import AddJobCard, { detailsOf, isOtherJobOnSite, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import AddJobCard, { isOtherJobOnSite, isSavedJob, jobIdsOf, looksLikeJobPage, offersPage } from "./AddJobCard";
+import { detailsOf } from "./job-details";
 import { missingAccess, requestAccess } from "./site-access";
 import { readJobPage } from "./tab-bridge";
 
@@ -29,6 +30,13 @@ async function show(onAdded = vi.fn(), knownUrls: string[] = [], knownJobs: Know
 }
 
 const click = (slot: string) => act(async () => { host.querySelector<HTMLButtonElement>(`[data-slot='${slot}']`)!.click(); });
+/** Types into one of React's inputs as the BDE would: the value, then the input event React listens for. */
+const type = (control: HTMLInputElement | HTMLTextAreaElement, value: string) => act(async () => {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(control), "value")!.set!.call(control, value);
+  control.dispatchEvent(new Event("input", { bubbles: true }));
+});
+const inputOf = (label: string) => [...host.querySelectorAll("[data-slot='add-job-form'] label")]
+  .find((field) => field.querySelector("span")?.textContent === label)!.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")!;
 
 afterEach(() => {
   act(() => { root?.unmount(); });
@@ -68,12 +76,43 @@ describe("adding the job on this page", () => {
     expect(host.querySelector("[data-slot='add-job']")).toBeNull();
   });
 
+  it("says when it shows a job, so the panel is the page that adds it, and opens the posting's own page on request", async () => {
+    vi.mocked(readJobPage).mockResolvedValue(page);
+    const onShown = vi.fn();
+    const onDetailsShown = vi.fn();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => { root!.render(<AddJobCard tab={{ id: 7, url: page.url }} firmId="firm-1" candidateId="cand-1" candidateName="Priya Shah" knownUrls={[]} onAdded={vi.fn()} onShown={onShown} onDetailsShown={onDetailsShown} />); });
+    expect(onShown).toHaveBeenLastCalledWith(true);
+    expect(onDetailsShown).toHaveBeenLastCalledWith(false);
+    // Save is under the card, for the candidate by their first name, as the design has it.
+    expect(host.querySelector("[data-slot='add-job'] [data-slot='add-job-run']")).toBeNull();
+    expect(host.querySelector("[data-slot='add-job-run']")!.textContent).toBe("Save job for Priya");
+    await click("add-job-more");
+    // The design's Job Details page: the posting's HTML read as text, and Save at its foot.
+    const details = host.querySelector("[data-slot='job-details']")!;
+    expect(details.querySelector("[data-slot='job-details-title']")!.textContent).toBe(page.title);
+    expect(details.querySelector("[data-slot='job-details-section'] p")!.textContent).toBe("Test the API.");
+    expect(details.querySelector("[data-slot='job-details-actions'] [data-slot='add-job-run']")!.textContent).toBe("Save job for Priya");
+    expect(host.querySelector("[data-slot='add-job']")).toBeNull();
+    expect(onDetailsShown).toHaveBeenLastCalledWith(true);
+    await click("job-details-back");
+    expect(host.querySelector("[data-slot='add-job']")).not.toBeNull();
+    expect(onDetailsShown).toHaveBeenLastCalledWith(false);
+    act(() => { root!.unmount(); });
+    root = null;
+    expect(onShown).toHaveBeenLastCalledWith(false);
+    expect(onDetailsShown).toHaveBeenLastCalledWith(false);
+  });
+
   it("adds on an explicit save click the job for the candidate and hands back its application", async () => {
     vi.mocked(readJobPage).mockResolvedValue(page);
     vi.mocked(addJob).mockResolvedValue({ id: "app-1", status: "saved", job_created: true, application_created: true } as never);
     const onAdded = await show();
     expect(host.querySelector("h2")?.textContent).toBe(page.title);
-    expect(host.textContent).toContain("Acme Bank · Atlanta, GA");
+    // The company, then the place on a line of its own, as the design has them.
+    expect([...host.querySelectorAll("[data-slot='add-job'] p")].map(({ textContent }) => textContent).slice(0, 2)).toEqual(["Acme Bank", "Atlanta, GA"]);
     expect(addJob).not.toHaveBeenCalled();
     await click("add-job-run");
     expect(addJob).toHaveBeenCalledWith("cand-1", page);
@@ -251,7 +290,7 @@ describe("what the card says the page stated, before the BDE adds the job", () =
   it("names each detail, the posted date in words, and only what the page stated", () => {
     expect(detailsOf({ ...page, workMode: "remote", employmentType: "Full-time", salaryMin: 120000, salaryMax: 150000, salaryCurrency: "USD",
       salaryPeriod: "year", postedAt: "2026-11-10", requisitionId: "R123456" })).toEqual([
-      ["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"], ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"],
+      ["Work mode", "Remote"], ["Employment", "Full-time"], ["Pay", "USD 120,000–150,000 a year"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"],
     ]);
     expect(detailsOf(page)).toEqual([]);
   });
@@ -261,7 +300,65 @@ describe("what the card says the page stated, before the BDE adds the job", () =
     vi.mocked(readJobPage).mockResolvedValue({ ...page, employmentType: "Contract", salaryMin: 60, salaryPeriod: "hour", salaryCurrency: "USD" });
     await show();
     const rows = [...host.querySelectorAll("[data-slot='add-job-details'] dt")].map((name) => [name.textContent, name.nextElementSibling!.textContent]);
-    expect(rows).toEqual([["Pay", "From USD 60 an hour"], ["Type", "Contract"]]);
+    expect(rows).toEqual([["Employment", "Contract"], ["Pay", "From USD 60 an hour"]]);
+  });
+});
+
+describe("editing the job before saving it", () => {
+  it("edits the description as text, keeps the edits through a later reading of the page, and saves what the BDE wrote", async () => {
+    vi.mocked(missingAccess).mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      const url = "https://boards.example.test/acme/jobs/777";
+      // A later look reads the same posting more fully: its requisition ID loads late.
+      vi.mocked(readJobPage).mockResolvedValueOnce({ ...page, url }).mockResolvedValue({ ...page, url, requisitionId: "R777" });
+      vi.mocked(addJob).mockResolvedValue({ id: "app-7", status: "saved", job_created: true, application_created: true } as never);
+      await show(vi.fn(), [], [], url);
+      await click("add-job-edit");
+      // The posting's HTML as text, never its tags.
+      expect(inputOf("Description").value).toBe("Test the API.");
+      await type(inputOf("Job title"), "Senior QA Engineer II");
+      await type(inputOf("Description"), "Test the API and the app.");
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(inputOf("Job title").value).toBe("Senior QA Engineer II");
+      expect(inputOf("Description").value).toBe("Test the API and the app.");
+      await click("add-job-done");
+      expect(host.querySelector("[data-slot='add-job-form']")).toBeNull();
+      expect(host.querySelector("h2")!.textContent).toBe("Senior QA Engineer II");
+      await click("add-job-run");
+      expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ title: "Senior QA Engineer II", description: "Test the API and the app.", requisitionId: "R777" }));
+      expect(host.querySelector("[role='status']")?.textContent).toBe("Added to Priya's Saved jobs.");
+      // Saved, the card still shows what the BDE made it.
+      expect(host.querySelector("h2")!.textContent).toBe("Senior QA Engineer II");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the edits when the card is drawn afresh on the same posting", async () => {
+    const url = "https://boards.example.test/acme/jobs/779";
+    vi.mocked(readJobPage).mockResolvedValue({ ...page, url });
+    await show(vi.fn(), [], [], url);
+    await click("add-job-edit");
+    await type(inputOf("Location"), "Remote (US)");
+    act(() => { root!.unmount(); });
+    host.remove();
+    await show(vi.fn(), [], [], url);
+    expect(host.querySelector("[data-slot='add-job'] p:nth-of-type(2)")!.textContent).toBe("Remote (US)");
+  });
+
+  it("keeps the BDE's edits when Save finds the page names the posting another way", async () => {
+    const url = "https://boards.example.test/acme/jobs/778";
+    vi.mocked(readJobPage).mockResolvedValueOnce({ ...page, url }).mockResolvedValue({ ...page, url, title: "QA Engineer (Payments)" });
+    await show(vi.fn(), [], [], url);
+    await click("add-job-edit");
+    await type(inputOf("Location"), "Remote");
+    await click("add-job-run");
+    expect(addJob).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("The posting changed");
+    // The page's reading now, with the BDE's edit still over it.
+    expect(host.querySelector("h2")!.textContent).toBe("QA Engineer (Payments)");
+    expect(inputOf("Location").value).toBe("Remote");
   });
 });
 
@@ -305,7 +402,7 @@ it("offers to save a job BenchQ already has, with BenchQ's details, and saves th
   await show();
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   expect(host.textContent).toContain("already in BenchQ");
-  expect(host.textContent).toContain("Acme Corp · Austin, TX");
+  expect([...host.querySelectorAll("[data-slot='add-job'] p")].map(({ textContent }) => textContent).slice(0, 2)).toEqual(["Acme Corp", "Austin, TX"]);
   await click("add-job-run");
   expect(getCandidateJob).toHaveBeenCalledWith("firm-1", "cand-1", "job-9");
   expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ title: "QA Lead", company: "Acme Corp" }), expect.objectContaining({ id: "job-9" }));

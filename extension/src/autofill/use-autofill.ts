@@ -55,6 +55,8 @@ const PAGE_RESET = "The page reset this value.";
 /** An upload the site emptied once BenchQ put the file on, with no chip naming it anywhere: not a reset, as a site that
  * reads a file often empties its upload. */
 const FILE_NOT_SHOWN = "The form doesn't show this file. Check it's attached, or attach it again.";
+/** An upload the site took away holds another résumé's file than the one picked: the form has no upload to put it in. */
+const GONE_UPLOAD = "The form shows another file here. Remove it on the form, then attach this one.";
 const FORM_FLAGGED = "The form flagged this value.";
 const UNVERIFIED = "BenchQ couldn't verify this value. Check it on the form.";
 const RUN_STOPPED = "The form changed, so BenchQ stopped here.";
@@ -73,7 +75,7 @@ type FillableRow = ReviewRow & { write: FieldWrite };
 type Pass = { filled: FillableRow[]; failed: number; late: number; stopped: boolean };
 
 const isAttachment = (row: FillableRow) => row.write.type === "file";
-const isFillable = (row: ReviewRow): row is FillableRow => row.status === "ready" && Boolean(row.write);
+const isFillable = (row: ReviewRow): row is FillableRow => row.status === "ready" && Boolean(row.write) && !row.field.isGone;
 
 /** `resumeId`: the résumé version the answers come from (docs/02 §8.1); null when the candidate has none, so the form is
  * reviewed with no answers; undefined while the panel is still finding out, so nothing is reviewed yet. `fileName`: what
@@ -121,6 +123,9 @@ type TabMemory = {
   attachedId: Map<string, string>;
   // The file BenchQ attached to each upload: the Resume section still shows it when the site swaps the input for a chip.
   attached: Map<string, string>;
+  // Each upload BenchQ attached a file to, as the form had it then, and where among the form's fields: a site that takes
+  // the upload away once it has the file, naming the file instead (Reddit's Greenhouse form), keeps its row (`goneUpload`).
+  uploads: Map<string, { field: TabField; index: number }>;
   // What the BDE saved for next time, by field, and to which résumé: the row says so while the field still holds it and
   // that résumé is picked (07 Q58).
   saved: Map<string, { resumeId: string; value: string }>;
@@ -133,7 +138,7 @@ type TabMemory = {
 const pageMemory = () => ({
   settled: new Map<string, string>(), handedBack: new Map<string, string>(), seen: new Map<string, string>(), edited: new Set<string>(),
   found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(), wrote: new Map<string, string>(), attachedId: new Map<string, string>(),
-  attached: new Map<string, string>(),
+  attached: new Map<string, string>(), uploads: new Map<string, { field: TabField; index: number }>(),
   saved: new Map<string, { resumeId: string; value: string }>(),
   resumeRun: false,
 });
@@ -177,7 +182,7 @@ async function restoreMemory(connection: Pick<Connection, "tabId" | "application
     lastScan: stored.lastScan, autoSteps: stored.autoSteps, settled: new Map(stored.settled), handedBack: new Map(stored.handedBack),
     seen: new Map(stored.seen), edited: new Set(stored.edited), found: new Set(stored.found), unmatched: new Set(stored.unmatched),
     filledFrom: new Map(stored.filledFrom), wrote: new Map(stored.wrote), attachedId: new Map(stored.attachedId),
-    attached: new Map(stored.attached), saved: new Map(stored.saved), resumeRun: Boolean(stored.resumeRun),
+    attached: new Map(stored.attached), uploads: new Map(stored.uploads ?? []), saved: new Map(stored.saved), resumeRun: Boolean(stored.resumeRun),
   } satisfies TabMemory);
   return true;
 }
@@ -205,6 +210,23 @@ export function forgetTabs() {
 /** What a tab remembers a field by: the control itself, which keeps its id while the page lasts, else its label and
  * place. A block of fields added above it then can't move what's remembered onto another field. */
 const memoKeyOf = ({ key, field }: Pick<ReviewRow, "key" | "field">) => (field.stableId ? `${field.frameId}:${field.stableId}` : key);
+
+/** The upload BenchQ attached `name` to, for a look that finds the upload gone while the page names the file: the field
+ * as the form had it, holding the file and marked gone, and where it was. It reads as BenchQ's fill, which it is, not as
+ * a value the BDE changed or the page reset. */
+function goneUpload(memory: TabMemory, name: string): { field: TabField; index: number } | null {
+  const found = [...memory.uploads].reverse().find(([key]) => memory.attached.get(key) === name);
+  if (!found) return null;
+  const [key, { field, index }] = found;
+  memory.settled.set(key, name);
+  memory.seen.set(key, name);
+  return { field: { ...field, current: name, isGone: true }, index };
+}
+
+/** A row for an upload the site took away (`goneUpload`): BenchQ's fill while it holds the file asked for, else the
+ * BDE's to change on the form. */
+const goneRow = (row: ReviewRow): ReviewRow => (!row.field.isGone || row.status === "same" ? row
+  : { ...row, status: "manual", reason: GONE_UPLOAD, write: undefined, isStale: undefined });
 
 /** The message plus why, so a failure says what actually went wrong instead of looking like every other one. */
 function explain(message: string, error: unknown): string {
@@ -349,6 +371,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const isScanRunning = useRef(false);
   const busy = useRef(false);
   const frames = useRef<Pick<TabScan, "scanIds" | "unreadableFrames">>({ scanIds: new Map(), unreadableFrames: 0 });
+  // The fields of the last look, in the form's order: where an upload was, for when the site takes it away.
+  const readFields = useRef<TabField[]>([]);
   const shownRows = useRef<ReviewRow[] | null>(null);
   // The answers the latest scan took, with what came with them, and the file: always one résumé's, never a mix.
   // `isRefused`: a file was offered that the form's upload won't take, so nothing is to replace what's attached.
@@ -469,7 +493,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       bank.current?.resumeId ?? null);
     const reviewed = withCoverLetterFile(withResumeFile(withHistory(buildReview(fields, answers, job), bank.current?.history ?? NO_HISTORY),
       bank.current?.file ?? null), bank.current?.letter ?? null);
-    const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => withSaveOffer(row, answers));
+    const next = withMemory(reviewed, memory.current, resume.current, justFilled).map((row) => goneRow(withSaveOffer(row, answers)));
     showRows(next);
     // While the panel asks whether the tab moved on to another job, the look goes on (it's how the job is checked), but
     // that page's fields aren't this application's: none go into its form for Mark applied (PR #140's review).
@@ -533,6 +557,11 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     if (page && lastAttached && resumeUpload && !resumeUpload.current.trim() && await fileShownOnPage(tabId, lastAttached).catch(() => false)) {
       page.fields = page.fields.map((field) => (field === resumeUpload ? { ...field, current: lastAttached } : field));
     }
+    // Others take the upload away once they have the file and name it instead (Reddit's Greenhouse form): the Resume/CV
+    // row stays where the upload was, holding the file as BenchQ's fill, so every look reads the form the same and
+    // nothing counts the résumé as reset or still to do.
+    const gone = page && isShown && lastAttached ? goneUpload(memory.current, lastAttached) : null;
+    if (page && gone) page.fields = [...page.fields.slice(0, gone.index), gone.field, ...page.fields.slice(gone.index)];
     if (answers && page && isCurrent()) {
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.
@@ -550,6 +579,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
         setAttachmentSource(file?.source ?? null);
         setRefusedAccept(refused);
         frames.current = page;
+        readFields.current = page.fields;
         setSignals(page.signals);
         latestSignals.current = page.signals;
         setBankEmpty(answers.entries.length === 0);
@@ -774,6 +804,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
         if (write.type === "file" && documentOf(row.field) !== "cover-letter") {
           memory.current.attached.set(memoKeyOf(row), write.name);
           memory.current.attachedId.set(memoKeyOf(row), fileKey(write));
+          const index = readFields.current.findIndex((field) => field.frameId === row.field.frameId && field.id === row.field.id);
+          memory.current.uploads.set(memoKeyOf(row), { field: row.field, index: Math.max(0, index) });
           setAttachedFile(write.name);
         }
         track({ key, label, status: "filled", value: result.current || row.proposed });
@@ -797,6 +829,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       if (row.write.type === "file") {
         memory.current.attached.delete(memoKeyOf(row));
         memory.current.attachedId.delete(memoKeyOf(row));
+        memory.current.uploads.delete(memoKeyOf(row));
         isFileCleared = true;
       }
     }
@@ -925,6 +958,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       memory.current.settled.delete(key);
       memory.current.attached.delete(key);
       memory.current.attachedId.delete(key);
+      memory.current.uploads.delete(key);
     }
     setAttachedFile([...memory.current.attached.values()].at(-1) ?? null);
     busy.current = false;
@@ -948,6 +982,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       if (!await removeFileOnPage(tabId, name).catch(() => false)) continue;
       memory.current.attached.delete(key);
       memory.current.attachedId.delete(key);
+      memory.current.uploads.delete(key);
       memory.current.settled.delete(key);
       memory.current.filledFrom.delete(key);
       memory.current.wrote.delete(key);
@@ -1123,6 +1158,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     memory.current.wrote.clear();
     memory.current.attached.clear();
     memory.current.attachedId.clear();
+    memory.current.uploads.clear();
     // The BDE took the fills back: the next pages wait for them to run Autofill again.
     memory.current.autoSteps = false;
     setIsFollowingSteps(false);

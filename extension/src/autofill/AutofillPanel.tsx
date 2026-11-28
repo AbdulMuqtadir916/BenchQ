@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { resumeStudioUrl, type Application } from "../api";
+import { applicationUrl, resumeStudioUrl, type Application } from "../api";
 import { ALERT, button, MOTION, MUTED_TEXT, SOFT_TEXT, TEXT_BUTTON } from "../ui";
 import { sendToBackground } from "./connection-store";
 import { confirmsSmartApplication, smartApplication } from "./smart-application";
 import { isOtherJobOnSite } from "./AddJobCard";
+import AppliedPage from "./AppliedPage";
 import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
 import { documentOf, fileKey, readOwnFile, resumeFileName } from "./documents";
@@ -13,6 +14,10 @@ import { ALERT_ICON, CHECK, CHEVRON_DOWN_ICON, RESUME_ICON, SPARKLES_ICON, SPINN
 import CoverLetterPicker from "./CoverLetterPicker";
 import { useCoverLetters } from "./use-cover-letters";
 import JobCard from "./JobCard";
+import JobDetails from "./JobDetails";
+import { savedJobFacts } from "./job-details";
+import { isThisJob, usePageJob } from "./use-page-job";
+import { usePosting } from "./use-posting";
 import MarkApplied from "./MarkApplied";
 import OutcomeNote from "./OutcomeNote";
 import ResumePicker from "./ResumePicker";
@@ -147,6 +152,12 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   // The job's two views: filling the form, and the résumé that goes on it (picked, tailored). Both stay mounted, so a
   // tailoring that runs or a pick in progress carries on while the other view shows.
   const [view, setView] = useState<"autofill" | "tailoring">("autofill");
+  // The job's own page (JobDetails), over the panel, from the job's bar.
+  const [isDetailsShown, setIsDetailsShown] = useState(false);
+  // The job's posting, read once its details page opens: its description, type, mode and posted date are in BenchQ's
+  // posting, not in the applications list the panel has.
+  const { posting, retry: retryPosting } = usePosting(firmId, connection.candidateId,
+    isDetailsShown && applicationStatus === "ready" ? details?.job_id ?? null : null, onSessionExpired);
   // The cover letter the BDE picked for this form; until they pick, the job's newest in BenchQ.
   const [coverLetterPick, setCoverLetterPick] = useState<string | null | undefined>(undefined);
   // Once the form is filled the fields list can fold to its heading.
@@ -175,6 +186,9 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const reviewConnection = useMemo(() => verifiedForm
     ? { ...connection, job: { ...connection.job, url: verifiedForm } } : connection, [connection, verifiedForm]);
   const movedAway = Boolean(!verifiedForm && tabUrl && job.url && tabUrl !== keptUrl && isOtherJobOnSite(tabUrl, job.url));
+  // The job's page as the tab shows it now, for its details page: read as it opens, while the tab still shows the job.
+  const pageJob = usePageJob(connection.tabId, isDetailsShown && !movedAway);
+  const live = pageJob && isThisJob(pageJob, job, details) ? pageJob : null;
   const { resumes, pick, retry, refresh, refreshFailed, source } = useResumes({
     firmId, candidateId: connection.candidateId, applicationId: connection.applicationId, applicationStatus,
     jobId: details?.job_id ?? null, namedId: details?.tailored_resume_id ?? null,
@@ -388,6 +402,24 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     setView(to);
     card.current?.querySelector<HTMLButtonElement>(`[data-slot='job-view-${to}']`)?.focus();
   };
+  const jobUrl = details?.url ?? job.url;
+  if (isDetailsShown) {
+    // What Add job read and BenchQ saved, else the job's page as the tab shows it now, else what the jobs list has.
+    const facts = savedJobFacts(job, details, posting.status === "ready" ? posting.posting : null, live);
+    const descriptionStatus = facts.description ? "ready" : posting.status === "loading" ? "loading" : posting.status === "error" ? "error" : "ready";
+    return <div data-slot="autofill" className="flex min-h-0 flex-1 flex-col">
+      <JobDetails job={facts} descriptionStatus={descriptionStatus} onRetry={retryPosting} onBack={() => setIsDetailsShown(false)} actions={<>
+        <button type="button" className={button("secondary", "large")} onClick={() => setIsDetailsShown(false)}>Back to Autofill</button>
+        {jobUrl && <a className={button("primary", "large")} href={jobUrl} target="_blank" rel="noreferrer">Open posting</a>}
+      </>} />
+    </div>;
+  }
+  if (!movedAway && isApplied && applicationStatus === "ready") {
+    return <div data-slot="autofill" className="flex min-h-0 flex-1 flex-col">
+      <AppliedPage title={job.title || details?.title || "Untitled role"} company={job.company || details?.company || ""} logoUrl={details?.logoUrl}
+        candidateName={candidateName} viewUrl={firmSlug ? applicationUrl(firmSlug, connection.applicationId) : null} onBack={onDisconnect} />
+    </div>;
+  }
   return <section ref={card} data-slot="autofill" className="flex min-h-0 flex-1 flex-col pt-2.5" aria-labelledby="autofill-title">
     {/* Simplify's layout: the job's two views as a switch at the top. Not while a question about the tab comes first. */}
     {isOpen && <div role="tablist" aria-label="This job" data-slot="job-views" className={VIEW_TABS} onKeyDown={onViewKey}>
@@ -399,7 +431,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     {/* Autofill: the job and the résumé stay put; only the form's fields and answers scroll, between them and the actions. */}
     <div role="tabpanel" id="job-panel-autofill" aria-labelledby="job-view-autofill" hidden={shown !== "autofill"} data-slot="autofill-body"
       className="flex min-h-0 flex-1 flex-col gap-2.5 pt-2.5">
-      <JobCard job={job} details={details} candidateName={candidateName} onDisconnect={onDisconnect} isCompact={stage === "after"} />
+      <JobCard job={job} details={details} candidateName={candidateName} onDisconnect={onDisconnect} onDetails={() => setIsDetailsShown(true)} isCompact={stage === "after"} />
       {/* The résumé and the cover letter, and over them, from a run on, the form's fields (Simplify's accordion). */}
       <div data-slot="autofill-stage" className={STAGE}>
         {isOpen && <div ref={measurePickers} data-slot="autofill-pickers" className="grid flex-none gap-2.5" inert={isSheetUp}>
@@ -472,15 +504,6 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       </div>}
 
       {/* Marked applied: the mock's success card, over the form it was filled on. */}
-      {!movedAway && isApplied && applicationStatus === "ready" && <div data-slot="applied-card" className={NOTICE.success}>
-        <span className={`${MARK} ${MARK_TINT.success}`} aria-hidden="true">{CHECK}</span>
-        <strong className="text-body-strong text-[var(--color-text)]">Marked applied</strong>
-        <p className={SOFT_TEXT}>It&apos;s in {candidateName}&apos;s Applied jobs in BenchQ.</p>
-        <dl className={COMPARE}>
-          <div className={COMPARE_ROW}><dt className={COMPARE_LABEL}>Candidate</dt><dd className="min-w-0 wrap-anywhere">{candidateName}</dd></div>
-          <div className={COMPARE_ROW}><dt className={COMPARE_LABEL}>Status</dt><dd className="font-[650] text-[var(--color-success-fg)]">Applied</dd></div>
-        </dl>
-      </div>}
 
       {isOpen && isComplete && <AutofillDone filled={outcome?.filled ?? 0} rows={currentRows ?? []} attached={state.attachedFile}
         attachedShown={state.attachedShown} canSave onGoTo={goTo} />}

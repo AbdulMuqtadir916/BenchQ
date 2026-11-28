@@ -48,7 +48,12 @@ export type ScannedField = {
   prefilledIdentity?: boolean;
 };
 
-export type TabField = ScannedField & { frameId: number; pageUrl: string };
+export type TabField = ScannedField & {
+  frameId: number; pageUrl: string;
+  /** An upload the site took away once it had BenchQ's file, naming the file instead (Reddit's Greenhouse form): kept as
+   * its row, holding the file, and never written to, since there's no upload left to write to. */
+  isGone?: boolean;
+};
 
 export type PageSignals = {
   url: string;

@@ -2,7 +2,7 @@
 import { act, cloneElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application } from "../api";
+import { applicationUrl, type Application } from "../api";
 import { installDialog } from "../test/dialog";
 import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import AutofillPanel from "./AutofillPanel";
@@ -12,11 +12,15 @@ import { useAutofill } from "./use-autofill";
 import { useResumes, type ApplicationContextStatus, type Resumes } from "./use-resumes";
 import { useTailoring, type Tailoring } from "./use-tailoring";
 import { useCoverLetters } from "./use-cover-letters";
+import { usePageJob } from "./use-page-job";
+import { usePosting } from "./use-posting";
 
 vi.mock("./use-autofill", () => ({ useAutofill: vi.fn() }));
 vi.mock("./use-resumes", () => ({ useResumes: vi.fn() }));
 vi.mock("./use-tailoring", async (actual) => ({ ...await actual<typeof import("./use-tailoring")>(), useTailoring: vi.fn() }));
 vi.mock("./use-cover-letters", () => ({ useCoverLetters: vi.fn(() => ({ letters: { status: "none" }, retry: vi.fn() })) }));
+vi.mock("./use-posting", () => ({ usePosting: vi.fn(() => ({ posting: { status: "none" }, retry: vi.fn() })) }));
+vi.mock("./use-page-job", async (actual) => ({ ...await actual<typeof import("./use-page-job")>(), usePageJob: vi.fn(() => null) }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 installDialog();
@@ -863,14 +867,102 @@ describe("the keyboard shortcuts", () => {
 });
 
 describe("the job card", () => {
-  it("keeps the job to three short lines: the title, the company, then where and the pay on one line", () => {
-    const details = { location: "Atlanta, GA - Hybrid; Denver, CO", salary_min: null, salary_max: null, discovered_at: new Date(Date.now() - 86_400_000).toISOString() } as unknown as Application;
+  // Nothing read for the details page until a test says what BenchQ and the page hold.
+  beforeEach(() => {
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "none" }, retry: vi.fn() });
+    vi.mocked(usePageJob).mockReturnValue(null);
+  });
+
+  it("keeps to the job's title, whose job it is and where, with the rest of the job a press away", () => {
+    const details = { location: "Atlanta, GA - Hybrid; Denver, CO", salary_min: 120000, salary_max: 150000 } as unknown as Application;
     show({}, { details });
-    const facts = [...host.querySelectorAll("[data-slot='job-facts'] li")];
-    expect(facts.map(({ textContent }) => textContent)).toEqual(["Location: Atlanta, GA - Hybrid; Denver, CO", "Pay not listed"]);
-    // One line: where takes the room, the pay keeps its own.
-    expect(facts.map(({ className }) => className.includes("flex-1"))).toEqual([true, false]);
-    expect(host.querySelector("[data-slot='job-card']")?.textContent).not.toContain("Linked job");
+    const card = host.querySelector("[data-slot='job-card']")!;
+    expect(card.querySelector("h2")!.textContent).toBe("Java Developer");
+    expect(card.querySelector("[data-slot='job-card-candidate']")!.textContent).toBe("Priya");
+    expect(card.querySelector("[data-slot='job-card-location']")!.textContent).toBe("Atlanta, GA - Hybrid; Denver, CO");
+    // The company and the pay are on the job's details page.
+    expect(card.textContent).not.toContain("Acme");
+    expect(card.textContent).not.toContain("$120k");
+    expect(card.textContent).not.toContain("Linked job");
+    expect(card.querySelector("[data-slot='job-details-open']")!.getAttribute("aria-label")).toBe("Job details");
+  });
+
+  // What the applications list has for the job: no description, type, mode or posted date. Those are in its posting.
+  const listed = { title: "Java Developer", company: "Acme", location: "Atlanta, GA", salary_min: 120000, salary_max: 150000,
+    url: "https://jobs.acme.test/1", job_id: "post-1" } as unknown as Application;
+  const openDetails = () => act(() => { host.querySelector<HTMLButtonElement>("[data-slot='job-details-open']")!.click(); });
+
+  it("opens the job's details page from its posting in BenchQ: its facts, its description in sections and its pay", () => {
+    vi.mocked(usePosting).mockImplementation((_firm, _candidate, postingId) => ({ retry: vi.fn(), posting: postingId ? { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1", employmentType: "FULL_TIME",
+      workMode: "remote", postedAt: "2026-11-10", description: "<p>Build the payments API.</p><h3>Requirements</h3><ul><li>Java 17</li></ul>",
+    } } : { status: "none" } }));
+    show({}, { details: listed });
+    // Read only once the BDE opens the page.
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "cand-1", null, expect.any(Function));
+    openDetails();
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "cand-1", "post-1", expect.any(Function));
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect(page.querySelector("[data-slot='job-details-title']")!.textContent).toBe("Java Developer");
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["About the role", "Requirements"]);
+    // Where, the employment and the work mode as badges, then the requirements as a list.
+    expect([...page.querySelectorAll("li")].map(({ textContent }) => textContent)).toEqual(["Atlanta, GA", "Full-time", "Remote", "Java 17"]);
+    expect(page.textContent).toContain("$120k–$150k/yr");
+    expect(page.textContent).toContain("10 Nov 2026");
+    expect(page.querySelector("[data-slot='job-details-actions'] a")!.getAttribute("href")).toBe("https://jobs.acme.test/1");
+    // The page is the job's: the form's controls aren't under it.
+    expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
+    act(() => { named("Back to Autofill").click(); });
+    expect(host.querySelector("[data-slot='job-details']")).toBeNull();
+    expect(host.querySelector("[data-slot='job-card']")).not.toBeNull();
+  });
+
+  it("shows a job added from its page as Add job showed it: the page's description, its pay as stated, its job ID", () => {
+    vi.mocked(usePosting).mockReturnValue({ retry: vi.fn(), posting: { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1",
+      description: "Build the payments API.\nBenefits\n401(k) with match", employmentType: "Full-time", workMode: "hybrid",
+      descriptionHtml: "<p>Build the payments API.</p><h3>Benefits</h3><ul><li>401(k) with match</li></ul>",
+      salaryMin: 164200, salaryMax: 229990, salaryCurrency: "USD", salaryPeriod: "year", requisitionId: "R123456", logoUrl: "https://acme.example/logo.png",
+    } } });
+    show({}, { details: listed });
+    openDetails();
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["About the role", "Benefits"]);
+    expect([...page.querySelectorAll("li")].map(({ textContent }) => textContent)).toEqual(["Atlanta, GA", "Full-time", "Hybrid", "401(k) with match"]);
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["USD 164,200–229,990 a year", "R123456"]);
+    expect(page.querySelector("img")?.getAttribute("src")).toBe("https://acme.example/logo.png");
+  });
+
+  it("takes what BenchQ doesn't hold from the job's page, while the tab still shows it", () => {
+    vi.mocked(usePosting).mockReturnValue({ retry: vi.fn(), posting: { status: "ready", posting: {
+      id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1", description: "Build things.",
+    } } });
+    vi.mocked(usePageJob).mockImplementation((_tab, isOpen) => (isOpen ? { title: "Java Developer", company: "Acme", location: "Atlanta, GA",
+      url: "https://jobs.acme.test/1", isJobPage: true, description: "<h3>Benefits</h3><ul><li>401(k)</li></ul>", salaryMin: 60,
+      salaryCurrency: "USD", salaryPeriod: "hour", requisitionId: "R9" } : null));
+    show({}, { details: listed });
+    expect(usePageJob).toHaveBeenLastCalledWith(7, false);
+    openDetails();
+    expect(usePageJob).toHaveBeenLastCalledWith(7, true);
+    const page = host.querySelector("[data-slot='job-details']")!;
+    expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["Benefits"]);
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["From USD 60 an hour", "R9"]);
+  });
+
+  it("holds the description's place while the posting loads, and offers Try again when it couldn't be read", () => {
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "loading" }, retry: vi.fn() });
+    show({}, { details: listed });
+    openDetails();
+    expect(host.querySelector("[data-slot='job-details-loading']")!.getAttribute("role")).toBe("status");
+    expect(host.textContent).not.toContain("This posting gives no description.");
+    // What the list has shows meanwhile.
+    expect(host.querySelector("[data-slot='job-details-title']")!.textContent).toBe("Java Developer");
+    const retry = vi.fn();
+    vi.mocked(usePosting).mockReturnValue({ posting: { status: "error" }, retry });
+    update({}, oneResume);
+    expect(host.querySelector("[data-slot='job-details-error'] [role='alert']")!.textContent).toBe("Could not load the job's description.");
+    act(() => { named("Try again").click(); });
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -960,25 +1052,28 @@ describe("the buttons at the bottom", () => {
     expect(named("Mark applied").getAttribute("aria-describedby")).toBe("required-left");
   });
 
-  it("say Applied once it's done", () => {
-    show({ fillCount: 0 }, { isApplied: true });
+  it("say Applied once it's done, while the tab shows another job", () => {
+    show({ fillCount: 0 }, { isApplied: true, tabUrl: "https://jobs.acme.test/jobs/98765" });
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Applied"]);
     expect(atBottom()[0]!.disabled).toBe(true);
   });
 
-  it("show a marked-applied card over the form, with the candidate and the status", () => {
+  it("show the success page once it's marked applied: the job, whose application, its status, then BenchQ or the jobs", () => {
     show({ fillCount: 0 }, { isApplied: true });
-    const card = host.querySelector("[data-slot='applied-card']")!;
-    expect(card.querySelector("strong")!.textContent).toBe("Marked applied");
-    expect(card.querySelector("p")!.textContent).toBe("It's in Priya's Applied jobs in BenchQ.");
-    expect([...card.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["Priya", "Applied"]);
-    // No buttons of its own: Applied stays the one at the bottom.
-    expect(card.querySelectorAll("button")).toHaveLength(0);
+    const page = host.querySelector("[data-slot='applied-page']")!;
+    expect(page.querySelector("#applied-title")!.textContent).toBe("Great job!");
+    expect(page.querySelector("[data-slot='applied-job']")!.textContent).toContain("Java Developer");
+    expect([...page.querySelectorAll("dd")].map(({ textContent }) => textContent)).toEqual(["Priya", "Applied"]);
+    expect(page.querySelector("[data-slot='applied-actions'] a")!.getAttribute("href")).toBe(applicationUrl("acme-staffing", connection.applicationId));
+    // Nothing is left to fill or mark under it.
+    expect(host.querySelector("[data-slot='autofill-actions']")).toBeNull();
+    act(() => { page.querySelector<HTMLButtonElement>("[data-slot='applied-back']")!.click(); });
+    expect((element.props as unknown as { onDisconnect: () => void }).onDisconnect).toHaveBeenCalledTimes(1);
   });
 
-  it("show no marked-applied card before the job is applied", () => {
+  it("show no success page before the job is applied", () => {
     show({ fillCount: 0 }, { onApply: vi.fn() });
-    expect(host.querySelector("[data-slot='applied-card']")).toBeNull();
+    expect(host.querySelector("[data-slot='applied-page']")).toBeNull();
   });
 
   it("say so while saving", () => {

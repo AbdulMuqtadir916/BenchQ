@@ -61,6 +61,21 @@ beforeEach(() => {
 
 const opened = { type: "open-job", connection: { applicationId: "app-1", candidateId: "cand-1", userId: "user-1", job: summary } };
 
+it("shows who's signed in in the settings drawer, with the preview and theme, and signs out from it", async () => {
+  await mount();
+  expect(document.body.textContent).not.toContain("· BDE ·");
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='settings-open']")!.click(); });
+  const drawer = document.querySelector<HTMLDialogElement>("dialog[data-slot='settings']")!;
+  expect(drawer.hasAttribute("open")).toBe(true);
+  expect(drawer.querySelector("[data-slot='settings-user']")!.textContent).toContain("BDE");
+  expect([...drawer.querySelectorAll("[role='switch']")].map((toggle) => toggle.getAttribute("aria-label"))).toEqual(["LinkedIn posting preview", "Dark mode"]);
+  await act(async () => { drawer.querySelector<HTMLElement>("[data-slot='sign-out']")!.click(); });
+  await settle();
+  const signOutCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/api/auth/sign-out"));
+  expect((signOutCall?.[1] as RequestInit | undefined)?.method).toBe("POST");
+  expect(document.body.textContent).toContain("Sign in to BenchQ");
+});
+
 it("opens and connects a job from Open job", async () => {
   await mount();
   await act(async () => { document.querySelector<HTMLElement>("[data-slot='job'] .bq-secondary")!.click(); });

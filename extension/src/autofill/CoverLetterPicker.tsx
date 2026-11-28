@@ -16,8 +16,10 @@ type CoverLetterPickerProps = {
 };
 
 /** The résumé card's look (Simplify's), for the cover letter. */
-const CARD = "grid flex-none gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-xs)]";
-const SELECT = `group flex w-full min-w-0 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] aria-expanded:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50`;
+const CARD = "grid flex-none gap-2";
+/** The section's name in small capitals, as the résumé's. */
+const LABEL = "flex-none text-caption font-[700] uppercase tracking-widest text-[var(--color-text-3)]";
+const SELECT = `group flex w-full min-w-0 items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-left transition-[background,border-color] ${MOTION} hover:bg-[var(--color-surface-2)] aria-expanded:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50`;
 const CHEVRON = "flex-none text-[var(--color-text-3)] [&_svg]:size-[var(--icon-md)] [&_svg]:-rotate-90 group-aria-expanded:[&_svg]:rotate-0";
 const MENU = "absolute inset-x-0 top-full z-20 mt-1 grid max-h-60 gap-0.5 overflow-y-auto overscroll-contain rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-lg)]";
 const OPTION = `group/opt flex w-full min-w-0 items-start gap-2 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)] focus-visible:bg-[var(--color-surface-2)] aria-pressed:bg-[var(--color-primary)] aria-pressed:hover:bg-[var(--color-primary-active)]`;
@@ -54,8 +56,7 @@ export default function CoverLetterPicker({ letters, pickedId, hasField, isBusy,
   }, [isListed]);
   if (letters.status === "none") return null;
   const head = <div className="flex min-w-0 items-center gap-2">
-    <span className="flex-none text-[var(--color-text-2)] [&_svg]:size-[var(--icon-md)]" aria-hidden="true">{LETTER_ICON}</span>
-    <h3 id="cover-letter-title" className="flex-none text-body-strong text-[var(--color-text)]">Cover letter</h3>
+    <h3 id="cover-letter-title" className={LABEL}>Cover letter</h3>
     {!hasField && <span data-slot="cover-letter-no-field" className="ml-auto text-caption text-[var(--color-text-3)]">No field found</span>}
   </div>;
   if (letters.status === "loading") {
@@ -119,6 +120,7 @@ export default function CoverLetterPicker({ letters, pickedId, hasField, isBusy,
           event.preventDefault();
           setIsListed(true);
         }}>
+        <span className="flex-none text-[var(--color-primary)] [&_svg]:size-5" aria-hidden="true">{LETTER_ICON}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-[650] text-[var(--color-text)]">{current ? nameOf(current) : "No cover letter"}</span>
         <span className={CHEVRON} aria-hidden="true">{CHEVRON_DOWN_ICON}</span>
       </button>

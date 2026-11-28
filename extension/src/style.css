@@ -155,6 +155,12 @@
   --animate-fade-out: fade-out var(--duration-fast) var(--ease-out) both;
   /* Fills only before it starts, so the fold's own slide moves the sheet afterwards. */
   --animate-sheet-rise: sheet-rise var(--duration-slide) var(--ease-sheet) backwards;
+  /* The settings drawer, in from the right edge. */
+  --animate-drawer-in: drawer-in var(--duration-slide) var(--ease-sheet) both;
+
+  @keyframes drawer-in {
+    from { transform: translateX(100%); }
+  }
 
   @keyframes rise-in {
     from { opacity: 0; transform: translateY(var(--motion-lift)); }
@@ -222,6 +228,9 @@
 }
 
 /* The website's type scale, as src/app/globals.css has it. */
+/* A page's own heading (the job's details, the application logged), above the panel's usual sizes. */
+.text-h1 { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.text-h2 { font-size: 17px; line-height: 23px; font-weight: 700; letter-spacing: -0.015em; }
 .text-h3 { font-size: 14px; line-height: 20px; font-weight: 550; letter-spacing: -0.01em; }
 .text-body-strong { font-size: 13px; line-height: 20px; font-weight: 550; }
 .text-sm { font-size: 12px; line-height: 18px; }

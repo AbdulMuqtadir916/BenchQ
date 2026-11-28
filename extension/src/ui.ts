@@ -26,6 +26,8 @@ export const FITTED_BUTTONS = "grid grid-cols-[repeat(auto-fit,minmax(var(--acti
 /** One hairline and a contact shadow. */
 export const CARD = "rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xs)]";
 
+/** A line of text still loading. */
+export const SKELETON_LINE = "h-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-3)] motion-safe:animate-pulse";
 export const ALERT = "rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-danger-fg)_24%,transparent)] bg-[var(--color-danger-bg)] px-2.5 py-2 text-sm text-[var(--color-danger-fg)]";
 export const WARNING = "rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-warning-fg)_26%,transparent)] bg-[var(--color-warning-bg)] px-2.5 py-2 text-sm text-[var(--color-warning-fg)]";
 

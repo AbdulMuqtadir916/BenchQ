@@ -11,7 +11,11 @@ import {
   isSessionExpired,
   markApplied,
   Session,
+  signOut,
 } from "./api";
+import { CHECK, PIN_ICON, USER_ICON } from "./autofill/icons";
+import { payText } from "./autofill/job-details";
+import SettingsDrawer, { initialsOf } from "./SettingsDrawer";
 import AutofillPanel from "./autofill/AutofillPanel";
 import type { ApplicationContextStatus } from "./autofill/use-resumes";
 import { connectionFor, sendToBackground } from "./autofill/connection-store";
@@ -21,6 +25,7 @@ import {
   reloadIfManifestIsStale,
 } from "./autofill/manifest-check";
 import { forgetTabs } from "./autofill/use-autofill";
+import { forgetPostings } from "./autofill/use-posting";
 import AddJobCard from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
@@ -33,10 +38,10 @@ import {
   ALERT,
   button,
   CARD,
-  EYEBROW,
   ICON_BUTTON_QUIET,
   MOTION,
   MUTED_TEXT,
+  SKELETON_LINE,
   SOFT_TEXT,
   TEXT_BUTTON,
 } from "./ui";
@@ -61,12 +66,24 @@ const TOPBAR =
 const VIEW = "relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
 /** The one part of the job list that scrolls: the jobs, under the fixed account, candidate and tabs. */
 const LIST = "relative -mx-3 min-h-32 flex-1 overflow-y-auto overscroll-contain px-3 pt-0.5 pb-3 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin]";
-const CANDIDATE_SELECT = `h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] bg-[image:var(--gradient-neutral)] pr-[var(--control-sm)] pl-2.5 text-sm text-[var(--color-text)] shadow-[var(--shadow-control)] transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-text-3)] enabled:hover:bg-[image:var(--gradient-neutral-hover)] focus-visible:border-[var(--color-focus-ring)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)] disabled:bg-none disabled:text-[var(--color-text-3)] disabled:shadow-none [&_option]:bg-[var(--color-surface)] [&_option]:text-[var(--color-text)]`;
+const CANDIDATE_SELECT = `h-[var(--control-lg)] w-full appearance-none rounded-[var(--radius-lg)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] bg-[image:var(--gradient-neutral)] pr-[var(--control-sm)] text-sm font-[550] text-[var(--color-text)] shadow-[var(--shadow-control)] transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-text-3)] enabled:hover:bg-[image:var(--gradient-neutral-hover)] focus-visible:border-[var(--color-focus-ring)] focus-visible:shadow-[var(--ring-input)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--color-surface-2)] disabled:bg-none disabled:text-[var(--color-text-3)] disabled:shadow-none [&_option]:bg-[var(--color-surface)] [&_option]:text-[var(--color-text)]`;
 const CANDIDATE_LOCK = "candidate-lock";
-/** The LinkedIn preview as a slide switch: blue and to the right when on. */
-const SWITCH = `group inline-flex flex-none items-center gap-1.5 rounded-[var(--radius-md)] px-1.5 py-1 transition-[background] ${MOTION} hover:bg-[var(--color-surface-2)]`;
-const TRACK = `inline-flex h-5 w-9 flex-none items-center rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface-3)] transition-[background,border-color] ${MOTION} group-aria-checked:border-[var(--color-primary)] group-aria-checked:bg-[var(--color-primary)]`;
-const THUMB = `size-3.5 translate-x-0.5 rounded-full bg-[var(--color-surface)] shadow-[var(--shadow-xs)] transition-transform ${MOTION} group-aria-checked:translate-x-4.5`;
+/** The candidate's initials inside the dropdown, on the page that adds a job for them. */
+const CANDIDATE_AVATAR = "pointer-events-none absolute top-1/2 left-2 grid size-5 -translate-y-1/2 place-items-center rounded-full bg-[var(--color-primary-subtle)] text-caption font-[700] text-[var(--color-primary-subtle-fg)]";
+/** A saved or applied job: its logo, what it is and where, its facts as badges, and Open job across the foot. */
+const JOB_CARD = `min-w-0 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-xs)] transition-[border-color,box-shadow,transform] ${MOTION} hover:-translate-y-px hover:border-[var(--color-primary)] hover:shadow-[var(--shadow-sm)] motion-reduce:hover:translate-y-0`;
+const BADGE = "rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-0.5 text-caption font-[550] text-[var(--color-text-2)]";
+const APPLIED_BADGE = "inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--color-success-fg)_35%,transparent)] bg-[var(--color-success-bg)] px-2 py-0.5 text-caption font-[650] text-[var(--color-success-fg)] [&_svg]:size-3 [&_svg]:flex-none";
+/** Open job, across the foot of a job card. */
+const OPEN_JOB_BUTTON = `${button("secondary", "small")} w-full`;
+/** A label over a control, as the design's: small capitals, wide spacing. */
+const FIELD_LABEL = "text-caption font-[700] uppercase tracking-widest text-[var(--color-text-3)]";
+
+/** What a job card says besides its title, company and place: its type, how it's done, and its pay. */
+function badgesOf(job: Application): string[] {
+  const mode = job.arr_remote || job.remote ? "Remote" : job.arr_hybrid ? "Hybrid" : job.arr_onsite ? "On-site" : job.work_type ?? "";
+  return [job.employment_type ?? job.job_type ?? "", mode, payText(job.salary_min, job.salary_max) ?? ""].filter(Boolean);
+}
 /** The panel opened as a tab of its own: the background answers only Chrome's side panel, so say how to get there. */
 const PANEL_IN_A_TAB = "BenchQ runs in Chrome's side panel. Go to the job's tab and click the BenchQ icon in the toolbar.";
 
@@ -89,7 +106,6 @@ const isConnectable = (job: Application) =>
 
 /** A card that holds the place of a job while the list loads. */
 const SKELETON_CARD = "grid gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3";
-const SKELETON_LINE = "h-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-3)] motion-safe:animate-pulse"
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -120,6 +136,13 @@ function App() {
     localStorage.getItem("benchq-theme") === "dark" ? "dark" : "light",
   );
   const [activeTab, setActiveTab] = useState<JobTab>("saved");
+  // The account and settings drawer, and the button it opens from (focus goes back there).
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const userButton = useRef<HTMLButtonElement>(null);
+  // A job's page in the tab: the panel is the page that adds it, the candidate and the job alone, no Saved or Applied.
+  const [isAddJobShown, setIsAddJobShown] = useState(false);
+  // Add job's page for the job's details: the panel is that page, with no candidate picker over it.
+  const [isAddJobDetailsShown, setIsAddJobDetailsShown] = useState(false);
   const savedJobs = jobs.filter((job) => job.status === "saved");
   const appliedJobs = jobs.filter((job) => job.status === "applied");
   const visibleJobs = activeTab === "saved" ? savedJobs : appliedJobs;
@@ -155,9 +178,21 @@ function App() {
     setJobs([]);
     localStorage.removeItem("benchq-selected-candidate");
     forgetTabs();
+    forgetPostings();
     setError("Your BenchQ session ended. Sign in again.");
     void sendToBackground({ type: "clear-connections" });
   }, []);
+  /** Sign out from the settings drawer: the session ends in BenchQ, and the panel forgets it as it does an expired one. */
+  const signOutNow = async () => {
+    setIsSettingsOpen(false);
+    await signOut().catch(() => undefined);
+    expireSession();
+    setError("");
+  };
+  const closeSettings = () => {
+    setIsSettingsOpen(false);
+    userButton.current?.focus();
+  };
   const connectedTabId = connection?.tabId ?? null;
   const connectedJobId = connection?.applicationId ?? null;
   const disconnectTab = useCallback(() => {
@@ -386,7 +421,7 @@ function App() {
       return (
         <button
           type="button"
-          className={button("secondary", "small")}
+          className={OPEN_JOB_BUTTON}
           onClick={() => void openJob(job)}
         >
           {OPEN_JOB}
@@ -396,7 +431,7 @@ function App() {
     if (job.url) {
       return (
         <a
-          className={button("secondary", "small")}
+          className={OPEN_JOB_BUTTON}
           href={job.url}
           target="_blank"
           rel="noreferrer"
@@ -406,18 +441,19 @@ function App() {
       );
     }
     return (
-      <button type="button" className={button("secondary", "small")} disabled>
+      <button type="button" className={OPEN_JOB_BUTTON} disabled>
         {OPEN_JOB}
       </button>
     );
   };
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null;
+  const selectedCandidateName = selectedCandidate?.full_name ?? "";
   // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then this tab connects, as
   // the BDE is already on the form (Q10), with no tab of its own.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
     <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} firmId={session?.principal.firm_id ?? null} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
-      onPageTitle={showPageTitle}
+      onPageTitle={showPageTitle} onShown={setIsAddJobShown} onDetailsShown={setIsAddJobDetailsShown}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
       onAdded={(application) => {
         loadJobs(selectedCandidate.id).catch(() => undefined);
@@ -431,6 +467,8 @@ function App() {
   const jobsArea = (
     <>
       {addJobCard}
+      {/* On a job's page the panel adds that job: the candidate and the job alone, no Saved or Applied under them. */}
+      {!(isAddJobShown && addJobCard) && <>
       <JobTabs
         active={activeTab}
         counts={
@@ -459,62 +497,59 @@ function App() {
             </p>
           </section>
         ) : (
-          <section className="grid grid-cols-[minmax(0,1fr)] gap-2" aria-label={`${activeTab} jobs`}>
-            {visibleJobs.map((job) => (
-              <article
-                data-slot="job"
-                className={`min-w-0 p-3 transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-sm)] ${CARD}`}
-                key={job.id}
-              >
-                <div className="flex min-w-0 items-center gap-1.5">
-                  {job.logoUrl && <CompanyLogo company={job.company ?? ""} url={job.logoUrl} isSmall />}
-                  <div className={`min-w-0 truncate ${EYEBROW}`}>{job.company || "Company"}</div>
+          <section className="grid grid-cols-[minmax(0,1fr)] gap-3" aria-label={`${activeTab} jobs`}>
+            {visibleJobs.map((job) => {
+              const badges = badgesOf(job);
+              return <article data-slot="job" className={JOB_CARD} key={job.id}>
+                <div className="flex min-w-0 items-start gap-3">
+                  <CompanyLogo company={job.company || job.title || "Job"} url={job.logoUrl} size="lg" />
+                  <div className="grid min-w-0 flex-1">
+                    <h2 className="truncate text-sm font-[650] leading-snug" title={job.title || undefined}>
+                      {isConnectable(job) ? (
+                        <button
+                          type="button"
+                          data-slot="job-select"
+                          className="max-w-full truncate text-left hover:text-[var(--color-primary)]"
+                          onClick={() => void openJob(job)}
+                        >
+                          {job.title || "Untitled role"}
+                        </button>
+                      ) : (
+                        job.title || "Untitled role"
+                      )}
+                    </h2>
+                    <p className="truncate text-caption text-[var(--color-text-2)]">{job.company || "Company not listed"}</p>
+                    <p className="mt-1 flex min-w-0 items-center gap-1 text-caption text-[var(--color-text-3)] [&_svg]:size-3 [&_svg]:flex-none" title={job.location || undefined}>
+                      {PIN_ICON}<span className="truncate">{job.location || "Location not listed"}</span>
+                    </p>
+                  </div>
                 </div>
-                <h2 className="my-0.5 text-h3 wrap-anywhere">
-                  {isConnectable(job) ? (
-                    <button
-                      type="button"
-                      data-slot="job-select"
-                      className="text-left hover:text-[var(--color-primary)]"
-                      onClick={() => void openJob(job)}
-                    >
-                      {job.title || "Untitled role"}
-                    </button>
-                  ) : (
-                    job.title || "Untitled role"
-                  )}
-                </h2>
-                <p className={`mb-2.5 wrap-anywhere ${MUTED_TEXT}`}>
-                  {job.location || "Location not listed"}
-                </p>
-                <div className="flex gap-1.5 *:min-w-0 *:flex-1">
-                  {openJobLink(job)}
-                  {job.status === "applied" && (
-                    <button className={button("primary", "small")} disabled>
-                      Applied
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+                {(badges.length > 0 || job.status === "applied") && <ul data-slot="job-badges" className="mt-3 flex flex-wrap gap-1.5">
+                  {job.status === "applied" && <li className={APPLIED_BADGE}>{CHECK}Applied</li>}
+                  {badges.map((badge) => <li key={badge} className={BADGE}>{badge}</li>)}
+                </ul>}
+                <div className="mt-3 grid">{openJobLink(job)}</div>
+              </article>;
+            })}
           </section>
         )}
       </div>
+      </>}
     </>
   );
   return (
     <main className={WORKSPACE}>
       <header className={TOPBAR}>
-        <div className="flex min-w-0 items-center gap-2 text-h3">
+        <div className="flex min-w-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            className="block size-6 shrink-0 rounded-[var(--radius-md)] object-cover"
+            className="block size-8 shrink-0 rounded-[var(--radius-lg)] object-cover shadow-[var(--shadow-sm)]"
             src="/icons/icon128.png"
             alt=""
           />
-          <span className="whitespace-nowrap">BenchQ</span>
+          <span className="whitespace-nowrap text-h3 font-[700] tracking-tight">BenchQ</span>
         </div>
-        <div className="flex min-w-0 flex-none items-center gap-1.5">
+        <div className="flex min-w-0 flex-none items-center gap-1">
           <button
             className={ICON_BUTTON_QUIET}
             onClick={() =>
@@ -543,20 +578,6 @@ function App() {
             )}
           </button>
           <button
-            type="button"
-            role="switch"
-            className={SWITCH}
-            onClick={togglePreview}
-            aria-label="LinkedIn posting preview"
-            aria-checked={isPreviewOn}
-            title="Show LinkedIn postings inside BenchQ"
-          >
-            <span className="text-caption font-[600] text-[var(--color-text-2)]">Preview</span>
-            <span className={TRACK} aria-hidden="true">
-              <span className={THUMB} />
-            </span>
-          </button>
-          <button
             className={ICON_BUTTON_QUIET}
             onClick={() => void refresh()}
             aria-label="Refresh saved jobs"
@@ -568,8 +589,24 @@ function App() {
               <path d="M21 3v5h-5" />
             </svg>
           </button>
+          {session && <button
+            ref={userButton}
+            type="button"
+            data-slot="settings-open"
+            className={ICON_BUTTON_QUIET}
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Account and settings"
+            aria-haspopup="dialog"
+            aria-expanded={isSettingsOpen}
+            title={`${session.user?.name || "BDE"} · Settings`}
+          >
+            {USER_ICON}
+          </button>}
         </div>
       </header>
+      {session && <SettingsDrawer isOpen={isSettingsOpen} session={session} isPreviewOn={isPreviewOn} isDark={theme === "dark"}
+        onTogglePreview={togglePreview} onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+        onSignOut={() => void signOutNow()} onClose={closeSettings} />}
       <div className={VIEW}>
       {loading ? (
         <p className={`my-3 ${MUTED_TEXT}`}>Checking your BenchQ session…</p>
@@ -598,25 +635,8 @@ function App() {
         </section>
       ) : (
         <>
-          {/* Who's signed in and whose jobs show: while a tab is connected to a job, its card says whose job it is. */}
-          {!connection && <div
-            className={`flex min-w-0 items-center gap-1.5 pt-3 pb-2 ${MUTED_TEXT}`}
-          >
-            <svg
-              className="size-[var(--icon-sm)] flex-none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="8" r="5" />
-              <path d="M20 21a8 8 0 0 0-16 0" />
-            </svg>
-            <h1 className="flex-[0_1_auto] truncate text-sm font-[550] text-[var(--color-text)]">
-              {session.user?.name || "BDE"}
-            </h1>
-            <span className="min-w-0 flex-[1_1_0] truncate">
-              · BDE · {session.firm?.name || session.firm?.slug || "BenchQ"}
-            </span>
-          </div>}
+          {/* Who's signed in is in the settings drawer (the user button in the top bar). */}
+          <h1 className="sr-only">BenchQ for {session.user?.name || "BDE"}</h1>
           {error && (
             <p data-slot="error" className={`mb-2.5 ${ALERT}`}>
               {error}
@@ -629,17 +649,18 @@ function App() {
               Apply.
             </p>
           )}
-          {!connection && <div className="mb-3 grid gap-1">
+          {!connection && !(isAddJobDetailsShown && addJobCard) && <div className="mt-3 mb-3 grid gap-1.5">
             <label
-              className="text-label text-[var(--color-text-2)]"
+              className={FIELD_LABEL}
               htmlFor="candidate-select"
             >
-              Show jobs for
+              {isAddJobShown ? "Add job for" : "Show jobs for"}
             </label>
             <div className="group relative" {...lockDetails}>
+              {isAddJobShown && selectedCandidateName && <span className={CANDIDATE_AVATAR} aria-hidden="true">{initialsOf(selectedCandidateName)}</span>}
               <select
                 id="candidate-select"
-                className={CANDIDATE_SELECT}
+                className={`${CANDIDATE_SELECT} ${isAddJobShown && selectedCandidateName ? "pl-9" : "pl-3"}`}
                 value={selectedCandidateId}
                 disabled={loading || Boolean(candidateLock)}
                 onChange={(event) => void chooseCandidate(event.target.value)}
