@@ -1047,7 +1047,7 @@ describe("the form for Mark applied", () => {
     expect((await finalForm()).fields[0]!.required).toBe(true);
   });
 
-  it("says whether the form on show still has a required field left, and a form it can't read doesn't", async () => {
+  it("requires a successful read with no outstanding required fields", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([{ ...field("n", "Nickname"), required: true }]));
     await mount();
     let result: { form: AppliedForm; complete: boolean } = { form: { fields: [] }, complete: true };
@@ -1059,7 +1059,7 @@ describe("the form for Mark applied", () => {
     expect(result.complete).toBe(true);
     vi.mocked(readTab).mockRejectedValue(new Error("page gone"));
     await run(async () => { result = await hook.finalForm(); });
-    expect(result.complete).toBe(true);
+    expect(result.complete).toBe(false);
   });
 
   it("keeps every page of the form", async () => {

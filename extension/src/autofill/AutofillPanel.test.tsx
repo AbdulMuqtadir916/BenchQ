@@ -232,7 +232,7 @@ describe("the résumé the answers come from", () => {
     expect(named("Mark applied")).toBeDefined();
   });
 
-  it("keeps Mark applied available when a résumé was picked and the site then needed access: the queued fill waits, tracking doesn't", async () => {
+  it("keeps Mark applied disabled when a résumé was picked and the site still needs access", async () => {
     const access = { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" };
     const reviewedForBase = { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id };
     show({ fillCount: 1, rows: [row("Email", true)], reviewedFor: reviewedForBase }, { onApply: vi.fn() }, twoResumes);
@@ -246,7 +246,7 @@ describe("the résumé the answers come from", () => {
     await act(async () => { root!.render(element); });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
     expect(named("Mark applied")).toBeDefined();
-    expect(named("Mark applied").disabled).toBe(false);
+    expect(named("Mark applied").disabled).toBe(true);
     expect(autofill).not.toHaveBeenCalled();
     // Allowed later: the page is reviewed for the picked résumé, and the fill that was queued runs once.
     vi.mocked(useAutofill).mockReturnValue({ ...reviewed, rows: [row("Email", true)], fillCount: 1, reviewedFor: { ...reviewedForBase, resumeId: tailored.id } } as unknown as ReturnType<typeof useAutofill>);
@@ -893,15 +893,15 @@ describe("the job card", () => {
   const openDetails = () => act(() => { host.querySelector<HTMLButtonElement>("[data-slot='job-details-open']")!.click(); });
 
   it("opens the job's details page from its posting in BenchQ: its facts, its description in sections and its pay", () => {
-    vi.mocked(usePosting).mockImplementation((_firm, _candidate, postingId) => ({ retry: vi.fn(), posting: postingId ? { status: "ready", posting: {
+    vi.mocked(usePosting).mockImplementation((_firm, _user, _candidate, postingId) => ({ retry: vi.fn(), posting: postingId ? { status: "ready", posting: {
       id: "post-1", title: "Java Developer", company: "Acme", location: "Atlanta, GA", url: "https://jobs.acme.test/1", employmentType: "FULL_TIME",
       workMode: "remote", postedAt: "2026-11-10", description: "<p>Build the payments API.</p><h3>Requirements</h3><ul><li>Java 17</li></ul>",
     } } : { status: "none" } }));
     show({}, { details: listed });
     // Read only once the BDE opens the page.
-    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "cand-1", null, expect.any(Function));
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "user-1", "cand-1", null, expect.any(Function));
     openDetails();
-    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "cand-1", "post-1", expect.any(Function));
+    expect(usePosting).toHaveBeenLastCalledWith("firm-1", "user-1", "cand-1", "post-1", expect.any(Function));
     const page = host.querySelector("[data-slot='job-details']")!;
     expect(page.querySelector("[data-slot='job-details-title']")!.textContent).toBe("Java Developer");
     expect([...page.querySelectorAll("[data-slot='job-details-section'] h3")].map(({ textContent }) => textContent)).toEqual(["About the role", "Requirements"]);
@@ -1016,11 +1016,11 @@ describe("the buttons at the bottom", () => {
     expect(markApplied.getAttribute("aria-describedby")).toBe(hint.id);
   });
 
-  it("keep Mark applied available on a site BenchQ may not read, so a refused site can still be marked applied", () => {
+  it("keeps Mark applied disabled on a site BenchQ may not read", () => {
     show({ rows: null, reviewedFor: { applicationId: "another-app", candidateId: "cand-1", resumeId: null }, fillCount: 0, needsAccess: { origins: ["https://careers.acme.test/*"], host: "careers.acme.test" }, isAccessDenied: true }, { onApply: vi.fn() });
     expect(host.querySelector("[data-slot='site-access']")).not.toBeNull();
     const mark = host.querySelector<HTMLButtonElement>("[data-slot='mark-applied']")!;
-    expect(mark.disabled).toBe(false);
+    expect(mark.disabled).toBe(true);
   });
 
   it("keep Mark applied waiting for the review when there is no access question", () => {

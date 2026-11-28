@@ -1200,20 +1200,19 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     return true;
   }, [candidateId, firmId, onSessionExpired, resumeId, scan, watchForm]);
 
-  /** The form as it stands, for Mark applied. A page that has gone leaves what BenchQ last saw on it, and one stuck on an
-   * alert() never answers, which mustn't hold up the job. */
+  /** Confirm the current scan before changing status. A readable page with no controls can still have saved form data
+   * from before submission. A failed read or a change to the form requires another check. */
   const finalForm = useCallback(async (): Promise<{ form: AppliedForm; complete: boolean }> => {
     let timer: number | undefined;
     try {
       const read = await Promise.race([watchForm(), new Promise<false>(resolve => { timer = window.setTimeout(() => resolve(false), LAST_LOOK_MS); })]);
-      // `complete`: no required field on show is left. A form that has gone (submitted), or that couldn't be read, says
-      // nothing against it, so Mark applied still works there.
-      const complete = !read || !(shownRows.current ?? []).some(needsRequiredAnswer);
+      const complete = read && frames.current.scanIds.has(TOP_FRAME) && !heldLook.current && !shouldStop()
+        && !(shownRows.current ?? []).some(needsRequiredAnswer);
       return { form: appliedForm(formOf(applicationId)), complete };
     } finally {
       window.clearTimeout(timer);
     }
-  }, [applicationId, watchForm]);
+  }, [applicationId, shouldStop, watchForm]);
 
   /** Whether a file BenchQ attached on this page is this one, by its identity (`fileKey`): the BDE's own file goes on
    * under the résumé's file name, so its name can't say (#148's review). For a click, not a render. */

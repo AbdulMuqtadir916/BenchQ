@@ -285,6 +285,10 @@ it("uses the source click to open the panel and bind the destination to the save
   expect(reply).toBe(true);
   expect(fake.sidePanel.open).toHaveBeenCalledWith({ windowId: 4 });
   expect(stored(101)).toMatchObject({ candidateId: "candidate-1", applicationId: "app-1", userId: "user-1" });
+  expect(fake.tabs.create).toHaveBeenCalledWith({ windowId: 4, url, active: false });
+  const writes = fake.storage.session.set.mock;
+  const sourceWrite = writes.calls.findIndex(([items]) => items["source-job:101"] === "job-42");
+  expect(writes.invocationCallOrder[sourceWrite]).toBeLessThan(fake.tabs.update.mock.invocationCallOrder[0]!);
   // Add job saves this very job if the tab is disconnected later.
   expect(fake.session.get("source-job:101")).toBe("job-42");
   expect(fake.runtime.sendMessage).not.toHaveBeenCalled();

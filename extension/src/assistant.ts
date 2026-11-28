@@ -93,13 +93,16 @@ export function installAssistant() {
       if (!["http:", "https:"].includes(source.protocol) || source.username || source.password) return false;
       // Consume the trusted click immediately and let Chrome finish opening the panel before switching tabs.
       void chrome.sidePanel.open({ windowId }).catch(() => undefined)
-        .then(() => chrome.tabs.create({ windowId, url: source.href })).then(async tab => {
+        .then(() => chrome.tabs.create({ windowId, url: source.href, active: false })).then(async tab => {
         const jobId = typeof message.jobId === "string" ? message.jobId : undefined;
         const candidateId = typeof message.candidateId === "string" ? message.candidateId : undefined;
         if (tab.id !== undefined && jobId) await chrome.storage.session.set({ [sourceJobKey(tab.id)]: jobId }).catch(() => undefined);
-        if (tab.id !== undefined && (jobId || candidateId)) await connectSource(tab.id, source, jobId, candidateId).catch(() => undefined);
+        if (tab.id !== undefined) {
+          await chrome.tabs.update(tab.id, { active: true });
+          if (jobId || candidateId) await connectSource(tab.id, source, jobId, candidateId).catch(() => undefined);
+        }
         respond(true);
-      }, () => respond(false));
+      }).catch(() => respond(false));
     } else return false;
     return true;
   });

@@ -234,17 +234,19 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // The BenchQ job this tab was opened for from the website, when this candidate has it: Save saves that job itself.
   // Kept with the candidate it was looked up for: another candidate's posting is never saved by its id for this one.
-  const [lookup, setLookup] = useState<{ candidateId: string; job: BenchqJob | null } | null>(null);
-  const known = lookup?.candidateId === candidateId ? lookup.job : null;
+  const [lookup, setLookup] = useState<{ tabId: number; candidateId: string; firmId: string; job: BenchqJob | null } | null>(null);
+  const currentLookup = lookup?.tabId === tabId && lookup.candidateId === candidateId && lookup.firmId === firmId ? lookup : null;
+  const known = currentLookup?.job ?? null;
+  const isLookingUp = Boolean(firmId && tabId !== null && !currentLookup);
   const [state, setState] = useState<{ status: "idle" | "adding" | "added" | "error"; text?: string }>({ status: "idle" });
   useEffect(() => {
     if (tabId === null || !firmId) return;
     let isLive = true;
     void readSourceJob(tabId).catch(() => null).then((jobId) => (jobId ? getCandidateJob(firmId, candidateId, jobId) : null)).then(
-      (found) => { if (isLive) setLookup({ candidateId, job: found }); },
+      (found) => { if (isLive) setLookup({ tabId, candidateId, firmId, job: found }); },
       (error: unknown) => {
         // A 404 is a job this candidate doesn't have, so the page's reading is what gets saved. Anything else is said.
-        if (isLive) setLookup({ candidateId, job: null });
+        if (isLive) setLookup({ tabId, candidateId, firmId, job: null });
         if (isLive && (error as { status?: number }).status !== 404) {
           setState({ status: "error", text: "Couldn't check whether BenchQ already has this job. Saving uses what the page shows." });
         }
@@ -370,7 +372,7 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
     }
   };
 
-  const save = !isAdded && <button type="button" data-slot="add-job-run" className={`w-full ${button("primary", "large")}`} disabled={isBusy || (!sameKnown && missing)} onClick={() => void add()}>
+  const save = !isAdded && <button type="button" data-slot="add-job-run" className={`w-full ${button("primary", "large")}`} disabled={isBusy || isLookingUp || (!sameKnown && missing)} onClick={() => void add()}>
     {isBusy ? <>{SPINNER_ICON}Saving…</> : `Save job for ${firstName}`}
   </button>;
   if (isDetailsShown) {

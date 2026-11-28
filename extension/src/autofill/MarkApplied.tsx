@@ -66,7 +66,7 @@ export default function MarkApplied({ isPrimary, isSaving, isDisabled, jobLine, 
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" className={`w-full ${button("secondary", "large")}`} onClick={close}>Cancel</button>
-          <button ref={yesButton} type="button" data-slot="mark-applied-confirm" className={`w-full ${button("primary", "large")}`} disabled={isDisabled} onClick={confirm}>Mark applied</button>
+          <button ref={yesButton} type="button" data-slot="mark-applied-confirm" className={`w-full ${button("primary", "large")}`} disabled={isDisabled || isSaving || isWaiting} onClick={confirm}>Mark applied</button>
         </div>
       </div>}
     </dialog>

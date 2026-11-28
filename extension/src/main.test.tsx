@@ -52,6 +52,11 @@ const jobCards = () => [...document.querySelectorAll("[data-slot='job']")];
 
 beforeEach(() => {
   fake = fakeChrome();
+  fake.scripting.executeScript.mockImplementation(async (request?: { args?: unknown[] }) => {
+    if (request?.args?.[0] === "scan") return [{ frameId: 0, result: { scanId: 1, fields: [], url: job.url, signals: null } }];
+    if (request?.args?.[0] === "read") return [{ frameId: 0, result: { scanId: 1, values: {}, moved: false } }];
+    return [];
+  });
   vi.stubGlobal("chrome", fake);
   vi.stubGlobal("fetch", vi.fn(respond));
   vi.resetModules();

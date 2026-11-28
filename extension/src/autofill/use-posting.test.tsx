@@ -15,7 +15,7 @@ let seen: { posting: Posting; retry: () => void };
 const report = (state: typeof seen) => { seen = state; };
 
 function Harness({ postingId, onExpired }: { postingId: string | null; onExpired: () => void }) {
-  const state = usePosting("firm-1", "cand-1", postingId, onExpired);
+  const state = usePosting("firm-1", "user-1", "cand-1", postingId, onExpired);
   useEffect(() => report(state));
   return null;
 }
@@ -69,5 +69,19 @@ describe("the job's posting, for its details page", () => {
     await render("post-1", onExpired);
     expect(onExpired).toHaveBeenCalledTimes(1);
     expect(seen.posting).toEqual({ status: "error" });
+  });
+
+  it("ignores a response that arrives after the session cache was cleared", async () => {
+    let finish!: (posting: BenchqJob) => void;
+    vi.mocked(getCandidateJob).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await render("post-1");
+    forgetPostings();
+    await act(async () => { finish(job); });
+    expect(seen.posting).toEqual({ status: "loading" });
+    await render(null);
+    vi.mocked(getCandidateJob).mockResolvedValue({ ...job, title: "Updated posting" });
+    await render("post-1");
+    expect(getCandidateJob).toHaveBeenCalledTimes(2);
+    expect(seen.posting).toMatchObject({ status: "ready", posting: { title: "Updated posting" } });
   });
 });

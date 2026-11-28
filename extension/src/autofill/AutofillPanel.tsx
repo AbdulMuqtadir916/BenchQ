@@ -156,7 +156,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const [isDetailsShown, setIsDetailsShown] = useState(false);
   // The job's posting, read once its details page opens: its description, type, mode and posted date are in BenchQ's
   // posting, not in the applications list the panel has.
-  const { posting, retry: retryPosting } = usePosting(firmId, connection.candidateId,
+  const { posting, retry: retryPosting } = usePosting(firmId, connection.userId, connection.candidateId,
     isDetailsShown && applicationStatus === "ready" ? details?.job_id ?? null : null, onSessionExpired);
   // The cover letter the BDE picked for this form; until they pick, the job's newest in BenchQ.
   const [coverLetterPick, setCoverLetterPick] = useState<string | null | undefined>(undefined);
@@ -326,6 +326,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     return () => chrome.runtime.onMessage.removeListener(onShortcut);
   }, [tabId]);
   const [isCollecting, setIsCollecting] = useState(false);
+  const [applyCheckFailed, setApplyCheckFailed] = useState(false);
   const card = useRef<HTMLElement>(null);
   const wasFilling = useRef(filling);
   // The note of a run that stopped, once the BDE closed it. A new run brings a new one.
@@ -366,11 +367,14 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     && !contextChanged && !isSelectionSyncing;
   const confirmHost = () => void sendToBackground({ type: "confirm-host", tabId, host: state.confirmKey });
   const apply = async () => {
+    setApplyCheckFailed(false);
     setIsCollecting(true);
     const { form, complete } = await state.finalForm();
     setIsCollecting(false);
-    // The last look found a required field emptied meanwhile: the button waits again, and the note says why.
-    if (!complete) return;
+    if (!complete) {
+      setApplyCheckFailed(true);
+      return;
+    }
     onApply?.(form, picked?.id ?? null);
   };
 
@@ -552,7 +556,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {!movedAway && onApply && canApply && !filling && requiredLeft > 0 && <p id="required-left" data-slot="required-left" className={REQUIRED_LEFT}>
         {ALERT_ICON}Fill {requiredLeft} required field{requiredLeft === 1 ? "" : "s"} to mark applied
       </p>}
-      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
+      {!movedAway && onApply && canApply && !filling && requiredLeft === 0 && applyCheckFailed && <p role="status" className={REQUIRED_LEFT}>
+        {ALERT_ICON}BenchQ couldn't verify the form. Check the page and try again.
+      </p>}
+      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || scanning || !reviewMatches || Boolean(state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
     </div>
   </section>;
