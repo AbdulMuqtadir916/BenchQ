@@ -557,7 +557,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
         {ALERT_ICON}Fill {requiredLeft} required field{requiredLeft === 1 ? "" : "s"} to mark applied
       </p>}
       {!movedAway && onApply && canApply && !filling && requiredLeft === 0 && applyCheckFailed && <p role="status" className={REQUIRED_LEFT}>
-        {ALERT_ICON}BenchQ couldn't verify the form. Check the page and try again.
+        {ALERT_ICON}BenchQ couldn&apos;t verify the form. Check the page and try again.
       </p>}
       {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || scanning || !reviewMatches || Boolean(state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
