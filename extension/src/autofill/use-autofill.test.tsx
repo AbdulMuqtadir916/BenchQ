@@ -1062,6 +1062,12 @@ describe("the form for Mark applied", () => {
     expect(result.complete).toBe(false);
   });
 
+  it("does not mark an unreadable embedded form as complete from the empty outer page", async () => {
+    vi.mocked(scanTab).mockResolvedValue({ ...page([]), unreadableFrames: 1 });
+    await mount();
+    await run(async () => { expect((await hook.finalForm()).complete).toBe(false); });
+  });
+
   it("keeps every page of the form", async () => {
     vi.mocked(scanTab).mockResolvedValue(page([field("n", "Nickname", "text", "Pri")]));
     await mount();
@@ -1357,7 +1363,7 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
   /** BenchQ attaches its own file; the site then shows `after` (the upload as the page now has it, or none). */
   async function attachBenchQFile(after: TabField[] = [upload(NAME), field("a", "Email", "text", "priya@example.test")]) {
     vi.mocked(getResumeFile).mockResolvedValue(pdf);
-    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email", "text", "priya@example.test")], onSite));
+    vi.mocked(scanTab).mockResolvedValue(page([{ ...upload(), required: true, complete: false }, field("a", "Email", "text", "priya@example.test")], onSite));
     vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
       if (write.type === "file") vi.mocked(scanTab).mockResolvedValue(page(after, onSite));
       return { status: "filled", current: write.type === "file" ? NAME : "" };
@@ -1403,7 +1409,8 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
     await attachBenchQFile([field("a", "Email", "text", "priya@example.test")]);
     const resume = () => hook.rows!.find(({ field: { kind } }) => kind === "file");
     expect(hook.rows!.map(({ field: { id } }) => id)).toEqual(["r", "a"]);
-    expect(resume()).toMatchObject({ status: "same", field: { id: "r", current: NAME, isGone: true } });
+    expect(resume()).toMatchObject({ status: "same", field: { id: "r", current: NAME, isGone: true, complete: true } });
+    await run(async () => { expect((await hook.finalForm()).complete).toBe(true); });
     await act(async () => { const looking = hook.rescan(); await vi.advanceTimersByTimeAsync(10); await looking; });
     expect(resume()).toMatchObject({ status: "same", field: { current: NAME } });
     expect(resume()!.reason).toBeUndefined();

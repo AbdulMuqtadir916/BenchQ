@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Application,
+  applicationUrl,
   BENCHQ_URL,
   Candidate,
   candidateResumesUrl,
@@ -17,6 +18,7 @@ import { CHECK, PIN_ICON, USER_ICON } from "./autofill/icons";
 import { payText } from "./autofill/job-details";
 import SettingsDrawer, { initialsOf } from "./SettingsDrawer";
 import AutofillPanel from "./autofill/AutofillPanel";
+import AppliedPage from "./autofill/AppliedPage";
 import type { ApplicationContextStatus } from "./autofill/use-resumes";
 import { connectionFor, sendToBackground } from "./autofill/connection-store";
 import { forgetForm } from "./autofill/form-memory";
@@ -26,7 +28,7 @@ import {
 } from "./autofill/manifest-check";
 import { forgetTabs } from "./autofill/use-autofill";
 import { forgetPostings } from "./autofill/use-posting";
-import AddJobCard from "./autofill/AddJobCard";
+import AddJobCard, { forgetJobDrafts } from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
@@ -129,6 +131,8 @@ function App() {
   }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [appliedResult, setAppliedResult] = useState<{ job: Application; tabId: number; userId: string } | null>(null);
+  const sessionGeneration = useRef(0);
   const [loading, setLoading] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [watchingLogin, setWatchingLogin] = useState(false);
@@ -147,6 +151,8 @@ function App() {
   const appliedJobs = jobs.filter((job) => job.status === "applied");
   const visibleJobs = activeTab === "saved" ? savedJobs : appliedJobs;
   const { tab: activeBrowserTab, connection } = useTabConnection(session?.principal.user_id ?? null);
+  const appliedHere = appliedResult?.userId === session?.principal.user_id && appliedResult?.tabId === activeBrowserTab?.id
+    && (!connection || connection.applicationId === appliedResult?.job.id) ? appliedResult : null;
   // The tab the BDE is on now, for an add that finishes after they moved on (Q10).
   const latestTab = useRef(activeBrowserTab);
   useEffect(() => { latestTab.current = activeBrowserTab; }, [activeBrowserTab]);
@@ -172,10 +178,16 @@ function App() {
     : {};
   const latestJobsLoad = useRef(0);
   const expireSession = useCallback(() => {
+    sessionGeneration.current += 1;
+    latestJobsLoad.current += 1;
+    setLoading(false);
+    setLoadingJobs(false);
     setSession(null);
     setCandidates([]);
     setSelectedCandidateId("");
     setJobs([]);
+    setAppliedResult(null);
+    forgetJobDrafts();
     localStorage.removeItem("benchq-selected-candidate");
     forgetTabs();
     forgetPostings();
@@ -185,7 +197,14 @@ function App() {
   /** Sign out from the settings drawer: the session ends in BenchQ, and the panel forgets it as it does an expired one. */
   const signOutNow = async () => {
     setIsSettingsOpen(false);
-    await signOut().catch(() => undefined);
+    try {
+      await signOut();
+    } catch (error) {
+      if (!isSessionExpired(error)) {
+        setError("Could not sign out. Try again.");
+        return;
+      }
+    }
     expireSession();
     setError("");
   };
@@ -221,11 +240,13 @@ function App() {
     }
   }, []);
   const refresh = useCallback(async () => {
+    const generation = sessionGeneration.current;
     setLoading(true);
     setError("");
     setJobs([]);
     try {
       const current = await getSession();
+      if (generation !== sessionGeneration.current) return;
       setSession(current);
       if (
         current.principal.kind !== "firm" ||
@@ -240,6 +261,7 @@ function App() {
       const assignedCandidates = (
         await getCandidates(current.principal.firm_id)
       ).sort((left, right) => left.full_name.localeCompare(right.full_name));
+      if (generation !== sessionGeneration.current) return;
       setCandidates(assignedCandidates);
       const storedCandidateId =
         localStorage.getItem("benchq-selected-candidate") || "";
@@ -257,6 +279,7 @@ function App() {
         setJobs([]);
       }
     } catch (e) {
+      if (generation !== sessionGeneration.current) return;
       setSession(null);
       setCandidates([]);
       setSelectedCandidateId("");
@@ -267,7 +290,7 @@ function App() {
           : "Could not reach BenchQ. Check the app connection and retry.",
       );
     } finally {
-      setLoading(false);
+      if (generation === sessionGeneration.current) setLoading(false);
     }
   }, [loadJobs]);
   const chooseCandidate = useCallback(
@@ -380,10 +403,13 @@ function App() {
     if (!reply?.ok) setError(await isInATab() ? PANEL_IN_A_TAB : "Could not open this job. Try again.");
   };
   const apply = async (job: Application, form: AppliedForm, resumeId: string | null) => {
+    const generation = sessionGeneration.current;
+    const submittedFrom = connection;
     setBusy(job.id);
     setError("");
     try {
       const updated = await markApplied(job, form, resumeId);
+      if (generation !== sessionGeneration.current) return;
       setJobs((all) =>
         all.map((item) =>
           item.id === job.id
@@ -397,10 +423,12 @@ function App() {
         ),
       );
       setActiveTab("applied");
+      if (submittedFrom) setAppliedResult({ job, tabId: submittedFrom.tabId, userId: submittedFrom.userId });
       // The job is done: the tab stays open on the page, but nothing is left to fill.
       forgetForm(job.id);
       void sendToBackground({ type: "disconnect-job", applicationId: job.id });
     } catch (e) {
+      if (generation !== sessionGeneration.current) return;
       if (isSessionExpired(e)) expireSession();
       else
         setError("Could not update this application. Refresh and try again.");
@@ -451,7 +479,7 @@ function App() {
   // A job on the page the BDE is looking at, not yet one of the candidate's: added and Saved, then this tab connects, as
   // the BDE is already on the form (Q10), with no tab of its own.
   const addJobCard = !connection && selectedCandidate && !loadingJobs ? (
-    <AddJobCard key={`${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} firmId={session?.principal.firm_id ?? null} candidateId={selectedCandidate.id}
+    <AddJobCard key={`${session?.principal.user_id ?? ""}:${selectedCandidate.id}:${activeBrowserTab?.id ?? ""}:${activeBrowserTab?.url ?? ""}`} tab={activeBrowserTab} firmId={session?.principal.firm_id ?? null} userId={session?.principal.user_id} candidateId={selectedCandidate.id}
       candidateName={selectedCandidate.full_name} knownUrls={jobs.flatMap((job) => (job.url ? [job.url] : []))} knownJobs={jobs}
       onPageTitle={showPageTitle} onShown={setIsAddJobShown} onDetailsShown={setIsAddJobDetailsShown}
       onUseTab={(known) => { const job = jobs.find(({ id }) => id === known.id); if (job?.status === "saved") void connectThisTab(job); }}
@@ -649,7 +677,7 @@ function App() {
               Apply.
             </p>
           )}
-          {!connection && !(isAddJobDetailsShown && addJobCard) && <div className="mt-3 mb-3 grid gap-1.5">
+          {!connection && !appliedHere && !(isAddJobDetailsShown && addJobCard) && <div className="mt-3 mb-3 grid gap-1.5">
             <label
               className={FIELD_LABEL}
               htmlFor="candidate-select"
@@ -689,7 +717,12 @@ function App() {
               )}
             </div>
           </div>}
-          {connection ? (
+          {appliedHere ? (
+            <AppliedPage title={appliedHere.job.title || "Untitled role"} company={appliedHere.job.company ?? ""} logoUrl={appliedHere.job.logoUrl}
+              candidateName={candidates.find(({ id }) => id === appliedHere.job.candidate_id)?.full_name ?? "this candidate"}
+              viewUrl={session.firm?.slug ? applicationUrl(session.firm.slug, appliedHere.job.id) : null}
+              onBack={() => { setAppliedResult(null); if (connection) disconnectTab(); }} />
+          ) : connection ? (
             <AutofillPanel
               // One panel per tab and job: a tab connected to another job starts afresh (its own form memory, next pages
               // off until the BDE runs Autofill for that job).

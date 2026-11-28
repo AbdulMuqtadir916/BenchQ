@@ -21,11 +21,11 @@ let host: HTMLElement;
 
 type Known = { title: string | null; company: string | null; location: string | null; url?: string | null };
 
-async function show(onAdded = vi.fn(), knownUrls: string[] = [], knownJobs: Known[] = [], url = page.url) {
+async function show(onAdded = vi.fn(), knownUrls: string[] = [], knownJobs: Known[] = [], url = page.url, userId?: string) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => { root!.render(<AddJobCard tab={{ id: 7, url }} firmId="firm-1" candidateId="cand-1" candidateName="Priya" knownUrls={knownUrls} knownJobs={knownJobs} onAdded={onAdded} />); });
+  await act(async () => { root!.render(<AddJobCard userId={userId} tab={{ id: 7, url }} firmId="firm-1" candidateId="cand-1" candidateName="Priya" knownUrls={knownUrls} knownJobs={knownJobs} onAdded={onAdded} />); });
   return onAdded;
 }
 
@@ -345,6 +345,18 @@ describe("editing the job before saving it", () => {
     host.remove();
     await show(vi.fn(), [], [], url);
     expect(host.querySelector("[data-slot='add-job'] p:nth-of-type(2)")!.textContent).toBe("Remote (US)");
+  });
+
+  it("starts from the page again when another account opens the same posting", async () => {
+    const url = "https://boards.example.test/acme/jobs/790";
+    vi.mocked(readJobPage).mockResolvedValue({ ...page, url });
+    await show(vi.fn(), [], [], url, "user-1");
+    await click("add-job-edit");
+    await type(inputOf("Job title"), "Edited for the first user");
+    act(() => { root!.unmount(); });
+    host.remove();
+    await show(vi.fn(), [], [], url, "user-2");
+    expect(host.querySelector("h2")?.textContent).toBe(page.title);
   });
 
   it("keeps the BDE's edits when Save finds the page names the posting another way", async () => {

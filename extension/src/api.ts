@@ -113,15 +113,18 @@ export const getSession = () => request<Session>("/api/auth/me");
  * changed, never its text. */
 export type CoverLetter = { id: string; name: string | null; job_id: string | null; updated_at: string | null; created_at: string | null };
 
-/** The cover letters BenchQ holds for one job, newest first (the backend's own order). */
-export const getCoverLetters = (jobId: string) =>
-  request<CoverLetter[]>(`/api/cover-letters?job_id=${encodeURIComponent(jobId)}`);
+/** The connected candidate's letters for this application, newest first. */
+export const getCoverLetters = async (applicationId: string): Promise<CoverLetter[]> => {
+  const result = await request<{ letters: CoverLetter[] }>(`/api/cover-letters?application_id=${encodeURIComponent(applicationId)}`);
+  if (!Array.isArray(result?.letters)) throw new Error("Application cover letters unavailable");
+  return result.letters;
+};
 
 /** A cover letter as a PDF, its type and its bytes in base64, for the form's cover-letter upload. Null when it's not
  * found. */
-export async function getCoverLetterFile(id: string): Promise<{ mimeType: string; data: string } | null> {
+export async function getCoverLetterFile(id: string, applicationId: string): Promise<{ mimeType: string; data: string } | null> {
   try {
-    const response = await send(`/api/cover-letters/${encodeURIComponent(id)}/pdf`);
+    const response = await send(`/api/cover-letters/${encodeURIComponent(id)}/pdf?application_id=${encodeURIComponent(applicationId)}`);
     const mimeType = (response.headers.get("Content-Type") ?? "").split(";")[0]!.trim() || "application/pdf";
     return { mimeType, data: base64Of(new Uint8Array(await response.arrayBuffer())) };
   } catch (error) {

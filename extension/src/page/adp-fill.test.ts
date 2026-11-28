@@ -58,6 +58,21 @@ it("types the old value back on Undo once ADP's page has the focus, and counts i
   expect(exec).toHaveBeenLastCalledWith("insertText", false, "Old");
 });
 
+it("keeps a value edited on ADP while switching resumes waits for focus", async () => {
+  const { registry, fieldId, input } = form("Old");
+  const filler = createFiller(() => registry);
+  typingEditor();
+  const hasFocus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  await filler.fill({ scanId: 1, fieldId, current: "Old", write: { type: "text", value: "Manoj" } });
+  hasFocus.mockReturnValue(false);
+  const restoring = filler.takeBack({ scanId: 1, fieldId });
+  input.value = "Manual correction";
+  hasFocus.mockReturnValue(true);
+  window.dispatchEvent(new Event("focus"));
+  expect(await restoring).toBe(false);
+  expect(input.value).toBe("Manual correction");
+});
+
 it("counts an ADP field skipped on Undo when its page never gets the focus", async () => {
   const { registry, fieldId, input } = form("Old");
   const filler = createFiller(() => registry);

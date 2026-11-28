@@ -209,10 +209,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const isReadingOwnFile = own.isReading;
   const [ownFileError, setOwnFileError] = useState<string | null>(null);
   // The job's cover letters in BenchQ, once the job is confirmed: the picked one goes on the form's cover-letter upload.
-  const letterJobId = applicationStatus === "ready" ? details?.job_id ?? null : null;
-  const { letters: coverLetters, retry: retryLetters } = useCoverLetters(letterJobId, onSessionExpired);
-  const coverLetterId = coverLetterPick !== undefined ? coverLetterPick
-    : coverLetters.status === "ready" ? coverLetters.letters[0]?.id ?? null : null;
+  const { letters: coverLetters, retry: retryLetters } = useCoverLetters(applicationStatus === "ready" && details?.job_id
+    ? connection.applicationId : null, onSessionExpired);
+  const coverLetterId = coverLetters.status !== "ready" ? null : coverLetterPick === undefined
+    ? coverLetters.letters[0]?.id ?? null : coverLetters.letters.find(({ id }) => id === coverLetterPick)?.id ?? null;
   const state = useAutofill({ connection: reviewConnection, firmId, resumeId, fileName, pickedFile, coverLetterId, onSessionExpired, onAccessLost, isHeld: movedAway || isReadingOwnFile });
   const { rows, scanning, error, filling, run, outcome, fillCount, staleCount, needsConfirmation, answeredFrom, reviewedFor, attachment, step } = state;
   const context = `${connection.candidateId}:${connection.applicationId}`;
@@ -355,6 +355,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   // A required field counts once the form holds it, or says it's done (a password, a box the site ticks): a value
   // BenchQ only proposed doesn't.
   const emptyRequired = (currentRows ?? []).filter(needsRequiredAnswer);
+  const unreadableForm = state.unreadableFrames > 0 && currentRows !== null && !currentRows.some(({ field }) => !field.isGone);
   // Mark applied waits for the form on show to have every required field; once it has gone, or there's none, it doesn't.
   const requiredLeft = !movedAway && !state.needsAccess && hasForm ? emptyRequired.length : 0;
   // Every field of the form, the résumé's upload and the cover letter's too, as Simplify lists them.
@@ -379,7 +380,7 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   };
 
   const jobName = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""}`;
-  // The panel's own content shows once nothing is asked first: neither that, nor a site's permission (Mark applied stays).
+  // Wait for the tab or site-access question before showing the form review.
   const isOpen = !movedAway && !state.needsAccess;
   // Once filled, the open fields take the room under the job; closed, the résumé and cover letter come back above them.
   // From a run on, the fields are a sheet over the pickers: up over them while open (the run, then the filled form), down
@@ -522,13 +523,14 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
         <span className={`${MARK} ${MARK_TINT.warning}`} aria-hidden="true">{ALERT_ICON}</span>
         <h3 className="text-body-strong text-[var(--color-text)]">No form on this page yet</h3>
         <p className={`mt-0.5 ${SOFT_TEXT}`}>Click Apply on the employer&apos;s page. BenchQ scans the form when it opens, in this tab or a new one.</p>
-        {state.unreadableFrames > 0 && <p className={`mt-1 ${SOFT_TEXT}`}>If you can already see a form, BenchQ can&apos;t read that part of the page, so fill it in yourself.</p>}
+        {unreadableForm && <p className={`mt-1 ${SOFT_TEXT}`}>If the form is embedded, open it in its own tab so BenchQ can verify it.</p>}
       </div>}
       {isOpen && hasForm && state.bankEmpty && picked && <p className={MUTED_TEXT}>This resume has no answers BenchQ can fill yet.</p>}
 
       {isOpen && step && <p data-slot="autofill-step" role="status" className={STEP}>{SPINNER_ICON}{step}</p>}
       {isOpen && filling && run && <RunList run={run} isHeadless={isSheet} />}
       {isOpen && reviewMatches && outcome?.stopped && outcome !== dismissed && <OutcomeNote onDismiss={dismiss} />}
+      {isOpen && state.undoNote && <p className={MUTED_TEXT} role="status">{state.undoNote}</p>}
 
       {isOpen && stage === "after" && rest.length > 0 && <ReviewList rows={rest} isFilling={filling} onGoTo={goTo} onReplace={(chosen) => void state.replace(chosen)}
         onListOptions={state.listOptions} onChoose={(row, label) => void state.choose(row, label)}
@@ -550,7 +552,6 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {/* Once the BDE has run Autofill on this application, its form's next pages fill as they open (07 Q4). */}
       {isOpen && state.isFollowingSteps && hasForm && !isWorking && <p data-slot="autofill-follows" className="sr-only">Next pages of this form fill on their own as they open.</p>}
       {/* Mark applied steps aside while a run fills the form, and is back once it ends. */}
-      {/* On a site BenchQ may not read yet there is no review to wait for: the BDE who declines fills the form by hand, and may still mark it applied. */}
       {/* Not while the tab shows another job: marking it would mark the connected job from another job's page. */}
       {/* What's left before the BDE submits the form, once Autofill has done its part (Simplify's line over Submit). */}
       {!movedAway && onApply && canApply && !filling && requiredLeft > 0 && <p id="required-left" data-slot="required-left" className={REQUIRED_LEFT}>
@@ -559,8 +560,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {!movedAway && onApply && canApply && !filling && requiredLeft === 0 && applyCheckFailed && <p role="status" className={REQUIRED_LEFT}>
         {ALERT_ICON}BenchQ couldn&apos;t verify the form. Check the page and try again.
       </p>}
-      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || scanning || !reviewMatches || Boolean(state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
+      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || scanning || !reviewMatches || unreadableForm || Boolean(state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
+      {isOpen && reviewMatches && state.undoable > 0 && !filling && <button type="button" className={button("secondary", "compact")}
+        disabled={isWorking || scanning || applying || isCollecting || needsConfirmation} onClick={() => void state.undo()}>Undo</button>}
     </div>
   </section>;
 }

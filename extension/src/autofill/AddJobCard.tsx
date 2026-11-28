@@ -4,11 +4,12 @@ import { ALERT, button, MOTION, MUTED_TEXT, SOFT_TEXT } from "../ui";
 import { CompanyLogo } from "./CompanyLogo";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { readSourceJob } from "./connection-store";
-import { sameCompany, sameListing, siteOf } from "./job-check";
+import { sameCompany, sameListing } from "./job-check";
 import { detailsOf, factsOf, textOfHtml } from "./job-details";
 import JobDetails from "./JobDetails";
 import { missingAccess, requestAccess, type SiteAccess } from "./site-access";
-import { isJobLink } from "./job-link";
+import { isJobLink, isSameJob, jobKeyOf } from "./job-link";
+export { isSameJob } from "./job-link";
 import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
@@ -23,6 +24,7 @@ function placeholderTitle(value: string | null, ids: readonly string[] = []): bo
 }
 
 type AddJobCardProps = {
+  userId?: string;
   /** The BDE's firm, for looking up the BenchQ job a tab was opened for. */
   firmId?: string | null;
   /** The tab the BDE is looking at. */
@@ -78,8 +80,8 @@ type Draft = Partial<Pick<PageJob, "title" | "company" | "location" | "descripti
 /** The BDE's edits to a page's job, by the job's link, while the panel is open: they stay when the page is read again,
  * when the card is drawn afresh (another tab and back, the tab's link changing) and when Save finds the page changed. */
 const drafts = new Map<string, Draft>();
-const draftKey = (job: PageJob) => sameUrl(job.postingUrl ?? job.url);
-const savedDraft = (job: PageJob) => drafts.get(draftKey(job)) ?? drafts.get(sameUrl(job.url));
+export const forgetJobDrafts = () => drafts.clear();
+const draftKey = (scope: string, url: string) => JSON.stringify([scope, sameUrl(url)]);
 
 const sameText = (one: string | null | undefined, other: string | null | undefined) =>
   (one ?? "").replace(/\s+/g, " ").trim().toLowerCase() === (other ?? "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -90,47 +92,6 @@ const sameText = (one: string | null | undefined, other: string | null | undefin
 function isSamePosting(fresh: PageJob | null | undefined, job: PageJob): boolean {
   return Boolean(fresh?.isJobPage && isSameJob(fresh.url, job.url) && sameText(fresh.title, job.title) && sameText(fresh.company, job.company)
     && (!fresh.requisitionId || !job.requisitionId || fresh.requisitionId === job.requisitionId));
-}
-
-/** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
-const JOB_KEYS = /^(gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
-
-/** What names a link's job: its site without the subdomain (Greenhouse sends `boards.` to `job-boards.`), its path, and
- * the query keys that name a job. */
-function jobKeyOf(url: string) {
-  try {
-    const link = new URL(url);
-    const site = siteOf(link.hostname);
-    const path = link.pathname.toLowerCase().replace(/\/+$/, "");
-    return {
-      site,
-      board: link.hostname.replace(/^www\./, "").replace(/^(?:job-boards|boards)\.greenhouse\.io$/, "boards.greenhouse.io"),
-      route: /^#!?\/|[?&=]/.test(link.hash) ? link.hash : "",
-      // Adzuna's tracked link (/land/ad/<id>) opens the listing (/details/<id>): one job at two addresses.
-      path: site === "adzuna.com" ? path.replace(/^\/land\/ad\/(\d+)$/, "/details/$1") : path,
-      ids: new Map([...link.searchParams].filter(([key]) => JOB_KEYS.test(key)).map(([key, value]) => [key.toLowerCase(), value])),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** The same job's page, however it was reached: the same site, the same path or a page under it (Lever's `/apply`,
- * Ashby's `/application`), and no job id that differs. */
-export function isSameJob(page: string, known: string): boolean {
-  if (sameUrl(page) === sameUrl(known)) return true;
-  const [here, saved] = [jobKeyOf(page), jobKeyOf(known)];
-  if (!here || !saved || here.board !== saved.board || here.route !== saved.route) return false;
-  const under = (inner: string, outer: string) => inner === outer || (outer.length > 1 && inner.startsWith(`${outer}/`));
-  if (!under(here.path, saved.path) && !under(saved.path, here.path)) return false;
-  // The same job ids on both, or one side's id written in the other's path (Greenhouse's gh_jid=8329677 on
-  // /jobs/8329677): an id the other side has nowhere can be another job's.
-  return [...new Set([...here.ids.keys(), ...saved.ids.keys()])].every((key) => {
-    const [mine, theirs] = [here.ids.get(key), saved.ids.get(key)];
-    if (mine !== undefined && theirs !== undefined) return mine === theirs;
-    const segments = (mine === undefined ? here.path : saved.path).split("/");
-    return segments.includes((mine ?? theirs ?? "").toLowerCase());
-  });
 }
 
 /** The connected tab moved on to another job's page on the job's own site (another posting on its board): not the job's
@@ -205,10 +166,10 @@ export const looksLikeJobPage = (url: string) => isJobLink(url);
  * page, and reads the page once the BDE allows it.
  */
 export default function AddJobCard(props: AddJobCardProps) {
-  return <CaptureCard key={JSON.stringify([props.firmId, props.candidateId, props.tab?.id, props.tab?.url])} {...props} />;
+  return <CaptureCard key={JSON.stringify([props.userId, props.firmId, props.candidateId, props.tab?.id, props.tab?.url])} {...props} />;
 }
 
-function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle, onShown, onDetailsShown }: AddJobCardProps) {
+function CaptureCard({ userId, tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle, onShown, onDetailsShown }: AddJobCardProps) {
   // Re-read only legacy placeholders whose saved URL identifies this exact posting.
   const legacy = knownJobs.find(known => tab && known.url === tab.url
     && placeholderTitle(known.title, jobIdsOf(tab.url)));
@@ -219,8 +180,10 @@ function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, known
   // The BDE's edits, by the job's link alone: a later reading of the same page (a fuller one, a requisition ID that
   // loads late) keeps them, and so does a card drawn afresh (`drafts`).
   const [edits, setEdits] = useState<{ key: string; values: Draft }>();
-  const key = job ? draftKey(job) : "";
-  const draft: Draft = !job ? {} : edits?.key === key ? edits.values : savedDraft(job) ?? {};
+  const draftScope = JSON.stringify([userId ?? null, firmId ?? null]);
+  const key = job ? draftKey(draftScope, job.postingUrl ?? job.url) : "";
+  const draft: Draft = !job ? {} : edits?.key === key ? edits.values
+    : drafts.get(key) ?? drafts.get(draftKey(draftScope, job.url)) ?? {};
   const [editing, setEditing] = useState(false);
   const setDraft = (values: Draft) => {
     drafts.set(key, values);

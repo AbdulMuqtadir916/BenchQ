@@ -1,9 +1,6 @@
 import { BENCHQ_URL, getSavedApplications, getSession } from "./api";
-import { isJobLink } from "./autofill/job-link";
+import { isJobLink, isSameJob } from "./autofill/job-link";
 import { connectionFor, connectionKey, connectionWrites, countConnectionWrite, sourceJobKey } from "./autofill/connection-store";
-import { siteOf } from "./autofill/job-check";
-
-const siteOfUrl = (url: string) => { try { return siteOf(new URL(url).hostname); } catch { return ""; } };
 
 /** Connects the opened tab to the saved job: the link's candidate's, or, from a page without one, the one candidate who
  * has it saved. With no such job the tab stays unconnected and the panel offers Add job. */
@@ -31,9 +28,8 @@ async function connectSource(tabId: number, source: URL, jobId: string | undefin
     if (!connection) return;
     if (!currentUrl || currentUrl === "about:blank") continue;
     // Source links often redirect within their own site (Adzuna's /land/ad/ opens /details/, Greenhouse's boards. opens
-    // job-boards.): compare sites, not addresses.
-    const site = siteOfUrl(currentUrl);
-    if (site !== siteOfUrl(source.href) && (!job.url || site !== siteOfUrl(job.url))) return;
+    // job-boards.). Only recognized aliases or the saved posting itself may receive the connection.
+    if (!isSameJob(currentUrl, source.href) && !isSameJob(currentUrl, connection.job.url)) return;
     // A connection made for this tab meanwhile (the BDE picked a job) wins. The check and the write are one step.
     if (connectionWrites(tabId) !== writesBefore) return;
     countConnectionWrite(tabId);

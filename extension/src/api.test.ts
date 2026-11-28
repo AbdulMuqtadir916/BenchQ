@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addJob, getCandidateJob, getSavedApplications, getSession } from "./api";
+import { addJob, getCandidateJob, getCoverLetters, getSavedApplications, getSession } from "./api";
 
 /** The backend's RFC 9457 error bodies (step 4b): `failureOf` shows `detail` for a refused request and its own words
  * for a 5xx. */
@@ -13,6 +13,15 @@ async function failure(status: number, body: object): Promise<Error & { status?:
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
+
+it("rejects the older firm-wide cover letter response for an application", async () => {
+  const send = vi.fn().mockResolvedValueOnce(Response.json([{ id: "unscoped-letter" }]))
+    .mockResolvedValueOnce(Response.json({ letters: [{ id: "candidate-letter" }] }));
+  vi.stubGlobal("fetch", send);
+  await expect(getCoverLetters("app-1")).rejects.toThrow("Application cover letters unavailable");
+  await expect(getCoverLetters("app-1")).resolves.toEqual([{ id: "candidate-letter" }]);
+  expect(send.mock.calls[0]![0]).toContain("/api/cover-letters?application_id=app-1");
+});
 
 it("says on every request to BenchQ that it comes from the extension", async () => {
   const send = vi.fn(async () => Response.json({ principal: null }));

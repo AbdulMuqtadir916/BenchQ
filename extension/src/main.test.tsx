@@ -81,6 +81,16 @@ it("shows who's signed in in the settings drawer, with the preview and theme, an
   expect(document.body.textContent).toContain("Sign in to BenchQ");
 });
 
+it("keeps the session visible and reports a failed sign out", async () => {
+  vi.mocked(fetch).mockImplementation(async (url) => String(url).endsWith("/api/auth/sign-out")
+    ? { ok: false, status: 503, json: async () => ({}) } as Response : respond(String(url)) as Promise<Response>);
+  await mount();
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='settings-open']")!.click(); });
+  await act(async () => { document.querySelector<HTMLElement>("[data-slot='sign-out']")!.click(); });
+  expect(document.querySelector("[data-slot='error']")?.textContent).toBe("Could not sign out. Try again.");
+  expect(document.querySelector("[data-slot='settings-open']")).not.toBeNull();
+});
+
 it("opens and connects a job from Open job", async () => {
   await mount();
   await act(async () => { document.querySelector<HTMLElement>("[data-slot='job'] .bq-secondary")!.click(); });
@@ -296,11 +306,15 @@ it("sends the form with the status, and only once confirmed", async () => {
   expect(JSON.parse(String(init?.body))).toMatchObject({ status: "applied", expected_revision: 0, form_data: { fields: [] }, resume_id: "res-1" });
 });
 
-it("ends the job's connections once it's marked applied", async () => {
+it("keeps the Applied confirmation available after disconnecting the job", async () => {
   connectTab();
   await mount();
   await markApplied();
   expect(fake.runtime.sendMessage).toHaveBeenCalledWith({ type: "disconnect-job", applicationId: "app-1" });
+  await endConnection();
+  expect(document.querySelector("[data-slot='applied-page']")?.textContent).toContain("Great job!");
+  await press("Back to jobs");
+  expect(document.querySelector("[data-slot='applied-page']")).toBeNull();
 });
 
 it("leaves the connection alone when marking applied fails", async () => {

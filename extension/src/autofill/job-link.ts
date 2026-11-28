@@ -1,3 +1,5 @@
+import { siteOf } from "./job-check";
+
 /**
  * Which links are one job's page, for the panel: the add-job card asks for a site only on such a link, since it can't
  * read a page it may not read yet. The same rule as `src/page/job.ts` `isJobLink`, kept as a copy because page.js has
@@ -50,4 +52,48 @@ export function isJobLink(url: string): boolean {
   const parts = partsOf(link);
   if (endsAtList(parts)) return false;
   return parts.some((part) => JOB_PART.test(part)) || (JOB_HOST.test(link.hostname) && parts.length >= 2);
+}
+
+
+const sameUrl = (url: string) => url.replace(/#(?:top|apply|application|description)?$/i, "").replace(/\/+$/, "");
+
+/** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
+const JOB_KEYS = /^(job|jl|gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
+
+/** What names a link's job: its site without the subdomain (Greenhouse sends `boards.` to `job-boards.`), its path, and
+ * the query keys that name a job. */
+export function jobKeyOf(url: string) {
+  try {
+    const link = new URL(url);
+    const site = siteOf(link.hostname);
+    const path = link.pathname.toLowerCase().replace(/\/+$/, "");
+    return {
+      site,
+      board: link.hostname.replace(/^www\./, "").replace(/^(?:job-boards|boards)\.greenhouse\.io$/, "boards.greenhouse.io"),
+      route: /^#!?\/|[?&=]/.test(link.hash) ? link.hash : "",
+      // Adzuna's tracked link (/land/ad/<id>) opens the listing (/details/<id>): one job at two addresses.
+      path: site === "adzuna.com" ? path.replace(/^\/land\/ad\/(\d+)$/, "/details/$1") : path,
+      ids: new Map([...link.searchParams].filter(([key]) => JOB_KEYS.test(key)).map(([key, value]) => [key.toLowerCase(), value])),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** The same job's page, however it was reached: the same site, the same path or a page under it (Lever's `/apply`,
+ * Ashby's `/application`), and no job id that differs. */
+export function isSameJob(page: string, known: string): boolean {
+  if (sameUrl(page) === sameUrl(known)) return true;
+  const [here, saved] = [jobKeyOf(page), jobKeyOf(known)];
+  if (!here || !saved || here.board !== saved.board || here.route !== saved.route) return false;
+  const under = (inner: string, outer: string) => inner === outer || (outer.length > 1 && inner.startsWith(`${outer}/`));
+  if (!under(here.path, saved.path) && !under(saved.path, here.path)) return false;
+  // The same job ids on both, or one side's id written in the other's path (Greenhouse's gh_jid=8329677 on
+  // /jobs/8329677): an id the other side has nowhere can be another job's.
+  return [...new Set([...here.ids.keys(), ...saved.ids.keys()])].every((key) => {
+    const [mine, theirs] = [here.ids.get(key), saved.ids.get(key)];
+    if (mine !== undefined && theirs !== undefined) return mine === theirs;
+    const segments = (mine === undefined ? here.path : saved.path).split("/");
+    return segments.includes((mine ?? theirs ?? "").toLowerCase());
+  });
 }

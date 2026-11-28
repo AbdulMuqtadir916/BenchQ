@@ -2150,6 +2150,10 @@ unchanged in this PR; their live DTO integration and display changes belong to l
   an attributable résumé are shown only for legacy applications. The legacy email monitor and auto-reject
   scheduler leave candidate applications untouched.
 
+  The extension lists letters with `GET /api/cover-letters?application_id=…` (`{letters: [...]}`) and uses that same
+  query parameter on `GET /api/cover-letters/{id}/pdf`. Both requests require visibility of the application and match
+  its posting and the candidate on the letter's source résumé. The PDF returns 404 for a letter outside that scope.
+
 
 ```ts
 // src/lib/schemas/application.ts

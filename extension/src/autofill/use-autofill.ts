@@ -220,7 +220,7 @@ function goneUpload(memory: TabMemory, name: string): { field: TabField; index: 
   const [key, { field, index }] = found;
   memory.settled.set(key, name);
   memory.seen.set(key, name);
-  return { field: { ...field, current: name, isGone: true }, index };
+  return { field: { ...field, current: name, complete: true, isGone: true }, index };
 }
 
 /** A row for an upload the site took away (`goneUpload`): BenchQ's fill while it holds the file asked for, else the
@@ -448,14 +448,15 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
    * upload to the BDE. */
   const loadCoverLetter = useCallback(async (): Promise<ResumeFile | null> => {
     if (!coverLetterId) return null;
-    let found = letters.current.get(coverLetterId);
+    const key = `${applicationId}:${coverLetterId}`;
+    let found = letters.current.get(key);
     if (found === undefined) {
-      found = await getCoverLetterFile(coverLetterId).then((file) => file && { ...file, source: "generated" as const }, () => undefined);
+      found = await getCoverLetterFile(coverLetterId, applicationId).then((file) => file && { ...file, source: "generated" as const }, () => undefined);
       if (found === undefined) return null;
-      letters.current.set(coverLetterId, found);
+      letters.current.set(key, found);
     }
     return found && { ...found, name: "Cover Letter.pdf", id: `cover:${coverLetterId}` };
-  }, [coverLetterId]);
+  }, [applicationId, coverLetterId]);
 
   const readPage = useCallback(async (isCurrent: () => boolean) => {
     try {
@@ -555,7 +556,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     // Many sites read the file as it goes on, then empty their upload and show it as a chip: the upload still holds
     // BenchQ's file, so it isn't "reset" (07 Q53).
     if (page && lastAttached && resumeUpload && !resumeUpload.current.trim() && await fileShownOnPage(tabId, lastAttached).catch(() => false)) {
-      page.fields = page.fields.map((field) => (field === resumeUpload ? { ...field, current: lastAttached } : field));
+      page.fields = page.fields.map((field) => (field === resumeUpload ? { ...field, current: lastAttached, complete: true } : field));
     }
     // Others take the upload away once they have the file and name it instead (Reddit's Greenhouse form): the Resume/CV
     // row stays where the upload was, holding the file as BenchQ's fill, so every look reads the form the same and
@@ -682,8 +683,18 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       return false;
     }
     const shown = shownRows.current!;
+    const lastAttached = [...memory.current.attached.values()].at(-1);
+    const upload = lastAttached ? shown.find(({ field }) => field.kind === "file"
+      && documentOf(field) === "resume" && (field.isGone || field.current === lastAttached)) : undefined;
+    const uploadKey = upload ? `${upload.field.frameId}:${upload.field.id}` : null;
+    const checkChip = upload && uploadKey && (upload.field.isGone || look.required?.get(uploadKey) === false
+      || !look.values.get(uploadKey)?.trim());
+    const chipShown = checkChip && await fileShownOnPage(tabId, lastAttached!).catch(() => false);
+    if (!canLook() || snapshot !== frames.current || shown !== shownRows.current) return false;
     const fields = shown.map(({ field }) => {
       const key = `${field.frameId}:${field.id}`;
+      if (field === upload?.field && chipShown) return { ...field, current: lastAttached!, complete: true };
+      if (field === upload?.field && field.isGone) return { ...field, current: "", complete: false };
       return { ...field, current: look.values.get(key) ?? field.current, complete: look.required?.get(key) ?? field.complete };
     });
     if (fields.every(({ current, complete }, i) => current === shown[i]!.field.current && complete === shown[i]!.field.complete)) return true;
@@ -947,7 +958,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     busy.current = true;
     setStep(STEP_CLEARING);
     for (const row of stale) {
-      if (held.current) break;
+      if (shouldStop()) break;
       const scanId = frames.current.scanIds.get(row.field.frameId);
       const target = { scanId: scanId ?? 0, fieldId: row.field.id };
       const isBack = scanId !== undefined && await takeBackField(tabId, row.field.frameId, target).catch(() => false);
@@ -964,7 +975,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     busy.current = false;
     // What changed is BenchQ's doing, so none of it counts as the BDE's edit.
     await scan(new Set());
-  }, [scan, tabId]);
+  }, [scan, shouldStop, tabId]);
 
   /** Takes the files BenchQ attached for another résumé off the page, through the page's own remove control, so the
    * picked résumé's file replaces them instead of being ignored beside them (Greenhouse shows a taken file as a chip and
@@ -1141,8 +1152,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   }, [scan, tabId]);
 
   const undo = useCallback(async () => {
-    if (busy.current) return;
+    if (busy.current || shouldStop()) return;
     busy.current = true;
+    setStep("Restoring form values…");
     setOutcome(null);
     try {
       const { restored, kept, skipped } = await undoFills(tabId);
@@ -1164,9 +1176,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     setIsFollowingSteps(false);
     setAttachedFile(null);
     busy.current = false;
+    setStep(null);
     await scan(new Set());
     drainMissedLook();
-  }, [drainMissedLook, scan, tabId]);
+  }, [drainMissedLook, scan, shouldStop, tabId]);
 
   /** Keeps an answer the BDE typed on the picked résumé, for next time (07 Q58): for all of the candidate's jobs, or the
    * picked résumé only. The answers load again, so the next form that asks it is filled. A résumé picked while it saved
@@ -1207,6 +1220,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     try {
       const read = await Promise.race([watchForm(), new Promise<false>(resolve => { timer = window.setTimeout(() => resolve(false), LAST_LOOK_MS); })]);
       const complete = read && frames.current.scanIds.has(TOP_FRAME) && !heldLook.current && !shouldStop()
+        && !(frames.current.unreadableFrames > 0 && !(shownRows.current ?? []).some(({ field }) => !field.isGone))
         && !(shownRows.current ?? []).some(needsRequiredAnswer);
       return { form: appliedForm(formOf(applicationId)), complete };
     } finally {

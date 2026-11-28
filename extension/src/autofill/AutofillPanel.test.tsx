@@ -34,11 +34,12 @@ const form: AppliedForm = { fields: [{ label: "City", value: "Dallas", required:
 
 const finalForm = vi.fn(async () => ({ form, complete: true }));
 const autofill = vi.fn();
+const undo = vi.fn();
 
 const holdsFile = vi.fn<(id: string) => boolean>(() => false);
 const reviewed = {
   rows: [], scanning: false, error: "", filling: false, outcome: null, undoable: 0, fillCount: 0, needsConfirmation: false, unreadableFrames: 0,
-  check: { conflict: false, detected: "" }, finalForm, autofill, holdsFile,
+  check: { conflict: false, detected: "" }, finalForm, autofill, undo, holdsFile,
 };
 
 const row = (label: string, required: boolean, current = ""): ReviewRow => ({
@@ -1039,10 +1040,11 @@ describe("the buttons at the bottom", () => {
     expect(atBottom().map(({ disabled }) => disabled)).toEqual([true]);
   });
 
-  it("show no Undo: the BDE puts a field right on the form itself", () => {
+  it("offers to undo the extension's fills after a run", async () => {
     show({ fillCount: 0, undoable: 2 }, { onApply: vi.fn() });
-    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied"]);
-    expect(named("Undo")).toBeUndefined();
+    expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Undo"]);
+    await click("Undo");
+    expect(undo).toHaveBeenCalledOnce();
   });
 
   it("wait for every required field before Mark applied, and say how many are left", () => {

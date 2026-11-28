@@ -295,7 +295,8 @@ it("uses the source click to open the panel and bind the destination to the save
   vi.restoreAllMocks();
 });
 it.each([
-  ["binds a source link that redirected within the job's site", "https://www.adzuna.example/land/ad/42", "https://www.adzuna.example/details/42?i=1", true],
+  ["binds an Adzuna tracking redirect", "https://www.adzuna.com/land/ad/42", "https://www.adzuna.com/details/42?i=1", true],
+  ["does not bind a different Taleo requisition in the same tab", "https://acme.taleo.net/careersection/2/jobdetail.ftl?job=25000123", "https://acme.taleo.net/careersection/2/jobdetail.ftl?job=25000124", false],
   ["binds a link that moved to another host of the same site", "https://boards.greenhouse.io/acme/jobs/42", "https://job-boards.greenhouse.io/acme/jobs/42", true],
   ["leaves the tab unbound once it shows another site", "https://www.adzuna.example/land/ad/42", "https://elsewhere.example/", false],
 ])("%s", async (_name, url, landed, isBound) => {

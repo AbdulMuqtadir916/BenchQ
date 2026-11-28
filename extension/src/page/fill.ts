@@ -336,13 +336,16 @@ const CLICK_THE_FORM = "ADP takes typing only on its own page: click the form, t
 
 /** Takes a field back to what it held, whether for undo or after a fill that didn't take. A styled radio can't be
  * turned off by a click, so whether it went back is checked. */
-async function putBack(entry: Entry, before: Snapshot, run?: string): Promise<boolean> {
+async function putBack(entry: Entry, before: Snapshot, run?: string, stillLive = () => true): Promise<boolean> {
   if ("choice" in before) return restoreChoice(entry, before.choice);
   // ADP drops a value set without typing: the old one is typed back once its page has the focus, and only a field that
   // holds it again counts as put back (CodeRabbit's review of cf130dea).
   const control = entry.controls[0] as HTMLInputElement;
   if ("value" in before && typesOnlyWithFocus(control)) {
+    const url = control.ownerDocument.URL;
+    const current = snapshot(entry);
     if (!(await focusArrives(control.ownerDocument, FOCUS_WAIT_MS, run))) return false;
+    if (!stillLive() || !control.isConnected || control.ownerDocument.URL !== url || !sameSnapshot(snapshot(entry), current)) return false;
     typeOnAdp(control, before.value);
     await pause(SETTLE_MS);
     return control.value === before.value;
@@ -576,8 +579,9 @@ export function createFiller(registry: () => Registry | null) {
       const mine = filled.filter((item) => item.entry.controls[0] === entry.controls[0]);
       const [first] = mine;
       if (!first || !sameSnapshot(snapshot(entry), mine.at(-1)!.after)) return false;
-      filled = filled.filter((item) => !mine.includes(item));
-      return putBack(entry, first.before);
+      const restored = await putBack(entry, first.before, undefined, () => liveEntry(scanId, fieldId) === entry);
+      if (restored) filled = filled.filter((item) => !mine.includes(item));
+      return restored;
     },
 
     async undo(): Promise<UndoResult> {
