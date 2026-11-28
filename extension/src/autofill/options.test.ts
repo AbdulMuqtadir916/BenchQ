@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { optionFor, pickOneReason, polarity } from "./options";
+import { optionFor, pickOneReason, polarity, withStateComma } from "./options";
 import type { FieldOption } from "./types";
 
 const options = (...labels: string[]): FieldOption[] => labels.map((label, index) => ({ id: `o${index}`, label }));
@@ -185,5 +185,50 @@ describe("pickOneReason", () => {
     expect(pickOneReason("Asian", options("Asian", "White"))).toBeNull();
     expect(pickOneReason("Purple", options("Red", "Blue"))).toBeNull();
     expect(pickOneReason("Engineer", options("A Engineer", "B Engineer", "C Engineer", "D Engineer", "E Engineer"))).toBeNull();
+  });
+});
+
+describe("US places", () => {
+  it("adds the comma a US state was written without", () => {
+    expect(withStateComma("Dallas TX")).toBe("Dallas, TX");
+    expect(withStateComma("Salt Lake City Utah 84101")).toBe("Salt Lake City, Utah 84101");
+    expect(withStateComma("New York NY")).toBe("New York, NY");
+    expect(withStateComma("Washington DC")).toBe("Washington, DC");
+    expect(withStateComma("Dallas TX, USA")).toBe("Dallas, TX, USA");
+    expect(withStateComma("1234 Elm St, Dallas TX 75201")).toBe("1234 Elm St, Dallas, TX 75201");
+    // A state alone, a city that ends in no state, and a code in lower case (a word like "or") stay as they are.
+    for (const place of ["West Virginia", "New York", "Kansas City", "Virginia Beach", "Dallas, TX", "Portland or"]) {
+      expect(withStateComma(place)).toBe(place);
+    }
+  });
+
+  it("picks the US state however the list writes it", () => {
+    const coded = options("VA - Virginia", "WV - West Virginia", "TX - Texas");
+    expect(optionFor("Virginia", coded)).toBe("o0");
+    expect(optionFor("West Virginia", coded)).toBe("o1");
+    expect(optionFor("VA", coded)).toBe("o0");
+    expect(optionFor("Texas", options("Texas (TX)", "Utah (UT)"))).toBe("o0");
+    expect(optionFor("TX", options("United States", "Texas, US", "Utah, US"))).toBe("o1");
+    // Washington the state is never Washington DC.
+    expect(optionFor("WA", options("DC - Washington DC", "WA - Washington"))).toBe("o1");
+  });
+
+  it("picks the country under any of its names", () => {
+    expect(optionFor("United States", options("Canada", "US", "UK"))).toBe("o1");
+    expect(optionFor("United States", options("Canada", "U.S.A."))).toBe("o1");
+    expect(optionFor("USA", options("United States of America", "United States Minor Outlying Islands"))).toBe("o0");
+  });
+
+  it("finds a US city in a lookup however either side writes it", () => {
+    expect(optionFor("Dallas, Texas", options("Dallas, GA, USA", "Dallas, TX, USA"))).toBe("o1");
+    expect(optionFor("Dallas TX", options("Dallas, Georgia, United States", "Dallas County, Texas, United States", "Dallas, Texas, United States"))).toBe("o2");
+    expect(optionFor("St. Louis, MO", options("St. Louis Park, Minnesota, United States", "Saint Louis, Missouri, United States"))).toBe("o1");
+    expect(optionFor("Ft. Lauderdale, FL", options("Fort Lauderdale, Florida, United States"))).toBe("o0");
+    expect(optionFor("Salt Lake City Utah", options("South Salt Lake, Utah, United States", "Salt Lake City, Utah, United States"))).toBe("o1");
+    // A city's own words are never read as states: "La" isn't Louisiana, nor "De" Delaware.
+    expect(optionFor("La Jolla, CA", options("La Jolla, California, United States"))).toBe("o0");
+    expect(optionFor("De Pere, WI", options("De Pere, Wisconsin, United States"))).toBe("o0");
+    // Without the state, two Dallases stay with the BDE.
+    expect(optionFor("Dallas", options("Dallas, Texas, United States", "Dallas, Georgia, United States"))).toBeNull();
   });
 });

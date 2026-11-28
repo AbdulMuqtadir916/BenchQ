@@ -1,5 +1,5 @@
 import { MUTED_TEXT } from "../ui";
-import { filledValue } from "./form-memory";
+import { filledValue, needsRequiredAnswer } from "./form-memory";
 import type { ReviewRow } from "./types";
 
 /** How far the form is, at a glance: the fields that hold a value out of all the form's fields, and the required ones
@@ -9,7 +9,7 @@ import type { ReviewRow } from "./types";
  * counts, including an old one the refill couldn't take back (a radio button, a dropdown that won't clear). */
 /** `isCompact`: one small line and a hairline bar, under the filled form's heading. */
 export default function FormProgress({ rows, isRestarting = false, isCompact = false }: { rows: ReviewRow[]; isRestarting?: boolean; isCompact?: boolean }) {
-  const isFilled = (row: ReviewRow) => Boolean(filledValue(row)) && !(isRestarting && row.isOldFill);
+  const isFilled = (row: ReviewRow) => (row.field.required ? !needsRequiredAnswer(row) : Boolean(filledValue(row))) && !(isRestarting && row.isOldFill);
   const filled = rows.filter(isFilled).length;
   const requiredLeft = rows.filter((row) => row.field.required && !isFilled(row)).length;
   const percent = rows.length ? Math.round((filled / rows.length) * 100) : 0;

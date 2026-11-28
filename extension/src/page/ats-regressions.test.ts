@@ -55,6 +55,17 @@ it("reads the listing behind an application page that shows only the role's head
   expect(fetched).toHaveBeenCalled();
 });
 
+it("discards a parent posting response when navigation happens while the response body loads", async () => {
+  let url = "https://apply.workable.com/acme/j/PDT12407/apply/";
+  const form = new DOMParser().parseFromString("<main></main>", "text/html");
+  Object.defineProperty(form, "URL", { get: () => url });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, url: "https://apply.workable.com/acme/j/PDT12407/", text: async () => {
+    url = "https://apply.workable.com/acme/jobs/search";
+    return '<script type="application/ld+json">{"@type":"JobPosting","title":"Old role"}</script>';
+  } }));
+  expect(await readJobForSave(form)).toMatchObject({ isJobPage: false, url: "https://apply.workable.com/acme/jobs/search", title: "" });
+});
+
 it("keeps the application page's description when the listing behind it has none", async () => {
   const url = "https://jobs.lever.co/tenant/12345678-1234-1234-1234-123456789012/apply";
   const form = new DOMParser().parseFromString('<script type="application/ld+json">{"@type":"JobPosting","title":"Programmer","description":"Write code for the payments team.","hiringOrganization":"Example"}</script>', "text/html");

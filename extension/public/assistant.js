@@ -23,7 +23,7 @@
     const job = globalThis.__benchqAutofill?.readJob();
     const application = document.querySelector("form") && /apply|application/i.test(location.pathname + " " + document.title)
       && document.querySelector("input[type=file], input[autocomplete=email], input[type=email]");
-    relevant = Boolean((job?.isJobPage && job.title) || application);
+    relevant = Boolean(job?.isJobPage || application);
     button.title = job?.title ? `Review ${job.title} in BenchQ` : "Open BenchQ Autofill Apply";
     button.setAttribute("aria-label", button.title);
     if (!relevant) { host.remove(); return; }

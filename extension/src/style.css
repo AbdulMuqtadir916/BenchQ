@@ -266,6 +266,25 @@
   .bq-secondary:active:not(:disabled) {
     transform: translateY(1px);
   }
+
+  /* A button that can't be pressed yet, muted in BenchQ's own blue: the primary's soft tint, its text dimmed, no glow;
+     never a see-through copy of itself, nor grey. One that is busy (aria-busy, "Saving…") keeps its look. */
+  .bq-primary:disabled:not([aria-busy="true"]) {
+    border-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    background: var(--color-primary-subtle);
+    box-shadow: none;
+    color: color-mix(in srgb, var(--color-primary-subtle-fg) 62%, transparent);
+  }
+
+  .bq-secondary:disabled:not([aria-busy="true"]) {
+    border-color: var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-3);
+  }
+
+  .bq-primary:disabled[aria-busy="true"] {
+    cursor: progress;
+  }
 }
 
 /* Zero, not a tiny duration: anything above zero starts a transition on every changed property of every element,

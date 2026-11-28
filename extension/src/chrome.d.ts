@@ -59,6 +59,10 @@ declare const chrome: {
     }): Promise<InjectionResult[]>;
   };
   storage: {
+    local: {
+      get(keys: string[]): Promise<Record<string, unknown>>;
+      set(items: Record<string, unknown>): Promise<void>;
+    };
     session: {
       get(keys: string | null): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;

@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { addJob, BENCHQ_URL, getCandidateJob, type Application, type BenchqJob } from "../api";
 import { ALERT, button, CARD, MUTED_TEXT, SOFT_TEXT } from "../ui";
+import { CompanyLogo } from "./CompanyLogo";
 import { CHECK, SPINNER_ICON } from "./icons";
 import { readSourceJob } from "./connection-store";
 import { sameCompany, sameListing, siteOf } from "./job-check";
@@ -10,6 +11,14 @@ import { readJobPage } from "./tab-bridge";
 import type { PageJob } from "./types";
 
 type KnownJob = { id?: string; status?: string; title: string | null; company: string | null; location: string | null; url?: string | null };
+
+function placeholderTitle(value: string | null, ids: readonly string[] = []): boolean {
+  const title = value?.trim() ?? "";
+  return !title || /^(?:view job|job details?|job description|candidate center)$/i.test(title)
+    || /^(?:job|req(?:uisition)?|position|posting)\s*(?:id|number|no\.?|code|#)(?=$|[\s:#.-])/i.test(title)
+    || /^(?:#?\d+|(?:jr|req|r)\s*[-_]?\s*\d[\w.-]*|[a-z]{1,12}\s*[-_]\s*\d[\w.-]*)$/i.test(title)
+    || ids.includes(title.replace(/\s*-\s*/g, "-").toLowerCase());
+}
 
 type AddJobCardProps = {
   /** The BDE's firm, for looking up the BenchQ job a tab was opened for. */
@@ -33,7 +42,7 @@ type AddJobCardProps = {
 const LOOK_AGAIN_MS = [1000, 2500, 5000, 9000, 15000];
 
 /** A link without its fragment or a trailing slash, so one job's page matches however it was opened. */
-const sameUrl = (url: string) => url.split("#")[0]!.replace(/\/+$/, "").toLowerCase();
+const sameUrl = (url: string) => url.replace(/#(?:top|apply|application|description)?$/i, "").replace(/\/+$/, "");
 
 /** Query keys that name a job. Other keys (tracking, the source of a click) don't tell two jobs apart. */
 const JOB_KEYS = /^(gh_jid|jk|vjk|jobid|job_id|id|req|reqid|req_id|requisitionid|pid|currentjobid)$/i;
@@ -47,6 +56,8 @@ function jobKeyOf(url: string) {
     const path = link.pathname.toLowerCase().replace(/\/+$/, "");
     return {
       site,
+      board: link.hostname.replace(/^www\./, "").replace(/^(?:job-boards|boards)\.greenhouse\.io$/, "boards.greenhouse.io"),
+      route: /^#!?\/|[?&=]/.test(link.hash) ? link.hash : "",
       // Adzuna's tracked link (/land/ad/<id>) opens the listing (/details/<id>): one job at two addresses.
       path: site === "adzuna.com" ? path.replace(/^\/land\/ad\/(\d+)$/, "/details/$1") : path,
       ids: new Map([...link.searchParams].filter(([key]) => JOB_KEYS.test(key)).map(([key, value]) => [key.toLowerCase(), value])),
@@ -61,7 +72,7 @@ function jobKeyOf(url: string) {
 function isSameJob(page: string, known: string): boolean {
   if (sameUrl(page) === sameUrl(known)) return true;
   const [here, saved] = [jobKeyOf(page), jobKeyOf(known)];
-  if (!here || !saved || here.site !== saved.site) return false;
+  if (!here || !saved || here.board !== saved.board || here.route !== saved.route) return false;
   const under = (inner: string, outer: string) => inner === outer || (outer.length > 1 && inner.startsWith(`${outer}/`));
   if (!under(here.path, saved.path) && !under(saved.path, here.path)) return false;
   // The same job ids on both, or one side's id written in the other's path (Greenhouse's gh_jid=8329677 on
@@ -69,7 +80,8 @@ function isSameJob(page: string, known: string): boolean {
   return [...new Set([...here.ids.keys(), ...saved.ids.keys()])].every((key) => {
     const [mine, theirs] = [here.ids.get(key), saved.ids.get(key)];
     if (mine !== undefined && theirs !== undefined) return mine === theirs;
-    return (mine === undefined ? here.path : saved.path).includes((mine ?? theirs ?? "").toLowerCase());
+    const segments = (mine === undefined ? here.path : saved.path).split("/");
+    return segments.includes((mine ?? theirs ?? "").toLowerCase());
   });
 }
 
@@ -128,13 +140,6 @@ function isOtherRequisition(found: PageJob, known: KnownJob): boolean {
 export const isSavedJob = (found: PageJob, known: KnownJob) =>
   (sameListing(found, known) && !isOtherRequisition(found, known)) || sharesJobId(found, known);
 
-/** How much a reading of a page holds: its stated fields. */
-const fieldsOf = (job: PageJob) => Object.values(job).filter((value) => value !== undefined && value !== null && value !== "").length;
-
-/** A later reading says more: more fields, or as many and a longer description (a page that shows a teaser first,
- * then its whole job description: PR #140's review). */
-const isFuller = (found: PageJob, shown: PageJob) => fieldsOf(found) > fieldsOf(shown)
-  || (fieldsOf(found) === fieldsOf(shown) && found.description.length > shown.description.length);
 const MODE_LABEL = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const;
 const PER = { hour: "an hour", day: "a day", week: "a week", month: "a month", year: "a year" } as const;
 const amount = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -149,9 +154,10 @@ const dateWords = (iso: string) => {
  * adds the job, so anyone can check it at a glance: [["Work mode", "Remote"], ["Pay", "USD 120,000–150,000 a year"],
  * ["Type", "Full-time"], ["Posted", "10 Nov 2026"], ["Job ID", "R123456"]]. Only what the page stated. */
 export function detailsOf(job: PageJob): Array<[string, string]> {
-  const pay = job.salaryMin === undefined ? "" : [job.salaryCurrency, job.salaryMax !== undefined && job.salaryMax !== job.salaryMin
-    ? `${amount(job.salaryMin)}–${amount(job.salaryMax)}` : amount(job.salaryMin), job.salaryPeriod ? PER[job.salaryPeriod] : ""]
-    .filter(Boolean).join(" ");
+  const { salaryMin: min, salaryMax: max } = job;
+  const bound = min === undefined ? "Up to" : max === undefined ? "From" : "";
+  const sum = min !== undefined && max !== undefined && min !== max ? `${amount(min)}–${amount(max)}` : amount(min ?? max ?? 0);
+  const pay = min === undefined && max === undefined ? "" : [bound, job.salaryCurrency, sum, job.salaryPeriod && PER[job.salaryPeriod]].filter(Boolean).join(" ");
   const facts: Array<[string, string]> = [["Work mode", job.workMode ? MODE_LABEL[job.workMode] : ""], ["Pay", pay],
     ["Type", job.employmentType ?? ""], ["Posted", job.postedAt ? dateWords(job.postedAt) : ""], ["Job ID", job.requisitionId ?? ""]];
   return facts.filter(([, value]) => value);
@@ -173,14 +179,25 @@ export const looksLikeJobPage = (url: string) => isJobLink(url);
  * to it, ready for Autofill. On a site BenchQ may not read yet (#126) it first asks, on a link that looks like a job's
  * page, and reads the page once the BDE allows it.
  */
-export default function AddJobCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
+export default function AddJobCard(props: AddJobCardProps) {
+  return <CaptureCard key={JSON.stringify([props.firmId, props.candidateId, props.tab?.id, props.tab?.url])} {...props} />;
+}
+
+function CaptureCard({ tab, firmId, candidateId, candidateName, knownUrls, knownJobs = [], onAdded, onUseTab, onPageTitle }: AddJobCardProps) {
   // Re-read only legacy placeholders whose saved URL identifies this exact posting.
   const legacy = knownJobs.find(known => tab && known.url === tab.url
-    && /^(?:view job|job details?|job description)$/i.test(known.title?.trim() ?? ""));
+    && placeholderTitle(known.title, jobIdsOf(tab.url)));
   const legacyId = legacy?.id;
   const legacyUrl = legacy?.url;
   const tabId = tab && offersPage(tab.url, legacyId ? [] : knownUrls) ? tab.id : null;
   const [job, setJob] = useState<PageJob | null>(null);
+  const [edits, setEdits] = useState<{ key: string; values: Partial<Pick<PageJob, "title" | "company" | "location" | "description">> }>();
+  const draftKey = JSON.stringify([job?.url, job?.requisitionId || job?.title]);
+  const draft = edits?.key === draftKey ? edits.values : {};
+  const setDraft = (values: typeof draft) => setEdits({ key: draftKey, values });
+  const [editing, setEditing] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // The BenchQ job this tab was opened for from the website, when this candidate has it: Save saves that job itself.
   // Kept with the candidate it was looked up for: another candidate's posting is never saved by its id for this one.
   const [lookup, setLookup] = useState<{ candidateId: string; job: BenchqJob | null } | null>(null);
@@ -211,13 +228,15 @@ export default function AddJobCard({ tab, firmId, candidateId, candidateName, kn
     let isLive = true;
     // Looks for the whole schedule: a page that adds its JobPosting data after it shows (Oracle's) gives more on a later
     // look, and the card takes that fuller reading of the same job.
-    const look = () => void readJobPage(tabId).then((found) => {
-      if (!isLive || !found?.isJobPage || !found.title || !found.company || !found.description) return;
-      if (legacyId && legacyUrl && found.url === legacyUrl) onPageTitle?.(legacyId, found.title);
-      // The same page (or the same title) read more fully: its JobPosting may also name the job better than the page's
-      // heading did, so the title may change. Another page's reading never replaces this one (PR #140's review).
-      setJob((shown) => (!shown || ((shown.url === found.url || shown.title === found.title) && isFuller(found, shown)) ? found : shown));
-    }, () => undefined);
+    let latest = 0;
+    const look = () => {
+      const readNumber = ++latest;
+      void readJobPage(tabId).then(found => {
+        if (!isLive || readNumber !== latest || !found?.isJobPage) return;
+        if (legacyId && found.title && found.url === legacyUrl) onPageTitle?.(legacyId, found.title);
+        setJob(shown => !shown || shown.url === found.url ? found : shown);
+      }, () => undefined);
+    };
     const read = () => {
       look();
       timers = LOOK_AGAIN_MS.map((wait) => setTimeout(look, wait));
@@ -270,17 +289,29 @@ export default function AddJobCard({ tab, firmId, candidateId, candidateName, kn
       </button>
     </section> : null;
   }
-  if (tabId === null || !job) return null;
+  if (tabId === null || !job) return state.status === "error" ? <p className={ALERT} role="alert">{state.text}</p> : null;
 
   // Still the page of the job BenchQ has (not one the tab moved on to): show BenchQ's details, not the page's reading.
   const sameKnown = known?.url && isSameJob(job.url, known.url) ? known : null;
-  const shown: PageJob = sameKnown ? { ...job, title: sameKnown.title || job.title, company: sameKnown.company || job.company,
-    location: sameKnown.location ?? job.location, description: sameKnown.description || job.description } : job;
+  const shown: PageJob = sameKnown ? { ...job, title: placeholderTitle(sameKnown.title, job.ids) ? job.title : sameKnown.title!, company: sameKnown.company || job.company,
+    location: sameKnown.location ?? job.location, description: sameKnown.description || job.description } : { ...job, ...draft };
+  if (shown.company !== job.company) delete shown.logoUrl;
+  const missing = !shown.title.trim() || !shown.company.trim() || !shown.description.trim();
+  const editFields = !sameKnown && (editing || missing || Object.keys(draft).length > 0);
   const details = detailsOf(shown);
   const add = async () => {
     setState({ status: "adding" });
     try {
+      const fresh = await readJobPage(tabId);
+      if (!mounted.current) return;
+      if (!fresh?.isJobPage || fresh.url !== job.url || fresh.title !== job.title || fresh.company !== job.company || fresh.requisitionId !== job.requisitionId) {
+        setDraft({});
+        setJob(fresh?.isJobPage ? fresh : null);
+        setState({ status: "error", text: "The posting changed. Review its current details before saving." });
+        return;
+      }
       const application = await (sameKnown ? addJob(candidateId, shown, sameKnown) : addJob(candidateId, shown));
+      if (!mounted.current) return;
       setState({ status: "added", text: sameKnown ? `Saved to ${candidateName}'s jobs.`
         : application.application_created ? `Added to ${candidateName}'s Saved jobs.` : `Already in ${candidateName}'s jobs.` });
       onAdded(application);
@@ -290,16 +321,26 @@ export default function AddJobCard({ tab, firmId, candidateId, candidateName, kn
   };
 
   return <section data-slot="add-job" className={`mb-3 grid gap-2 p-3 ${CARD}`} aria-labelledby="add-job-title">
-    <h2 id="add-job-title" className="text-h3 wrap-anywhere">{shown.title}</h2>
+    <div className="flex items-center gap-2">
+      {shown.logoUrl && <CompanyLogo company={shown.company} url={shown.logoUrl} />}
+      <h2 id="add-job-title" className="text-h3 wrap-anywhere">{shown.title || "Job on this page"}</h2>
+    </div>
     <p className={SOFT_TEXT}>{[shown.company, shown.location].filter(Boolean).join(" · ")}</p>
     {sameKnown && <p data-slot="add-job-known" className={MUTED_TEXT}>{`This job is already in BenchQ. Save it to ${candidateName}'s jobs.`}</p>}
+    {!sameKnown && !editFields && (state.status === "idle" || state.status === "error") && <button type="button" className={button("secondary", "compact")} onClick={() => setEditing(true)}>Edit details</button>}
+    {editFields && state.status !== "added" && <fieldset disabled={state.status === "adding"} className="grid gap-2">
+      {(["title", "company", "location", "description"] as const).map(field => <label key={field} className="grid gap-1 text-caption capitalize">{field}
+        {field === "description" ? <textarea value={shown.description} maxLength={100000} onChange={event => setDraft({ ...draft, description: event.target.value })} />
+          : <input value={shown[field] ?? ""} maxLength={300} onChange={event => setDraft({ ...draft, [field]: event.target.value })} />}
+      </label>)}
+    </fieldset>}
     {details.length > 0 && <dl data-slot="add-job-details" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
       {details.map(([name, value]) => <Fragment key={name}>
         <dt className="text-[var(--color-text-3)]">{name}</dt>
         <dd className="min-w-0 text-[var(--color-text-2)] wrap-anywhere">{value}</dd>
       </Fragment>)}
     </dl>}
-    {state.status !== "added" && <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding"} onClick={() => void add()}>
+    {state.status !== "added" && <button type="button" data-slot="add-job-run" className={button("primary")} disabled={state.status === "adding" || (!sameKnown && missing)} onClick={() => void add()}>
       {state.status === "adding" ? <>{SPINNER_ICON}Saving…</> : `Save job for ${candidateName}`}
     </button>}
     {state.status === "added" && <p role="status" className={`flex items-center gap-1 ${MUTED_TEXT} [&_svg]:size-[var(--icon-sm)]`}>{CHECK}{state.text}</p>}

@@ -70,6 +70,7 @@ const amountOf = (digits: string, thousands?: string) => {
 /** The pay a line states: a range of amounts ("$120,000 - $150,000", "USD 60–70/hr") or one amount with its period
  * ("$65 an hour"). The first amount needs a currency sign or code; the period and currency only when the line says them. */
 export function payIn(text: string): Pay | undefined {
+  if (/\bestimat(?:ed|e)\b/i.test(text)) return undefined;
   const amounts = [...text.matchAll(MONEY)];
   for (let n = 0; n < amounts.length; n += 1) {
     const first = amounts[n]!;
@@ -93,9 +94,12 @@ export function payIn(text: string): Pay | undefined {
     const min = amountOf(first[2]!, first[3] ?? (isRange ? next![3] : undefined));
     const max = isRange ? amountOf(next![2]!, next![3]) : min;
     if (min === undefined || max === undefined || max < min) continue;
-    const sign = first[1] ?? next?.[1];
-    const currency = first[4] ?? next?.[4] ?? (sign && sign !== "$" ? SIGNS[sign] ?? sign : undefined);
-    return { salaryMin: min, salaryMax: max, ...(currency ? { salaryCurrency: currency } : {}), ...(period ? { salaryPeriod: period } : {}) };
+    const sign = first[1] ?? (isRange ? next?.[1] : undefined);
+    const currency = first[4] ?? (isRange ? next?.[4] : undefined) ?? (sign && sign !== "$" ? SIGNS[sign] ?? sign : undefined);
+    const lowerOnly = !isRange && /\b(?:from|starting at|at least|minimum(?: of)?)\s*[:=]?\s*$/i.test(before);
+    const upperOnly = !isRange && /\b(?:up to|at most|maximum(?: of)?)\s*[:=]?\s*$/i.test(before);
+    return { ...(!upperOnly && { salaryMin: min }), ...(!lowerOnly && { salaryMax: max }),
+      ...(currency ? { salaryCurrency: currency } : {}), ...(period ? { salaryPeriod: period } : {}) };
   }
   return undefined;
 }
@@ -126,7 +130,8 @@ export function dateOf(value: string, monthFirst = false): string | undefined {
 /** A requisition ID as a page writes it: a code with a digit, at most 60 characters. */
 export const idOf = (value: unknown) => {
   const code = typeof value === "number" ? String(value) : typeof value === "string" ? collapse(value) : "";
-  return /^[A-Za-z0-9][A-Za-z0-9_.#/-]{0,59}$/.test(code) && /\d/.test(code) ? code : undefined;
+  const normalized = code.replace(/\s*-\s*/g, "-");
+  return /^[A-Za-z0-9][A-Za-z0-9_.#/-]{0,59}$/.test(normalized) && /\d/.test(normalized) ? normalized : undefined;
 };
 
 /** What a JobPosting states: its location type, employment type, base salary, posting date and identifier. */
@@ -145,15 +150,26 @@ export function postingDetails(posting: Json): JobDetails {
 
 /** What a page states in schema.org microdata (`itemprop="employmentType"`, `<meta itemprop="datePosted">`, the
  * address's parts), as SmartRecruiters and others publish a JobPosting. */
-export function microdataDetails(doc: Document): JobDetails {
-  const root = doc.querySelector("[itemtype*='JobPosting']") ?? doc;
+export function microdataDetails(scope: Document | Element): JobDetails {
+  const roots = Array.from(scope.querySelectorAll("[itemtype*='JobPosting']")).filter(el => !el.closest(UNRELATED));
+  if (roots.length > 1) return {};
+  const root = roots[0] ?? scope;
   const prop = (name: string, within: ParentNode = root) => {
-    const element = within.querySelector(`[itemprop~='${name}']`);
+    const element = Array.from(within.querySelectorAll(`[itemprop~='${name}']`)).find(el => !el.closest(UNRELATED));
     return element ? collapse(element.getAttribute("content") ?? element.getAttribute("datetime") ?? element.textContent ?? "") : "";
   };
-  const place = [prop("addressLocality"), prop("addressRegion")].filter(Boolean).join(", ");
+  const place = [prop("addressLocality"), prop("addressRegion"), prop("addressCountry")].filter(Boolean).join(", ");
+  const salaries = Array.from(root.querySelectorAll('[itemprop~="baseSalary"]')).filter(el => !el.closest(UNRELATED));
+  const base = salaries.length === 1 ? salaries[0] : undefined;
+  const quantity = base?.querySelector('[itemprop~="value"][itemscope]') ?? base;
+  const pay = base && quantity ? salaryOf({
+    currency: prop("currency", base),
+    value: { minValue: prop("minValue", quantity) || undefined, maxValue: prop("maxValue", quantity) || undefined,
+      value: prop("value", quantity), unitText: prop("unitText", quantity) },
+  }) : {};
   return definedOnly({
     location: place || undefined,
+    ...pay,
     employmentType: employmentOf(prop("employmentType")),
     workMode: prop("jobLocationType").toUpperCase().includes("TELECOMMUTE") ? "remote" : undefined,
     postedAt: dateOf(prop("datePosted")),
@@ -168,10 +184,12 @@ function salaryOf(value: unknown): Pay {
   const range = (typeof amount === "object" && amount ? amount : { value: amount }) as Json;
   const number = (item: unknown) => (typeof item === "number" ? item : typeof item === "string" ? Number(item.replace(/,/g, "")) : NaN);
   const [min, max] = [number(range.minValue ?? range.value), number(range.maxValue ?? range.value)];
-  if (!(min > 0) || !(max >= min)) return {};
+  const hasMin = Number.isFinite(min) && min > 0;
+  const hasMax = Number.isFinite(max) && max > 0;
+  if ((!hasMin && !hasMax) || (hasMin && hasMax && max < min)) return {};
   const currency = typeof base.currency === "string" && /^[A-Za-z]{3}$/.test(base.currency) ? base.currency.toUpperCase() : undefined;
   const period = UNITS[String(range.unitText ?? base.unitText ?? "").toUpperCase()];
-  return { salaryMin: min, salaryMax: max, ...(currency ? { salaryCurrency: currency } : {}), ...(period ? { salaryPeriod: period } : {}) };
+  return { ...(hasMin && { salaryMin: min }), ...(hasMax && { salaryMax: max }), ...(currency && { salaryCurrency: currency }), ...(period && { salaryPeriod: period }) };
 }
 
 /** A chip that is only a workplace or an employment type. */
@@ -188,7 +206,8 @@ const ID_LABEL = /^(?:job\s+)?(?:job|req|requisition|posting|reference|ref|vacan
 
 const BLOCKS = new Set(["P", "LI", "DT", "DD", "DIV", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "SECTION", "ARTICLE",
   "MAIN", "ASIDE", "FORM", "UL", "OL", "TABLE", "TR", "BODY", "BLOCKQUOTE", "PRE", "LABEL", "BUTTON", "FIGCAPTION"]);
-const SKIPPED = "script, style, noscript, template, svg, nav, header, footer, select";
+export const UNRELATED = "aside, nav, footer, [role='complementary'], [aria-modal='true'], [hidden], [aria-hidden='true'], [data-testid='related-jobs']";
+const SKIPPED = `script, style, noscript, template, svg, header, select, ${UNRELATED}`;
 /** Site chrome a page marks by name rather than by element: `div.footer`, a navbar, a menu. */
 const CHROME = /^(?:site-?|global-?|page-?)?(?:footer|navbar|nav|menu)$|[-_]footer$|^footer[-_]/i;
 
@@ -283,8 +302,7 @@ const firstOf = <T>(values: string[], read: (value: string) => T | undefined) =>
 };
 
 /** What the page itself states, read from its labelled lines and its pay statements. */
-export function pageDetails(doc: Document, title: string): JobDetails {
-  const root = doc.querySelector("main, [role='main'], article") ?? doc.body;
+export function pageDetails(doc: Document, title: string, root = doc.querySelector("main, [role='main'], article") ?? doc.body): JobDetails {
   if (!root) return {};
   const lines = linesOf(root);
   // An icon the page names "location" says it outright, before lines a menu of places may imitate.
@@ -294,8 +312,11 @@ export function pageDetails(doc: Document, title: string): JobDetails {
   // Month first only on a page that says it's US English: a bare "en" is a UK page too, where 05/06/2026 is 5 June, so
   // such a date stays unread (PR #140's review).
   const monthFirst = /^en-us$/i.test(doc.documentElement.getAttribute("lang") ?? "");
-  const payLines = lines.filter((line, n) => line.length <= 400 && /\d/.test(line)
-    && PAY_WORDS.test([lines[n - 2] ?? "", lines[n - 1] ?? "", line].join(" ")));
+  // Board estimates stay labelled in the original description. The structured pay fields describe employer pay.
+  const employerPayLines = lines.map((line, i) => /\bestimat(?:ed|e)\b/i.test(line)
+    || (/\bestimat(?:ed|e)\b/i.test(lines[i - 1] ?? "") && PAY_WORDS.test(lines[i - 1] ?? "")) ? "" : line);
+  const payLines = employerPayLines.filter((line, n) => line.length <= 400 && /\d/.test(line)
+    && PAY_WORDS.test([employerPayLines[n - 2] ?? "", employerPayLines[n - 1] ?? "", line].join(" ")));
   const idLine = firstOf(lines, (line) => /^(?:job|req|requisition)\.? ?(?:id|#|number)\s*#?\s+(\S+)$/i.exec(line)?.[1]);
   return definedOnly({
     location,
@@ -303,9 +324,9 @@ export function pageDetails(doc: Document, title: string): JobDetails {
       ?? appMode(doc) ?? (location ? modeIn(location) : undefined) ?? titleMode(title),
     employmentType: firstOf(valuesOf(lines, TYPE_LABEL), employmentOf)
       ?? firstOf(chips(lines), (line) => (CHIP_TYPE.test(line) ? employmentOf(line) : undefined)),
-    ...(firstOf(valuesOf(lines, PAY_LABEL), payIn) ?? firstOf(payLines, payIn) ?? {}),
+    ...(firstOf(valuesOf(employerPayLines, PAY_LABEL), payIn) ?? firstOf(payLines, payIn) ?? {}),
     postedAt: firstOf(valuesOf(lines, POSTED_LABEL), (value) => dateOf(value, monthFirst)),
-    requisitionId: firstOf(valuesOf(lines, ID_LABEL), (value) => idOf(value.split(/[\s|,;]+/)[0])) ?? (idLine ? idOf(idLine) : undefined),
+    requisitionId: firstOf(valuesOf(lines, ID_LABEL), (value) => idOf(value.replace(/\s*-\s*/g, "-").split(/[\s|,;]+/)[0])) ?? (idLine ? idOf(idLine) : undefined),
   });
 }
 

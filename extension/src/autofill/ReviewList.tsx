@@ -1,8 +1,9 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { BELOW_TOP_BAR, button, MOTION } from "../ui";
+import { BELOW_TOP_BAR, MOTION } from "../ui";
 import ChoicePicker from "./ChoicePicker";
+import { isChoosable, ownOptions } from "./choices";
 import { fieldLabel, filledValue } from "./form-memory";
-import { CHECK, LIGHTBULB_ICON } from "./icons";
+import { BOOKMARK_ICON, CHECK, LIGHTBULB_ICON } from "./icons";
 import { Tick } from "./marks";
 import type { BankEntry, ReviewRow } from "./types";
 
@@ -34,8 +35,14 @@ const LINK = "text-caption text-[var(--color-text-2)] underline-offset-2 hover:t
 /** An answer longer than this shows four lines until "Show all". */
 const LONG_ANSWER = 220;
 
-const SAVE_BUTTON = `bq-secondary inline-flex min-h-[var(--control-sm)] max-w-full items-center rounded-[var(--radius-md)] px-2 py-0.5 text-left text-sm font-[550] wrap-anywhere transition-[background,box-shadow] ${MOTION} disabled:cursor-not-allowed disabled:opacity-50`;
+/** Save for next time: a small pill in the primary tint, as Use is, with a bookmark. */
+const SAVE_BUTTON = `inline-flex max-w-full items-center gap-1.5 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-primary)_40%,transparent)] bg-[var(--color-primary-subtle)] px-2.5 py-1 text-left text-caption font-[650] text-[var(--color-primary)] wrap-anywhere transition-[border-color,background] ${MOTION} enabled:hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:text-[color-mix(in_srgb,var(--color-primary)_55%,transparent)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none`;
 const SAVED = "flex items-center gap-1 text-caption font-[550] text-[var(--color-success-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
+/** A checkbox in BenchQ's colours: the native box stays, unseen, for the keyboard and screen readers. */
+const CHOICE_LABEL = "inline-flex cursor-pointer items-center gap-1.5 text-caption font-[550] text-[var(--color-text-2)] hover:text-[var(--color-text)]";
+const CHECKBOX = `grid size-3.5 flex-none place-items-center rounded-[calc(var(--radius-sm)/2)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-primary-fg)] transition-[background,border-color] ${MOTION} peer-checked:border-[var(--color-primary)] peer-checked:bg-[var(--color-primary)] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-focus-ring)] [&_svg]:size-2.5 [&_svg]:opacity-0 peer-checked:[&_svg]:opacity-100`;
+/** Use, on a saved answer that might fit: a small pill in the primary tint. */
+const USE = `inline-flex flex-none items-center rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-primary)_45%,transparent)] bg-[var(--color-primary-subtle)] px-2.5 py-1 text-caption font-[650] text-[var(--color-primary)] transition-[border-color,background] ${MOTION} hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50`;
 
 /** Keeping a typed answer for next time (07 Q58): the button says what saving does, saving a new answer or updating the
  * one saved before (Q21), and "Only this résumé" keeps it to the picked résumé (Q22): that version, which other jobs may use too. */
@@ -51,9 +58,10 @@ function SaveAnswer({ row, isFilling, onSave }: { row: ReviewRow; isFilling: boo
     setIsSaving(false);
   };
   return <div data-slot="review-save" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[calc(var(--icon-md)+var(--spacing)*2)]">
-    <button type="button" className={SAVE_BUTTON} disabled={isFilling || isSaving} onClick={() => void save()}>{isSaving ? "Saving…" : offer.label}</button>
-    <label className="flex items-center gap-1 text-caption text-[var(--color-text-2)]">
-      <input type="checkbox" checked={isOnlyThisResume} onChange={(event) => setIsOnlyThisResume(event.target.checked)} />Only this résumé
+    <button type="button" className={SAVE_BUTTON} disabled={isFilling || isSaving} onClick={() => void save()}>{BOOKMARK_ICON}{isSaving ? "Saving…" : offer.label}</button>
+    <label className={CHOICE_LABEL} title="Ticked: only the résumé picked now keeps this answer. Unticked: this résumé and every version of it (its tailored copies for other jobs) keep it.">
+      <input type="checkbox" className="peer sr-only" checked={isOnlyThisResume} onChange={(event) => setIsOnlyThisResume(event.target.checked)} />
+      <span className={CHECKBOX} aria-hidden="true">{CHECK}</span>Only this résumé
     </label>
   </div>;
 }
@@ -115,10 +123,12 @@ function Row({ row, ...actions }: RowActions & { row: ReviewRow }) {
         {!filled && savedAnswers(row).map((answer) => <span key={answer} data-slot="review-saved" className="sr-only">Saved: {answer}</span>)}
       </span>
     </RowBody>
-    {row.canChoose && !filled && actions.onListOptions && actions.onChoose && <div className="pl-[calc(var(--icon-md)+var(--spacing)*2)]">
-      <ChoicePicker row={row} isFilling={actions.isFilling} onListOptions={actions.onListOptions} onChoose={actions.onChoose} />
+    {isChoosable(row) && !filled && actions.onListOptions && actions.onChoose && <div className="pl-[calc(var(--icon-md)+var(--spacing)*2)]">
+      <ChoicePicker row={row} isFilling={actions.isFilling} known={ownOptions(row.field) ?? undefined} onListOptions={actions.onListOptions} onChoose={actions.onChoose} />
     </div>}
-    {row.suggestions && !filled && actions.onSuggest && <Suggestions row={row} suggestions={row.suggestions} isFilling={actions.isFilling} onSuggest={actions.onSuggest} />}
+    {/* A question with its own answers (Yes or No, a list) is answered from them: saved answers to other questions
+        would only crowd them out. */}
+    {row.suggestions && !filled && actions.onSuggest && !(isChoosable(row) && ownOptions(row.field)) && <Suggestions row={row} suggestions={row.suggestions} isFilling={actions.isFilling} onSuggest={actions.onSuggest} />}
     {row.saveOffer && actions.onSave && <SaveAnswer row={row} isFilling={actions.isFilling} onSave={actions.onSave} />}
   </li>;
 }
@@ -137,7 +147,7 @@ function Suggestion({ row, entry, isFilling, onSuggest }: SuggestionProps & { en
       <p data-slot="suggestion-question" className="text-caption text-[var(--color-text-3)] wrap-anywhere">Saved for “{entry.question}”</p>
       {isLong && <button type="button" className={LINK} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>{isOpen ? "Show less" : "Show all"}</button>}
     </div>
-    <button type="button" data-slot="suggestion-use" className={`flex-none ${button("secondary", "compact")}`} disabled={isFilling}
+    <button type="button" data-slot="suggestion-use" className={USE} disabled={isFilling}
       aria-label={`Fill ${fieldLabel(row.field)} with "${entry.answer}", saved for "${entry.question}"`} onClick={() => onSuggest(row, entry)}>Use</button>
   </li>;
 }

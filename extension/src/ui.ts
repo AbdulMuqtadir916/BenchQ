@@ -12,7 +12,7 @@ const BUTTON_SIZES = {
 
 /** The website's raised primary and neutral secondary buttons, which also style a link. */
 export const button = (look: "primary" | "secondary", size: keyof typeof BUTTON_SIZES = "regular") =>
-  `bq-${look} inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] no-underline transition-[background,border-color,box-shadow,transform] ${MOTION} disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none ${BUTTON_SIZES[size]}`;
+  `bq-${look} inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] no-underline transition-[background,border-color,box-shadow,transform] ${MOTION} disabled:cursor-not-allowed [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none ${BUTTON_SIZES[size]}`;
 
 const ICON_BUTTON = `grid size-[var(--control-height)] flex-none place-items-center rounded-[var(--radius-sm)] border text-[var(--color-text-2)] transition-[color,background,border-color] ${MOTION} hover:text-[var(--color-text)] [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
 export const ICON_BUTTON_RAISED = `${ICON_BUTTON} border-[var(--color-border-strong)] bg-[image:var(--gradient-neutral)] shadow-[var(--shadow-control)] hover:bg-[image:var(--gradient-neutral-hover)]`;

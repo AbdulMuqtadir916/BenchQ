@@ -35,7 +35,8 @@ function optionElements(control: HTMLElement): HTMLElement[] {
   const listId = control.getAttribute("aria-controls") ?? control.getAttribute("aria-owns");
   const list = listId ? byId(control, listId) : null;
   const scope = list ?? controlBox(control).parentElement ?? control.ownerDocument;
-  return Array.from(scope.querySelectorAll<HTMLElement>(control.matches(LEVER_LOCATION) ? ".dropdown-location" : OPTION)).filter(isVisible);
+  return Array.from(scope.querySelectorAll<HTMLElement>(control.matches(LEVER_LOCATION) ? ".dropdown-location" : OPTION))
+    .filter(option => isVisible(option) && !option.matches(":disabled, [aria-disabled='true']"));
 }
 
 async function waitForOptions(control: HTMLElement, limitMs: number): Promise<HTMLElement[]> {
@@ -67,21 +68,22 @@ export async function searchList(control: HTMLElement, search: string): Promise<
 
 /** Opens the list and returns its options. The keyboard works even while the side panel has focus, so it goes first.
  * A list that opens empty is a search box, like a city lookup: typing `search` is what brings its options. */
-export async function openList(control: HTMLElement, search: string): Promise<HTMLElement[]> {
+export async function openList(control: HTMLElement, search: string, stillCurrent = () => true): Promise<HTMLElement[]> {
   control.focus({ preventScroll: true });
   if (control.matches(LEVER_LOCATION)) return searchList(control, search);
   const attempts = [() => press(control, "ArrowDown", 40), () => clickLike(controlBox(control))];
   for (const attempt of attempts) {
+    if (!stillCurrent()) return [];
     attempt();
     const found = await waitForOptions(control, OPEN_WAIT_MS);
     if (found.length > 0) return found;
     if (control.getAttribute("aria-expanded") === "true") break;
   }
-  return searchList(control, search);
+  return stillCurrent() ? searchList(control, search) : [];
 }
 
-export function closeList(control: HTMLElement) {
-  if (control.tagName === "INPUT" && (control as HTMLInputElement).value) typeSearch(control as HTMLInputElement, "");
+export function closeList(control: HTMLElement, clearSearch = true) {
+  if (clearSearch && control.tagName === "INPUT" && (control as HTMLInputElement).value) typeSearch(control as HTMLInputElement, "");
   press(control, "Escape", 27);
   if (control.matches(LEVER_LOCATION)) control.blur();
 }

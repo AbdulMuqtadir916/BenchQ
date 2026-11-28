@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getSession } from "./api";
+import { addJob, getSavedApplications, getSession } from "./api";
 
 /** The backend's RFC 9457 error bodies (step 4b): `failureOf` shows `detail` for a refused request and its own words
  * for a 5xx. */
@@ -13,6 +13,29 @@ async function failure(status: number, body: object): Promise<Error & { status?:
 }
 
 afterEach(() => { vi.unstubAllGlobals(); });
+
+it("says on every request to BenchQ that it comes from the extension", async () => {
+  const send = vi.fn(async () => Response.json({ principal: null }));
+  vi.stubGlobal("fetch", send);
+  await getSession();
+  const [, init] = send.mock.calls[0]! as unknown as [string, RequestInit];
+  expect(init.headers).toMatchObject({ "X-BenchQ-Client": "extension", "Content-Type": "application/json" });
+});
+
+it("restores a captured logo only on the corresponding saved application", async () => {
+  const local: Record<string, unknown> = {};
+  vi.stubGlobal("chrome", { storage: { local: { set: async (items: object) => Object.assign(local, items), get: async () => local } } });
+  const saved = { id: "a1", title: "Engineer", company: "Acme", status: "saved" };
+  const send = vi.fn().mockResolvedValueOnce(Response.json(saved))
+    .mockResolvedValueOnce(Response.json({ applications: [saved, { ...saved, id: "a2" }] }))
+    .mockResolvedValueOnce(Response.json({ applications: [] }));
+  vi.stubGlobal("fetch", send);
+  const logoUrl = "https://acme.example/logo.svg";
+  const job = { ...saved, url: "https://jobs.example/42", isJobPage: true, description: "Build things.", location: null, logoUrl };
+  expect((await addJob("c1", job)).logoUrl).toBe(logoUrl);
+  expect(JSON.parse(send.mock.calls[0]![1].body).job).not.toHaveProperty("logoUrl");
+  expect((await getSavedApplications("c1")).map(app => app.logoUrl)).toEqual([logoUrl, undefined]);
+});
 
 describe("reading the backend's error body", () => {
   it("shows the detail of a 422 problem, not its field errors", async () => {

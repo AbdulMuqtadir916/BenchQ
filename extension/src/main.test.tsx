@@ -258,7 +258,7 @@ it("asks before marking applied", async () => {
   connectTab();
   await mount();
   await press("Mark applied");
-  expect(actionLabels()).toEqual(["Mark applied", "Mark applied", "Cancel"]);
+  expect(actionLabels()).toEqual(["Mark applied", "Cancel", "Mark applied"]);
   expect(document.querySelector("dialog[data-slot='autofill-confirm']")?.hasAttribute("open")).toBe(true);
   const patches = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("candidate-status"));
   expect(patches()).toEqual([]);

@@ -13,6 +13,9 @@ const scope = globalThis as typeof globalThis & { __benchqAutofill?: PageApi };
 if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
   let registry: Registry | null = null;
   let scans = 0;
+  // This page load, as the panel remembers it: one closed and opened again on the same page takes up what it knew,
+  // and a reload starts afresh.
+  const loadId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
   scope.__benchqAutofill = {
     version: __PAGE_BUILD__,
@@ -21,7 +24,7 @@ if (scope.__benchqAutofill?.version !== __PAGE_BUILD__) {
       scans += 1;
       const result = scanDocument(document, scans, window === window.top);
       registry = result.registry;
-      return result.scan;
+      return { ...result.scan, loadId };
     },
     read: () => (registry ? readFields(document, registry) : null),
     readJob: () => readJob(document),

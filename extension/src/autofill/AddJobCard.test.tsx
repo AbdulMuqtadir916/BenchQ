@@ -81,6 +81,14 @@ describe("adding the job on this page", () => {
     expect(host.querySelector("[role='status']")?.textContent).toBe("Added to Priya's Saved jobs.");
   });
 
+  it("shows the captured employer logo and lets the recruiter complete a partial job", async () => {
+    vi.mocked(readJobPage).mockResolvedValue({ ...page, logoUrl: "https://acme.example/logo.png", description: "" });
+    await show();
+    expect(host.querySelector("img")?.getAttribute("src")).toBe("https://acme.example/logo.png");
+    expect(host.querySelector("textarea")).not.toBeNull();
+    expect(host.querySelector<HTMLButtonElement>("[data-slot='add-job-run']")?.disabled).toBe(true);
+  });
+
   it("adds nothing until the BDE chooses Save", async () => {
     vi.mocked(readJobPage).mockResolvedValue(page);
     await show();
@@ -139,10 +147,10 @@ describe("adding the job on this page", () => {
     expect(readJobPage).not.toHaveBeenCalled();
   });
 
-  it("recovers a previously saved View Job title only from that exact listing", async () => {
+  it.each(["View Job", "PDT - 12407", "Requisition ID: 12407"])("recovers the saved placeholder %s only from that exact listing", async placeholder => {
     const onPageTitle = vi.fn();
     vi.mocked(readJobPage).mockResolvedValue(page);
-    const saved = { ...page, id: "app-9", title: "View Job" };
+    const saved = { ...page, id: "app-9", title: placeholder };
     host = document.createElement("div");
     root = createRoot(host);
     await act(async () => {
@@ -253,12 +261,12 @@ describe("what the card says the page stated, before the BDE adds the job", () =
     vi.mocked(readJobPage).mockResolvedValue({ ...page, employmentType: "Contract", salaryMin: 60, salaryPeriod: "hour", salaryCurrency: "USD" });
     await show();
     const rows = [...host.querySelectorAll("[data-slot='add-job-details'] dt")].map((name) => [name.textContent, name.nextElementSibling!.textContent]);
-    expect(rows).toEqual([["Pay", "USD 60 an hour"], ["Type", "Contract"]]);
+    expect(rows).toEqual([["Pay", "From USD 60 an hour"], ["Type", "Contract"]]);
   });
 });
 
 describe("a later reading of the page (PR #140, second review)", () => {
-  it("takes the whole description when only the description grew, and saves the posting currently displayed", async () => {
+  it("requires a fresh review if the tab moves to a different requisition with the same title", async () => {
     vi.mocked(missingAccess).mockResolvedValue(null);
     vi.useFakeTimers();
     try {
@@ -269,12 +277,14 @@ describe("a later reading of the page (PR #140, second review)", () => {
       await show();
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(addJob).not.toHaveBeenCalled();
-      // The same title on another posting, read more fully: the card shows it, and the question asked about the first closes.
+      // A delayed read of the new page must not silently change the Save action.
       await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
-      expect(host.textContent).toContain("Remote");
+      expect(host.textContent).not.toContain("Remote");
       expect(host.querySelector("[data-slot='add-job-confirm']")).toBeNull();
       await click("add-job-run");
-      expect(addJob).toHaveBeenCalledWith("cand-1", expect.objectContaining({ url: "https://boards.example.test/acme/jobs/456" }));
+      expect(addJob).not.toHaveBeenCalled();
+      expect(host.textContent).toContain("The posting changed");
+      expect(host.textContent).toContain("Remote");
     } finally {
       vi.useRealTimers();
     }

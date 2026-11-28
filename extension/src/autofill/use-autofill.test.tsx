@@ -7,7 +7,7 @@ import { fakeChrome, type FakeChrome } from "../test/fake-chrome";
 import { confirmationKey } from "./job-check";
 import { fileShownOnPage, fillChoice, fillField, flaggedFields, focusField, readTab, rejectedFields, removeFileOnPage, scanTab, takeBackField, undoCount, undoFills, type TabScan } from "./tab-bridge";
 import type { AppliedForm, Connection, FieldKind, FillResult, PageSignals, ResumeFile, TabField } from "./types";
-import { forgetTabs, useAutofill } from "./use-autofill";
+import { forgetOpenTabs, forgetTabs, useAutofill } from "./use-autofill";
 
 vi.mock("../api", async (actual) => ({ ...await actual<typeof import("../api")>(), getResumeAnswers: vi.fn(), getResumeFile: vi.fn(), saveResumeAnswers: vi.fn() }));
 vi.mock("./tab-bridge", () => ({
@@ -248,7 +248,7 @@ describe("the picked résumé", () => {
 describe("a suggestion the BDE picks", () => {
   it("fills the field with it, as BenchQ's own fill", async () => {
     vi.mocked(getResumeAnswers).mockResolvedValue([custom("Willing to work weekends?", "Yes")]);
-    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Can you support Saturday/Sunday shifts?")]));
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Are you available to work on weekends?")]));
     await mount();
     const row = hook.rows![0]!;
     expect(row.suggestions?.map(({ question }) => question)).toEqual(["Willing to work weekends?"]);
@@ -483,6 +483,34 @@ describe("autofill", () => {
     await run(() => hook.autofill());
     expect(scanTab).toHaveBeenCalledTimes(1);
   });
+
+  it("fills an existing select after its options load, then the question that selection reveals", async () => {
+    const written = new Set<string>();
+    vi.mocked(scanTab).mockImplementation(async () => page([
+      field("a", "Email", "text", written.has("a") ? "priya@example.test" : ""),
+      { ...field("b", "City", "select", written.has("b") ? "Phoenix" : ""),
+        options: written.has("a") ? [{ id: "phoenix", label: "Phoenix" }] : [] },
+      ...(written.has("b") ? [field("c", "Do you need sponsorship?", "text", written.has("c") ? "Yes" : "")] : []),
+    ], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { fieldId }) => {
+      written.add(fieldId);
+      return { status: "filled", current: "" };
+    });
+    await mount();
+    expect(hook.fillCount).toBe(1);
+    await run(() => hook.autofill());
+    expect(vi.mocked(fillField).mock.calls.map(([, , req]) => req.fieldId)).toEqual(["a", "b", "c"]);
+    expect(hook.outcome).toEqual({ filled: 3, handedBack: 0, stopped: false });
+  });
+
+  it("stops when a rescan between dependent questions detects another job", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([field("a", "Email")], onSite));
+    await mount();
+    vi.mocked(scanTab).mockResolvedValue(page([field("b", "City")], elsewhere));
+    await run(() => hook.autofill());
+    expect(vi.mocked(fillField).mock.calls.map(([, , req]) => req.fieldId)).toEqual(["a"]);
+    expect(hook.outcome?.stopped).toBe(true);
+  });
 });
 
 describe("the refill loop", () => {
@@ -564,11 +592,12 @@ describe("the refill loop", () => {
     expect(hook.outcome?.handedBack).toBe(1);
   });
 
-  it("still fills when the form can't be asked", async () => {
+  it("hands unverified fields back when their frame disappears during validation", async () => {
     vi.mocked(flaggedFields).mockRejectedValue(new Error("frame gone"));
     await mount();
     await run(() => hook.autofill());
-    expect(hook.outcome).toEqual({ filled: 2, handedBack: 0, stopped: false });
+    expect(hook.outcome).toEqual({ filled: 0, handedBack: 2, stopped: false });
+    expect(hook.rows?.every(row => row.reason?.includes("verify"))).toBe(true);
   });
 
   const failOnce = () => vi.mocked(fillField).mockResolvedValueOnce({ status: "failed", current: "" });
@@ -648,7 +677,7 @@ const typed = (...values: [string, string][]) => vi.mocked(readTab).mockResolved
 
 async function finalForm() {
   let form: AppliedForm = { fields: [] };
-  await run(async () => { form = await hook.finalForm(); });
+  await run(async () => { form = (await hook.finalForm()).form; });
   return form;
 }
 
@@ -689,6 +718,46 @@ describe("the list as it fills", () => {
     await mount();
     await run(() => hook.autofill());
     expect(vi.mocked(fillField).mock.calls.map(([, , request]) => request.fieldId)).toEqual(["a", "b"]);
+  });
+});
+
+describe("a run the panel leaves before it ends", () => {
+  it("is queued for when the panel is back on the page, and isn't once a run has ended there", async () => {
+    let release = () => undefined as void;
+    vi.mocked(fillField).mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ status: "filled", current: "priya@example.test" }); }));
+    await mount();
+    expect(hook.resumeQueued).toBe(false);
+    let running: Promise<void> = Promise.resolve();
+    await act(async () => { running = hook.autofill(); });
+    await wait(5);
+    // The BDE goes to another tab: this tab's panel goes, mid-run.
+    await act(async () => { root.unmount(); });
+    release();
+    await running;
+    await mount();
+    expect(hook.resumeQueued).toBe(true);
+    // The panel goes on with it, and this time it ends here: nothing is left queued.
+    await run(() => hook.autofill());
+    expect(hook.resumeQueued).toBe(false);
+    await act(async () => { root.unmount(); });
+    await mount();
+    expect(hook.resumeQueued).toBe(false);
+  });
+});
+
+describe("an answer the BDE picks in the panel", () => {
+  it("goes on a question that shows its answers, a sensitive one too, as any fill does", async () => {
+    const radios = { ...field("q", "Have you worked here before?", "radio"), options: [{ id: "y", label: "Yes" }, { id: "n", label: "No" }] };
+    vi.mocked(scanTab).mockResolvedValue(page([radios, field("c", "I agree to the privacy policy", "checkbox")], onSite));
+    await mount();
+    expect(hook.rows!.find((row) => row.field.id === "c")!.status).toBe("blocked");
+    await run(() => hook.choose(hook.rows!.find((row) => row.field.id === "q")!, "No"));
+    expect(vi.mocked(fillField).mock.calls.at(-1)![2]).toMatchObject({ fieldId: "q", write: { type: "option", optionId: "n" } });
+    // Quietly, as a pick in a dropdown: no run, so the panel shows no Autofilling for it.
+    expect(hook.outcome).toBeNull();
+    expect(hook.run).toBeNull();
+    await run(() => hook.choose(hook.rows!.find((row) => row.field.id === "c")!, "Yes"));
+    expect(vi.mocked(fillField).mock.calls.at(-1)![2]).toMatchObject({ fieldId: "c", write: { type: "check", checked: true } });
   });
 });
 
@@ -923,7 +992,7 @@ describe("the regular check", () => {
     await mountWithFakeTimers();
     vi.mocked(readTab).mockReturnValue(new Promise(() => undefined));
     let form: AppliedForm | null = null;
-    void hook.finalForm().then((found) => { form = found; });
+    void hook.finalForm().then((found) => { form = found.form; });
     await advance(3999);
     expect(form).toBeNull();
     await advance(1);
@@ -976,6 +1045,21 @@ describe("the form for Mark applied", () => {
     vi.mocked(scanTab).mockResolvedValue(page([{ ...field("n", "Nickname", "text", "Pri"), required: true }]));
     await mount();
     expect((await finalForm()).fields[0]!.required).toBe(true);
+  });
+
+  it("says whether the form on show still has a required field left, and a form it can't read doesn't", async () => {
+    vi.mocked(scanTab).mockResolvedValue(page([{ ...field("n", "Nickname"), required: true }]));
+    await mount();
+    let result: { form: AppliedForm; complete: boolean } = { form: { fields: [] }, complete: true };
+    typed(["0:n", ""]);
+    await run(async () => { result = await hook.finalForm(); });
+    expect(result.complete).toBe(false);
+    typed(["0:n", "Pri"]);
+    await run(async () => { result = await hook.finalForm(); });
+    expect(result.complete).toBe(true);
+    vi.mocked(readTab).mockRejectedValue(new Error("page gone"));
+    await run(async () => { result = await hook.finalForm(); });
+    expect(result.complete).toBe(true);
   });
 
   it("keeps every page of the form", async () => {
@@ -1114,6 +1198,90 @@ describe("the picked résumé's file (07 Q49–Q52)", () => {
   const upload = (current = "") => field("r", "Resume/CV", "file", current);
 
   afterEach(() => { vi.useRealTimers(); });
+
+  it("puts the file on once a run, though the site draws a new upload once it has it", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    // Each look is a fresh read of the page, as the tab gives it.
+    let onPage = { upload: "r", email: "" };
+    // A scan names each control by the element itself (`stableId`): a redrawn upload is a new one.
+    vi.mocked(scanTab).mockImplementation(async () => page([{ ...field(onPage.upload, "Resume/CV", "file"), stableId: `el-${onPage.upload}` },
+      { ...field("a", "Email", "text", onPage.email), stableId: "el-a" }], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
+      // The site takes the file, then draws a new, empty upload where the one BenchQ used was.
+      if (write.type === "file") onPage = { ...onPage, upload: "r2" };
+      if (write.type === "text") onPage = { ...onPage, email: write.value };
+      return { status: "filled", current: write.type === "file" ? NAME : write.type === "text" ? write.value : "" };
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500 * 30);
+    await act(async () => { await running; });
+    expect(vi.mocked(fillField).mock.calls.filter(([, , request]) => request.write.type === "file")).toHaveLength(1);
+    expect(hook.rows!.find((row) => row.field.id === "r2")?.reason).not.toBe("The page reset this value.");
+  });
+
+  it("knows its file is on the form when the site empties the upload and shows the file as a chip, never a reset", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    vi.mocked(scanTab).mockResolvedValue(page([upload(), field("a", "Email")], onSite));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { write }) => {
+      if (write.type === "file") vi.mocked(fileShownOnPage).mockResolvedValue(true);
+      return { status: "filled", current: write.type === "file" ? NAME : write.type === "text" ? write.value : "" };
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    root = createRoot(document.createElement("div"));
+    await act(async () => { root.render(<Harness value={connection} />); });
+    await advance(1);
+    const running = hook.autofill();
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    const resume = hook.rows!.find((row) => row.field.id === "r")!;
+    expect(resume).toMatchObject({ status: "same", field: { current: NAME } });
+    expect(resume.reason).toBeUndefined();
+  });
+
+  it("knows its own file and answers when the panel opens again on the page, and forgets them after a reload", async () => {
+    vi.mocked(getResumeFile).mockResolvedValue(pdf);
+    let onPage = { r: "", a: "" };
+    let loadId = "load-1";
+    vi.mocked(scanTab).mockImplementation(async () => ({ ...page([upload(onPage.r), field("a", "Email", "text", onPage.a)], onSite), loadId }));
+    vi.mocked(fillField).mockImplementation(async (_tab, _frame, { fieldId, write }) => {
+      const value = write.type === "file" ? NAME : write.type === "text" ? write.value : "";
+      onPage = { ...onPage, [fieldId]: value };
+      return { status: "filled", current: value };
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const open = async () => {
+      root = createRoot(document.createElement("div"));
+      await act(async () => { root.render(<Harness value={connection} />); });
+      await advance(1);
+    };
+    const close = async () => {
+      await act(async () => { root.unmount(); });
+      forgetOpenTabs();
+    };
+    await open();
+    const running = hook.autofill();
+    await advance(500 * 24);
+    await act(async () => { await running; });
+    expect(onPage).toEqual({ r: NAME, a: "priya@example.test" });
+    expect(statuses()).toEqual([["r", "same"], ["a", "same"]]);
+    // Closed and opened again on the same page: the file and the answer are still BenchQ's own, so nothing is offered
+    // to replace, and the file shows as attached.
+    await close();
+    await open();
+    expect(statuses()).toEqual([["r", "same"], ["a", "same"]]);
+    expect(hook.fillCount).toBe(0);
+    expect(hook.attachedFile).toBe(NAME);
+    // The page loads again: a new form, and what BenchQ knew of the old one is gone.
+    await close();
+    loadId = "load-2";
+    onPage = { r: "", a: "" };
+    await open();
+    expect(statuses()).toEqual([["r", "ready"], ["a", "ready"]]);
+  });
 
   it("goes on first, and the answers go on once the form is still, over what the site read from it", async () => {
     vi.mocked(getResumeFile).mockResolvedValue(pdf);

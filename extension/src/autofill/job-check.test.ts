@@ -76,5 +76,6 @@ describe("sameListing's places (CodeRabbit #129)", () => {
     expect(sameListing({ ...job, location: "Austin, TX" }, job)).toBe(false);
     expect(sameListing({ ...job, location: "Dallas, Texas, USA" }, job)).toBe(true);
     expect(sameListing({ ...job, location: "TX" }, job)).toBe(true);
+    expect(sameListing({ ...job, location: "Portland, OR" }, { ...job, location: "Portland, ME" })).toBe(false);
   });
 });

@@ -48,6 +48,10 @@ const ENTRY_MARKER = /\b(\d+|first|second|third|other|another|alternate|alternat
 const REPEATED = "This asks the same thing again, for another entry, so it's yours to fill.";
 const CHOICE_KINDS = new Set<FieldKind>(["select", "radio", "combobox", "checkbox"]);
 const MAX_SUGGESTIONS = 3;
+/** How alike a saved question's wording must be (bigram likeness, 0 to 1) to be offered: unrelated questions score up
+ * to about 0.3, the same question asked another way from about 0.43 ("Are you open to relocation?" and "Willing to
+ * relocate?"). */
+const MIN_SUGGESTION_SCORE = 0.4;
 
 type Fit = { write: FieldWrite; proposed: string } | { reason: string };
 type Base = Pick<ReviewRow, "key" | "field" | "isUnsaved">;
@@ -203,8 +207,11 @@ function tied(base: Base, entries: BankEntry[], type: EngineFieldType | null, an
 function suggestionsFor(field: TabField, label: string, type: EngineFieldType | null, { bank, byType }: Review): BankEntry[] | undefined {
   if (type || !(CHOICE_KINDS.has(field.kind) || /\?\s*$/.test(field.label.trim()))) return undefined;
   const typed = new Set([...byType.values()].flat());
+  // Only questions worded near enough to this one: any two long questions share some letters, so the closest of
+  // unrelated ones ("Remote" for an ETL question) would turn up otherwise.
   const closest = bank.filter((entry) => !typed.has(entry))
     .map((entry) => ({ entry, score: similarity(label, questionOf(entry.question)) }))
+    .filter(({ score }) => score >= MIN_SUGGESTION_SCORE)
     .sort((left, right) => right.score - left.score).slice(0, MAX_SUGGESTIONS).map(({ entry }) => entry);
   return closest.length > 0 ? closest : undefined;
 }
@@ -423,6 +430,9 @@ function reviewCore(scanned: Base, repeated: boolean, { bank, byType, job }: Rev
   if (sameType.length > 1) return tied(base, sameType, type, answerOf);
   if (sameType[0]) return fromSaved(sameType[0]);
   const derived = type ? derivedAnswer(type, asked, saved) : null;
+  // A place the bank's other answers make goes as a saved one does: a state's code for a two-letter box, and a
+  // "location" list of countries takes the country.
+  if (derived?.source && (type === "city-state" || type === "address-region")) return fromBank(base, derived.source, type, derived.answer);
   if (derived) return rowFor(base, type === "middle-name" ? shaped(type, derived.answer, asked) : derived.answer, derived.source);
   const entry = closestBankEntry(asked.label, bank, answers);
   if (entry) return fromSaved(entry);

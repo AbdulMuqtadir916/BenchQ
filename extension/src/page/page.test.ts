@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { documentOf } from "../autofill/documents";
 import { addEntry } from "./entries";
-import { createFiller } from "./fill";
+import { createFiller, namesFile } from "./fill";
 import { readFields, scanDocument, waitForQuiet, type Registry } from "./scan";
 
 /** jsdom has no layout, so everything is "visible" unless a test hides it. */
@@ -464,6 +464,74 @@ describe("attaching the résumé's file (07 Q49–Q51)", () => {
     expect(held()).toEqual([]);
   });
 
+  it("counts the file as on the form when the site takes it and swaps its upload for a chip naming it", async () => {
+    const { filler, rescan, input, held } = upload(`<div id="box"><input id="r" type="file" aria-label="Resume/CV"></div>`);
+    // As Ashby and Workday do: once the file is in, the input goes and a chip names the file.
+    input.addEventListener("change", () => {
+      const chip = document.createElement("span");
+      chip.textContent = held()[0]!.name;
+      element("#box").replaceChildren(chip);
+    });
+    const { scanId, fields } = rescan();
+    expect(await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" })).toEqual({ status: "filled", current: write.name });
+    expect(filler.undoCount()).toBe(1);
+    // The check once the run settles keeps it while the chip names it, and gives it up once the chip has gone.
+    expect(filler.rejected(scanId, [fields[0]!.id])).toEqual([]);
+    element("#box").replaceChildren();
+    expect(filler.rejected(scanId, [fields[0]!.id])).toEqual([fields[0]!.id]);
+  });
+
+  it("keeps a file the site took, then emptied its upload for and shows as a chip", async () => {
+    const { filler, rescan, input, held, put } = upload(`<div id="box"><input id="r" type="file" aria-label="Resume/CV"></div>`);
+    input.addEventListener("change", () => {
+      const chip = document.createElement("span");
+      chip.textContent = held()[0]!.name;
+      element("#box").append(chip);
+      put([]);
+    });
+    const { scanId, fields } = rescan();
+    expect((await filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" })).status).toBe("filled");
+    expect(filler.rejected(scanId, [fields[0]!.id])).toEqual([]);
+  });
+
+  it("knows its file in a chip that writes the name its own way: underscores, cut short, or with its size", () => {
+    const name = "Priya Shah - Java Developer.pdf";
+    expect(namesFile("Priya_Shah_-_Java_Developer.pdf", name)).toBe(true);
+    expect(namesFile("Priya Shah - Java Developer.pdf (120 KB)", name)).toBe(true);
+    expect(namesFile("Priya Shah - Java Dev….pdf", name)).toBe(true);
+    expect(namesFile("Priya Shah - Data Engineer.pdf", name)).toBe(false);
+    expect(namesFile("Resume.pdf", name)).toBe(false);
+  });
+
+  it("waits for the chip of a site that sends the file to its server before it shows it", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { filler, rescan, input, put } = upload(`<div id="box"><input id="r" type="file" aria-label="Resume/CV"></div>`);
+    input.addEventListener("change", () => {
+      put([]);
+      setTimeout(() => { element("#box").insertAdjacentHTML("beforeend", `<span>${write.name.replace(/ /g, "_")}</span>`); }, 1500);
+    });
+    const { scanId, fields } = rescan();
+    const result = filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await result).toEqual({ status: "filled", current: write.name });
+    vi.useRealTimers();
+  });
+
+  it("says the form doesn't show a file no input holds and no chip names, once the wait is over, and takes nothing back", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { filler, rescan, input } = upload(`<div id="box"><input id="r" type="file" aria-label="Resume/CV"></div>`);
+    input.addEventListener("change", () => {
+      Object.defineProperty(input, "files", { configurable: true, get: () => [] });
+      element("#box").replaceChildren();
+    });
+    const { scanId, fields } = rescan();
+    const result = filler.fill({ scanId, fieldId: fields[0]!.id, write, current: "" });
+    await vi.advanceTimersByTimeAsync(3500);
+    expect(await result).toMatchObject({ status: "failed", reason: "The form doesn't show this file. Check it's attached, or attach it again." });
+    expect(filler.undoCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
   it("puts back the file that was there when the upload doesn't take it", async () => {
     const { filler, rescan, input, held, put } = upload();
     const mine = new File(["mine"], "mine.pdf", { type: "application/pdf" });
@@ -607,6 +675,34 @@ describe("filling", () => {
     expect((await filler.fill({ scanId, fieldId: field.id, write: { type: "option", optionId }, current: "" })).status).toBe("filled");
     expect(element<HTMLSelectElement>("#s").value).toBe("0");
     expect(change).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Email", "ada.l@example.test", "adal@example.test", "failed"],
+    ["Email", "é@example.test", "ø@example.test", "failed"],
+    ["Work sample URL", "https://example.test/a/b", "https://example.test/ab", "failed"],
+    ["Salary", "85000.50", "8500050", "failed"],
+    ["Phone", "+44 1234567890", "+91 1234567890", "failed"],
+    ["Expected salary", "95000.50", "95,000.50", "filled"],
+    ["Start date", "11/20/2026", "11-20-2026", "filled"],
+  ])("verifies %s after the form converts %s to %s", async (label, wanted, shown, status) => {
+    const { filler, rescan } = setup('<input id="masked">');
+    const input = element<HTMLInputElement>("#masked");
+    input.setAttribute("aria-label", label);
+    input.addEventListener("input", () => { input.value = shown; }, { once: true });
+    const { scanId, fields } = rescan();
+    const result = await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "text", value: wanted }, current: "" });
+    expect(result).toEqual({ status, current: status === "filled" ? shown : "" });
+  });
+
+  it("leaves a select untouched when the site recycles a state's option for another country", async () => {
+    const { filler, rescan } = setup('<select><option value="">Select</option><option value="vic" label="Victoria"></option></select>');
+    const { scanId, fields } = rescan();
+    const option = fields[0]!.options[0]!;
+    expect(option.label).toBe("Victoria");
+    element<HTMLOptionElement>("option:last-child").value = "different-region";
+    expect((await filler.fill({ scanId, fieldId: fields[0]!.id, write: { type: "option", optionId: option.id }, current: "" })).status).toBe("stale");
+    expect(element<HTMLSelectElement>("select").value).toBe("");
   });
 
   it("clicks a radio, so a framework sees the choice", async () => {
@@ -974,6 +1070,29 @@ describe("custom dropdowns", () => {
     expect(field.current).toBe("+1");
   });
 
+  it.each([["No sponsorship", "No"], ["India +91", "+9"], ["C++", "C"]])("rejects a dropdown showing only part of %s", async (label, changedTo) => {
+    const { filler, request } = setupDropdown({ options: [label] });
+    await filler.openChoices(request);
+    element("[role='option']").addEventListener("click", () => { element(".select__single-value").textContent = changedTo; });
+    expect((await filler.pickChoice({ ...request, optionId: "c0" })).status).toBe("failed");
+  });
+
+  it("leaves a dropdown that someone edited while the panel was matching its options", async () => {
+    const { filler, request } = setupDropdown({ options: ["Dallas", "Austin"] });
+    await filler.openChoices(request);
+    element<HTMLInputElement>("#c").value = "Houston";
+    expect(await filler.pickChoice({ ...request, optionId: "c0" })).toEqual({ status: "changed", current: "Houston" });
+    filler.closeChoices(request);
+    expect(element<HTMLInputElement>("#c").value).toBe("Houston");
+  });
+
+  it("rejects an option whose DOM node now represents a different answer", async () => {
+    const { filler, request } = setupDropdown({ options: ["Dallas"] });
+    await filler.openChoices(request);
+    element("[role='option']").textContent = "Boston";
+    expect((await filler.pickChoice({ ...request, optionId: "c0" })).status).toBe("stale");
+  });
+
   it("reports a pick the page refused", async () => {
     const { filler, request } = setupDropdown({ options: ["Yes"] });
     await filler.openChoices(request);
@@ -1092,6 +1211,15 @@ describe("reading a scanned form", () => {
   it("notices a new option in a group of radios", () => {
     const registry = registryOf(`<fieldset><legend>Remote?</legend><label><input type="radio" name="r"> Yes</label></fieldset>`);
     element("fieldset").insertAdjacentHTML("beforeend", `<label><input type="radio" name="r"> No</label>`);
+    expect(readFields(document, registry).moved).toBe(true);
+  });
+
+  it.each(["rename", "disable", "replace"])("notices native option changes with the same option count (%s)", change => {
+    const registry = registryOf('<select><optgroup><option value="1">Texas</option></optgroup></select>');
+    const option = element<HTMLOptionElement>("option");
+    if (change === "rename") option.label = "Ontario";
+    if (change === "disable") element<HTMLOptGroupElement>("optgroup").disabled = true;
+    if (change === "replace") option.replaceWith(option.cloneNode(true));
     expect(readFields(document, registry).moved).toBe(true);
   });
 });

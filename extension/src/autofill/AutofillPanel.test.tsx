@@ -28,7 +28,7 @@ const connection = {
 
 const form: AppliedForm = { fields: [{ label: "City", value: "Dallas", required: false, source: "bde" }] };
 
-const finalForm = vi.fn(async () => form);
+const finalForm = vi.fn(async () => ({ form, complete: true }));
 const autofill = vi.fn();
 
 const holdsFile = vi.fn<(id: string) => boolean>(() => false);
@@ -75,6 +75,7 @@ type State = {
   step?: string | null; error?: string;
   needsAccess?: { origins: string[]; host: string } | null; isAccessDenied?: boolean;
   reviewedFor?: { applicationId: string; candidateId: string; resumeId: string | null; fileId?: string | null } | null;
+  resumeQueued?: boolean;
 };
 
 function show(state: State, panel: { onApply?: (form: AppliedForm, resumeId: string | null) => void; isApplied?: boolean; applying?: boolean; details?: Application | null; applicationStatus?: ApplicationContextStatus; resumesUrl?: string | null; tabUrl?: string | null } = {}, resumes: Resumes = oneResume) {
@@ -192,6 +193,16 @@ describe("the résumé the answers come from", () => {
     expect(host.textContent).toContain("The resume saved with this application is no longer available");
     expect(host.querySelector("[data-slot='autofill-run']")).toBeNull();
     expect(named("Mark applied")).toBeUndefined();
+  });
+
+  it("goes on with a run it left once it's back on the page, with no Autofill to press again", async () => {
+    show({ fillCount: 2, rows: [row("Email", true), row("Phone", true)], resumeQueued: true,
+      reviewedFor: { applicationId: "app-1", candidateId: "cand-1", resumeId: base.id } }, { onApply: vi.fn() });
+    await act(async () => { await Promise.resolve(); });
+    expect(autofill).toHaveBeenCalledTimes(1);
+    // Once: a later render doesn't queue it again.
+    await act(async () => { root!.render(element); });
+    expect(autofill).toHaveBeenCalledTimes(1);
   });
 
   it("refills after a connected application changes and holds Mark applied until the new résumé is in sync", async () => {
@@ -942,9 +953,11 @@ describe("the buttons at the bottom", () => {
     expect(named("Undo")).toBeUndefined();
   });
 
-  it("say how many required fields are left over Mark applied once Autofill is done, as Simplify does over Submit", () => {
+  it("wait for every required field before Mark applied, and say how many are left", () => {
     show({ fillCount: 0, rows: [row("Email", true), row("Phone", true, "555 0100")] }, { onApply: vi.fn() });
-    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='required-left']")!.textContent).toBe("Complete 1 required field to submit");
+    expect(host.querySelector("[data-slot='autofill-actions'] [data-slot='required-left']")!.textContent).toBe("Fill 1 required field to mark applied");
+    expect(named("Mark applied").disabled).toBe(true);
+    expect(named("Mark applied").getAttribute("aria-describedby")).toBe("required-left");
   });
 
   it("say Applied once it's done", () => {
@@ -988,7 +1001,6 @@ describe("confirming Mark applied", () => {
   // The dialog's own Mark applied, beside the one that opened it.
   const confirmButton = () => host.querySelector<HTMLButtonElement>("[data-slot='mark-applied-confirm']")!;
   const confirm = () => act(async () => { confirmButton().click(); });
-  const note = () => host.querySelector("[data-slot='autofill-confirm-note']");
 
   it("asks first, in a modal dialog that names the job, and marks nothing yet", async () => {
     show({ fillCount: 0 }, { onApply });
@@ -998,8 +1010,8 @@ describe("confirming Mark applied", () => {
     expect(dialog().getAttribute("aria-labelledby")).toBe("autofill-confirm-title");
     expect(host.querySelector("#autofill-confirm-title")?.textContent).toBe("Mark this job as applied?");
     expect(host.querySelector("#autofill-confirm-job")?.textContent).toBe("Java Developer at Acme · for Priya");
-    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Mark applied", "Cancel"]);
-    expect(inDialog()[0]!.className).toContain("bq-primary");
+    expect(inDialog().map(({ textContent }) => textContent)).toEqual(["Cancel", "Mark applied"]);
+    expect(inDialog()[1]!.className).toContain("bq-primary");
     expect(document.activeElement).toBe(confirmButton());
     expect(onApply).not.toHaveBeenCalled();
     expect(finalForm).not.toHaveBeenCalled();
@@ -1014,14 +1026,14 @@ describe("confirming Mark applied", () => {
   });
 
   it("shows it's saving while it reads the form", async () => {
-    let finish: (found: AppliedForm) => void = () => undefined;
+    let finish: (found: { form: AppliedForm; complete: boolean }) => void = () => undefined;
     finalForm.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     show({ fillCount: 0 }, { onApply });
     await click("Mark applied");
     await confirm();
     expect(atBottom().map(({ textContent }) => textContent)).toEqual(["Saving…"]);
     expect(onApply).not.toHaveBeenCalled();
-    await act(async () => { finish(form); });
+    await act(async () => { finish({ form, complete: true }); });
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
   });
 
@@ -1044,45 +1056,32 @@ describe("confirming Mark applied", () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
-  it("warns about required fields still empty, each a way back to it, and still lets the BDE confirm", async () => {
-    show({ fillCount: 0, rows: [row("Email", true), row("Phone", true), row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+  it("can mark applied once every required field is filled, or when no form is on show", async () => {
+    show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
+    expect(host.querySelector("[data-slot='required-left']")).toBeNull();
     await click("Mark applied");
-    expect(note()?.querySelector("p")?.textContent).toBe("2 required fields are still empty:");
-    expect([...note()!.querySelectorAll("li button")].map(({ textContent }) => textContent)).toEqual(["Email", "Phone"]);
+    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaCancelMark applied");
     await confirm();
     expect(onApply).toHaveBeenCalledWith(form, "res-2");
-  });
-
-  it("lists the first three empty fields, one line each, and all of them on request", async () => {
-    const empty = ["Email", "Phone", "Zip code", "Which of the following metropolitan areas do you reside in?", "Veteran status"];
-    show({ fillCount: 0, rows: empty.map((label) => row(label, true)) }, { onApply });
-    await click("Mark applied");
-    const fields = () => [...note()!.querySelectorAll<HTMLButtonElement>("li button")];
-    expect(fields().map(({ textContent }) => textContent)).toEqual(["Email", "Phone", "Zip code"]);
-    expect(fields()[0]!.querySelector("[data-slot='autofill-confirm-field']")!.className).toContain("truncate");
-    expect(fields()[0]!.getAttribute("title")).toBe("Email");
-    const more = note()!.querySelector<HTMLButtonElement>("[data-slot='autofill-confirm-more']")!;
-    expect(more.textContent).toBe("Show all 5");
-    await act(async () => { more.click(); });
-    expect(fields()).toHaveLength(5);
-    expect(more.textContent).toBe("Show fewer");
-  });
-
-  it("says it right for one", async () => {
-    show({ fillCount: 0, rows: [row("Email", true)] }, { onApply });
-    await click("Mark applied");
-    expect(note()?.querySelector("p")?.textContent).toBe("1 required field is still empty:");
-  });
-
-  it("has nothing to warn about when the required fields are filled, or no form could be read", async () => {
-    show({ fillCount: 0, rows: [row("City", true, "Dallas"), row("LinkedIn", false)] }, { onApply });
-    await click("Mark applied");
-    expect(confirmText()).toBe("Mark this job as applied?Java Developer at Acme · for PriyaMark appliedCancel");
     act(() => { root?.unmount(); });
     host.remove();
     show({ fillCount: 0, rows: null }, { onApply });
+    expect(named("Mark applied").disabled).toBe(false);
+  });
+
+  it("counts a required field the site says is done, though BenchQ can't read it, like a password", () => {
+    const password = { ...row("Password", true), field: { label: "Password", required: true, current: "", complete: true } as TabField };
+    show({ fillCount: 0, rows: [password] }, { onApply });
+    expect(named("Mark applied").disabled).toBe(false);
+  });
+
+  it("marks nothing when its last look finds a required field emptied meanwhile", async () => {
+    finalForm.mockResolvedValueOnce({ form, complete: false });
+    show({ fillCount: 0, rows: [row("City", true, "Dallas")] }, { onApply });
     await click("Mark applied");
-    expect(note()).toBeNull();
+    await confirm();
+    expect(finalForm).toHaveBeenCalledTimes(1);
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   describe("around a run", () => {

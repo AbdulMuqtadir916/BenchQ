@@ -7,7 +7,7 @@ import { isOtherJobOnSite } from "./AddJobCard";
 import AutofillDone from "./AutofillDone";
 import DocumentSections from "./DocumentSections";
 import { documentOf, fileKey, readOwnFile, resumeFileName } from "./documents";
-import { filledValue } from "./form-memory";
+import { needsRequiredAnswer } from "./form-memory";
 import FormProgress from "./FormProgress";
 import { ALERT_ICON, CHECK, CHEVRON_DOWN_ICON, RESUME_ICON, SPARKLES_ICON, SPINNER_ICON } from "./icons";
 import CoverLetterPicker from "./CoverLetterPicker";
@@ -54,6 +54,8 @@ type AutofillPanelProps = {
 const STEP = "flex items-center gap-1.5 text-sm text-[var(--color-text-2)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none [&_svg]:animate-spin [&_svg]:text-[var(--color-primary)] motion-reduce:[&_svg]:animate-none";
 /** A page with no form yet: a quiet card that says what to do. */
 const NO_FORM = "grid justify-items-center gap-1.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-strong)] px-3 py-4 text-center";
+/** Why Mark applied waits: one quiet amber line over it. */
+const REQUIRED_LEFT = "flex items-center justify-center gap-1.5 text-caption font-[550] text-[var(--color-warning-fg)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
 
 /** To "Autofill complete" once a run ends, or to the note of a run that stopped, so the BDE sees how it went: just
  * under the sticky top bar (their scroll margin), with the résumé and the fields below. Smoothly, unless the BDE's
@@ -113,7 +115,7 @@ const VIEW_TAB_BASE = `inline-flex min-w-0 items-center justify-center gap-1.5 r
 const VIEW_TAB = `${VIEW_TAB_BASE} text-[var(--color-text-2)] hover:text-[var(--color-text)]`;
 const VIEW_TAB_ON = `${VIEW_TAB_BASE} bg-[var(--color-surface)] text-[var(--color-primary)] shadow-[var(--shadow-xs)]`;
 /** Simplify's big Autofill button, in BenchQ's blue gradient: the panel's first action, right under the job. */
-const CTA = `bq-primary inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-[image:var(--gradient-primary)] px-4 text-body-strong transition-[background,box-shadow,transform] ${MOTION} hover:bg-[image:var(--gradient-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
+const CTA = `bq-primary inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-[image:var(--gradient-primary)] px-4 text-body-strong transition-[background,box-shadow,transform] ${MOTION} enabled:hover:bg-[image:var(--gradient-primary-hover)] disabled:cursor-not-allowed disabled:bg-none [&_svg]:size-[var(--icon-md)] [&_svg]:flex-none`;
 const SPIN = "[&_svg]:animate-spin motion-reduce:[&_svg]:animate-none";
 /** The filled form's heading, Simplify's "Autofill complete!", kept at the top of the fields as they scroll. */
 const FIELDS_HEAD = "sticky top-0 z-1 -mx-3 grid gap-1 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 pt-0.5 pb-2";
@@ -287,6 +289,14 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
     const fill = !needsConfirmation && rows?.length && (fillCount > 0 || staleCount > 0 || wanted.isFileSwap) ? autofill() : undefined;
     void Promise.resolve(fill).finally(() => setPendingFill((now) => (now === wanted ? null : now)));
   }, [pendingFill, movedAway, isReadingOwnFile, context, resumeId, reviewMatches, scanning, filling, rows, needsConfirmation, fillCount, staleCount, autofill]);
+  // A run the panel left before it ended (the BDE went to another tab, or closed the panel) goes on from the fields still
+  // to fill once the panel is back on its page and ready, queued as a pick's fill is: no Autofill button to press again.
+  // Once per panel: the run itself clears what it left when it ends here.
+  const [isResumeTaken, setIsResumeTaken] = useState(false);
+  if (state.resumeQueued && !isResumeTaken && readyContext === context && resumeId !== undefined) {
+    setIsResumeTaken(true);
+    setPendingFill({ context, resumeId });
+  }
   // The keyboard shortcuts (background.ts), for this tab's job: each clicks its button, so it does nothing when the
   // button couldn't be clicked. Mark applied opens its dialog with Yes focused, so Enter confirms.
   useEffect(() => {
@@ -327,7 +337,11 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   // Simplify's flow: before a run, the big Autofill and the résumé, with only how many fields it fills; once a run has
   // filled the form, or there's nothing BenchQ can fill, the fields themselves, in a section that takes the room left.
   const stage = filling ? "during" : outcome || (hasForm && !hasFillsLeft) ? "after" : "before";
-  const emptyRequired = (currentRows ?? []).filter((row) => row.field.required && !filledValue(row));
+  // A required field counts once the form holds it, or says it's done (a password, a box the site ticks): a value
+  // BenchQ only proposed doesn't.
+  const emptyRequired = (currentRows ?? []).filter(needsRequiredAnswer);
+  // Mark applied waits for the form on show to have every required field; once it has gone, or there's none, it doesn't.
+  const requiredLeft = !movedAway && !state.needsAccess && hasForm ? emptyRequired.length : 0;
   // Every field of the form, the résumé's upload and the cover letter's too, as Simplify lists them.
   const rest = currentRows ?? [];
   const jobLine = `${job.title || "Untitled role"}${job.company ? ` at ${job.company}` : ""} · for ${candidateName}`;
@@ -339,8 +353,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
   const confirmHost = () => void sendToBackground({ type: "confirm-host", tabId, host: state.confirmKey });
   const apply = async () => {
     setIsCollecting(true);
-    const form = await state.finalForm();
+    const { form, complete } = await state.finalForm();
     setIsCollecting(false);
+    // The last look found a required field emptied meanwhile: the button waits again, and the note says why.
+    if (!complete) return;
     onApply?.(form, picked?.id ?? null);
   };
 
@@ -510,10 +526,10 @@ export default function AutofillPanel({ connection, tabUrl = null, firmId = null
       {/* On a site BenchQ may not read yet there is no review to wait for: the BDE who declines fills the form by hand, and may still mark it applied. */}
       {/* Not while the tab shows another job: marking it would mark the connected job from another job's page. */}
       {/* What's left before the BDE submits the form, once Autofill has done its part (Simplify's line over Submit). */}
-      {isOpen && hasForm && !hasFillsLeft && !filling && emptyRequired.length > 0 && <p data-slot="required-left" className="sr-only">
-        Complete {emptyRequired.length} required field{emptyRequired.length === 1 ? "" : "s"} to submit
+      {!movedAway && onApply && canApply && !filling && requiredLeft > 0 && <p id="required-left" data-slot="required-left" className={REQUIRED_LEFT}>
+        {ALERT_ICON}Fill {requiredLeft} required field{requiredLeft === 1 ? "" : "s"} to mark applied
       </p>}
-      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} emptyRequired={emptyRequired} onConfirm={() => void apply()} onGoTo={goTo} />}
+      {!movedAway && onApply && canApply && !filling && <MarkApplied isPrimary={!hasFillsLeft} isSaving={applying || isCollecting} isDisabled={isWorking || (!reviewMatches && !state.needsAccess)} jobLine={jobLine} requiredLeft={requiredLeft} noteId="required-left" onConfirm={() => void apply()} />}
       {isApplied && applicationStatus === "ready" && <button type="button" className={button("secondary", "large")} disabled>{CHECK}Applied</button>}
     </div>
   </section>;

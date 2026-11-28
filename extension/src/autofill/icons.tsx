@@ -2,6 +2,12 @@
 
 export const CHECK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>;
 
+/** Save for next time: a bookmark. */
+export const BOOKMARK_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 21l-6-4.5L6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" /></svg>;
+
+/** An exclamation mark drawn like the tick, so it fills its round mark the same way: a stroke, then a dot. */
+export const EXCLAIM_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5v9.5M12 19.5v.01" /></svg>;
+
 export const CROSS_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
 
 export const UPLOAD_ICON = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>;

@@ -31,6 +31,10 @@ export const fieldLabel = ({ label }: Pick<TabField, "label">) => label || "Unla
 export const filledValue = ({ field, status, proposed }: ReviewRow) =>
   (isDialCodeOnly(field) ? "" : field.current) || (status === "same" ? proposed ?? "" : "");
 
+/** A proposed value or an unchecked required box cannot unlock Mark applied. */
+export const needsRequiredAnswer = ({ field }: ReviewRow) => field.required
+  && (isDialCodeOnly(field) || !(field.complete ?? field.current.trim()));
+
 /** A full phone-number box showing only its dial code. A box asking for the code itself ("Country code", a code
  * dropdown) holds a real value in "+1", and so does a "+5000" in a salary box. */
 const isDialCodeOnly = ({ current, kind, label }: TabField) =>

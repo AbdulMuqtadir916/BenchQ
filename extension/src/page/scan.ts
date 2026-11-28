@@ -1,3 +1,4 @@
+import { readJob } from "./job";
 import type { FieldKind, FieldOption, FrameRead, FrameScan, PageSignals, ScannedField } from "../autofill/types";
 import {
   ariaChecked, ariaLabelOf, cleanLabel, collapse, fieldClues, groupLabel, hasOptionalMark, hasRequiredMark, isAriaChoice, isChoiceVisible, isFileInput,
@@ -11,10 +12,11 @@ export type Entry = {
   field: ScannedField;
   controls: HTMLElement[];
   options: Map<string, HTMLElement>;
+  optionValues?: Map<HTMLElement, string>;
 };
 
-/** The controls a scan finds, in order, and how many options each has. */
-type Shape = { control: HTMLElement; size: number }[];
+/** A dependent select can reuse its option nodes and change what those nodes mean. */
+type Shape = { control: HTMLElement; detail?: string }[];
 
 export type Registry = { scanId: number; entries: Map<string, Entry>; shape: Shape };
 
@@ -79,8 +81,11 @@ export function waitForQuiet(doc: Document): Promise<void> {
 }
 
 function isPlaceholder(option: HTMLOptionElement): boolean {
-  return option.value === "" || PLACEHOLDER_OPTION.test(collapse(option.text));
+  return option.value === "" || PLACEHOLDER_OPTION.test(collapse(option.label));
 }
+
+export const availableOption = (option: HTMLOptionElement) =>
+  !isPlaceholder(option) && !option.disabled && !option.closest("optgroup[disabled]");
 
 function kindOf(element: HTMLElement): FieldKind {
   if (isAriaChoice(element)) return element.getAttribute("role") === "radio" ? "radio" : "checkbox";
@@ -145,7 +150,7 @@ export function readCurrent(entry: Entry): string {
   if (entry.field.kind === "combobox") return shownValue(control);
   if (isSelect(control)) {
     const selected = control.selectedOptions[0];
-    return selected && !isPlaceholder(selected) ? collapse(selected.text) : "";
+    return selected && !isPlaceholder(selected) ? collapse(selected.label) : "";
   }
   if (entry.field.options.length > 0) {
     return entry.field.options
@@ -156,6 +161,15 @@ export function readCurrent(entry: Entry): string {
   if (isChoice(control)) return control.checked ? "Checked" : "";
   if (isInput(control) || control.tagName === "TEXTAREA") return (control as HTMLInputElement).value;
   return collapse(textOf(control));
+}
+
+function requiredComplete(entry: Entry, current: string): boolean {
+  const invalid = entry.controls.some(control => control.matches(":invalid, [aria-invalid='true']")
+    || control.closest("[aria-invalid='true']") !== null);
+  if (invalid) return false;
+  // The site may mark a password required only via ARIA. Only its presence leaves this frame.
+  if (entry.field.kind === "password") return (entry.controls[0] as HTMLInputElement).value.length > 0;
+  return Boolean(current.trim());
 }
 
 /** A phone number's own "Country" dropdown holds a dialling code, not where the candidate lives. */
@@ -171,16 +185,18 @@ function singleEntry(element: HTMLElement, id: string): Entry {
   const field = common(element, id, kind, labelOf(element));
   const options: Entry["options"] = new Map();
   if (isSelect(element) && kind === "select") {
-    Array.from(element.options).filter((option) => !isPlaceholder(option) && !option.disabled).forEach((option) => {
+    Array.from(element.options).filter(availableOption).forEach((option) => {
       const optionId = `o${option.index}`;
       options.set(optionId, option);
-      field.options.push({ id: optionId, label: collapse(option.text) });
+      field.options.push({ id: optionId, label: collapse(option.label) });
     });
   }
   const limit = (element as HTMLInputElement).maxLength;
   if (typeof limit === "number" && limit > 0) field.maxLength = limit;
-  return { field, controls: [element], options };
+  return { field, controls: [element], options, ...(isSelect(element) ? { optionValues: nativeValues(element) } : {}) };
 }
+
+const nativeValues = (select: HTMLSelectElement) => new Map(Array.from(select.options, option => [option, option.value] as const));
 
 function groupEntry(inputs: HTMLInputElement[], id: string): Entry {
   const first = inputs[0]!;
@@ -200,13 +216,13 @@ function groupEntry(inputs: HTMLInputElement[], id: string): Entry {
 /** A list box that keeps several choices, read like a group of checkboxes: its options are the boxes. */
 function multiSelectEntry(select: HTMLSelectElement, id: string): Entry {
   const field = common(select, id, "checkbox", labelOf(select));
-  const choices = Array.from(select.options).filter((option) => !isPlaceholder(option) && !option.disabled);
+  const choices = Array.from(select.options).filter(availableOption);
   const options: Entry["options"] = new Map();
   field.options = choices.map((option, index) => {
     options.set(`o${index}`, option);
-    return { id: `o${index}`, label: collapse(option.text) };
+    return { id: `o${index}`, label: collapse(option.label) };
   });
-  return { field, controls: choices.length > 0 ? choices : [select], options };
+  return { field, controls: choices.length > 0 ? choices : [select], options, optionValues: nativeValues(select) };
 }
 
 /** A styled group's question and its options, which are its choices' own words. */
@@ -388,64 +404,44 @@ function formControls(doc: Document) {
 
 function shapeOf(doc: Document): Shape {
   const { slots, custom } = formControls(doc);
-  const sized = slots.map((slot) => {
-    if (Array.isArray(slot)) return { control: slot[0]! as HTMLElement, size: slot.length };
-    if ("aria" in slot) return { control: slot.aria[0]!, size: slot.aria.length };
-    return { control: slot, size: isSelect(slot) ? slot.options.length : 1 };
-  });
-  return [...sized, ...custom.map((control) => ({ control, size: 1 }))];
+  const shape: Shape = [];
+  for (const slot of slots) {
+    const group = Array.isArray(slot) ? slot : "aria" in slot ? slot.aria : [slot];
+    for (const control of group) {
+      shape.push({ control, detail: `${group.length}:${control.matches("[required]") || Boolean(control.closest("[aria-required='true']"))}` });
+      if (isSelect(control)) for (const option of Array.from(control.options)) {
+        shape.push({ control: option, detail: JSON.stringify([option.label, option.value, availableOption(option)]) });
+      }
+    }
+  }
+  return [...shape, ...custom.map(control => ({ control, detail: String(Boolean(control.closest("[aria-required='true']"))) }))];
 }
 
 const sameShape = (left: Shape, right: Shape) => left.length === right.length
-  && left.every(({ control, size }, index) => control === right[index]!.control && size === right[index]!.size);
+  && left.every(({ control, detail }, index) => control === right[index]!.control && detail === right[index]!.detail);
 
 /** The panel's regular look at a scanned form: what each field holds now, and whether it takes a new scan to see the
  * rest, because fields came or went or a dropdown got new options. */
 export function readFields(doc: Document, { scanId, entries, shape }: Registry): FrameRead {
   const values = Object.fromEntries(Array.from(entries, ([id, entry]) => [id, readCurrent(entry)]));
-  return { scanId, values, moved: !sameShape(shape, shapeOf(doc)) };
-}
-
-function postingIn(node: unknown): PageSignals["posting"] {
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = postingIn(item);
-      if (found) return found;
-    }
-    return null;
+  const required: Record<string, boolean> = {};
+  for (const [id, entry] of entries) {
+    if (entry.field.required) required[id] = requiredComplete(entry, values[id]!);
   }
-  if (typeof node !== "object" || node === null) return null;
-  const record = node as Record<string, unknown>;
-  if (record["@graph"]) return postingIn(record["@graph"]);
-  const types = Array.isArray(record["@type"]) ? record["@type"] : [record["@type"]];
-  if (!types.includes("JobPosting")) return null;
-  const organisation = record.hiringOrganization;
-  const company = typeof organisation === "string" ? organisation
-    : String((organisation as Record<string, unknown> | undefined)?.name ?? "");
-  return { title: String(record.title ?? ""), company };
-}
-
-function findPosting(doc: Document): PageSignals["posting"] {
-  for (const script of Array.from(doc.querySelectorAll("script[type='application/ld+json']"))) {
-    try {
-      const found = postingIn(JSON.parse(script.textContent ?? ""));
-      if (found) return found;
-    } catch {
-      // A page's broken structured data just gives no signal.
-    }
-  }
-  return null;
+  // Only a form with required fields says how far each is: the read stays as it was for any other.
+  return { scanId, values, ...(Object.keys(required).length > 0 ? { required } : {}), moved: !sameShape(shape, shapeOf(doc)) };
 }
 
 function pageSignals(doc: Document): PageSignals {
   const meta = (property: string) => doc.querySelector(`meta[property='${property}']`)?.getAttribute("content") ?? "";
   const heading = doc.querySelector("h1");
+  const job = readJob(doc);
   return {
     url: doc.URL,
     title: collapse(`${doc.title} ${meta("og:title")}`),
     heading: heading ? collapse(textOf(heading)).slice(0, 200) : "",
     siteName: meta("og:site_name"),
-    posting: findPosting(doc),
+    posting: job.isJobPage && job.title ? { title: job.title, company: job.company } : null,
   };
 }
 
@@ -456,6 +452,7 @@ export function scanDocument(doc: Document, scanId: number, isTop: boolean): { r
     const id = `f${entries.size}`;
     const entry = build(id);
     entry.field.current = readCurrent(entry);
+    if (entry.field.required) entry.field.complete = requiredComplete(entry, entry.field.current);
     const control = entry.controls[0]!;
     const form = (control as HTMLInputElement).form ?? closestThrough(control, "form, [role='form']");
     if (form && /newsletter|subscribe/i.test([form.id, form.getAttribute("name"), form.getAttribute("aria-label")].join(" "))) return;

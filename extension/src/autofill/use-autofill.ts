@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCoverLetterFile, getResumeAnswers, getResumeFile, isSessionExpired, saveResumeAnswers } from "../api";
 import { documentOf, DOCX_MIME, fileKey, fitsUpload, formatFor, PDF_MIME, resumeUploadOf, withCoverLetterFile, withResumeFile } from "./documents";
-import { appliedForm, fieldLabel, forgetForms, formOf, rememberRows } from "./form-memory";
+import { appliedForm, fieldLabel, forgetForms, formOf, needsRequiredAnswer, rememberRows } from "./form-memory";
 import { forgetOwnFiles } from "./own-files";
+import { ownOptions, writeFor } from "./choices";
 import { checkJob, confirmationKey, hostOf } from "./job-check";
 import { withJobSite } from "./job-site";
 import { answersFromResume, historyOf, type HistoryRecords } from "./resume-answers";
@@ -22,8 +23,8 @@ const WATCH_MS = 2000;
 const LAST_LOOK_MS = 4000;
 const TOP_FRAME = 0;
 const LATE_CHECK_MS = 300;
-/** A run fills what it found, then once more for questions its answers brought out, like "If yes, which visa?". */
-const PASSES = 2;
+/** Allow nested dependent fields, with a ceiling for pages that keep creating new controls. */
+const PASSES = 5;
 /** "Add another" (#132): at most this many blocks a run adds, with a pause for each block to appear. */
 const MAX_ENTRIES = 5;
 const ENTRY_MS = 700;
@@ -51,7 +52,11 @@ const PAGE_UNREADABLE = "BenchQ can't read this page. You can still fill the for
 const REVIEW_FAILED = "BenchQ couldn't work out this form.";
 const ANSWERS_UNAVAILABLE = "Could not load this resume's answers. Try again.";
 const PAGE_RESET = "The page reset this value.";
+/** An upload the site emptied once BenchQ put the file on, with no chip naming it anywhere: not a reset, as a site that
+ * reads a file often empties its upload. */
+const FILE_NOT_SHOWN = "The form doesn't show this file. Check it's attached, or attach it again.";
 const FORM_FLAGGED = "The form flagged this value.";
+const UNVERIFIED = "BenchQ couldn't verify this value. Check it on the form.";
 const RUN_STOPPED = "The form changed, so BenchQ stopped here.";
 /** A résumé upload the page swapped out once it took a file (a chip for it, with a new input): the BDE changes it there. */
 const UPLOAD_GONE = "The page changed this upload, so change the file there.";
@@ -119,6 +124,9 @@ type TabMemory = {
   // What the BDE saved for next time, by field, and to which résumé: the row says so while the field still holds it and
   // that résumé is picked (07 Q58).
   saved: Map<string, { resumeId: string; value: string }>;
+  // A run the panel left before it ended (another tab picked, the panel closed): it goes on, from the fields still to
+  // fill, once the panel is back on this page.
+  resumeRun: boolean;
 };
 
 /** What a page load wipes. */
@@ -127,6 +135,7 @@ const pageMemory = () => ({
   found: new Set<string>(), unmatched: new Set<string>(), filledFrom: new Map<string, string | null>(), wrote: new Map<string, string>(), attachedId: new Map<string, string>(),
   attached: new Map<string, string>(),
   saved: new Map<string, { resumeId: string; value: string }>(),
+  resumeRun: false,
 });
 
 const tabMemory = new Map<string, TabMemory>();
@@ -140,8 +149,55 @@ function memoryOf({ tabId, applicationId }: Connection): TabMemory {
   return fresh;
 }
 
+/** The tab memory, kept in the browser session for the page load it's about (`TabScan.loadId`): the panel's own
+ * memory goes when it closes, and a panel opened again on the same page takes up what BenchQ filled there, so its
+ * own fills (the résumé's file among them) aren't taken for someone else's. A reload of the page starts afresh. */
+type Stored<T> = T extends Map<infer K, infer V> ? [K, V][] : T extends Set<infer V> ? V[] : T;
+type StoredMemory = { [K in keyof TabMemory]: Stored<TabMemory[K]> } & { loadId: string };
+const STORED_PREFIX = "autofill-memory:";
+const storedKey = ({ tabId, applicationId }: Pick<Connection, "tabId" | "applicationId">) => `${STORED_PREFIX}${tabId}:${applicationId}`;
+const sessionStore = () => (typeof chrome !== "undefined" ? chrome.storage?.session : undefined);
+
+function saveMemory(connection: Pick<Connection, "tabId" | "applicationId">, memory: TabMemory, loadId: string | null | undefined) {
+  const store = sessionStore();
+  if (!store || !loadId) return;
+  const stored = { ...Object.fromEntries(Object.entries(memory).map(([name, value]) =>
+    [name, value instanceof Map || value instanceof Set ? [...value] : value])), loadId };
+  void store.set({ [storedKey(connection)]: stored }).catch(() => undefined);
+}
+
+/** The memory kept for this page load, put into `memory`: whether there was one. */
+async function restoreMemory(connection: Pick<Connection, "tabId" | "applicationId">, memory: TabMemory, loadId: string | null | undefined) {
+  const store = sessionStore();
+  if (!store || !loadId) return false;
+  const key = storedKey(connection);
+  const stored = (await store.get(key).catch(() => ({} as Record<string, unknown>)))[key] as StoredMemory | undefined;
+  if (!stored || stored.loadId !== loadId) return false;
+  Object.assign(memory, {
+    lastScan: stored.lastScan, autoSteps: stored.autoSteps, settled: new Map(stored.settled), handedBack: new Map(stored.handedBack),
+    seen: new Map(stored.seen), edited: new Set(stored.edited), found: new Set(stored.found), unmatched: new Set(stored.unmatched),
+    filledFrom: new Map(stored.filledFrom), wrote: new Map(stored.wrote), attachedId: new Map(stored.attachedId),
+    attached: new Map(stored.attached), saved: new Map(stored.saved), resumeRun: Boolean(stored.resumeRun),
+  } satisfies TabMemory);
+  return true;
+}
+
+async function forgetStoredMemory() {
+  const store = sessionStore();
+  if (!store) return;
+  const all = await store.get(null).catch(() => ({} as Record<string, unknown>));
+  const keys = Object.keys(all).filter((key) => key.startsWith(STORED_PREFIX));
+  if (keys.length > 0) await store.remove(keys).catch(() => undefined);
+}
+
+/** What closing the panel loses: the memory of the tabs it had open. What the session keeps stays. */
+export function forgetOpenTabs() {
+  tabMemory.clear();
+}
+
 export function forgetTabs() {
   tabMemory.clear();
+  void forgetStoredMemory();
   forgetForms();
   forgetOwnFiles();
 }
@@ -187,7 +243,7 @@ function rememberedRow(row: ReviewRow, memory: TabMemory, resume: string | null,
   if (row.status === "blocked") return isStale && row.field.kind === "file" ? { ...row, isStale: true } : row;
   if (justFilled?.has(key)) {
     if (current) settled.set(key, current);
-    else handedBack.set(key, PAGE_RESET);
+    else handedBack.set(key, row.field.kind === "file" ? FILE_NOT_SHOWN : PAGE_RESET);
   }
   const last = seen.get(key);
   seen.set(key, current);
@@ -202,6 +258,9 @@ function rememberedRow(row: ReviewRow, memory: TabMemory, resume: string | null,
   if (isOtherResumes && row.status === "same") {
     filledFrom.set(key, resume);
     return row;
+  }
+  if (row.status === "same" && handedBack.has(key)) {
+    return { ...row, status: "manual", reason: handedBack.get(key), write: undefined };
   }
   if (row.status !== "ready") return isStale ? { ...row, isStale: true } : row;
   // The saved answer changed since BenchQ filled this field, which still holds what BenchQ wrote: ready again (Q7). For
@@ -268,6 +327,10 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const [unreadableFrames, setUnreadableFrames] = useState(0);
   const [signals, setSignals] = useState<PageSignals | null>(null);
   const memory = useRef(memoryOf(connection));
+  // Whether this panel took up the memory the session kept for the page (`restoreMemory`), and the page load the
+  // current look is of, for keeping the memory with it.
+  const restoreTried = useRef(false);
+  const loadOf = useRef<string | null>(null);
   // What the run is doing before it fills (taking the old file off, attaching, waiting for the page), for the panel.
   const [step, setStep] = useState<string | null>(null);
   // The last file BenchQ attached on this page (07 Q53).
@@ -278,6 +341,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const [undoable, setUndoable] = useState(0);
   const [undoNote, setUndoNote] = useState("");
   const [isFollowingSteps, setIsFollowingSteps] = useState(() => memoryOf(connection).autoSteps);
+  // A run this page's panel left unfinished, for the panel to go on with once it's ready (`TabMemory.resumeRun`).
+  const [resumeQueued, setResumeQueued] = useState(() => memoryOf(connection).resumeRun);
   // What the page does once it moves on (`followPage`, defined after Autofill, which it can run).
   const followPageRef = useRef<(reuseBank: boolean) => Promise<void>>(async () => undefined);
   const latestScan = useRef(0);
@@ -415,7 +480,8 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       return value === undefined ? [] : [[row.key, value] as const];
     }));
     rememberRows(formOf(applicationId), next, autofilled);
-  }, [applicationId, job, showRows]);
+    saveMemory({ tabId, applicationId }, memory.current, loadOf.current);
+  }, [applicationId, job, showRows, tabId]);
 
   const scan = useCallback(async (justFilled?: ReadonlySet<string>, reuseBank = false) => {
     // The résumés are still loading: there's nothing to answer from yet.
@@ -445,12 +511,28 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     const file = offered && fitsUpload(page?.fields ?? [], offered.mimeType, offered.name) ? offered : null;
     // The kinds the upload takes when the file offered isn't one: the Resume section says so and keeps the BDE's controls.
     const refused = offered && !file && page ? resumeUploadOf(page.fields)?.accept ?? "" : null;
+    // A panel opened again on a page it filled takes up what it knew there, once: its own fills stay its own, the
+    // résumé's file among them, and nothing reads as another résumé's (`restoreMemory`).
+    if (page && !restoreTried.current && memory.current.lastScan === 0) {
+      restoreTried.current = true;
+      if (await restoreMemory({ tabId, applicationId }, memory.current, page.loadId) && isCurrent()) {
+        setAttachedFile([...memory.current.attached.values()].at(-1) ?? null);
+        setIsFollowingSteps(memory.current.autoSteps);
+        setResumeQueued(memory.current.resumeRun);
+      }
+    }
     // The site swapped the upload out: does it still show the file BenchQ attached (07 Q53)? Without a chip naming it,
     // the file isn't taken as on the form. Asked before this look counts as the current one, so a newer look started
     // meanwhile wins and this one shows nothing (#148).
     const lastAttached = [...memory.current.attached.values()].at(-1) ?? null;
-    const isShown = page !== null && lastAttached !== null && resumeUploadOf(page.fields) === undefined
+    const resumeUpload = page ? resumeUploadOf(page.fields) : undefined;
+    const isShown = page !== null && lastAttached !== null && resumeUpload === undefined
       && await fileShownOnPage(tabId, lastAttached).catch(() => false);
+    // Many sites read the file as it goes on, then empty their upload and show it as a chip: the upload still holds
+    // BenchQ's file, so it isn't "reset" (07 Q53).
+    if (page && lastAttached && resumeUpload && !resumeUpload.current.trim() && await fileShownOnPage(tabId, lastAttached).catch(() => false)) {
+      page.fields = page.fields.map((field) => (field === resumeUpload ? { ...field, current: lastAttached } : field));
+    }
     if (answers && page && isCurrent()) {
       try {
         // A page's scans count from one, so a lower count means it loaded afresh.
@@ -460,6 +542,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
           setAttachedFile(null);
         }
         memory.current.lastScan = topScan;
+        loadOf.current = page.loadId ?? null;
         bank.current = { ...answers, resumeId, file, isRefused: refused !== null, letter };
         heldLook.current = isHeldAtStart || held.current;
         review(page.fields, answers.entries, justFilled);
@@ -560,20 +643,26 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
    * way to message the extension, so the panel asks. */
   const watchForm = useCallback(async () => {
     const canLook = () => !busy.current && !isScanRunning.current && shownRows.current !== null;
-    if (!canLook()) return;
+    if (!canLook()) return false;
+    const snapshot = frames.current;
     const look = await readTab(tabId, frames.current).catch(() => null);
-    if (!look || !canLook()) return;
+    if (!look || !canLook() || snapshot !== frames.current) return false;
     if (look.moved) {
       await followPageRef.current(true);
-      return;
+      return false;
     }
     const shown = shownRows.current!;
-    const fields = shown.map(({ field }) => ({ ...field, current: look.values.get(`${field.frameId}:${field.id}`) ?? field.current }));
-    if (fields.every(({ current }, index) => current === shown[index]!.field.current)) return;
+    const fields = shown.map(({ field }) => {
+      const key = `${field.frameId}:${field.id}`;
+      return { ...field, current: look.values.get(key) ?? field.current, complete: look.required?.get(key) ?? field.complete };
+    });
+    if (fields.every(({ current, complete }, i) => current === shown[i]!.field.current && complete === shown[i]!.field.complete)) return true;
     try {
       review(fields, bank.current?.entries ?? []);
+      return true;
     } catch (e) {
       setError(explain(REVIEW_FAILED, e));
+      return false;
     }
   }, [review, tabId]);
 
@@ -599,8 +688,23 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
   const targets = useMemo(() => (rows ?? []).filter((row): row is FillableRow =>
     row.status === "ready" && Boolean(row.write)), [rows]);
 
+  // A run may outlive a résumé selection, its panel, or the job shown by a follow-up scan.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const shouldStop = useCallback(() => {
+    if (!mounted.current || held.current || resume.current !== resumeSource) return true;
+    const page = latestSignals.current;
+    if (!page) return false;
+    const match = checkJob(job, page);
+    return match.conflict && !confirmedHosts.includes(confirmationKey(page.url, match.detected));
+  }, [confirmedHosts, job, resumeSource]);
+
   /** Some pages reset a field when a later one changes, so the whole run is checked again once it has settled. */
   const lateFailures = useCallback(async (filled: FillableRow[]) => {
+    if (filled.length === 0) return 0;
     await new Promise((resolve) => window.setTimeout(resolve, LATE_CHECK_MS));
     const filledFrames = new Set(filled.map(({ field }) => field.frameId));
     let late = 0;
@@ -608,15 +712,19 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       const inFrame = filled.filter(({ field }) => field.frameId === frameId);
       const scanId = frames.current.scanIds.get(frameId) ?? 0;
       const ids = inFrame.map(({ field }) => field.id);
-      const rejected = await rejectedFields(tabId, frameId, scanId, ids).catch((): string[] => []);
-      const flagged = await flaggedFields(tabId, frameId, scanId, ids).catch((): string[] => []);
-      inFrame.filter(({ field }) => rejected.includes(field.id) || flagged.includes(field.id)).forEach((row) => {
-        memory.current.handedBack.set(memoKeyOf(row), rejected.includes(row.field.id) ? PAGE_RESET : FORM_FLAGGED);
+      const rejected = shouldStop() ? null : await rejectedFields(tabId, frameId, scanId, ids).catch(() => null);
+      const flagged = shouldStop() ? null : await flaggedFields(tabId, frameId, scanId, ids).catch(() => null);
+      for (const row of inFrame) {
+        const id = row.field.id;
+        const reason = rejected?.includes(id) ? (row.field.kind === "file" ? FILE_NOT_SHOWN : PAGE_RESET) : flagged?.includes(id) ? FORM_FLAGGED
+          : rejected === null || flagged === null ? UNVERIFIED : null;
+        if (!reason) continue;
+        memory.current.handedBack.set(memoKeyOf(row), reason);
         late += 1;
-      });
+      }
     }
     return late;
-  }, [tabId]);
+  }, [shouldStop, tabId]);
 
   /** Shows one field's result as soon as it's known, so the list fills in as the run goes. */
   const showResult = useCallback((key: string, update: (row: ReviewRow) => ReviewRow) => {
@@ -640,7 +748,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     let stopped = false;
     for (const row of rows) {
       // The tab moved on to another job mid-run: nothing more is written there (PR #140's review); the run ends as held.
-      if (held.current) break;
+      if (shouldStop()) { stopped = true; break; }
       const { field, write, key } = row;
       const label = fieldLabel(field);
       track({ key, label, status: "filling" });
@@ -651,7 +759,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
             ...(/^(?:school|discipline)(?:\s*[*✱])?$/i.test(field.label.trim()) ? {
               searchHint: write.value.split(/[^\p{L}\p{N}]+/u).filter(word => word.length > 2 && !/^(?:university|college|the|and|institute)$/i.test(word))
                 .sort((a, b) => b.length - a.length)[0],
-            } : {}) }, write.value, write.also, () => held.current)
+            } : {}) }, write.value, write.also, shouldStop)
         : fillField(tabId, field.frameId, { ...request, write, runId: String(runCount.current) });
       const result = scanId === undefined ? STALE : await fill.catch(() => STALE);
       if (result.status === "stale") {
@@ -661,7 +769,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       }
       if (result.status === "filled") {
         filled.push(row);
-        memory.current.filledFrom.set(memoKeyOf(row), resume.current);
+        memory.current.filledFrom.set(memoKeyOf(row), resumeSource);
         memory.current.wrote.set(memoKeyOf(row), write.type === "file" ? fileKey(write) : row.proposed ?? "");
         if (write.type === "file" && documentOf(row.field) !== "cover-letter") {
           memory.current.attached.set(memoKeyOf(row), write.name);
@@ -694,7 +802,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     }
     if (isFileCleared) setAttachedFile([...memory.current.attached.values()].at(-1) ?? null);
     return { filled, failed, late, stopped };
-  }, [lateFailures, showResult, tabId, track]);
+  }, [lateFailures, resumeSource, shouldStop, showResult, tabId, track]);
 
   /** Waits for the form to go still once the résumé is on it: a site that reads the file fills fields of its own, and
    * the answers go on after that, never under it (07 Q50). */
@@ -711,21 +819,37 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     }
   }, [tabId]);
 
-  /** Fills `first`, then, when `passes` allows, the questions its answers brought out: fields that weren't on the form
-   * before the run. A field that was there keeps whatever the first pass left it. The résumé's file goes on before
-   * anything else: what the site reads from it is then the site's, and the answers replace it (07 Q50). */
+  /** Revisit newly answerable questions, including existing selects whose options depend on an earlier answer.
+   * Each field is attempted once. The résumé goes on first so the form can finish reading it (07 Q50). */
   const fillRows = useCallback(async (first: FillableRow[], passes: number) => {
+    if (busy.current || needsConfirmation || shouldStop() || first.length === 0) return;
     runCount.current += 1;
-    if (busy.current || needsConfirmation || held.current || first.length === 0) return;
     busy.current = true;
+    // Until the run ends here: a panel that leaves the page meanwhile goes on with it once it's back (`resumeRun`).
+    memory.current.resumeRun = true;
+    saveMemory({ tabId, applicationId }, memory.current, loadOf.current);
     setOutcome(null);
     setUndoNote("");
     setRun({ total: first.length, items: [] });
     setFilling(true);
     const total: Outcome = { filled: 0, handedBack: 0, stopped: false };
-    const known = new Set((shownRows.current ?? []).map(memoKeyOf));
     let batch = first;
     const files = first.filter(isAttachment);
+    const attempted = new Set(files.map(memoKeyOf));
+    // A field that held something when the run began (the BDE's own answer, or the site's) stays as it was: a later look
+    // that finds it empty doesn't make it BenchQ's to fill.
+    const heldAtStart = new Set((shownRows.current ?? []).filter((row) => row.field.current.trim()).map(memoKeyOf));
+    const refreshAfterPass = async (filled: FillableRow[]) => {
+      if (shouldStop()) return false;
+      const previous = frames.current;
+      busy.current = false;
+      try {
+        await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))), true);
+      } finally {
+        busy.current = true;
+      }
+      return frames.current !== previous && !shouldStop();
+    };
     if (files.length > 0) {
       const [file] = files;
       setStep(`Attaching ${file!.write.type === "file" ? file!.write.name : "the resume"}…`);
@@ -747,36 +871,42 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       setStep(null);
       // A look that counts what changed meanwhile as BenchQ's doing: a field the site filled from the file is no edit
       // of the BDE's, so its answer still goes on.
-      busy.current = false;
-      await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
-      busy.current = true;
-      // Held while the file settled (the tab moved on to another job): no answer goes on (PR #140's review).
-      batch = held.current ? [] : (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !isAttachment(row as FillableRow));
+      total.stopped = !await refreshAfterPass(filled);
+      batch = total.stopped ? [] : (shownRows.current ?? []).filter(isFillable).filter(row =>
+        !isAttachment(row) && (passes > 1 || first.some(chosen => memoKeyOf(chosen) === memoKeyOf(row))));
       const count = batch.length;
       setRun((current) => current && { ...current, total: files.length + count });
     }
-    for (let pass = 0; pass < passes && batch.length > 0 && !held.current; pass += 1) {
+    for (let pass = 0; pass < passes && batch.length > 0 && !shouldStop(); pass += 1) {
       const count = batch.length;
       if (pass > 0) setRun((current) => current && { ...current, total: current.total + count });
-      batch.forEach((row) => known.add(memoKeyOf(row)));
+      batch.forEach((row) => attempted.add(memoKeyOf(row)));
       const { filled, failed, late, stopped } = await fillPass(batch);
       total.filled += filled.length - late;
       total.handedBack += failed + late;
-      total.stopped = stopped;
       // A fresh look at the form, which also shows what the answers brought out.
-      busy.current = false;
-      await scan(new Set(filled.map(memoKeyOf).filter((key) => !memory.current.handedBack.has(key))));
-      busy.current = true;
-      if (stopped) break;
-      batch = (shownRows.current ?? []).filter((row): row is FillableRow => row.status === "ready" && Boolean(row.write) && !known.has(memoKeyOf(row)));
+      const refreshed = await refreshAfterPass(filled);
+      total.stopped = stopped || !refreshed;
+      if (total.stopped) break;
+      // The résumé's file goes on once a run, first: a site that redraws its upload once it has the file shows a "new"
+      // upload, which must not get the file again (and be emptied again).
+      batch = (shownRows.current ?? []).filter(isFillable).filter(row => !isAttachment(row)
+        && !row.field.current.trim() && !attempted.has(memoKeyOf(row)) && !heldAtStart.has(memoKeyOf(row)));
     }
     // A run the hold cut short ends as stopped, so the panel says it didn't finish.
-    if (held.current) total.stopped = true;
+    if (shouldStop()) total.stopped = true;
     busy.current = false;
+    // Ended here, done or stopped by the page: nothing to go on with. One the panel left (it closed, or the BDE went to
+    // another tab) stays queued for when it's back.
+    if (mounted.current) {
+      memory.current.resumeRun = false;
+      setResumeQueued(false);
+    }
+    saveMemory({ tabId, applicationId }, memory.current, loadOf.current);
     setFilling(false);
     setRun(null);
     setOutcome(total);
-  }, [fillPass, needsConfirmation, scan, settle, track]);
+  }, [applicationId, fillPass, needsConfirmation, scan, settle, shouldStop, tabId, track]);
 
   /** Takes back BenchQ's fills from another résumé that the picked one doesn't answer, as Undo would, so the form holds
    * nothing of the old résumé; a field the BDE has changed since stays as it is. */
@@ -845,7 +975,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     for (const [kind, type] of [["education", "education-school"], ["work", "current-company"]] as const) {
       const wanted = Math.min((bank.current?.history ?? NO_HISTORY)[kind].length, MAX_ENTRIES);
       let blocks = blocksOf(type);
-      while (blocks > 0 && blocks < wanted && !held.current && await addEntryIn(tabId, kind, () => held.current).catch(() => false)) {
+      while (blocks > 0 && blocks < wanted && !shouldStop() && await addEntryIn(tabId, kind, shouldStop).catch(() => false)) {
         await new Promise((resolve) => setTimeout(resolve, ENTRY_MS));
         if (resume.current !== picked) return;
         await scan(undefined, true);
@@ -856,21 +986,21 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       }
     }
     if (added && resume.current === picked) await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
-  }, [fillRows, scan, tabId]);
+  }, [fillRows, scan, shouldStop, tabId]);
 
   const autofill = useCallback(async () => {
-    if (busy.current || needsConfirmation || held.current) return;
+    if (busy.current || needsConfirmation || shouldStop()) return;
     memory.current.autoSteps = true;
     setIsFollowingSteps(true);
     try {
       // A file the upload won't take replaces nothing: what's attached stays rather than leave the upload empty.
       if (!bank.current?.isRefused) await removeOldFiles(bank.current?.file ? fileKey(bank.current.file) : null);
       // Each step checks the hold again: the tab can move on to another job while one runs (PR #140's review).
-      if (held.current) return;
+      if (shouldStop()) return;
       // A file the upload won't take replaces nothing, here too: the attached one isn't taken back (#148).
       const stale = (shownRows.current ?? []).filter((row) => row.isStale && !(bank.current?.isRefused && row.field.kind === "file"));
       if (stale.length > 0) await takeBackStale(stale);
-      if (held.current) return;
+      if (shouldStop()) return;
       setStep(null);
       await fillRows((shownRows.current ?? []).filter(isFillable), PASSES);
       await addEntries();
@@ -878,7 +1008,7 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
       setStep(null);
       drainMissedLook();
     }
-  }, [addEntries, drainMissedLook, fillRows, needsConfirmation, removeOldFiles, takeBackStale]);
+  }, [addEntries, drainMissedLook, fillRows, needsConfirmation, removeOldFiles, shouldStop, takeBackStale]);
 
   /** The page moved on: a new page or step of the form, or fields that came or went. A fresh look first. When most of
    * the fields are new, it's the form's next step rather than a question an answer brought out; once the BDE has run
@@ -936,6 +1066,9 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
 
   /** A dropdown's options, for a row Autofill found no clear option for, so the BDE can choose one in the panel. */
   const listOptions = useCallback(async ({ field }: ReviewRow): Promise<string[] | null> => {
+    // A question that shows its answers (a select, radios, boxes) has them already: nothing is opened on the page.
+    const own = ownOptions(field);
+    if (own) return own;
     const scanId = frames.current.scanIds.get(field.frameId);
     if (scanId === undefined || busy.current) return null;
     return listChoices(tabId, field.frameId, { scanId, fieldId: field.id, current: field.current, search: "" }).catch(() => null);
@@ -947,8 +1080,13 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
     const scanId = frames.current.scanIds.get(field.frameId);
     if (busy.current || held.current || scanId === undefined) return;
     busy.current = true;
-    const request = { scanId, fieldId: field.id, current: field.current, search: label };
-    const result = await chooseChoice(tabId, field.frameId, request, label, () => held.current).catch(() => STALE);
+    const request = { scanId, fieldId: field.id, current: field.current };
+    // A question that shows its answers, yes or no and the sensitive ones among them: the BDE's pick goes straight on,
+    // quietly, as a pick in a dropdown does (no run, so the panel stays as it is), checked on the page and kept for Undo.
+    const write = ownOptions(field) ? writeFor(field, label) : null;
+    const result = write
+      ? await fillField(tabId, field.frameId, { ...request, write, runId: String(runCount.current) }).catch(() => STALE)
+      : await chooseChoice(tabId, field.frameId, { ...request, search: label }, label, () => held.current).catch(() => STALE);
     const key = memoKeyOf(row);
     if (result.status === "filled") {
       memory.current.handedBack.delete(key);
@@ -1028,18 +1166,27 @@ export function useAutofill({ connection, firmId, resumeId, fileName = null, pic
 
   /** The form as it stands, for Mark applied. A page that has gone leaves what BenchQ last saw on it, and one stuck on an
    * alert() never answers, which mustn't hold up the job. */
-  const finalForm = useCallback(async (): Promise<AppliedForm> => {
-    await Promise.race([watchForm(), new Promise((resolve) => window.setTimeout(resolve, LAST_LOOK_MS))]);
-    return appliedForm(formOf(applicationId));
+  const finalForm = useCallback(async (): Promise<{ form: AppliedForm; complete: boolean }> => {
+    let timer: number | undefined;
+    try {
+      const read = await Promise.race([watchForm(), new Promise<false>(resolve => { timer = window.setTimeout(() => resolve(false), LAST_LOOK_MS); })]);
+      // `complete`: no required field on show is left. A form that has gone (submitted), or that couldn't be read, says
+      // nothing against it, so Mark applied still works there.
+      const complete = !read || !(shownRows.current ?? []).some(needsRequiredAnswer);
+      return { form: appliedForm(formOf(applicationId)), complete };
+    } finally {
+      window.clearTimeout(timer);
+    }
   }, [applicationId, watchForm]);
 
   /** Whether a file BenchQ attached on this page is this one, by its identity (`fileKey`): the BDE's own file goes on
    * under the résumé's file name, so its name can't say (#148's review). For a click, not a render. */
   const holdsFile = useCallback((id: string) => [...memory.current.attachedId.values()].includes(id), []);
 
+
   return {
     rows, scanning, error, needsAccess: access, isAccessDenied, isAsking, allowAccess, bankEmpty, unreadableFrames, filling, run, outcome, undoable, undoNote, check, host, answeredFrom, reviewedFor, attachment, attachmentSource, attachedFile, attachedShown, fileProblem, refusedAccept, step, isFollowingSteps,
     needsConfirmation, confirmKey, fillCount: targets.length, staleCount: (rows ?? []).filter((row) => row.isStale).length, rescan: scan, autofill, replace, fillWith, listOptions, choose, undo, goToField, finalForm,
-    saveAnswer, holdsFile,
+    saveAnswer, holdsFile, resumeQueued,
   };
 }

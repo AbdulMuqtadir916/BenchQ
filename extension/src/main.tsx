@@ -25,6 +25,7 @@ import AddJobCard from "./autofill/AddJobCard";
 import { useTabConnection } from "./autofill/use-tab-connection";
 import type { AppliedForm } from "./autofill/types";
 import JobTabs, { JOB_PANEL, tabId, type JobTab } from "./JobTabs";
+import { CompanyLogo } from "./autofill/CompanyLogo";
 import { PREVIEW_KEY } from "./frame-rules";
 import "./style.css";
 import { answerPanelWindow } from "./panel-window";
@@ -465,7 +466,10 @@ function App() {
                 className={`min-w-0 p-3 transition-[border-color,box-shadow] ${MOTION} hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-sm)] ${CARD}`}
                 key={job.id}
               >
-                <div className={`truncate ${EYEBROW}`}>{job.company || "Company"}</div>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {job.logoUrl && <CompanyLogo company={job.company ?? ""} url={job.logoUrl} isSmall />}
+                  <div className={`min-w-0 truncate ${EYEBROW}`}>{job.company || "Company"}</div>
+                </div>
                 <h2 className="my-0.5 text-h3 wrap-anywhere">
                   {isConnectable(job) ? (
                     <button

@@ -6,6 +6,7 @@ type Principal = { kind: "firm" | "platform"; role: string; user_id: string; fir
 export type Session = { principal: Principal; user?: { id: string; name: string; role: string }; firm?: { name?: string; slug: string } | null };
 type StatusTransition = { from: string | null; to: string };
 export type Application = {
+  logoUrl?: string;
   id: string;
   candidate_id: string | null;
   status: string;
@@ -40,10 +41,14 @@ export type Application = {
   has_cover_letter?: boolean;
 };
 
+/** Every request says it comes from the extension, so BenchQ can tell what was done here from what was done on the
+ * website (the Activity source, planned 2026-11-27). Only BenchQ's own requests carry it, never one to a job's site. */
+export const CLIENT_HEADER = "X-BenchQ-Client";
+
 async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BENCHQ_URL}${path}`, {
     ...init, credentials: "include", cache: "no-store",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}), [CLIENT_HEADER]: "extension" },
   }).catch(() => {
     throw Object.assign(new Error("BenchQ can't be reached. Check your connection, or that BenchQ is running, and try again."), { status: 0 });
   });
@@ -219,7 +224,15 @@ export const getSavedApplications = async (candidateId?: string) => {
       (transition) => transition.from === "saved" && transition.to === "applied",
     ),
   );
-  return [...saved, ...appliedFromSaved];
+  const jobs = [...saved, ...appliedFromSaved];
+  const keys = jobs.map(job => logoKey(job.id));
+  if (!keys.length || typeof chrome === "undefined" || !chrome.storage?.local) return jobs;
+  const logos = await chrome.storage.local.get(keys).catch(() => ({} as Record<string, unknown>));
+  return jobs.map(job => {
+    const logo = logos[logoKey(job.id)] as { company?: string; url?: string } | undefined;
+    return logo?.company && logo.company === job.company && typeof logo.url === "string"
+      ? { ...job, logoUrl: logo.url } : job;
+  });
 };
 /** Marks the job applied with the form as it stood and, when known, the résumé version its answers came from: the one
  * sent (docs/02 §9). */
@@ -238,8 +251,18 @@ export const getCandidateJob = async (firmId: string, candidateId: string, posti
 
 type AddedApplication = Application & { job_created: boolean; application_created: boolean };
 
+const logoKey = (applicationId: string) => `job-logo:${BENCHQ_URL}:${applicationId}`;
+
 /** Saves a job for the candidate: a job BenchQ already has by its id, any other from what its page stated. */
 export const addJob = async (candidateId: string, job: PageJob, known?: BenchqJob): Promise<AddedApplication> => {
+  const application = await saveApplication(candidateId, job, known);
+  if (!job.logoUrl || job.company !== application.company) return application;
+  // Job records have no logo field. Associate the page's public image with this saved application in this browser.
+  if (typeof chrome !== "undefined") await chrome.storage?.local?.set({ [logoKey(application.id)]: { company: job.company, url: job.logoUrl } }).catch(() => undefined);
+  return { ...application, logoUrl: job.logoUrl };
+};
+
+const saveApplication = async (candidateId: string, job: PageJob, known?: BenchqJob): Promise<AddedApplication> => {
   if (known) {
     const saved = await request<{ id: string; job_id: string; candidate_id: string; status: string }>("/api/applications", {
       method: "POST", body: JSON.stringify({ candidate_id: candidateId, job_id: known.id, status: "saved" }),
@@ -251,7 +274,7 @@ export const addJob = async (candidateId: string, job: PageJob, known?: BenchqJo
     body: JSON.stringify({
       candidate_id: candidateId,
       job: {
-        source: "extension", title: job.title, company: job.company, description: job.description, url: job.url, location: job.location,
+        source: "extension", title: job.title, company: job.company, description: job.description, url: job.postingUrl ?? job.url, location: job.location,
         // What the page stated besides; a detail it didn't state is left out (JSON drops undefined).
         work_mode: job.workMode, employment_type: job.employmentType, salary_min: job.salaryMin, salary_max: job.salaryMax,
         salary_currency: job.salaryCurrency, salary_period: job.salaryPeriod, posted_at: job.postedAt, requisition_id: job.requisitionId,

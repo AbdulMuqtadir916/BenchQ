@@ -1,3 +1,4 @@
+import { isCallingCode } from "./countries";
 import { holdsSensitiveNumber } from "./never-fill";
 import { KEY_TYPES } from "./answer-keys";
 import { fieldLabel } from "./form-memory";
@@ -97,6 +98,9 @@ export function saveOffer(row: ReviewRow, bank: BankEntry[], built: ReadonlyMap<
   if (!typed || typed.length > MAX_ANSWER || row.status === "blocked" || row.isUnsaved || row.field.kind === "file"
     || holdsSensitiveNumber(typed)) return null;
   const type = typeOf(row.field);
+  // A phone number the form wrote its own way (spaced, dashed, or with the country code it puts in front) is the number
+  // already saved: nothing to save.
+  const isSame = (saved: string) => normalize(saved) === normalize(typed) || (type === "phone" && sameNumber(saved, typed));
   // A form asking one of BenchQ's questions word for word asks that question, whatever kind of field it looks like:
   // "What is your professional title?" is the headline, not the job held.
   const asked = normalize(questionOf(fieldLabel(row.field)));
@@ -106,15 +110,25 @@ export function saveOffer(row: ReviewRow, bank: BankEntry[], built: ReadonlyMap<
     const answer = key && key in SAVABLE ? valueFor(key, typed) : null;
     if (!key || answer === null) return null;
     const saved = bank.find((entry) => entry.key === key)?.answer;
-    if (saved !== undefined && normalize(saved) === normalize(typed)) return null;
+    if (saved !== undefined && isSame(saved)) return null;
     const shown = answered ? { answered: { [key]: answered.get(key) ?? null } } : {};
     return { label: label(saved, typed), change: { edit: { [key]: answer }, built: { [key]: built.get(key) ?? null }, ...shown } };
   }
   const own = bank.filter((entry) => !entry.key);
   const match = matchBank(fieldLabel(row.field), own);
   const saved = match.status === "match" ? match.entry : undefined;
-  if (saved && normalize(saved.answer) === normalize(typed)) return null;
+  if (saved && isSame(saved.answer)) return null;
   return { label: label(saved?.answer, typed), change: { add: { [saved?.question ?? fieldLabel(row.field)]: typed } } };
+}
+
+/** Two phone numbers that are one: the same digits, or one with a country code in front of the other ("+91 98661
+ * 38693" and "9866138693"). */
+function sameNumber(saved: string, typed: string): boolean {
+  const [a, b] = [saved.replace(/\D/g, ""), typed.replace(/\D/g, "")];
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  return short.length >= 7 && long.endsWith(short) && isCallingCode(long.slice(0, long.length - short.length));
 }
 
 /** The built answer of each fixed question in a résumé's autofill (docs/02 §8.1): its answer, or what an edit replaced. */

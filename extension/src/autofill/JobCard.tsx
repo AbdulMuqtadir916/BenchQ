@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import type { Application } from "../api";
 import { CROSS_ICON, PAY_ICON, PIN_ICON } from "./icons";
-import { initialOf, payText } from "./job-details";
+import { payText } from "./job-details";
+import { CompanyLogo } from "./CompanyLogo";
 import type { JobSummary } from "./types";
 
 type JobCardProps = {
@@ -17,7 +18,6 @@ type JobCardProps = {
 type Fact = { key: string; icon: ReactNode; text: string; name?: string; isWide?: boolean };
 
 const FACT = "flex min-w-0 items-center gap-1 text-caption text-[var(--color-text-3)] [&_svg]:size-[var(--icon-sm)] [&_svg]:flex-none";
-const TILE = "grid size-9 flex-none place-items-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-primary-subtle)] text-sm font-[700] text-[var(--color-primary-subtle-fg)]";
 
 function factsOf(details: Application | null): Fact[] {
   if (!details) return [];
@@ -40,7 +40,7 @@ export default function JobCard({ job, details, candidateName, onDisconnect, isC
   const title = job.title || "Untitled role";
   const facts = factsOf(details);
   return <div data-slot="job-card" className="flex flex-none items-start gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-2 shadow-[var(--shadow-xs)]">
-    <span className={TILE} aria-hidden="true">{initialOf(job.company || title)}</span>
+    <CompanyLogo url={details?.logoUrl} company={job.company || title} />
     <div className="min-w-0 flex-1">
       <h2 id="autofill-title" className="truncate text-sm font-[650] leading-snug" title={title}>{title}</h2>
       <p className="truncate text-caption text-[var(--color-text-2)]">{job.company || "Company not listed"} · for {candidateName}</p>

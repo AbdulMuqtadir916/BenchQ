@@ -747,14 +747,14 @@ describe("the same answer again", () => {
 describe("suggestions for a question nothing answers", () => {
   const radio: Partial<TabField> = { kind: "radio", options: yesNo };
 
-  it("offers the candidate's own screening answers, never to fill on their own", () => {
+  it("offers the candidate's own screening answers worded near enough, never to fill on their own", () => {
     const bank = [entry("Willing to work weekends?", "Yes"), entry("Do you own a car?", "No"), entry("Email", "a@example.test")];
-    const row = review(field("Can you support Saturday/Sunday shifts?", radio), bank);
+    const row = review(field("Are you available to work on weekends?", radio), bank);
     expect(row).toMatchObject({ status: "manual", reason: "No answer in the bank." });
     expect(row.write).toBeUndefined();
-    const offered = row.suggestions!.map(({ question }) => question);
-    expect(offered).toEqual(expect.arrayContaining(["Willing to work weekends?", "Do you own a car?"]));
-    expect(offered).not.toContain("Email");
+    // An unrelated question isn't offered, however few others there are.
+    expect(row.suggestions!.map(({ question }) => question)).toEqual(["Willing to work weekends?"]);
+    expect(review(field("Can you support Saturday/Sunday shifts?", radio), bank).suggestions).toBeUndefined();
   });
 
   it("offers none for a plain field, or for a kind of question BenchQ knows", () => {
@@ -764,10 +764,11 @@ describe("suggestions for a question nothing answers", () => {
   });
 
   it("offers three at most, the closest wording first", () => {
-    const bank = ["Do you smoke?", "Can you work holidays?", "Do you own a car?", "Can you drive a truck?"].map((question) => entry(question, "Yes"));
+    const bank = ["Do you smoke?", "Comfortable working on holidays?", "Can you work on bank holidays?", "Willing to work on public holidays?",
+      "Happy to work public holidays?"].map((question) => entry(question, "Yes"));
     const offered = review(field("Are you available to work on public holidays?", radio), bank).suggestions!;
-    expect(offered).toHaveLength(3);
-    expect(offered[0]!.question).toBe("Can you work holidays?");
+    expect(offered.map(({ question }) => question)).toEqual(["Willing to work on public holidays?", "Happy to work public holidays?",
+      "Can you work on bank holidays?"]);
   });
 });
 
@@ -895,4 +896,43 @@ it("fills ADP's Mobile Number, whose name says login, and isn't taken for a sign
   const row = review(field("Mobile Number", { kind: "tel", current: "+1", hints: "phone login_view_phone" }), [entry("Phone", "+1 704-555-0299")]);
   expect(row.status).toBe("ready");
   expect(review(field("", { hints: "login_username" }), [entry("Phone", "+1 704-555-0299")]).status).toBe("blocked");
+});
+
+describe("US locations", () => {
+  const keyed = (key: string, question: string, answer: string): BankEntry => ({ id: `key:${key}`, question, answer, category: "OTHER", key });
+  const profile = [keyed("address-city", "City", "Dallas"), keyed("address-region", "State", "Texas"),
+    keyed("address-country", "Country", "United States"), keyed("benchq:location", "Where do you live?", "Dallas, Texas")];
+
+  it("answers each way a form asks where the candidate lives", () => {
+    expect(review(field("Which city do you live in?"), profile).proposed).toBe("Dallas");
+    expect(review(field("Which state do you live in?"), profile).proposed).toBe("Texas");
+    expect(review(field("Which country do you live in?"), profile).proposed).toBe("United States");
+    expect(review(field("Current city"), profile).proposed).toBe("Dallas");
+    expect(review(field("State of residence"), profile).proposed).toBe("Texas");
+    expect(review(field("In which state do you currently reside?"), profile).proposed).toBe("Texas");
+    expect(review(field("Where are you based?"), profile).proposed).toBe("Dallas, Texas");
+    // Where they'd like to work is another question.
+    expect(review(field("Preferred location"), profile).status).toBe("manual");
+  });
+
+  it("writes the state's code where the box takes two characters or asks for a code", () => {
+    expect(review(field("State", { maxLength: 2 }), profile)).toMatchObject({ status: "ready", write: { value: "TX" } });
+    expect(review(field("State code"), profile).proposed).toBe("TX");
+    expect(review(field("State"), profile).proposed).toBe("Texas");
+  });
+
+  it("reads a saved location written without its commas", () => {
+    const saved = [entry("Current location", "Dallas TX")];
+    expect(review(field("City"), saved).proposed).toBe("Dallas");
+    expect(review(field("State"), saved).proposed).toBe("TX");
+    expect(review(field("Country"), saved).proposed).toBe("United States");
+    expect(review(field("Location"), saved).proposed).toBe("Dallas, TX");
+    expect(review(field("Zip code"), [entry("Current location", "Salt Lake City Utah 84101")]).proposed).toBe("84101");
+  });
+
+  it("knows the candidate lives in the US from the saved country alone", () => {
+    const cityOnly = [keyed("address-city", "City", "Dallas"), keyed("address-country", "Country", "United States")];
+    const question = field("Are you currently located in the United States?", { kind: "radio", options: yesNo });
+    expect(review(question, cityOnly)).toMatchObject({ status: "ready", write: { optionId: "o0" } });
+  });
 });

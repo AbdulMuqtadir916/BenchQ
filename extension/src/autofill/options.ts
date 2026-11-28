@@ -30,6 +30,57 @@ export const US_STATES: Record<string, string> = {
 export const isUsState = (name: string) =>
   Object.prototype.hasOwnProperty.call(US_STATES, name) || Object.values(US_STATES).includes(name);
 
+const STATE_CODES = new Map(Object.entries(US_STATES).map(([code, name]) => [name, code]));
+
+/** The US state a canonical name or code names, as its code: "texas" and "tx" are both "tx". */
+export const usStateCode = (name: string): string | null =>
+  (Object.prototype.hasOwnProperty.call(US_STATES, name) ? name : STATE_CODES.get(name) ?? null);
+
+/** A state written the way it ends a place: its code in capitals ("TX", so "in" and "or" stay words) or its name. */
+const isStateWord = (text: string) => usStateCode(canonical(text)) !== null && (canonical(text).length > 2 || /^[A-Z]{2}$/.test(text));
+
+/** "Dallas TX" is "Dallas, TX": a US state that ends a place's last part (the one before its country), written without
+ * the comma before it. A ZIP code after it stays with it ("Dallas TX 75201" is "Dallas, TX 75201"). A part that's only a
+ * state ("West Virginia") or ends in none ("Kansas City", "Virginia Beach") stays as it is. */
+export function withStateComma(place: string): string {
+  const parts = place.split(",");
+  const at = parts.length > 1 && countryNamed(parts.at(-1)!.trim()) ? parts.length - 2 : parts.length - 1;
+  const [, before = "", zip = ""] = /^(.*?)(?:\s+(\d{5}(?:-\d{4})?))?$/.exec(parts[at]!.trim()) ?? [];
+  const words = before.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || isStateWord(words.join(" "))) return place;
+  for (let size = Math.min(3, words.length - 1); size >= 1; size -= 1) {
+    const state = words.slice(-size).join(" ");
+    if (!isStateWord(state)) continue;
+    parts.splice(at, 1, words.slice(0, -size).join(" "), [state, zip].filter(Boolean).join(" "));
+    return parts.map((part) => part.trim()).join(", ");
+  }
+  return place;
+}
+
+/** City names as lookups spell them out: "St. Louis" is "Saint Louis", "Ft. Lauderdale" "Fort Lauderdale". */
+const CITY_WORDS: Record<string, string> = { st: "saint", ste: "sainte", ft: "fort", mt: "mount" };
+const cityOf = (part: string) => canonical(part).split(" ").map((word) => CITY_WORDS[word] ?? word).join(" ");
+
+/** The option that is the US state the answer names, however the list writes it: "TX", "Texas", "TX - Texas",
+ * "Texas (TX)", "Texas, US". "Virginia" is never "WV - West Virginia", nor "Washington" "Washington DC". */
+function stateFor(wanted: string, options: FieldOption[]): string | null {
+  const code = usStateCode(wanted);
+  if (!code) return null;
+  const name = US_STATES[code]!;
+  return only(options.filter((option) => {
+    const label = ` ${canonical(option.label)} `;
+    const isNamed = label.includes(` ${name} `) || label.includes(` ${code} `);
+    const rest = label.replace(` ${name} `, " ").replace(` ${code} `, " ").replace(/ (?:united states(?: of america)?|usa|us) /, " ");
+    return isNamed && rest.trim() === "";
+  }));
+}
+
+/** The option that is the country the answer names, under any of its names: "United States" is "US" or "U.S.A.". */
+function countryFor(answer: string, options: FieldOption[]): string | null {
+  const country = countryNamed(answer.trim());
+  return country ? only(options.filter((option) => countryNamed(option.label.trim()) === country)) : null;
+}
+
 /** Words forms use for the same answer. */
 const SAME_THING = [
   ["permanent resident", "green card"], ["us citizen", "citizen"], ["male", "man"], ["female", "woman"],
@@ -78,7 +129,7 @@ export function numberIn(answer: string): string | null {
 function placeFor(answer: string, options: FieldOption[]): string | null {
   // A country at the end is the option's country however each writes it: "Baltimore, MD, USA" is Lever's "Baltimore,
   // Maryland, United States". A state code there ("Dallas, TX") is the state, never a country with the same code.
-  const parts = answer.split(",").map((part) => part.trim()).filter(Boolean);
+  const parts = withStateComma(answer).split(",").map((part) => part.trim()).filter(Boolean);
   const last = parts[parts.length - 1] ?? "";
   const country = parts.length > 1 && !isUsState(canonical(last)) ? countryNamed(last) : null;
   // An option ending in a US state is in the United States: "Hyderabad, Texas" is never "Hyderabad, India".
@@ -86,24 +137,32 @@ function placeFor(answer: string, options: FieldOption[]): string | null {
     const end = place.split(",").pop()!.trim();
     return isUsState(canonical(end)) ? countryNamed("United States") : countryNamed(end);
   };
-  const wanted = canonical(country ? parts.slice(0, -1).join(", ") : answer);
+  const head = country ? parts.slice(0, -1) : parts;
+  const wanted = canonical(head.join(", "));
   // A state code as the address's own country writes it: "TS" is Telangana in India, "ON" Ontario in Canada, "OR"
-  // Oregon in the US. Without a country, a US code first, then India's or Canada's.
+  // Oregon in the US. Without a country, a US code first, then India's or Canada's. Only after the city: "La Jolla" and
+  // "De Pere" keep their words.
   const regions = country === "India" ? INDIA_REGIONS : country === "Canada" ? CANADA_REGIONS : US_STATES;
-  const words = wanted.split(" ").map((word) => regions[word] ?? (country ? null : INDIA_REGIONS[word] ?? CANADA_REGIONS[word]) ?? word);
+  const region = (word: string) => regions[word] ?? (country ? null : INDIA_REGIONS[word] ?? CANADA_REGIONS[word]) ?? word;
+  const words = head.flatMap((part, index) => (index === 0 ? cityOf(part).split(" ") : canonical(part).split(" ").map(region)));
   if (!country && words.length < 2 && words[0] === wanted) return null;
-  const named = options.filter((option) => words.every((word) => hasPhrase(canonical(option.label), word))
+  // An option in the US writes its state either way too: "Dallas, TX, USA" is in Texas.
+  const placeText = (label: string) => {
+    const inUs = [null, "United States"].includes(countryOf(label));
+    return label.split(",").map((part, index) => (index === 0 ? cityOf(part)
+      : canonical(part).split(" ").map((word) => (inUs ? US_STATES[word] ?? word : word)).join(" "))).join(" ");
+  };
+  const named = options.filter((option) => words.every((word) => hasPhrase(placeText(option.label), word))
     && (!country || [null, country].includes(countryOf(option.label))));
   // The state written another way, or not at all ("Hyderabad, IND"): the city alone, when just one option names it in
   // the address's own country. Two such cities still need the state to tell them apart.
+  const city = cityOf(parts[0] ?? "");
   if (named.length === 0 && country) {
-    const city = canonical(parts[0]!);
-    const sameCity = options.filter((option) => canonical(option.label.split(",")[0]!) === city && countryOf(option.label) === country);
+    const sameCity = options.filter((option) => cityOf(option.label.split(",")[0]!) === city && countryOf(option.label) === country);
     return sameCity.length === 1 ? sameCity[0]!.id : null;
   }
   if (named.length < 2) return named[0]?.id ?? null;
-  const city = canonical(answer.split(",")[0]!);
-  const plain = named.filter((option) => canonical(option.label.split(",")[0]!) === city);
+  const plain = named.filter((option) => cityOf(option.label.split(",")[0]!) === city);
   return plain.sort((left, right) => left.label.length - right.label.length)[0]?.id ?? null;
 }
 
@@ -165,6 +224,8 @@ export function optionFor(saved: string, options: FieldOption[]): string | null 
   const wanted = canonical(answer);
   const exact = options.filter((option) => sameAnswer(canonical(option.label), wanted));
   if (exact.length > 0) return only(exact);
+  const place = stateFor(wanted, options) ?? countryFor(answer, options);
+  if (place) return place;
   const race = raceOptionFor(answer, options);
   if (race !== undefined) return race;
   const status = statusOptionFor(answer, options);

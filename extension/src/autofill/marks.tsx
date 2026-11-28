@@ -1,5 +1,5 @@
 import { MOTION } from "../ui";
-import { CHECK } from "./icons";
+import { CHECK, EXCLAIM_ICON } from "./icons";
 
 const TICK = `mt-0.5 grid size-[var(--icon-md)] flex-none place-items-center rounded-[var(--radius-full)] border border-[var(--color-border-strong)] p-0.5 text-[var(--color-surface)] transition-[background,border-color] ${MOTION} data-[filled=true]:border-[var(--color-success-fg)] data-[filled=true]:bg-[var(--color-success-fg)] [&_svg]:size-full [&_svg]:[stroke-width:var(--tick-stroke)]`;
 
@@ -15,6 +15,7 @@ export function Tick({ isFilled, slot, isNew = false }: TickProps) {
   // As Simplify marks its checklist: a tick once filled, an amber "!" while the field still needs the BDE.
   const look = isFilled ? TICK : `${TICK} border-transparent bg-[var(--color-warning-bg)] text-[var(--color-warning-fg)]`;
   return <span data-slot={slot} className={isNew ? `${look} animate-tick-in` : look} role="img" aria-label={isFilled ? "Filled" : "Not filled"} data-filled={isFilled}>
-    {isFilled ? CHECK : <span aria-hidden="true" className="text-caption leading-none font-[800]">!</span>}
+    {/* The "!" is drawn, as the tick is: a text "!" takes the caption's taller line and sits half out of the mark. */}
+    {isFilled ? CHECK : EXCLAIM_ICON}
   </span>;
 }
